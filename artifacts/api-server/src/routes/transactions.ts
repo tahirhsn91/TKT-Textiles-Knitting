@@ -15,6 +15,25 @@ import {
 
 const router: IRouter = Router();
 
+function normalizeNumericString(v: string | null | undefined): string | null {
+  if (v == null || v === "") return null;
+  const trimmed = v.trim();
+  if (trimmed === "") return null;
+  const n = Number(trimmed);
+  if (isNaN(n)) return null;
+  return trimmed;
+}
+
+type DetailInput = { quantity?: string | null; netWt?: string | null; [key: string]: unknown };
+
+function normalizeDetail<T extends DetailInput>(d: T): T {
+  return {
+    ...d,
+    quantity: normalizeNumericString(d.quantity),
+    netWt: normalizeNumericString(d.netWt),
+  };
+}
+
 router.get("/transactions", async (_req, res): Promise<void> => {
   const rows = await db
     .select()
@@ -42,7 +61,7 @@ router.post("/transactions", async (req, res): Promise<void> => {
     if (details && details.length > 0) {
       detailRows = await tx
         .insert(transactionDetailTable)
-        .values(details.map((d) => ({ ...d, headerId: header.id })))
+        .values(details.map((d) => ({ ...normalizeDetail(d), headerId: header.id })))
         .returning();
     }
 
@@ -110,7 +129,7 @@ router.put("/transactions/:id", async (req, res): Promise<void> => {
     if (details && details.length > 0) {
       detailRows = await tx
         .insert(transactionDetailTable)
-        .values(details.map((d) => ({ ...d, headerId: header.id })))
+        .values(details.map((d) => ({ ...normalizeDetail(d), headerId: header.id })))
         .returning();
     }
 

@@ -47,6 +47,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
+const nullableInt = z.preprocess(
+  (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
+  z.number().int().nullable()
+);
+
 const detailSchema = z.object({
   id: z.number().optional(),
   yarnTypeId: z.number().nullable(),
@@ -54,8 +59,8 @@ const detailSchema = z.object({
   yarnBrandId: z.number().nullable(),
   uomId: z.number().nullable(),
   fabricType: z.number().nullable(),
-  sl: z.coerce.number().nullable(),
-  gsm: z.coerce.number().nullable(),
+  sl: nullableInt,
+  gsm: nullableInt,
   quantity: z.string().nullable(),
   netWt: z.string().nullable(),
 });
@@ -161,6 +166,11 @@ export default function TransactionForm() {
     const payload = {
       ...values,
       date: format(values.date, "yyyy-MM-dd"),
+      details: values.details.map((d) => ({
+        ...d,
+        quantity: d.quantity === "" ? null : d.quantity,
+        netWt: d.netWt === "" ? null : d.netWt,
+      })),
     };
 
     if (isEditing) {
