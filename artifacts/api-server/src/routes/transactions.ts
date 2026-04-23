@@ -32,22 +32,24 @@ router.post("/transactions", async (req, res): Promise<void> => {
 
   const { details, ...headerData } = parsed.data;
 
-  const [header] = await db
-    .insert(transactionHeaderTable)
-    .values(headerData)
-    .returning();
-
-  let detailRows: (typeof transactionDetailTable.$inferSelect)[] = [];
-  if (details && details.length > 0) {
-    detailRows = await db
-      .insert(transactionDetailTable)
-      .values(details.map((d) => ({ ...d, headerId: header.id })))
+  const result = await db.transaction(async (tx) => {
+    const [header] = await tx
+      .insert(transactionHeaderTable)
+      .values(headerData)
       .returning();
-  }
 
-  res.status(201).json(
-    GetTransactionResponse.parse({ ...header, details: detailRows })
-  );
+    let detailRows: (typeof transactionDetailTable.$inferSelect)[] = [];
+    if (details && details.length > 0) {
+      detailRows = await tx
+        .insert(transactionDetailTable)
+        .values(details.map((d) => ({ ...d, headerId: header.id })))
+        .returning();
+    }
+
+    return { ...header, details: detailRows };
+  });
+
+  res.status(201).json(GetTransactionResponse.parse(result));
 });
 
 router.get("/transactions/:id", async (req, res): Promise<void> => {
@@ -91,30 +93,36 @@ router.put("/transactions/:id", async (req, res): Promise<void> => {
 
   const { details, ...headerData } = parsed.data;
 
-  const [header] = await db
-    .update(transactionHeaderTable)
-    .set(headerData)
-    .where(eq(transactionHeaderTable.id, params.data.id))
-    .returning();
+  const result = await db.transaction(async (tx) => {
+    const [header] = await tx
+      .update(transactionHeaderTable)
+      .set(headerData)
+      .where(eq(transactionHeaderTable.id, params.data.id))
+      .returning();
 
-  if (!header) {
+    if (!header) return null;
+
+    await tx
+      .delete(transactionDetailTable)
+      .where(eq(transactionDetailTable.headerId, params.data.id));
+
+    let detailRows: (typeof transactionDetailTable.$inferSelect)[] = [];
+    if (details && details.length > 0) {
+      detailRows = await tx
+        .insert(transactionDetailTable)
+        .values(details.map((d) => ({ ...d, headerId: header.id })))
+        .returning();
+    }
+
+    return { ...header, details: detailRows };
+  });
+
+  if (!result) {
     res.status(404).json({ error: "Transaction not found" });
     return;
   }
 
-  await db
-    .delete(transactionDetailTable)
-    .where(eq(transactionDetailTable.headerId, params.data.id));
-
-  let detailRows: (typeof transactionDetailTable.$inferSelect)[] = [];
-  if (details && details.length > 0) {
-    detailRows = await db
-      .insert(transactionDetailTable)
-      .values(details.map((d) => ({ ...d, headerId: header.id })))
-      .returning();
-  }
-
-  res.json(UpdateTransactionResponse.parse({ ...header, details: detailRows }));
+  res.json(UpdateTransactionResponse.parse(result));
 });
 
 router.delete("/transactions/:id", async (req, res): Promise<void> => {

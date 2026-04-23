@@ -72,6 +72,7 @@ Express 5 REST API serving the factory management system.
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- `pnpm --filter @workspace/db run seed` — seed all lookup tables + 1 sample transaction
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
 ## Notes
