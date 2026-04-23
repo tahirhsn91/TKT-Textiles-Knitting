@@ -41,19 +41,7 @@ export interface TransactionDetailItem {
   id: number;
   headerId: number;
   /** @nullable */
-  yarnTypeId?: number | null;
-  /** @nullable */
-  yarnCountId?: number | null;
-  /** @nullable */
-  yarnBrandId?: number | null;
-  /** @nullable */
-  uomId?: number | null;
-  /** @nullable */
-  fabricType?: number | null;
-  /** @nullable */
-  sl?: number | null;
-  /** @nullable */
-  gsm?: number | null;
+  machineId?: number | null;
   /** @nullable */
   quantity?: string | null;
   /** @nullable */
@@ -70,9 +58,21 @@ export interface TransactionSummary {
   /** @nullable */
   partyId?: number | null;
   /** @nullable */
-  machineNumber?: number | null;
-  /** @nullable */
   locationId?: number | null;
+  /** @nullable */
+  yarnTypeId?: number | null;
+  /** @nullable */
+  yarnCountId?: number | null;
+  /** @nullable */
+  yarnBrandId?: number | null;
+  /** @nullable */
+  uomId?: number | null;
+  /** @nullable */
+  fabricTypeId?: number | null;
+  /** @nullable */
+  sl?: number | null;
+  /** @nullable */
+  gsm?: number | null;
 }
 
 export interface TransactionWithDetails {
@@ -85,13 +85,7 @@ export interface TransactionWithDetails {
   /** @nullable */
   partyId?: number | null;
   /** @nullable */
-  machineNumber?: number | null;
-  /** @nullable */
   locationId?: number | null;
-  details: TransactionDetailItem[];
-}
-
-export interface CreateTransactionDetailBody {
   /** @nullable */
   yarnTypeId?: number | null;
   /** @nullable */
@@ -101,11 +95,17 @@ export interface CreateTransactionDetailBody {
   /** @nullable */
   uomId?: number | null;
   /** @nullable */
-  fabricType?: number | null;
+  fabricTypeId?: number | null;
   /** @nullable */
   sl?: number | null;
   /** @nullable */
   gsm?: number | null;
+  details: TransactionDetailItem[];
+}
+
+export interface CreateTransactionDetailBody {
+  /** @nullable */
+  machineId?: number | null;
   /** @nullable */
   quantity?: string | null;
   /** @nullable */
@@ -121,8 +121,20 @@ export interface CreateTransactionBody {
   /** @nullable */
   partyId?: number | null;
   /** @nullable */
-  machineNumber?: number | null;
-  /** @nullable */
   locationId?: number | null;
+  /** @nullable */
+  yarnTypeId?: number | null;
+  /** @nullable */
+  yarnCountId?: number | null;
+  /** @nullable */
+  yarnBrandId?: number | null;
+  /** @nullable */
+  uomId?: number | null;
+  /** @nullable */
+  fabricTypeId?: number | null;
+  /** @nullable */
+  sl?: number | null;
+  /** @nullable */
+  gsm?: number | null;
   details: CreateTransactionDetailBody[];
 }

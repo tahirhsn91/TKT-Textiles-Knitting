@@ -63,8 +63,8 @@ Express 5 REST API serving the factory management system.
 - `fabric_type_master` — Fabric types (id, name, code)
 
 ### Transaction tables
-- `transaction_header` — Transaction header (id, transaction_type_id, date, doc_number, job_id, party_id, machine_number, location_id)
-- `transaction_detail` — Line items (id, header_id, yarn_type_id, yarn_count_id, yarn_brand_id, uom_id, fabric_type, sl, gsm, quantity, net_wt)
+- `transaction_header` — Transaction header (id, transaction_type_id, date, doc_number, job_id, party_id, location_id, yarn_type_id, yarn_count_id, yarn_brand_id, uom_id, fabric_type_id, sl, gsm)
+- `transaction_detail` — Line items per machine (id, header_id, machine_id, quantity, net_wt)
 
 ## Key Commands
 

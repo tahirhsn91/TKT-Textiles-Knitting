@@ -8,19 +8,7 @@
 
 export interface CreateTransactionDetailBody {
   /** @nullable */
-  yarnTypeId?: number | null;
-  /** @nullable */
-  yarnCountId?: number | null;
-  /** @nullable */
-  yarnBrandId?: number | null;
-  /** @nullable */
-  uomId?: number | null;
-  /** @nullable */
-  fabricType?: number | null;
-  /** @nullable */
-  sl?: number | null;
-  /** @nullable */
-  gsm?: number | null;
+  machineId?: number | null;
   /** @nullable */
   quantity?: string | null;
   /** @nullable */

@@ -1,6 +1,5 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
-import { eq } from "drizzle-orm";
 import * as schema from "./schema";
 import {
   jobMasterTable,
@@ -128,20 +127,41 @@ async function seed() {
 
   console.log("Seeding sample transaction...");
 
+  // Always fetch current lookup IDs (inserts above may have conflicted with existing data)
+  const allJobs = await db.select().from(jobMasterTable).limit(2);
+  const allParties = await db.select().from(partyMasterTable).limit(1);
+  const allLocations = await db.select().from(locationMasterTable).limit(1);
+  const allYarnTypes = await db.select().from(yarnTypeMasterTable).limit(1);
+  const allYarnCounts = await db.select().from(yarnCountMasterTable).limit(2);
+  const allYarnBrands = await db.select().from(yarnBrandMasterTable).limit(1);
+  const allUoms = await db.select().from(uomMasterTable).limit(1);
+  const allFabricTypes = await db.select().from(fabricTypeMasterTable).limit(1);
+  const allMachines = await db.select().from(machineMasterTable).limit(2);
+
   const existingHeaders = await db.select().from(transactionHeaderTable).limit(1);
 
-  const jobKnitting = jobs[0];
-  const jobProduction = jobs[1];
-  const party1 = await db.select().from(partyMasterTable).limit(1).then(r => r[0]);
-  const machine1 = machines[0];
-  const loc1 = locations[0];
+  const jobKnitting = allJobs[0];
+  const jobProduction = allJobs[1];
+  const party1 = allParties[0];
+  const loc1 = allLocations[0];
+  const yarnCotton = allYarnTypes[0];
+  const yc30 = allYarnCounts[1] ?? allYarnCounts[0];
+  const yb1 = allYarnBrands[0];
+  const uomKg = allUoms[0];
+  const ft1 = allFabricTypes[0];
+  const m1 = allMachines[0];
+  const m2 = allMachines[1];
 
   if (
     existingHeaders.length === 0 &&
     jobKnitting &&
-    machine1 &&
     loc1 &&
-    party1
+    party1 &&
+    yarnCotton &&
+    yc30 &&
+    yb1 &&
+    uomKg &&
+    ft1
   ) {
     const [header] = await db
       .insert(transactionHeaderTable)
@@ -151,47 +171,31 @@ async function seed() {
         docNumber: "DOC-001",
         jobId: jobProduction?.id ?? null,
         partyId: party1.id,
-        machineNumber: machine1.id,
         locationId: loc1.id,
+        yarnTypeId: yarnCotton.id,
+        yarnCountId: yc30.id,
+        yarnBrandId: yb1.id,
+        uomId: uomKg.id,
+        fabricTypeId: ft1.id,
+        sl: 1,
+        gsm: 160,
       })
       .returning();
 
-    const yarnCotton = yarnTypes[0];
-    const yarnPoly = yarnTypes[1];
-    const yc30 = yarnCounts[1];
-    const yc40 = yarnCounts[2];
-    const yb1 = yarnBrands[0];
-    const yb2 = yarnBrands[1];
-    const uomKg = uoms[0];
-    const ft1 = fabricTypes[0];
-    const ft2 = fabricTypes[1];
-
-    if (header && yarnCotton && yarnPoly && yc30 && yc40 && yb1 && yb2 && uomKg && ft1 && ft2) {
+    if (header && m1) {
       await db.insert(transactionDetailTable).values([
         {
           headerId: header.id,
-          yarnTypeId: yarnCotton.id,
-          yarnCountId: yc30.id,
-          yarnBrandId: yb1.id,
-          uomId: uomKg.id,
-          fabricType: ft1.id,
-          sl: 1,
-          gsm: 160,
+          machineId: m1.id,
           quantity: "250.500",
           netWt: "248.750",
         },
-        {
+        ...(m2 ? [{
           headerId: header.id,
-          yarnTypeId: yarnPoly.id,
-          yarnCountId: yc40.id,
-          yarnBrandId: yb2.id,
-          uomId: uomKg.id,
-          fabricType: ft2.id,
-          sl: 2,
-          gsm: 220,
+          machineId: m2.id,
           quantity: "120.000",
           netWt: "119.500",
-        },
+        }] : []),
       ]);
     }
   }

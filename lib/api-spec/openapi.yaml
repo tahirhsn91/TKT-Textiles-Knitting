@@ -367,19 +367,7 @@ components:
           type: integer
         headerId:
           type: integer
-        yarnTypeId:
-          type: ["integer", "null"]
-        yarnCountId:
-          type: ["integer", "null"]
-        yarnBrandId:
-          type: ["integer", "null"]
-        uomId:
-          type: ["integer", "null"]
-        fabricType:
-          type: ["integer", "null"]
-        sl:
-          type: ["integer", "null"]
-        gsm:
+        machineId:
           type: ["integer", "null"]
         quantity:
           type: ["string", "null"]
@@ -404,9 +392,21 @@ components:
           type: ["integer", "null"]
         partyId:
           type: ["integer", "null"]
-        machineNumber:
-          type: ["integer", "null"]
         locationId:
+          type: ["integer", "null"]
+        yarnTypeId:
+          type: ["integer", "null"]
+        yarnCountId:
+          type: ["integer", "null"]
+        yarnBrandId:
+          type: ["integer", "null"]
+        uomId:
+          type: ["integer", "null"]
+        fabricTypeId:
+          type: ["integer", "null"]
+        sl:
+          type: ["integer", "null"]
+        gsm:
           type: ["integer", "null"]
       required:
         - id
@@ -429,9 +429,21 @@ components:
           type: ["integer", "null"]
         partyId:
           type: ["integer", "null"]
-        machineNumber:
-          type: ["integer", "null"]
         locationId:
+          type: ["integer", "null"]
+        yarnTypeId:
+          type: ["integer", "null"]
+        yarnCountId:
+          type: ["integer", "null"]
+        yarnBrandId:
+          type: ["integer", "null"]
+        uomId:
+          type: ["integer", "null"]
+        fabricTypeId:
+          type: ["integer", "null"]
+        sl:
+          type: ["integer", "null"]
+        gsm:
           type: ["integer", "null"]
         details:
           type: array
@@ -447,19 +459,7 @@ components:
     CreateTransactionDetailBody:
       type: object
       properties:
-        yarnTypeId:
-          type: ["integer", "null"]
-        yarnCountId:
-          type: ["integer", "null"]
-        yarnBrandId:
-          type: ["integer", "null"]
-        uomId:
-          type: ["integer", "null"]
-        fabricType:
-          type: ["integer", "null"]
-        sl:
-          type: ["integer", "null"]
-        gsm:
+        machineId:
           type: ["integer", "null"]
         quantity:
           type: ["string", "null"]
@@ -479,9 +479,21 @@ components:
           type: ["integer", "null"]
         partyId:
           type: ["integer", "null"]
-        machineNumber:
-          type: ["integer", "null"]
         locationId:
+          type: ["integer", "null"]
+        yarnTypeId:
+          type: ["integer", "null"]
+        yarnCountId:
+          type: ["integer", "null"]
+        yarnBrandId:
+          type: ["integer", "null"]
+        uomId:
+          type: ["integer", "null"]
+        fabricTypeId:
+          type: ["integer", "null"]
+        sl:
+          type: ["integer", "null"]
+        gsm:
           type: ["integer", "null"]
         details:
           type: array

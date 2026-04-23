@@ -6,8 +6,8 @@ import {
   getListTransactionsQueryKey,
   useListJobMaster,
   useListPartyMaster,
-  useListMachineMaster,
   useListLocationMaster,
+  useListYarnTypeMaster,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -39,16 +39,14 @@ export default function TransactionList() {
   const { data: transactions, isLoading } = useListTransactions();
   const { data: jobMaster } = useListJobMaster();
   const { data: partyMaster } = useListPartyMaster();
-  const { data: machineMaster } = useListMachineMaster();
   const { data: locationMaster } = useListLocationMaster();
+  const { data: yarnTypeMaster } = useListYarnTypeMaster();
   const deleteTransaction = useDeleteTransaction();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const lookupName = (list: { id: number; name: string }[] | undefined, id: number | null | undefined) =>
     id != null ? (list?.find((x) => x.id === id)?.name ?? String(id)) : "-";
-  const machineName = (id: number | null | undefined) =>
-    id != null ? (machineMaster?.find((m) => m.id === id)?.machineNumber ?? String(id)) : "-";
 
   const handleDelete = (id: number) => {
     deleteTransaction.mutate(
@@ -89,7 +87,7 @@ export default function TransactionList() {
                 <TableHead>Transaction Type</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Party</TableHead>
-                <TableHead>Machine</TableHead>
+                <TableHead>Yarn Type</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -120,7 +118,7 @@ export default function TransactionList() {
                     <TableCell>{lookupName(jobMaster, t.transactionTypeId)}</TableCell>
                     <TableCell>{new Date(t.date + "T00:00:00").toLocaleDateString()}</TableCell>
                     <TableCell>{lookupName(partyMaster, t.partyId)}</TableCell>
-                    <TableCell>{machineName(t.machineNumber)}</TableCell>
+                    <TableCell>{lookupName(yarnTypeMaster, t.yarnTypeId)}</TableCell>
                     <TableCell>{lookupName(locationMaster, t.locationId)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -130,7 +128,7 @@ export default function TransactionList() {
                             <span className="sr-only">Edit</span>
                           </Button>
                         </Link>
-                        
+
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
@@ -147,7 +145,7 @@ export default function TransactionList() {
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction 
+                              <AlertDialogAction
                                 onClick={() => handleDelete(t.id)}
                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                               >

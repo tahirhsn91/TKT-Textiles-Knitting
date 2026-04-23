@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { useLocation, useParams } from "wouter";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -54,13 +54,7 @@ const nullableInt = z.preprocess(
 
 const detailSchema = z.object({
   id: z.number().optional(),
-  yarnTypeId: z.number().nullable(),
-  yarnCountId: z.number().nullable(),
-  yarnBrandId: z.number().nullable(),
-  uomId: z.number().nullable(),
-  fabricType: z.number().nullable(),
-  sl: nullableInt,
-  gsm: nullableInt,
+  machineId: z.number().nullable(),
   quantity: z.string().nullable(),
   netWt: z.string().nullable(),
 });
@@ -71,12 +65,24 @@ const formSchema = z.object({
   docNumber: z.string().min(1, "Document Number is required"),
   jobId: z.number().nullable(),
   partyId: z.number().nullable(),
-  machineNumber: z.number().nullable(),
   locationId: z.number().nullable(),
+  yarnTypeId: z.number().nullable(),
+  yarnCountId: z.number().nullable(),
+  yarnBrandId: z.number().nullable(),
+  uomId: z.number().nullable(),
+  fabricTypeId: z.number().nullable(),
+  sl: nullableInt,
+  gsm: nullableInt,
   details: z.array(detailSchema),
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+const emptyDetail = (): z.infer<typeof detailSchema> => ({
+  machineId: null,
+  quantity: null,
+  netWt: null,
+});
 
 export default function TransactionForm() {
   const [, setLocation] = useLocation();
@@ -86,7 +92,6 @@ export default function TransactionForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Queries
   const { data: transaction, isLoading: isLoadingTx } = useGetTransaction(id!, {
     query: { enabled: isEditing, queryKey: getGetTransactionQueryKey(id!) }
   });
@@ -95,14 +100,12 @@ export default function TransactionForm() {
   const { data: partyMaster } = useListPartyMaster();
   const { data: machineMaster } = useListMachineMaster();
   const { data: locationMaster } = useListLocationMaster();
-  
   const { data: yarnTypeMaster } = useListYarnTypeMaster();
   const { data: yarnCountMaster } = useListYarnCountMaster();
   const { data: yarnBrandMaster } = useListYarnBrandMaster();
   const { data: uomMaster } = useListUomMaster();
   const { data: fabricTypeMaster } = useListFabricTypeMaster();
 
-  // Mutations
   const createTx = useCreateTransaction();
   const updateTx = useUpdateTransaction();
 
@@ -114,19 +117,15 @@ export default function TransactionForm() {
       docNumber: "",
       jobId: null,
       partyId: null,
-      machineNumber: null,
       locationId: null,
-      details: [{
-        yarnTypeId: null,
-        yarnCountId: null,
-        yarnBrandId: null,
-        uomId: null,
-        fabricType: null,
-        sl: null,
-        gsm: null,
-        quantity: null,
-        netWt: null,
-      }],
+      yarnTypeId: null,
+      yarnCountId: null,
+      yarnBrandId: null,
+      uomId: null,
+      fabricTypeId: null,
+      sl: null,
+      gsm: null,
+      details: [emptyDetail()],
     },
   });
 
@@ -135,29 +134,35 @@ export default function TransactionForm() {
     control: form.control,
   });
 
-  // Populate form on edit — wait for transaction AND lookups to be ready
-  const lookupsReady = !!(jobMaster && partyMaster && machineMaster && locationMaster);
+  const lookupsReady = !!(
+    jobMaster && partyMaster && machineMaster && locationMaster &&
+    yarnTypeMaster && yarnCountMaster && yarnBrandMaster && uomMaster && fabricTypeMaster
+  );
+
   useEffect(() => {
     if (transaction && isEditing && lookupsReady) {
       form.reset({
         transactionTypeId: transaction.transactionTypeId,
         date: new Date(transaction.date + "T00:00:00"),
         docNumber: transaction.docNumber,
-        jobId: transaction.jobId,
-        partyId: transaction.partyId,
-        machineNumber: transaction.machineNumber,
-        locationId: transaction.locationId,
-        details: transaction.details.length > 0 ? transaction.details : [{
-          yarnTypeId: null,
-          yarnCountId: null,
-          yarnBrandId: null,
-          uomId: null,
-          fabricType: null,
-          sl: null,
-          gsm: null,
-          quantity: null,
-          netWt: null,
-        }],
+        jobId: transaction.jobId ?? null,
+        partyId: transaction.partyId ?? null,
+        locationId: transaction.locationId ?? null,
+        yarnTypeId: transaction.yarnTypeId ?? null,
+        yarnCountId: transaction.yarnCountId ?? null,
+        yarnBrandId: transaction.yarnBrandId ?? null,
+        uomId: transaction.uomId ?? null,
+        fabricTypeId: transaction.fabricTypeId ?? null,
+        sl: transaction.sl ?? null,
+        gsm: transaction.gsm ?? null,
+        details: transaction.details.length > 0
+          ? transaction.details.map(d => ({
+              id: d.id,
+              machineId: d.machineId ?? null,
+              quantity: d.quantity ?? null,
+              netWt: d.netWt ?? null,
+            }))
+          : [emptyDetail()],
       });
     }
   }, [transaction, isEditing, lookupsReady, form]);
@@ -230,194 +235,342 @@ export default function TransactionForm() {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            
+
             {/* Header Card */}
             <Card>
               <CardHeader className="pb-4">
                 <CardTitle className="text-lg">Header Information</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <FormField
-                  control={form.control}
-                  name="transactionTypeId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Transaction Type *</FormLabel>
-                      <Select 
-                        onValueChange={(val) => field.onChange(parseInt(val))} 
-                        value={field.value?.toString() || ""}
-                      >
+              <CardContent className="space-y-4">
+                {/* Row 1: Transaction Type, Date, Doc Number, Job */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="transactionTypeId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Transaction Type *</FormLabel>
+                        <Select
+                          onValueChange={(val) => field.onChange(parseInt(val))}
+                          value={field.value?.toString() || ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {jobMaster?.map(j => (
+                              <SelectItem key={`type-${j.id}`} value={j.id.toString()}>{j.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="date"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col pt-2">
+                        <FormLabel className="mb-1.5">Date *</FormLabel>
+                        <DatePicker date={field.value} setDate={field.onChange} />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="docNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Document Number *</FormLabel>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
+                          <Input {...field} />
                         </FormControl>
-                        <SelectContent>
-                          {jobMaster?.map(j => (
-                            <SelectItem key={`type-${j.id}`} value={j.id.toString()}>{j.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="date"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col pt-2">
-                      <FormLabel className="mb-1.5">Date *</FormLabel>
-                      <DatePicker date={field.value} setDate={field.onChange} />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="jobId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Job</FormLabel>
+                        <Select
+                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
+                          value={field.value?.toString() || "none"}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select job" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {jobMaster?.map(j => (
+                              <SelectItem key={`job-${j.id}`} value={j.id.toString()}>{j.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-                <FormField
-                  control={form.control}
-                  name="docNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Document Number *</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Row 2: Party, Location */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="partyId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Party</FormLabel>
+                        <Select
+                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
+                          value={field.value?.toString() || "none"}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select party" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {partyMaster?.map(p => (
+                              <SelectItem key={`party-${p.id}`} value={p.id.toString()}>{p.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="jobId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Job</FormLabel>
-                      <Select 
-                        onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))} 
-                        value={field.value?.toString() || "none"}
-                      >
+                  <FormField
+                    control={form.control}
+                    name="locationId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Location</FormLabel>
+                        <Select
+                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
+                          value={field.value?.toString() || "none"}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select location" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {locationMaster?.map(l => (
+                              <SelectItem key={`loc-${l.id}`} value={l.id.toString()}>{l.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Row 3: Yarn Type, Yarn Count, Yarn Brand, UOM */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="yarnTypeId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Yarn Type</FormLabel>
+                        <Select
+                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
+                          value={field.value?.toString() || "none"}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select yarn type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {yarnTypeMaster?.map(y => (
+                              <SelectItem key={y.id} value={y.id.toString()}>{y.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="yarnCountId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Yarn Count</FormLabel>
+                        <Select
+                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
+                          value={field.value?.toString() || "none"}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select count" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {yarnCountMaster?.map(y => (
+                              <SelectItem key={y.id} value={y.id.toString()}>{y.name} ({y.count})</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="yarnBrandId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Yarn Brand</FormLabel>
+                        <Select
+                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
+                          value={field.value?.toString() || "none"}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select brand" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {yarnBrandMaster?.map(y => (
+                              <SelectItem key={y.id} value={y.id.toString()}>{y.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="uomId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>UOM</FormLabel>
+                        <Select
+                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
+                          value={field.value?.toString() || "none"}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select UOM" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {uomMaster?.map(u => (
+                              <SelectItem key={u.id} value={u.id.toString()}>{u.abbreviation}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Row 4: Fabric Type, SL, GSM */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="fabricTypeId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Fabric Type</FormLabel>
+                        <Select
+                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
+                          value={field.value?.toString() || "none"}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select fabric type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {fabricTypeMaster?.map(f => (
+                              <SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="sl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>SL</FormLabel>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select job" />
-                          </SelectTrigger>
+                          <Input
+                            type="number"
+                            placeholder="SL"
+                            {...field}
+                            value={field.value ?? ""}
+                          />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          {jobMaster?.map(j => (
-                            <SelectItem key={`job-${j.id}`} value={j.id.toString()}>{j.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="partyId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Party</FormLabel>
-                      <Select 
-                        onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))} 
-                        value={field.value?.toString() || "none"}
-                      >
+                  <FormField
+                    control={form.control}
+                    name="gsm"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>GSM</FormLabel>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select party" />
-                          </SelectTrigger>
+                          <Input
+                            type="number"
+                            placeholder="GSM"
+                            {...field}
+                            value={field.value ?? ""}
+                          />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          {partyMaster?.map(p => (
-                            <SelectItem key={`party-${p.id}`} value={p.id.toString()}>{p.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="machineNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Machine</FormLabel>
-                      <Select 
-                        onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))} 
-                        value={field.value?.toString() || "none"}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select machine" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          {machineMaster?.map(m => (
-                            <SelectItem key={`machine-${m.id}`} value={m.id.toString()}>{m.name} ({m.machineNumber})</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="locationId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Location</FormLabel>
-                      <Select 
-                        onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))} 
-                        value={field.value?.toString() || "none"}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select location" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          {locationMaster?.map(l => (
-                            <SelectItem key={`loc-${l.id}`} value={l.id.toString()}>{l.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </CardContent>
             </Card>
 
-            {/* Details Card */}
+            {/* Line Items Card */}
             <Card>
               <CardHeader className="pb-4 flex flex-row items-center justify-between">
                 <CardTitle className="text-lg">Line Items</CardTitle>
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   size="sm"
-                  onClick={() => append({
-                    yarnTypeId: null,
-                    yarnCountId: null,
-                    yarnBrandId: null,
-                    uomId: null,
-                    fabricType: null,
-                    sl: null,
-                    gsm: null,
-                    quantity: null,
-                    netWt: null,
-                  })}
+                  onClick={() => append(emptyDetail())}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Add Row
@@ -425,158 +578,40 @@ export default function TransactionForm() {
               </CardHeader>
               <CardContent className="p-0">
                 <ScrollArea className="w-full rounded-md">
-                  <div className="min-w-[1000px] p-4 pt-0">
-                    <div className="grid grid-cols-[2fr_2fr_2fr_1.5fr_2fr_1fr_1fr_1.5fr_1.5fr_auto] gap-2 mb-2 font-medium text-sm text-muted-foreground">
-                      <div>Yarn Type</div>
-                      <div>Yarn Count</div>
-                      <div>Yarn Brand</div>
-                      <div>UOM</div>
-                      <div>Fabric Type</div>
-                      <div>SL</div>
-                      <div>GSM</div>
+                  <div className="min-w-[600px] p-4 pt-0">
+                    <div className="grid grid-cols-[3fr_2fr_2fr_auto] gap-2 mb-2 font-medium text-sm text-muted-foreground">
+                      <div>Machine</div>
                       <div>Qty</div>
                       <div>Net Wt</div>
                       <div className="w-10"></div>
                     </div>
-                    
+
                     <div className="space-y-2">
                       {fields.map((field, index) => (
-                        <div key={field.id} className="grid grid-cols-[2fr_2fr_2fr_1.5fr_2fr_1fr_1fr_1.5fr_1.5fr_auto] gap-2 items-start">
+                        <div key={field.id} className="grid grid-cols-[3fr_2fr_2fr_auto] gap-2 items-start">
                           <FormField
                             control={form.control}
-                            name={`details.${index}.yarnTypeId`}
+                            name={`details.${index}.machineId`}
                             render={({ field }) => (
                               <FormItem>
-                                <Select 
-                                  onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))} 
+                                <Select
+                                  onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
                                   value={field.value?.toString() || "none"}
                                 >
                                   <FormControl>
-                                    <SelectTrigger className="h-9"><SelectValue placeholder="Type" /></SelectTrigger>
+                                    <SelectTrigger className="h-9">
+                                      <SelectValue placeholder="Select machine" />
+                                    </SelectTrigger>
                                   </FormControl>
                                   <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
-                                    {yarnTypeMaster?.map(y => (
-                                      <SelectItem key={y.id} value={y.id.toString()}>{y.name}</SelectItem>
+                                    {machineMaster?.map(m => (
+                                      <SelectItem key={m.id} value={m.id.toString()}>
+                                        {m.name} ({m.machineNumber})
+                                      </SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name={`details.${index}.yarnCountId`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <Select 
-                                  onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))} 
-                                  value={field.value?.toString() || "none"}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger className="h-9"><SelectValue placeholder="Count" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
-                                    {yarnCountMaster?.map(y => (
-                                      <SelectItem key={y.id} value={y.id.toString()}>{y.name} ({y.count})</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name={`details.${index}.yarnBrandId`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <Select 
-                                  onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))} 
-                                  value={field.value?.toString() || "none"}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger className="h-9"><SelectValue placeholder="Brand" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
-                                    {yarnBrandMaster?.map(y => (
-                                      <SelectItem key={y.id} value={y.id.toString()}>{y.name}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name={`details.${index}.uomId`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <Select 
-                                  onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))} 
-                                  value={field.value?.toString() || "none"}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger className="h-9"><SelectValue placeholder="UOM" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
-                                    {uomMaster?.map(u => (
-                                      <SelectItem key={u.id} value={u.id.toString()}>{u.abbreviation}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name={`details.${index}.fabricType`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <Select 
-                                  onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))} 
-                                  value={field.value?.toString() || "none"}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger className="h-9"><SelectValue placeholder="Fabric" /></SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
-                                    {fabricTypeMaster?.map(f => (
-                                      <SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name={`details.${index}.sl`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormControl>
-                                  <Input type="number" className="h-9" placeholder="SL" {...field} value={field.value || ""} />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name={`details.${index}.gsm`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormControl>
-                                  <Input type="number" className="h-9" placeholder="GSM" {...field} value={field.value || ""} />
-                                </FormControl>
                               </FormItem>
                             )}
                           />
@@ -587,7 +622,14 @@ export default function TransactionForm() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormControl>
-                                  <Input type="number" step="0.01" className="h-9" placeholder="Qty" {...field} value={field.value || ""} />
+                                  <Input
+                                    type="number"
+                                    step="0.001"
+                                    className="h-9"
+                                    placeholder="Qty"
+                                    {...field}
+                                    value={field.value || ""}
+                                  />
                                 </FormControl>
                               </FormItem>
                             )}
@@ -599,7 +641,14 @@ export default function TransactionForm() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormControl>
-                                  <Input type="number" step="0.01" className="h-9" placeholder="Net Wt" {...field} value={field.value || ""} />
+                                  <Input
+                                    type="number"
+                                    step="0.001"
+                                    className="h-9"
+                                    placeholder="Net Wt"
+                                    {...field}
+                                    value={field.value || ""}
+                                  />
                                 </FormControl>
                               </FormItem>
                             )}
