@@ -789,6 +789,82 @@ export function useListFabricTypeMaster<
 }
 
 /**
+ * @summary List machine operator master entries
+ */
+export const getListMachineOperatorMasterUrl = () => {
+  return `/api/lookups/machine-operator-master`;
+};
+
+export const listMachineOperatorMaster = async (
+  options?: RequestInit,
+): Promise<LookupItem[]> => {
+  return customFetch<LookupItem[]>(getListMachineOperatorMasterUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListMachineOperatorMasterQueryKey = () => {
+  return [`/api/lookups/machine-operator-master`] as const;
+};
+
+export const getListMachineOperatorMasterQueryOptions = <
+  TData = Awaited<ReturnType<typeof listMachineOperatorMaster>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listMachineOperatorMaster>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListMachineOperatorMasterQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listMachineOperatorMaster>>
+  > = ({ signal }) => listMachineOperatorMaster({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listMachineOperatorMaster>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListMachineOperatorMasterQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listMachineOperatorMaster>>
+>;
+export type ListMachineOperatorMasterQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List machine operator master entries
+ */
+
+export function useListMachineOperatorMaster<
+  TData = Awaited<ReturnType<typeof listMachineOperatorMaster>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listMachineOperatorMaster>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListMachineOperatorMasterQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary List all transactions
  */
 export const getListTransactionsUrl = () => {

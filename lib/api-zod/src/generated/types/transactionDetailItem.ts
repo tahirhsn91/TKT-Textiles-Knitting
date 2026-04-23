@@ -12,6 +12,8 @@ export interface TransactionDetailItem {
   /** @nullable */
   machineId?: number | null;
   /** @nullable */
+  machineOperatorId?: number | null;
+  /** @nullable */
   quantity?: string | null;
   /** @nullable */
   netWt?: string | null;

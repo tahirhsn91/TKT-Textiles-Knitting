@@ -11,6 +11,7 @@ import {
   yarnBrandMasterTable,
   uomMasterTable,
   fabricTypeMasterTable,
+  machineOperatorMasterTable,
   transactionHeaderTable,
   transactionDetailTable,
 } from "./schema";
@@ -125,6 +126,16 @@ async function seed() {
     .onConflictDoNothing()
     .returning();
 
+  await db
+    .insert(machineOperatorMasterTable)
+    .values([
+      { name: "Operator Alpha", code: "OPA" },
+      { name: "Operator Beta", code: "OPB" },
+      { name: "Operator Gamma", code: "OPG" },
+      { name: "Operator Delta", code: "OPD" },
+    ])
+    .onConflictDoNothing();
+
   console.log("Seeding sample transaction...");
 
   // Always fetch current lookup IDs (inserts above may have conflicted with existing data)
@@ -137,6 +148,7 @@ async function seed() {
   const allUoms = await db.select().from(uomMasterTable).limit(1);
   const allFabricTypes = await db.select().from(fabricTypeMasterTable).limit(1);
   const allMachines = await db.select().from(machineMasterTable).limit(2);
+  const allOperators = await db.select().from(machineOperatorMasterTable).limit(2);
 
   const existingHeaders = await db.select().from(transactionHeaderTable).limit(1);
 
@@ -151,6 +163,8 @@ async function seed() {
   const ft1 = allFabricTypes[0];
   const m1 = allMachines[0];
   const m2 = allMachines[1];
+  const op1 = allOperators[0];
+  const op2 = allOperators[1];
 
   if (
     existingHeaders.length === 0 &&
@@ -187,12 +201,14 @@ async function seed() {
         {
           headerId: header.id,
           machineId: m1.id,
+          machineOperatorId: op1?.id ?? null,
           quantity: "250.500",
           netWt: "248.750",
         },
         ...(m2 ? [{
           headerId: header.id,
           machineId: m2.id,
+          machineOperatorId: op2?.id ?? null,
           quantity: "120.000",
           netWt: "119.500",
         }] : []),

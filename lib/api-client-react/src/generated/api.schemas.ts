@@ -43,6 +43,8 @@ export interface TransactionDetailItem {
   /** @nullable */
   machineId?: number | null;
   /** @nullable */
+  machineOperatorId?: number | null;
+  /** @nullable */
   quantity?: string | null;
   /** @nullable */
   netWt?: string | null;
@@ -106,6 +108,8 @@ export interface TransactionWithDetails {
 export interface CreateTransactionDetailBody {
   /** @nullable */
   machineId?: number | null;
+  /** @nullable */
+  machineOperatorId?: number | null;
   /** @nullable */
   quantity?: string | null;
   /** @nullable */

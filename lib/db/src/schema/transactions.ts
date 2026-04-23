@@ -17,6 +17,7 @@ import { yarnCountMasterTable } from "./lookups";
 import { yarnBrandMasterTable } from "./lookups";
 import { uomMasterTable } from "./lookups";
 import { fabricTypeMasterTable } from "./lookups";
+import { machineOperatorMasterTable } from "./lookups";
 
 export const transactionHeaderTable = pgTable("transaction_header", {
   id: serial("id").primaryKey(),
@@ -47,6 +48,7 @@ export const transactionDetailTable = pgTable("transaction_detail", {
     .notNull()
     .references(() => transactionHeaderTable.id, { onDelete: "cascade" }),
   machineId: integer("machine_id").references(() => machineMasterTable.id),
+  machineOperatorId: integer("machine_operator_id").references(() => machineOperatorMasterTable.id),
   quantity: numeric("quantity", { precision: 12, scale: 3 }),
   netWt: numeric("net_wt", { precision: 12, scale: 3 }),
 });

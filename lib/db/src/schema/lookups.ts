@@ -82,3 +82,12 @@ export const fabricTypeMasterTable = pgTable("fabric_type_master", {
 export const insertFabricTypeMasterSchema = createInsertSchema(fabricTypeMasterTable).omit({ id: true });
 export type InsertFabricTypeMaster = z.infer<typeof insertFabricTypeMasterSchema>;
 export type FabricTypeMaster = typeof fabricTypeMasterTable.$inferSelect;
+
+export const machineOperatorMasterTable = pgTable("machine_operator_master", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+});
+export const insertMachineOperatorMasterSchema = createInsertSchema(machineOperatorMasterTable).omit({ id: true });
+export type InsertMachineOperatorMaster = z.infer<typeof insertMachineOperatorMasterSchema>;
+export type MachineOperatorMaster = typeof machineOperatorMasterTable.$inferSelect;

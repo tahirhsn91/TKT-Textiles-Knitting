@@ -10,6 +10,7 @@ import {
   yarnBrandMasterTable,
   uomMasterTable,
   fabricTypeMasterTable,
+  machineOperatorMasterTable,
 } from "@workspace/db";
 import {
   ListJobMasterResponse,
@@ -21,6 +22,7 @@ import {
   ListYarnBrandMasterResponse,
   ListUomMasterResponse,
   ListFabricTypeMasterResponse,
+  ListMachineOperatorMasterResponse,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -68,6 +70,11 @@ router.get("/lookups/uom-master", async (_req, res): Promise<void> => {
 router.get("/lookups/fabric-type-master", async (_req, res): Promise<void> => {
   const rows = await db.select().from(fabricTypeMasterTable).orderBy(fabricTypeMasterTable.name);
   res.json(ListFabricTypeMasterResponse.parse(rows));
+});
+
+router.get("/lookups/machine-operator-master", async (_req, res): Promise<void> => {
+  const rows = await db.select().from(machineOperatorMasterTable).orderBy(machineOperatorMasterTable.name);
+  res.json(ListMachineOperatorMasterResponse.parse(rows));
 });
 
 export default router;

@@ -118,6 +118,18 @@ export const ListFabricTypeMasterResponse = zod.array(
 );
 
 /**
+ * @summary List machine operator master entries
+ */
+export const ListMachineOperatorMasterResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+export const ListMachineOperatorMasterResponse = zod.array(
+  ListMachineOperatorMasterResponseItem,
+);
+
+/**
  * @summary List all transactions
  */
 export const ListTransactionsResponseItem = zod.object({
@@ -158,6 +170,7 @@ export const CreateTransactionBody = zod.object({
   details: zod.array(
     zod.object({
       machineId: zod.number().nullish(),
+      machineOperatorId: zod.number().nullish(),
       quantity: zod.string().nullish(),
       netWt: zod.string().nullish(),
     }),
@@ -191,6 +204,7 @@ export const GetTransactionResponse = zod.object({
       id: zod.number(),
       headerId: zod.number(),
       machineId: zod.number().nullish(),
+      machineOperatorId: zod.number().nullish(),
       quantity: zod.string().nullish(),
       netWt: zod.string().nullish(),
     }),
@@ -221,6 +235,7 @@ export const UpdateTransactionBody = zod.object({
   details: zod.array(
     zod.object({
       machineId: zod.number().nullish(),
+      machineOperatorId: zod.number().nullish(),
       quantity: zod.string().nullish(),
       netWt: zod.string().nullish(),
     }),
@@ -247,6 +262,7 @@ export const UpdateTransactionResponse = zod.object({
       id: zod.number(),
       headerId: zod.number(),
       machineId: zod.number().nullish(),
+      machineOperatorId: zod.number().nullish(),
       quantity: zod.string().nullish(),
       netWt: zod.string().nullish(),
     }),

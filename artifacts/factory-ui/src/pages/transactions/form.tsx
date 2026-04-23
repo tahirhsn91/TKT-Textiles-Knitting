@@ -17,6 +17,7 @@ import {
   useListYarnBrandMaster,
   useListUomMaster,
   useListFabricTypeMaster,
+  useListMachineOperatorMaster,
   useGetTransaction,
   useCreateTransaction,
   useUpdateTransaction,
@@ -55,6 +56,7 @@ const nullableInt = z.preprocess(
 const detailSchema = z.object({
   id: z.number().optional(),
   machineId: z.number().nullable(),
+  machineOperatorId: z.number().nullable(),
   quantity: z.string().nullable(),
   netWt: z.string().nullable(),
 });
@@ -80,6 +82,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 const emptyDetail = (): z.infer<typeof detailSchema> => ({
   machineId: null,
+  machineOperatorId: null,
   quantity: null,
   netWt: null,
 });
@@ -105,6 +108,7 @@ export default function TransactionForm() {
   const { data: yarnBrandMaster } = useListYarnBrandMaster();
   const { data: uomMaster } = useListUomMaster();
   const { data: fabricTypeMaster } = useListFabricTypeMaster();
+  const { data: machineOperatorMaster } = useListMachineOperatorMaster();
 
   const createTx = useCreateTransaction();
   const updateTx = useUpdateTransaction();
@@ -136,7 +140,8 @@ export default function TransactionForm() {
 
   const lookupsReady = !!(
     jobMaster && partyMaster && machineMaster && locationMaster &&
-    yarnTypeMaster && yarnCountMaster && yarnBrandMaster && uomMaster && fabricTypeMaster
+    yarnTypeMaster && yarnCountMaster && yarnBrandMaster && uomMaster &&
+    fabricTypeMaster && machineOperatorMaster
   );
 
   useEffect(() => {
@@ -159,6 +164,7 @@ export default function TransactionForm() {
           ? transaction.details.map(d => ({
               id: d.id,
               machineId: d.machineId ?? null,
+              machineOperatorId: d.machineOperatorId ?? null,
               quantity: d.quantity ?? null,
               netWt: d.netWt ?? null,
             }))
@@ -579,8 +585,9 @@ export default function TransactionForm() {
               <CardContent className="p-0">
                 <ScrollArea className="w-full rounded-md">
                   <div className="min-w-[600px] p-4 pt-0">
-                    <div className="grid grid-cols-[3fr_2fr_2fr_auto] gap-2 mb-2 font-medium text-sm text-muted-foreground">
+                    <div className="grid grid-cols-[3fr_3fr_2fr_2fr_auto] gap-2 mb-2 font-medium text-sm text-muted-foreground">
                       <div>Machine</div>
+                      <div>Machine Operator</div>
                       <div>Qty</div>
                       <div>Net Wt</div>
                       <div className="w-10"></div>
@@ -588,7 +595,7 @@ export default function TransactionForm() {
 
                     <div className="space-y-2">
                       {fields.map((field, index) => (
-                        <div key={field.id} className="grid grid-cols-[3fr_2fr_2fr_auto] gap-2 items-start">
+                        <div key={field.id} className="grid grid-cols-[3fr_3fr_2fr_2fr_auto] gap-2 items-start">
                           <FormField
                             control={form.control}
                             name={`details.${index}.machineId`}
@@ -608,6 +615,33 @@ export default function TransactionForm() {
                                     {machineMaster?.map(m => (
                                       <SelectItem key={m.id} value={m.id.toString()}>
                                         {m.name} ({m.machineNumber})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name={`details.${index}.machineOperatorId`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <Select
+                                  onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
+                                  value={field.value?.toString() || "none"}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="h-9">
+                                      <SelectValue placeholder="Select operator" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    {machineOperatorMaster?.map(op => (
+                                      <SelectItem key={op.id} value={op.id.toString()}>
+                                        {op.name}
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
