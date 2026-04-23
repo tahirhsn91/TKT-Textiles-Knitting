@@ -17,11 +17,18 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  BadRequestResponse,
+  ConflictResponse,
+  CreateLookupBody,
+  CreateMachineBody,
   CreateTransactionBody,
+  CreateUomBody,
+  CreateYarnCountBody,
   ErrorResponse,
   HealthStatus,
   LookupItem,
   MachineLookupItem,
+  NotFoundResponse,
   TransactionSummary,
   TransactionWithDetails,
   UomLookupItem,
@@ -863,6 +870,3376 @@ export function useListMachineOperatorMaster<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List job master entries (CRUD)
+ */
+export const getListJobMasterCrudUrl = () => {
+  return `/api/masters/job`;
+};
+
+export const listJobMasterCrud = async (
+  options?: RequestInit,
+): Promise<LookupItem[]> => {
+  return customFetch<LookupItem[]>(getListJobMasterCrudUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListJobMasterCrudQueryKey = () => {
+  return [`/api/masters/job`] as const;
+};
+
+export const getListJobMasterCrudQueryOptions = <
+  TData = Awaited<ReturnType<typeof listJobMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listJobMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListJobMasterCrudQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listJobMasterCrud>>
+  > = ({ signal }) => listJobMasterCrud({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listJobMasterCrud>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListJobMasterCrudQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listJobMasterCrud>>
+>;
+export type ListJobMasterCrudQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List job master entries (CRUD)
+ */
+
+export function useListJobMasterCrud<
+  TData = Awaited<ReturnType<typeof listJobMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listJobMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListJobMasterCrudQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create job master entry
+ */
+export const getCreateJobMasterUrl = () => {
+  return `/api/masters/job`;
+};
+
+export const createJobMaster = async (
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getCreateJobMasterUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getCreateJobMasterMutationOptions = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createJobMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createJobMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["createJobMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createJobMaster>>,
+    { data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createJobMaster(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateJobMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createJobMaster>>
+>;
+export type CreateJobMasterMutationBody = BodyType<CreateLookupBody>;
+export type CreateJobMasterMutationError = ErrorType<
+  BadRequestResponse | ConflictResponse
+>;
+
+/**
+ * @summary Create job master entry
+ */
+export const useCreateJobMaster = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createJobMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createJobMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getCreateJobMasterMutationOptions(options));
+};
+
+/**
+ * @summary Update job master entry
+ */
+export const getUpdateJobMasterUrl = (id: number) => {
+  return `/api/masters/job/${id}`;
+};
+
+export const updateJobMaster = async (
+  id: number,
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getUpdateJobMasterUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getUpdateJobMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateJobMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateJobMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["updateJobMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateJobMaster>>,
+    { id: number; data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateJobMaster(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateJobMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateJobMaster>>
+>;
+export type UpdateJobMasterMutationBody = BodyType<CreateLookupBody>;
+export type UpdateJobMasterMutationError = ErrorType<
+  NotFoundResponse | ConflictResponse
+>;
+
+/**
+ * @summary Update job master entry
+ */
+export const useUpdateJobMaster = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateJobMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateJobMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getUpdateJobMasterMutationOptions(options));
+};
+
+/**
+ * @summary Delete job master entry
+ */
+export const getDeleteJobMasterUrl = (id: number) => {
+  return `/api/masters/job/${id}`;
+};
+
+export const deleteJobMaster = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteJobMasterUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteJobMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteJobMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteJobMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteJobMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteJobMaster>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteJobMaster(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteJobMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteJobMaster>>
+>;
+
+export type DeleteJobMasterMutationError = ErrorType<NotFoundResponse>;
+
+/**
+ * @summary Delete job master entry
+ */
+export const useDeleteJobMaster = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteJobMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteJobMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteJobMasterMutationOptions(options));
+};
+
+/**
+ * @summary List party master entries (CRUD)
+ */
+export const getListPartyMasterCrudUrl = () => {
+  return `/api/masters/party`;
+};
+
+export const listPartyMasterCrud = async (
+  options?: RequestInit,
+): Promise<LookupItem[]> => {
+  return customFetch<LookupItem[]>(getListPartyMasterCrudUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListPartyMasterCrudQueryKey = () => {
+  return [`/api/masters/party`] as const;
+};
+
+export const getListPartyMasterCrudQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPartyMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listPartyMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListPartyMasterCrudQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listPartyMasterCrud>>
+  > = ({ signal }) => listPartyMasterCrud({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listPartyMasterCrud>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListPartyMasterCrudQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listPartyMasterCrud>>
+>;
+export type ListPartyMasterCrudQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List party master entries (CRUD)
+ */
+
+export function useListPartyMasterCrud<
+  TData = Awaited<ReturnType<typeof listPartyMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listPartyMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListPartyMasterCrudQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create party master entry
+ */
+export const getCreatePartyMasterUrl = () => {
+  return `/api/masters/party`;
+};
+
+export const createPartyMaster = async (
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getCreatePartyMasterUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getCreatePartyMasterMutationOptions = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPartyMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createPartyMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["createPartyMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createPartyMaster>>,
+    { data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createPartyMaster(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreatePartyMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createPartyMaster>>
+>;
+export type CreatePartyMasterMutationBody = BodyType<CreateLookupBody>;
+export type CreatePartyMasterMutationError = ErrorType<
+  BadRequestResponse | ConflictResponse
+>;
+
+/**
+ * @summary Create party master entry
+ */
+export const useCreatePartyMaster = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createPartyMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createPartyMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getCreatePartyMasterMutationOptions(options));
+};
+
+/**
+ * @summary Update party master entry
+ */
+export const getUpdatePartyMasterUrl = (id: number) => {
+  return `/api/masters/party/${id}`;
+};
+
+export const updatePartyMaster = async (
+  id: number,
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getUpdatePartyMasterUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getUpdatePartyMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePartyMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updatePartyMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["updatePartyMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updatePartyMaster>>,
+    { id: number; data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updatePartyMaster(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdatePartyMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updatePartyMaster>>
+>;
+export type UpdatePartyMasterMutationBody = BodyType<CreateLookupBody>;
+export type UpdatePartyMasterMutationError = ErrorType<
+  NotFoundResponse | ConflictResponse
+>;
+
+/**
+ * @summary Update party master entry
+ */
+export const useUpdatePartyMaster = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePartyMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updatePartyMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getUpdatePartyMasterMutationOptions(options));
+};
+
+/**
+ * @summary Delete party master entry
+ */
+export const getDeletePartyMasterUrl = (id: number) => {
+  return `/api/masters/party/${id}`;
+};
+
+export const deletePartyMaster = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeletePartyMasterUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeletePartyMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deletePartyMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deletePartyMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deletePartyMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deletePartyMaster>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deletePartyMaster(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeletePartyMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deletePartyMaster>>
+>;
+
+export type DeletePartyMasterMutationError = ErrorType<NotFoundResponse>;
+
+/**
+ * @summary Delete party master entry
+ */
+export const useDeletePartyMaster = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deletePartyMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deletePartyMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeletePartyMasterMutationOptions(options));
+};
+
+/**
+ * @summary List machine master entries (CRUD)
+ */
+export const getListMachineMasterCrudUrl = () => {
+  return `/api/masters/machine`;
+};
+
+export const listMachineMasterCrud = async (
+  options?: RequestInit,
+): Promise<MachineLookupItem[]> => {
+  return customFetch<MachineLookupItem[]>(getListMachineMasterCrudUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListMachineMasterCrudQueryKey = () => {
+  return [`/api/masters/machine`] as const;
+};
+
+export const getListMachineMasterCrudQueryOptions = <
+  TData = Awaited<ReturnType<typeof listMachineMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listMachineMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListMachineMasterCrudQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listMachineMasterCrud>>
+  > = ({ signal }) => listMachineMasterCrud({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listMachineMasterCrud>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListMachineMasterCrudQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listMachineMasterCrud>>
+>;
+export type ListMachineMasterCrudQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List machine master entries (CRUD)
+ */
+
+export function useListMachineMasterCrud<
+  TData = Awaited<ReturnType<typeof listMachineMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listMachineMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListMachineMasterCrudQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create machine master entry
+ */
+export const getCreateMachineMasterUrl = () => {
+  return `/api/masters/machine`;
+};
+
+export const createMachineMaster = async (
+  createMachineBody: CreateMachineBody,
+  options?: RequestInit,
+): Promise<MachineLookupItem> => {
+  return customFetch<MachineLookupItem>(getCreateMachineMasterUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createMachineBody),
+  });
+};
+
+export const getCreateMachineMasterMutationOptions = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createMachineMaster>>,
+    TError,
+    { data: BodyType<CreateMachineBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createMachineMaster>>,
+  TError,
+  { data: BodyType<CreateMachineBody> },
+  TContext
+> => {
+  const mutationKey = ["createMachineMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createMachineMaster>>,
+    { data: BodyType<CreateMachineBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createMachineMaster(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateMachineMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createMachineMaster>>
+>;
+export type CreateMachineMasterMutationBody = BodyType<CreateMachineBody>;
+export type CreateMachineMasterMutationError = ErrorType<
+  BadRequestResponse | ConflictResponse
+>;
+
+/**
+ * @summary Create machine master entry
+ */
+export const useCreateMachineMaster = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createMachineMaster>>,
+    TError,
+    { data: BodyType<CreateMachineBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createMachineMaster>>,
+  TError,
+  { data: BodyType<CreateMachineBody> },
+  TContext
+> => {
+  return useMutation(getCreateMachineMasterMutationOptions(options));
+};
+
+/**
+ * @summary Update machine master entry
+ */
+export const getUpdateMachineMasterUrl = (id: number) => {
+  return `/api/masters/machine/${id}`;
+};
+
+export const updateMachineMaster = async (
+  id: number,
+  createMachineBody: CreateMachineBody,
+  options?: RequestInit,
+): Promise<MachineLookupItem> => {
+  return customFetch<MachineLookupItem>(getUpdateMachineMasterUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createMachineBody),
+  });
+};
+
+export const getUpdateMachineMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMachineMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateMachineBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateMachineMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateMachineBody> },
+  TContext
+> => {
+  const mutationKey = ["updateMachineMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateMachineMaster>>,
+    { id: number; data: BodyType<CreateMachineBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateMachineMaster(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateMachineMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateMachineMaster>>
+>;
+export type UpdateMachineMasterMutationBody = BodyType<CreateMachineBody>;
+export type UpdateMachineMasterMutationError = ErrorType<
+  NotFoundResponse | ConflictResponse
+>;
+
+/**
+ * @summary Update machine master entry
+ */
+export const useUpdateMachineMaster = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMachineMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateMachineBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateMachineMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateMachineBody> },
+  TContext
+> => {
+  return useMutation(getUpdateMachineMasterMutationOptions(options));
+};
+
+/**
+ * @summary Delete machine master entry
+ */
+export const getDeleteMachineMasterUrl = (id: number) => {
+  return `/api/masters/machine/${id}`;
+};
+
+export const deleteMachineMaster = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteMachineMasterUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteMachineMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteMachineMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteMachineMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteMachineMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteMachineMaster>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteMachineMaster(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteMachineMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteMachineMaster>>
+>;
+
+export type DeleteMachineMasterMutationError = ErrorType<NotFoundResponse>;
+
+/**
+ * @summary Delete machine master entry
+ */
+export const useDeleteMachineMaster = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteMachineMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteMachineMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteMachineMasterMutationOptions(options));
+};
+
+/**
+ * @summary List location master entries (CRUD)
+ */
+export const getListLocationMasterCrudUrl = () => {
+  return `/api/masters/location`;
+};
+
+export const listLocationMasterCrud = async (
+  options?: RequestInit,
+): Promise<LookupItem[]> => {
+  return customFetch<LookupItem[]>(getListLocationMasterCrudUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListLocationMasterCrudQueryKey = () => {
+  return [`/api/masters/location`] as const;
+};
+
+export const getListLocationMasterCrudQueryOptions = <
+  TData = Awaited<ReturnType<typeof listLocationMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listLocationMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListLocationMasterCrudQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listLocationMasterCrud>>
+  > = ({ signal }) => listLocationMasterCrud({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listLocationMasterCrud>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListLocationMasterCrudQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listLocationMasterCrud>>
+>;
+export type ListLocationMasterCrudQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List location master entries (CRUD)
+ */
+
+export function useListLocationMasterCrud<
+  TData = Awaited<ReturnType<typeof listLocationMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listLocationMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListLocationMasterCrudQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create location master entry
+ */
+export const getCreateLocationMasterUrl = () => {
+  return `/api/masters/location`;
+};
+
+export const createLocationMaster = async (
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getCreateLocationMasterUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getCreateLocationMasterMutationOptions = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createLocationMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createLocationMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["createLocationMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createLocationMaster>>,
+    { data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createLocationMaster(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateLocationMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createLocationMaster>>
+>;
+export type CreateLocationMasterMutationBody = BodyType<CreateLookupBody>;
+export type CreateLocationMasterMutationError = ErrorType<
+  BadRequestResponse | ConflictResponse
+>;
+
+/**
+ * @summary Create location master entry
+ */
+export const useCreateLocationMaster = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createLocationMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createLocationMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getCreateLocationMasterMutationOptions(options));
+};
+
+/**
+ * @summary Update location master entry
+ */
+export const getUpdateLocationMasterUrl = (id: number) => {
+  return `/api/masters/location/${id}`;
+};
+
+export const updateLocationMaster = async (
+  id: number,
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getUpdateLocationMasterUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getUpdateLocationMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateLocationMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateLocationMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["updateLocationMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateLocationMaster>>,
+    { id: number; data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateLocationMaster(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateLocationMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateLocationMaster>>
+>;
+export type UpdateLocationMasterMutationBody = BodyType<CreateLookupBody>;
+export type UpdateLocationMasterMutationError = ErrorType<
+  NotFoundResponse | ConflictResponse
+>;
+
+/**
+ * @summary Update location master entry
+ */
+export const useUpdateLocationMaster = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateLocationMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateLocationMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getUpdateLocationMasterMutationOptions(options));
+};
+
+/**
+ * @summary Delete location master entry
+ */
+export const getDeleteLocationMasterUrl = (id: number) => {
+  return `/api/masters/location/${id}`;
+};
+
+export const deleteLocationMaster = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteLocationMasterUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteLocationMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteLocationMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteLocationMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteLocationMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteLocationMaster>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteLocationMaster(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteLocationMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteLocationMaster>>
+>;
+
+export type DeleteLocationMasterMutationError = ErrorType<NotFoundResponse>;
+
+/**
+ * @summary Delete location master entry
+ */
+export const useDeleteLocationMaster = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteLocationMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteLocationMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteLocationMasterMutationOptions(options));
+};
+
+/**
+ * @summary List yarn type master entries (CRUD)
+ */
+export const getListYarnTypeMasterCrudUrl = () => {
+  return `/api/masters/yarn-type`;
+};
+
+export const listYarnTypeMasterCrud = async (
+  options?: RequestInit,
+): Promise<LookupItem[]> => {
+  return customFetch<LookupItem[]>(getListYarnTypeMasterCrudUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListYarnTypeMasterCrudQueryKey = () => {
+  return [`/api/masters/yarn-type`] as const;
+};
+
+export const getListYarnTypeMasterCrudQueryOptions = <
+  TData = Awaited<ReturnType<typeof listYarnTypeMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listYarnTypeMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListYarnTypeMasterCrudQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listYarnTypeMasterCrud>>
+  > = ({ signal }) => listYarnTypeMasterCrud({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listYarnTypeMasterCrud>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListYarnTypeMasterCrudQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listYarnTypeMasterCrud>>
+>;
+export type ListYarnTypeMasterCrudQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List yarn type master entries (CRUD)
+ */
+
+export function useListYarnTypeMasterCrud<
+  TData = Awaited<ReturnType<typeof listYarnTypeMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listYarnTypeMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListYarnTypeMasterCrudQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create yarn type master entry
+ */
+export const getCreateYarnTypeMasterUrl = () => {
+  return `/api/masters/yarn-type`;
+};
+
+export const createYarnTypeMaster = async (
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getCreateYarnTypeMasterUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getCreateYarnTypeMasterMutationOptions = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createYarnTypeMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createYarnTypeMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["createYarnTypeMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createYarnTypeMaster>>,
+    { data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createYarnTypeMaster(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateYarnTypeMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createYarnTypeMaster>>
+>;
+export type CreateYarnTypeMasterMutationBody = BodyType<CreateLookupBody>;
+export type CreateYarnTypeMasterMutationError = ErrorType<
+  BadRequestResponse | ConflictResponse
+>;
+
+/**
+ * @summary Create yarn type master entry
+ */
+export const useCreateYarnTypeMaster = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createYarnTypeMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createYarnTypeMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getCreateYarnTypeMasterMutationOptions(options));
+};
+
+/**
+ * @summary Update yarn type master entry
+ */
+export const getUpdateYarnTypeMasterUrl = (id: number) => {
+  return `/api/masters/yarn-type/${id}`;
+};
+
+export const updateYarnTypeMaster = async (
+  id: number,
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getUpdateYarnTypeMasterUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getUpdateYarnTypeMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateYarnTypeMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateYarnTypeMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["updateYarnTypeMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateYarnTypeMaster>>,
+    { id: number; data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateYarnTypeMaster(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateYarnTypeMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateYarnTypeMaster>>
+>;
+export type UpdateYarnTypeMasterMutationBody = BodyType<CreateLookupBody>;
+export type UpdateYarnTypeMasterMutationError = ErrorType<
+  NotFoundResponse | ConflictResponse
+>;
+
+/**
+ * @summary Update yarn type master entry
+ */
+export const useUpdateYarnTypeMaster = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateYarnTypeMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateYarnTypeMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getUpdateYarnTypeMasterMutationOptions(options));
+};
+
+/**
+ * @summary Delete yarn type master entry
+ */
+export const getDeleteYarnTypeMasterUrl = (id: number) => {
+  return `/api/masters/yarn-type/${id}`;
+};
+
+export const deleteYarnTypeMaster = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteYarnTypeMasterUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteYarnTypeMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteYarnTypeMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteYarnTypeMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteYarnTypeMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteYarnTypeMaster>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteYarnTypeMaster(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteYarnTypeMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteYarnTypeMaster>>
+>;
+
+export type DeleteYarnTypeMasterMutationError = ErrorType<NotFoundResponse>;
+
+/**
+ * @summary Delete yarn type master entry
+ */
+export const useDeleteYarnTypeMaster = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteYarnTypeMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteYarnTypeMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteYarnTypeMasterMutationOptions(options));
+};
+
+/**
+ * @summary List yarn count master entries (CRUD)
+ */
+export const getListYarnCountMasterCrudUrl = () => {
+  return `/api/masters/yarn-count`;
+};
+
+export const listYarnCountMasterCrud = async (
+  options?: RequestInit,
+): Promise<YarnCountLookupItem[]> => {
+  return customFetch<YarnCountLookupItem[]>(getListYarnCountMasterCrudUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListYarnCountMasterCrudQueryKey = () => {
+  return [`/api/masters/yarn-count`] as const;
+};
+
+export const getListYarnCountMasterCrudQueryOptions = <
+  TData = Awaited<ReturnType<typeof listYarnCountMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listYarnCountMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListYarnCountMasterCrudQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listYarnCountMasterCrud>>
+  > = ({ signal }) => listYarnCountMasterCrud({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listYarnCountMasterCrud>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListYarnCountMasterCrudQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listYarnCountMasterCrud>>
+>;
+export type ListYarnCountMasterCrudQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List yarn count master entries (CRUD)
+ */
+
+export function useListYarnCountMasterCrud<
+  TData = Awaited<ReturnType<typeof listYarnCountMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listYarnCountMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListYarnCountMasterCrudQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create yarn count master entry
+ */
+export const getCreateYarnCountMasterUrl = () => {
+  return `/api/masters/yarn-count`;
+};
+
+export const createYarnCountMaster = async (
+  createYarnCountBody: CreateYarnCountBody,
+  options?: RequestInit,
+): Promise<YarnCountLookupItem> => {
+  return customFetch<YarnCountLookupItem>(getCreateYarnCountMasterUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createYarnCountBody),
+  });
+};
+
+export const getCreateYarnCountMasterMutationOptions = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createYarnCountMaster>>,
+    TError,
+    { data: BodyType<CreateYarnCountBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createYarnCountMaster>>,
+  TError,
+  { data: BodyType<CreateYarnCountBody> },
+  TContext
+> => {
+  const mutationKey = ["createYarnCountMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createYarnCountMaster>>,
+    { data: BodyType<CreateYarnCountBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createYarnCountMaster(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateYarnCountMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createYarnCountMaster>>
+>;
+export type CreateYarnCountMasterMutationBody = BodyType<CreateYarnCountBody>;
+export type CreateYarnCountMasterMutationError = ErrorType<
+  BadRequestResponse | ConflictResponse
+>;
+
+/**
+ * @summary Create yarn count master entry
+ */
+export const useCreateYarnCountMaster = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createYarnCountMaster>>,
+    TError,
+    { data: BodyType<CreateYarnCountBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createYarnCountMaster>>,
+  TError,
+  { data: BodyType<CreateYarnCountBody> },
+  TContext
+> => {
+  return useMutation(getCreateYarnCountMasterMutationOptions(options));
+};
+
+/**
+ * @summary Update yarn count master entry
+ */
+export const getUpdateYarnCountMasterUrl = (id: number) => {
+  return `/api/masters/yarn-count/${id}`;
+};
+
+export const updateYarnCountMaster = async (
+  id: number,
+  createYarnCountBody: CreateYarnCountBody,
+  options?: RequestInit,
+): Promise<YarnCountLookupItem> => {
+  return customFetch<YarnCountLookupItem>(getUpdateYarnCountMasterUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createYarnCountBody),
+  });
+};
+
+export const getUpdateYarnCountMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateYarnCountMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateYarnCountBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateYarnCountMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateYarnCountBody> },
+  TContext
+> => {
+  const mutationKey = ["updateYarnCountMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateYarnCountMaster>>,
+    { id: number; data: BodyType<CreateYarnCountBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateYarnCountMaster(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateYarnCountMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateYarnCountMaster>>
+>;
+export type UpdateYarnCountMasterMutationBody = BodyType<CreateYarnCountBody>;
+export type UpdateYarnCountMasterMutationError = ErrorType<
+  NotFoundResponse | ConflictResponse
+>;
+
+/**
+ * @summary Update yarn count master entry
+ */
+export const useUpdateYarnCountMaster = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateYarnCountMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateYarnCountBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateYarnCountMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateYarnCountBody> },
+  TContext
+> => {
+  return useMutation(getUpdateYarnCountMasterMutationOptions(options));
+};
+
+/**
+ * @summary Delete yarn count master entry
+ */
+export const getDeleteYarnCountMasterUrl = (id: number) => {
+  return `/api/masters/yarn-count/${id}`;
+};
+
+export const deleteYarnCountMaster = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteYarnCountMasterUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteYarnCountMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteYarnCountMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteYarnCountMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteYarnCountMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteYarnCountMaster>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteYarnCountMaster(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteYarnCountMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteYarnCountMaster>>
+>;
+
+export type DeleteYarnCountMasterMutationError = ErrorType<NotFoundResponse>;
+
+/**
+ * @summary Delete yarn count master entry
+ */
+export const useDeleteYarnCountMaster = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteYarnCountMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteYarnCountMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteYarnCountMasterMutationOptions(options));
+};
+
+/**
+ * @summary List yarn brand master entries (CRUD)
+ */
+export const getListYarnBrandMasterCrudUrl = () => {
+  return `/api/masters/yarn-brand`;
+};
+
+export const listYarnBrandMasterCrud = async (
+  options?: RequestInit,
+): Promise<LookupItem[]> => {
+  return customFetch<LookupItem[]>(getListYarnBrandMasterCrudUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListYarnBrandMasterCrudQueryKey = () => {
+  return [`/api/masters/yarn-brand`] as const;
+};
+
+export const getListYarnBrandMasterCrudQueryOptions = <
+  TData = Awaited<ReturnType<typeof listYarnBrandMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listYarnBrandMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListYarnBrandMasterCrudQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listYarnBrandMasterCrud>>
+  > = ({ signal }) => listYarnBrandMasterCrud({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listYarnBrandMasterCrud>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListYarnBrandMasterCrudQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listYarnBrandMasterCrud>>
+>;
+export type ListYarnBrandMasterCrudQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List yarn brand master entries (CRUD)
+ */
+
+export function useListYarnBrandMasterCrud<
+  TData = Awaited<ReturnType<typeof listYarnBrandMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listYarnBrandMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListYarnBrandMasterCrudQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create yarn brand master entry
+ */
+export const getCreateYarnBrandMasterUrl = () => {
+  return `/api/masters/yarn-brand`;
+};
+
+export const createYarnBrandMaster = async (
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getCreateYarnBrandMasterUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getCreateYarnBrandMasterMutationOptions = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createYarnBrandMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createYarnBrandMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["createYarnBrandMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createYarnBrandMaster>>,
+    { data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createYarnBrandMaster(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateYarnBrandMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createYarnBrandMaster>>
+>;
+export type CreateYarnBrandMasterMutationBody = BodyType<CreateLookupBody>;
+export type CreateYarnBrandMasterMutationError = ErrorType<
+  BadRequestResponse | ConflictResponse
+>;
+
+/**
+ * @summary Create yarn brand master entry
+ */
+export const useCreateYarnBrandMaster = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createYarnBrandMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createYarnBrandMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getCreateYarnBrandMasterMutationOptions(options));
+};
+
+/**
+ * @summary Update yarn brand master entry
+ */
+export const getUpdateYarnBrandMasterUrl = (id: number) => {
+  return `/api/masters/yarn-brand/${id}`;
+};
+
+export const updateYarnBrandMaster = async (
+  id: number,
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getUpdateYarnBrandMasterUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getUpdateYarnBrandMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateYarnBrandMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateYarnBrandMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["updateYarnBrandMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateYarnBrandMaster>>,
+    { id: number; data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateYarnBrandMaster(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateYarnBrandMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateYarnBrandMaster>>
+>;
+export type UpdateYarnBrandMasterMutationBody = BodyType<CreateLookupBody>;
+export type UpdateYarnBrandMasterMutationError = ErrorType<
+  NotFoundResponse | ConflictResponse
+>;
+
+/**
+ * @summary Update yarn brand master entry
+ */
+export const useUpdateYarnBrandMaster = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateYarnBrandMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateYarnBrandMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getUpdateYarnBrandMasterMutationOptions(options));
+};
+
+/**
+ * @summary Delete yarn brand master entry
+ */
+export const getDeleteYarnBrandMasterUrl = (id: number) => {
+  return `/api/masters/yarn-brand/${id}`;
+};
+
+export const deleteYarnBrandMaster = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteYarnBrandMasterUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteYarnBrandMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteYarnBrandMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteYarnBrandMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteYarnBrandMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteYarnBrandMaster>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteYarnBrandMaster(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteYarnBrandMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteYarnBrandMaster>>
+>;
+
+export type DeleteYarnBrandMasterMutationError = ErrorType<NotFoundResponse>;
+
+/**
+ * @summary Delete yarn brand master entry
+ */
+export const useDeleteYarnBrandMaster = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteYarnBrandMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteYarnBrandMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteYarnBrandMasterMutationOptions(options));
+};
+
+/**
+ * @summary List UOM master entries (CRUD)
+ */
+export const getListUomMasterCrudUrl = () => {
+  return `/api/masters/uom`;
+};
+
+export const listUomMasterCrud = async (
+  options?: RequestInit,
+): Promise<UomLookupItem[]> => {
+  return customFetch<UomLookupItem[]>(getListUomMasterCrudUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListUomMasterCrudQueryKey = () => {
+  return [`/api/masters/uom`] as const;
+};
+
+export const getListUomMasterCrudQueryOptions = <
+  TData = Awaited<ReturnType<typeof listUomMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listUomMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListUomMasterCrudQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listUomMasterCrud>>
+  > = ({ signal }) => listUomMasterCrud({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listUomMasterCrud>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListUomMasterCrudQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listUomMasterCrud>>
+>;
+export type ListUomMasterCrudQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List UOM master entries (CRUD)
+ */
+
+export function useListUomMasterCrud<
+  TData = Awaited<ReturnType<typeof listUomMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listUomMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListUomMasterCrudQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create UOM master entry
+ */
+export const getCreateUomMasterUrl = () => {
+  return `/api/masters/uom`;
+};
+
+export const createUomMaster = async (
+  createUomBody: CreateUomBody,
+  options?: RequestInit,
+): Promise<UomLookupItem> => {
+  return customFetch<UomLookupItem>(getCreateUomMasterUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createUomBody),
+  });
+};
+
+export const getCreateUomMasterMutationOptions = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createUomMaster>>,
+    TError,
+    { data: BodyType<CreateUomBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createUomMaster>>,
+  TError,
+  { data: BodyType<CreateUomBody> },
+  TContext
+> => {
+  const mutationKey = ["createUomMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createUomMaster>>,
+    { data: BodyType<CreateUomBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createUomMaster(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateUomMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createUomMaster>>
+>;
+export type CreateUomMasterMutationBody = BodyType<CreateUomBody>;
+export type CreateUomMasterMutationError = ErrorType<
+  BadRequestResponse | ConflictResponse
+>;
+
+/**
+ * @summary Create UOM master entry
+ */
+export const useCreateUomMaster = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createUomMaster>>,
+    TError,
+    { data: BodyType<CreateUomBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createUomMaster>>,
+  TError,
+  { data: BodyType<CreateUomBody> },
+  TContext
+> => {
+  return useMutation(getCreateUomMasterMutationOptions(options));
+};
+
+/**
+ * @summary Update UOM master entry
+ */
+export const getUpdateUomMasterUrl = (id: number) => {
+  return `/api/masters/uom/${id}`;
+};
+
+export const updateUomMaster = async (
+  id: number,
+  createUomBody: CreateUomBody,
+  options?: RequestInit,
+): Promise<UomLookupItem> => {
+  return customFetch<UomLookupItem>(getUpdateUomMasterUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createUomBody),
+  });
+};
+
+export const getUpdateUomMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateUomMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateUomBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateUomMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateUomBody> },
+  TContext
+> => {
+  const mutationKey = ["updateUomMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateUomMaster>>,
+    { id: number; data: BodyType<CreateUomBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateUomMaster(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateUomMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateUomMaster>>
+>;
+export type UpdateUomMasterMutationBody = BodyType<CreateUomBody>;
+export type UpdateUomMasterMutationError = ErrorType<
+  NotFoundResponse | ConflictResponse
+>;
+
+/**
+ * @summary Update UOM master entry
+ */
+export const useUpdateUomMaster = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateUomMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateUomBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateUomMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateUomBody> },
+  TContext
+> => {
+  return useMutation(getUpdateUomMasterMutationOptions(options));
+};
+
+/**
+ * @summary Delete UOM master entry
+ */
+export const getDeleteUomMasterUrl = (id: number) => {
+  return `/api/masters/uom/${id}`;
+};
+
+export const deleteUomMaster = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteUomMasterUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteUomMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteUomMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteUomMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteUomMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteUomMaster>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteUomMaster(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteUomMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteUomMaster>>
+>;
+
+export type DeleteUomMasterMutationError = ErrorType<NotFoundResponse>;
+
+/**
+ * @summary Delete UOM master entry
+ */
+export const useDeleteUomMaster = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteUomMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteUomMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteUomMasterMutationOptions(options));
+};
+
+/**
+ * @summary List fabric type master entries (CRUD)
+ */
+export const getListFabricTypeMasterCrudUrl = () => {
+  return `/api/masters/fabric-type`;
+};
+
+export const listFabricTypeMasterCrud = async (
+  options?: RequestInit,
+): Promise<LookupItem[]> => {
+  return customFetch<LookupItem[]>(getListFabricTypeMasterCrudUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListFabricTypeMasterCrudQueryKey = () => {
+  return [`/api/masters/fabric-type`] as const;
+};
+
+export const getListFabricTypeMasterCrudQueryOptions = <
+  TData = Awaited<ReturnType<typeof listFabricTypeMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listFabricTypeMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListFabricTypeMasterCrudQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listFabricTypeMasterCrud>>
+  > = ({ signal }) => listFabricTypeMasterCrud({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listFabricTypeMasterCrud>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListFabricTypeMasterCrudQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listFabricTypeMasterCrud>>
+>;
+export type ListFabricTypeMasterCrudQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List fabric type master entries (CRUD)
+ */
+
+export function useListFabricTypeMasterCrud<
+  TData = Awaited<ReturnType<typeof listFabricTypeMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listFabricTypeMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListFabricTypeMasterCrudQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create fabric type master entry
+ */
+export const getCreateFabricTypeMasterUrl = () => {
+  return `/api/masters/fabric-type`;
+};
+
+export const createFabricTypeMaster = async (
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getCreateFabricTypeMasterUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getCreateFabricTypeMasterMutationOptions = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createFabricTypeMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createFabricTypeMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["createFabricTypeMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createFabricTypeMaster>>,
+    { data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createFabricTypeMaster(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateFabricTypeMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createFabricTypeMaster>>
+>;
+export type CreateFabricTypeMasterMutationBody = BodyType<CreateLookupBody>;
+export type CreateFabricTypeMasterMutationError = ErrorType<
+  BadRequestResponse | ConflictResponse
+>;
+
+/**
+ * @summary Create fabric type master entry
+ */
+export const useCreateFabricTypeMaster = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createFabricTypeMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createFabricTypeMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getCreateFabricTypeMasterMutationOptions(options));
+};
+
+/**
+ * @summary Update fabric type master entry
+ */
+export const getUpdateFabricTypeMasterUrl = (id: number) => {
+  return `/api/masters/fabric-type/${id}`;
+};
+
+export const updateFabricTypeMaster = async (
+  id: number,
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getUpdateFabricTypeMasterUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getUpdateFabricTypeMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateFabricTypeMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateFabricTypeMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["updateFabricTypeMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateFabricTypeMaster>>,
+    { id: number; data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateFabricTypeMaster(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateFabricTypeMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateFabricTypeMaster>>
+>;
+export type UpdateFabricTypeMasterMutationBody = BodyType<CreateLookupBody>;
+export type UpdateFabricTypeMasterMutationError = ErrorType<
+  NotFoundResponse | ConflictResponse
+>;
+
+/**
+ * @summary Update fabric type master entry
+ */
+export const useUpdateFabricTypeMaster = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateFabricTypeMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateFabricTypeMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getUpdateFabricTypeMasterMutationOptions(options));
+};
+
+/**
+ * @summary Delete fabric type master entry
+ */
+export const getDeleteFabricTypeMasterUrl = (id: number) => {
+  return `/api/masters/fabric-type/${id}`;
+};
+
+export const deleteFabricTypeMaster = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteFabricTypeMasterUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteFabricTypeMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteFabricTypeMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteFabricTypeMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteFabricTypeMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteFabricTypeMaster>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteFabricTypeMaster(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteFabricTypeMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteFabricTypeMaster>>
+>;
+
+export type DeleteFabricTypeMasterMutationError = ErrorType<NotFoundResponse>;
+
+/**
+ * @summary Delete fabric type master entry
+ */
+export const useDeleteFabricTypeMaster = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteFabricTypeMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteFabricTypeMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteFabricTypeMasterMutationOptions(options));
+};
+
+/**
+ * @summary List machine operator master entries (CRUD)
+ */
+export const getListMachineOperatorMasterCrudUrl = () => {
+  return `/api/masters/machine-operator`;
+};
+
+export const listMachineOperatorMasterCrud = async (
+  options?: RequestInit,
+): Promise<LookupItem[]> => {
+  return customFetch<LookupItem[]>(getListMachineOperatorMasterCrudUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListMachineOperatorMasterCrudQueryKey = () => {
+  return [`/api/masters/machine-operator`] as const;
+};
+
+export const getListMachineOperatorMasterCrudQueryOptions = <
+  TData = Awaited<ReturnType<typeof listMachineOperatorMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listMachineOperatorMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListMachineOperatorMasterCrudQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listMachineOperatorMasterCrud>>
+  > = ({ signal }) =>
+    listMachineOperatorMasterCrud({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listMachineOperatorMasterCrud>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListMachineOperatorMasterCrudQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listMachineOperatorMasterCrud>>
+>;
+export type ListMachineOperatorMasterCrudQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List machine operator master entries (CRUD)
+ */
+
+export function useListMachineOperatorMasterCrud<
+  TData = Awaited<ReturnType<typeof listMachineOperatorMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listMachineOperatorMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListMachineOperatorMasterCrudQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create machine operator master entry
+ */
+export const getCreateMachineOperatorMasterUrl = () => {
+  return `/api/masters/machine-operator`;
+};
+
+export const createMachineOperatorMaster = async (
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getCreateMachineOperatorMasterUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getCreateMachineOperatorMasterMutationOptions = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createMachineOperatorMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createMachineOperatorMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["createMachineOperatorMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createMachineOperatorMaster>>,
+    { data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createMachineOperatorMaster(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateMachineOperatorMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createMachineOperatorMaster>>
+>;
+export type CreateMachineOperatorMasterMutationBody =
+  BodyType<CreateLookupBody>;
+export type CreateMachineOperatorMasterMutationError = ErrorType<
+  BadRequestResponse | ConflictResponse
+>;
+
+/**
+ * @summary Create machine operator master entry
+ */
+export const useCreateMachineOperatorMaster = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createMachineOperatorMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createMachineOperatorMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getCreateMachineOperatorMasterMutationOptions(options));
+};
+
+/**
+ * @summary Update machine operator master entry
+ */
+export const getUpdateMachineOperatorMasterUrl = (id: number) => {
+  return `/api/masters/machine-operator/${id}`;
+};
+
+export const updateMachineOperatorMaster = async (
+  id: number,
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getUpdateMachineOperatorMasterUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getUpdateMachineOperatorMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMachineOperatorMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateMachineOperatorMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["updateMachineOperatorMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateMachineOperatorMaster>>,
+    { id: number; data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateMachineOperatorMaster(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateMachineOperatorMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateMachineOperatorMaster>>
+>;
+export type UpdateMachineOperatorMasterMutationBody =
+  BodyType<CreateLookupBody>;
+export type UpdateMachineOperatorMasterMutationError = ErrorType<
+  NotFoundResponse | ConflictResponse
+>;
+
+/**
+ * @summary Update machine operator master entry
+ */
+export const useUpdateMachineOperatorMaster = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateMachineOperatorMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateMachineOperatorMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getUpdateMachineOperatorMasterMutationOptions(options));
+};
+
+/**
+ * @summary Delete machine operator master entry
+ */
+export const getDeleteMachineOperatorMasterUrl = (id: number) => {
+  return `/api/masters/machine-operator/${id}`;
+};
+
+export const deleteMachineOperatorMaster = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteMachineOperatorMasterUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteMachineOperatorMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteMachineOperatorMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteMachineOperatorMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteMachineOperatorMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteMachineOperatorMaster>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteMachineOperatorMaster(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteMachineOperatorMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteMachineOperatorMaster>>
+>;
+
+export type DeleteMachineOperatorMasterMutationError =
+  ErrorType<NotFoundResponse>;
+
+/**
+ * @summary Delete machine operator master entry
+ */
+export const useDeleteMachineOperatorMaster = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteMachineOperatorMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteMachineOperatorMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteMachineOperatorMasterMutationOptions(options));
+};
 
 /**
  * @summary List all transactions

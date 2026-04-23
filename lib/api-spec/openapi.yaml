@@ -11,7 +11,9 @@ tags:
   - name: health
     description: Health operations
   - name: lookups
-    description: Lookup master tables
+    description: Lookup master tables (read)
+  - name: masters
+    description: Master table CRUD
   - name: transactions
     description: Transaction CRUD operations
 paths:
@@ -29,7 +31,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
-  # Lookup endpoints
+  # ─── READ-ONLY LOOKUP ENDPOINTS ───────────────────────────────────────────
   /lookups/job-master:
     get:
       operationId: listJobMaster
@@ -180,7 +182,739 @@ paths:
                 items:
                   $ref: "#/components/schemas/LookupItem"
 
-  # Transaction endpoints
+  # ─── MASTER CRUD ENDPOINTS ────────────────────────────────────────────────
+
+  # Job Master
+  /masters/job:
+    get:
+      operationId: listJobMasterCrud
+      tags: [masters]
+      summary: List job master entries (CRUD)
+      responses:
+        "200":
+          description: List of job master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookupItem"
+    post:
+      operationId: createJobMaster
+      tags: [masters]
+      summary: Create job master entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLookupBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /masters/job/{id}:
+    put:
+      operationId: updateJobMaster
+      tags: [masters]
+      summary: Update job master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLookupBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: deleteJobMaster
+      tags: [masters]
+      summary: Delete job master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # Party Master
+  /masters/party:
+    get:
+      operationId: listPartyMasterCrud
+      tags: [masters]
+      summary: List party master entries (CRUD)
+      responses:
+        "200":
+          description: List of party master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookupItem"
+    post:
+      operationId: createPartyMaster
+      tags: [masters]
+      summary: Create party master entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLookupBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /masters/party/{id}:
+    put:
+      operationId: updatePartyMaster
+      tags: [masters]
+      summary: Update party master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLookupBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: deletePartyMaster
+      tags: [masters]
+      summary: Delete party master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # Machine Master
+  /masters/machine:
+    get:
+      operationId: listMachineMasterCrud
+      tags: [masters]
+      summary: List machine master entries (CRUD)
+      responses:
+        "200":
+          description: List of machine master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MachineLookupItem"
+    post:
+      operationId: createMachineMaster
+      tags: [masters]
+      summary: Create machine master entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMachineBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MachineLookupItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /masters/machine/{id}:
+    put:
+      operationId: updateMachineMaster
+      tags: [masters]
+      summary: Update machine master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMachineBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MachineLookupItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: deleteMachineMaster
+      tags: [masters]
+      summary: Delete machine master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # Location Master
+  /masters/location:
+    get:
+      operationId: listLocationMasterCrud
+      tags: [masters]
+      summary: List location master entries (CRUD)
+      responses:
+        "200":
+          description: List of location master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookupItem"
+    post:
+      operationId: createLocationMaster
+      tags: [masters]
+      summary: Create location master entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLookupBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /masters/location/{id}:
+    put:
+      operationId: updateLocationMaster
+      tags: [masters]
+      summary: Update location master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLookupBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: deleteLocationMaster
+      tags: [masters]
+      summary: Delete location master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # Yarn Type Master
+  /masters/yarn-type:
+    get:
+      operationId: listYarnTypeMasterCrud
+      tags: [masters]
+      summary: List yarn type master entries (CRUD)
+      responses:
+        "200":
+          description: List of yarn type master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookupItem"
+    post:
+      operationId: createYarnTypeMaster
+      tags: [masters]
+      summary: Create yarn type master entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLookupBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /masters/yarn-type/{id}:
+    put:
+      operationId: updateYarnTypeMaster
+      tags: [masters]
+      summary: Update yarn type master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLookupBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: deleteYarnTypeMaster
+      tags: [masters]
+      summary: Delete yarn type master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # Yarn Count Master
+  /masters/yarn-count:
+    get:
+      operationId: listYarnCountMasterCrud
+      tags: [masters]
+      summary: List yarn count master entries (CRUD)
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/YarnCountLookupItem"
+    post:
+      operationId: createYarnCountMaster
+      tags: [masters]
+      summary: Create yarn count master entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateYarnCountBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YarnCountLookupItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /masters/yarn-count/{id}:
+    put:
+      operationId: updateYarnCountMaster
+      tags: [masters]
+      summary: Update yarn count master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateYarnCountBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/YarnCountLookupItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: deleteYarnCountMaster
+      tags: [masters]
+      summary: Delete yarn count master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # Yarn Brand Master
+  /masters/yarn-brand:
+    get:
+      operationId: listYarnBrandMasterCrud
+      tags: [masters]
+      summary: List yarn brand master entries (CRUD)
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookupItem"
+    post:
+      operationId: createYarnBrandMaster
+      tags: [masters]
+      summary: Create yarn brand master entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLookupBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /masters/yarn-brand/{id}:
+    put:
+      operationId: updateYarnBrandMaster
+      tags: [masters]
+      summary: Update yarn brand master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLookupBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: deleteYarnBrandMaster
+      tags: [masters]
+      summary: Delete yarn brand master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # UOM Master
+  /masters/uom:
+    get:
+      operationId: listUomMasterCrud
+      tags: [masters]
+      summary: List UOM master entries (CRUD)
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UomLookupItem"
+    post:
+      operationId: createUomMaster
+      tags: [masters]
+      summary: Create UOM master entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUomBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UomLookupItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /masters/uom/{id}:
+    put:
+      operationId: updateUomMaster
+      tags: [masters]
+      summary: Update UOM master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUomBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UomLookupItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: deleteUomMaster
+      tags: [masters]
+      summary: Delete UOM master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # Fabric Type Master
+  /masters/fabric-type:
+    get:
+      operationId: listFabricTypeMasterCrud
+      tags: [masters]
+      summary: List fabric type master entries (CRUD)
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookupItem"
+    post:
+      operationId: createFabricTypeMaster
+      tags: [masters]
+      summary: Create fabric type master entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLookupBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /masters/fabric-type/{id}:
+    put:
+      operationId: updateFabricTypeMaster
+      tags: [masters]
+      summary: Update fabric type master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLookupBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: deleteFabricTypeMaster
+      tags: [masters]
+      summary: Delete fabric type master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # Machine Operator Master
+  /masters/machine-operator:
+    get:
+      operationId: listMachineOperatorMasterCrud
+      tags: [masters]
+      summary: List machine operator master entries (CRUD)
+      responses:
+        "200":
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookupItem"
+    post:
+      operationId: createMachineOperatorMaster
+      tags: [masters]
+      summary: Create machine operator master entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLookupBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /masters/machine-operator/{id}:
+    put:
+      operationId: updateMachineOperatorMaster
+      tags: [masters]
+      summary: Update machine operator master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLookupBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: deleteMachineOperatorMaster
+      tags: [masters]
+      summary: Delete machine operator master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ─── TRANSACTION ENDPOINTS ────────────────────────────────────────────────
   /transactions:
     get:
       operationId: listTransactions
@@ -302,6 +1036,34 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
 
 components:
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+
+  responses:
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Duplicate code/name conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
   schemas:
     HealthStatus:
       type: object
@@ -372,6 +1134,50 @@ components:
           type: string
       required:
         - id
+        - name
+        - abbreviation
+
+    CreateLookupBody:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+      required:
+        - name
+        - code
+
+    CreateMachineBody:
+      type: object
+      properties:
+        name:
+          type: string
+        machineNumber:
+          type: string
+      required:
+        - name
+        - machineNumber
+
+    CreateYarnCountBody:
+      type: object
+      properties:
+        name:
+          type: string
+        count:
+          type: string
+      required:
+        - name
+        - count
+
+    CreateUomBody:
+      type: object
+      properties:
+        name:
+          type: string
+        abbreviation:
+          type: string
+      required:
         - name
         - abbreviation
 

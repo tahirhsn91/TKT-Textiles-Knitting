@@ -130,6 +130,456 @@ export const ListMachineOperatorMasterResponse = zod.array(
 );
 
 /**
+ * @summary List job master entries (CRUD)
+ */
+export const ListJobMasterCrudResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+export const ListJobMasterCrudResponse = zod.array(
+  ListJobMasterCrudResponseItem,
+);
+
+/**
+ * @summary Create job master entry
+ */
+export const CreateJobMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Update job master entry
+ */
+export const UpdateJobMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateJobMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+export const UpdateJobMasterResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Delete job master entry
+ */
+export const DeleteJobMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List party master entries (CRUD)
+ */
+export const ListPartyMasterCrudResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+export const ListPartyMasterCrudResponse = zod.array(
+  ListPartyMasterCrudResponseItem,
+);
+
+/**
+ * @summary Create party master entry
+ */
+export const CreatePartyMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Update party master entry
+ */
+export const UpdatePartyMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdatePartyMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+export const UpdatePartyMasterResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Delete party master entry
+ */
+export const DeletePartyMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List machine master entries (CRUD)
+ */
+export const ListMachineMasterCrudResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  machineNumber: zod.string(),
+});
+export const ListMachineMasterCrudResponse = zod.array(
+  ListMachineMasterCrudResponseItem,
+);
+
+/**
+ * @summary Create machine master entry
+ */
+export const CreateMachineMasterBody = zod.object({
+  name: zod.string(),
+  machineNumber: zod.string(),
+});
+
+/**
+ * @summary Update machine master entry
+ */
+export const UpdateMachineMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateMachineMasterBody = zod.object({
+  name: zod.string(),
+  machineNumber: zod.string(),
+});
+
+export const UpdateMachineMasterResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  machineNumber: zod.string(),
+});
+
+/**
+ * @summary Delete machine master entry
+ */
+export const DeleteMachineMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List location master entries (CRUD)
+ */
+export const ListLocationMasterCrudResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+export const ListLocationMasterCrudResponse = zod.array(
+  ListLocationMasterCrudResponseItem,
+);
+
+/**
+ * @summary Create location master entry
+ */
+export const CreateLocationMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Update location master entry
+ */
+export const UpdateLocationMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateLocationMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+export const UpdateLocationMasterResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Delete location master entry
+ */
+export const DeleteLocationMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List yarn type master entries (CRUD)
+ */
+export const ListYarnTypeMasterCrudResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+export const ListYarnTypeMasterCrudResponse = zod.array(
+  ListYarnTypeMasterCrudResponseItem,
+);
+
+/**
+ * @summary Create yarn type master entry
+ */
+export const CreateYarnTypeMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Update yarn type master entry
+ */
+export const UpdateYarnTypeMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateYarnTypeMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+export const UpdateYarnTypeMasterResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Delete yarn type master entry
+ */
+export const DeleteYarnTypeMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List yarn count master entries (CRUD)
+ */
+export const ListYarnCountMasterCrudResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  count: zod.string(),
+});
+export const ListYarnCountMasterCrudResponse = zod.array(
+  ListYarnCountMasterCrudResponseItem,
+);
+
+/**
+ * @summary Create yarn count master entry
+ */
+export const CreateYarnCountMasterBody = zod.object({
+  name: zod.string(),
+  count: zod.string(),
+});
+
+/**
+ * @summary Update yarn count master entry
+ */
+export const UpdateYarnCountMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateYarnCountMasterBody = zod.object({
+  name: zod.string(),
+  count: zod.string(),
+});
+
+export const UpdateYarnCountMasterResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  count: zod.string(),
+});
+
+/**
+ * @summary Delete yarn count master entry
+ */
+export const DeleteYarnCountMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List yarn brand master entries (CRUD)
+ */
+export const ListYarnBrandMasterCrudResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+export const ListYarnBrandMasterCrudResponse = zod.array(
+  ListYarnBrandMasterCrudResponseItem,
+);
+
+/**
+ * @summary Create yarn brand master entry
+ */
+export const CreateYarnBrandMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Update yarn brand master entry
+ */
+export const UpdateYarnBrandMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateYarnBrandMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+export const UpdateYarnBrandMasterResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Delete yarn brand master entry
+ */
+export const DeleteYarnBrandMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List UOM master entries (CRUD)
+ */
+export const ListUomMasterCrudResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  abbreviation: zod.string(),
+});
+export const ListUomMasterCrudResponse = zod.array(
+  ListUomMasterCrudResponseItem,
+);
+
+/**
+ * @summary Create UOM master entry
+ */
+export const CreateUomMasterBody = zod.object({
+  name: zod.string(),
+  abbreviation: zod.string(),
+});
+
+/**
+ * @summary Update UOM master entry
+ */
+export const UpdateUomMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateUomMasterBody = zod.object({
+  name: zod.string(),
+  abbreviation: zod.string(),
+});
+
+export const UpdateUomMasterResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  abbreviation: zod.string(),
+});
+
+/**
+ * @summary Delete UOM master entry
+ */
+export const DeleteUomMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List fabric type master entries (CRUD)
+ */
+export const ListFabricTypeMasterCrudResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+export const ListFabricTypeMasterCrudResponse = zod.array(
+  ListFabricTypeMasterCrudResponseItem,
+);
+
+/**
+ * @summary Create fabric type master entry
+ */
+export const CreateFabricTypeMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Update fabric type master entry
+ */
+export const UpdateFabricTypeMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateFabricTypeMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+export const UpdateFabricTypeMasterResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Delete fabric type master entry
+ */
+export const DeleteFabricTypeMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List machine operator master entries (CRUD)
+ */
+export const ListMachineOperatorMasterCrudResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+export const ListMachineOperatorMasterCrudResponse = zod.array(
+  ListMachineOperatorMasterCrudResponseItem,
+);
+
+/**
+ * @summary Create machine operator master entry
+ */
+export const CreateMachineOperatorMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Update machine operator master entry
+ */
+export const UpdateMachineOperatorMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateMachineOperatorMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+export const UpdateMachineOperatorMasterResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Delete machine operator master entry
+ */
+export const DeleteMachineOperatorMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary List all transactions
  */
 export const ListTransactionsResponseItem = zod.object({

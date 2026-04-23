@@ -37,6 +37,26 @@ export interface UomLookupItem {
   abbreviation: string;
 }
 
+export interface CreateLookupBody {
+  name: string;
+  code: string;
+}
+
+export interface CreateMachineBody {
+  name: string;
+  machineNumber: string;
+}
+
+export interface CreateYarnCountBody {
+  name: string;
+  count: string;
+}
+
+export interface CreateUomBody {
+  name: string;
+  abbreviation: string;
+}
+
 export interface TransactionDetailItem {
   id: number;
   headerId: number;
@@ -142,3 +162,18 @@ export interface CreateTransactionBody {
   gsm?: number | null;
   details: CreateTransactionDetailBody[];
 }
+
+/**
+ * Validation error
+ */
+export type BadRequestResponse = ErrorResponse;
+
+/**
+ * Not found
+ */
+export type NotFoundResponse = ErrorResponse;
+
+/**
+ * Duplicate code/name conflict
+ */
+export type ConflictResponse = ErrorResponse;
