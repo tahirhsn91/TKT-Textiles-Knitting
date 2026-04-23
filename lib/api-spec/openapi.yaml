@@ -3,13 +3,17 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Fabric Knitting Factory Management System API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: lookups
+    description: Lookup master tables
+  - name: transactions
+    description: Transaction CRUD operations
 paths:
   /healthz:
     get:
@@ -24,6 +28,264 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # Lookup endpoints
+  /lookups/job-master:
+    get:
+      operationId: listJobMaster
+      tags: [lookups]
+      summary: List job master entries
+      responses:
+        "200":
+          description: List of job master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookupItem"
+
+  /lookups/party-master:
+    get:
+      operationId: listPartyMaster
+      tags: [lookups]
+      summary: List party master entries
+      responses:
+        "200":
+          description: List of party master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookupItem"
+
+  /lookups/machine-master:
+    get:
+      operationId: listMachineMaster
+      tags: [lookups]
+      summary: List machine master entries
+      responses:
+        "200":
+          description: List of machine master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MachineLookupItem"
+
+  /lookups/location-master:
+    get:
+      operationId: listLocationMaster
+      tags: [lookups]
+      summary: List location master entries
+      responses:
+        "200":
+          description: List of location master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookupItem"
+
+  /lookups/yarn-type-master:
+    get:
+      operationId: listYarnTypeMaster
+      tags: [lookups]
+      summary: List yarn type master entries
+      responses:
+        "200":
+          description: List of yarn type master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookupItem"
+
+  /lookups/yarn-count-master:
+    get:
+      operationId: listYarnCountMaster
+      tags: [lookups]
+      summary: List yarn count master entries
+      responses:
+        "200":
+          description: List of yarn count master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/YarnCountLookupItem"
+
+  /lookups/yarn-brand-master:
+    get:
+      operationId: listYarnBrandMaster
+      tags: [lookups]
+      summary: List yarn brand master entries
+      responses:
+        "200":
+          description: List of yarn brand master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookupItem"
+
+  /lookups/uom-master:
+    get:
+      operationId: listUomMaster
+      tags: [lookups]
+      summary: List UOM master entries
+      responses:
+        "200":
+          description: List of UOM master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UomLookupItem"
+
+  /lookups/fabric-type-master:
+    get:
+      operationId: listFabricTypeMaster
+      tags: [lookups]
+      summary: List fabric type master entries
+      responses:
+        "200":
+          description: List of fabric type master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookupItem"
+
+  # Transaction endpoints
+  /transactions:
+    get:
+      operationId: listTransactions
+      tags: [transactions]
+      summary: List all transactions
+      responses:
+        "200":
+          description: List of transaction headers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TransactionSummary"
+
+    post:
+      operationId: createTransaction
+      tags: [transactions]
+      summary: Create a new transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTransactionBody"
+      responses:
+        "201":
+          description: Created transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionWithDetails"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /transactions/{id}:
+    get:
+      operationId: getTransaction
+      tags: [transactions]
+      summary: Get a transaction by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Transaction with details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionWithDetails"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    put:
+      operationId: updateTransaction
+      tags: [transactions]
+      summary: Update a transaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTransactionBody"
+      responses:
+        "200":
+          description: Updated transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionWithDetails"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deleteTransaction
+      tags: [transactions]
+      summary: Delete a transaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +296,199 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    LookupItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+      required:
+        - id
+        - name
+        - code
+
+    MachineLookupItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        machineNumber:
+          type: string
+      required:
+        - id
+        - name
+        - machineNumber
+
+    YarnCountLookupItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        count:
+          type: string
+      required:
+        - id
+        - name
+        - count
+
+    UomLookupItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        abbreviation:
+          type: string
+      required:
+        - id
+        - name
+        - abbreviation
+
+    TransactionDetailItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        headerId:
+          type: integer
+        yarnTypeId:
+          type: ["integer", "null"]
+        yarnCountId:
+          type: ["integer", "null"]
+        yarnBrandId:
+          type: ["integer", "null"]
+        uomId:
+          type: ["integer", "null"]
+        fabricType:
+          type: ["integer", "null"]
+        sl:
+          type: ["integer", "null"]
+        gsm:
+          type: ["integer", "null"]
+        quantity:
+          type: ["string", "null"]
+        netWt:
+          type: ["string", "null"]
+      required:
+        - id
+        - headerId
+
+    TransactionSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        transactionTypeId:
+          type: integer
+        date:
+          type: string
+        docNumber:
+          type: string
+        jobId:
+          type: ["integer", "null"]
+        partyId:
+          type: ["integer", "null"]
+        machineNumber:
+          type: ["integer", "null"]
+        locationId:
+          type: ["integer", "null"]
+      required:
+        - id
+        - transactionTypeId
+        - date
+        - docNumber
+
+    TransactionWithDetails:
+      type: object
+      properties:
+        id:
+          type: integer
+        transactionTypeId:
+          type: integer
+        date:
+          type: string
+        docNumber:
+          type: string
+        jobId:
+          type: ["integer", "null"]
+        partyId:
+          type: ["integer", "null"]
+        machineNumber:
+          type: ["integer", "null"]
+        locationId:
+          type: ["integer", "null"]
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransactionDetailItem"
+      required:
+        - id
+        - transactionTypeId
+        - date
+        - docNumber
+        - details
+
+    CreateTransactionDetailBody:
+      type: object
+      properties:
+        yarnTypeId:
+          type: ["integer", "null"]
+        yarnCountId:
+          type: ["integer", "null"]
+        yarnBrandId:
+          type: ["integer", "null"]
+        uomId:
+          type: ["integer", "null"]
+        fabricType:
+          type: ["integer", "null"]
+        sl:
+          type: ["integer", "null"]
+        gsm:
+          type: ["integer", "null"]
+        quantity:
+          type: ["string", "null"]
+        netWt:
+          type: ["string", "null"]
+
+    CreateTransactionBody:
+      type: object
+      properties:
+        transactionTypeId:
+          type: integer
+        date:
+          type: string
+        docNumber:
+          type: string
+        jobId:
+          type: ["integer", "null"]
+        partyId:
+          type: ["integer", "null"]
+        machineNumber:
+          type: ["integer", "null"]
+        locationId:
+          type: ["integer", "null"]
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateTransactionDetailBody"
+      required:
+        - transactionTypeId
+        - date
+        - docNumber
+        - details

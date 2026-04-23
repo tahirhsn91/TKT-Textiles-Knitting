@@ -1,0 +1,84 @@
+import { pgTable, text, serial } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod/v4";
+
+export const jobMasterTable = pgTable("job_master", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  code: text("code").notNull(),
+});
+export const insertJobMasterSchema = createInsertSchema(jobMasterTable).omit({ id: true });
+export type InsertJobMaster = z.infer<typeof insertJobMasterSchema>;
+export type JobMaster = typeof jobMasterTable.$inferSelect;
+
+export const partyMasterTable = pgTable("party_master", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  code: text("code").notNull(),
+});
+export const insertPartyMasterSchema = createInsertSchema(partyMasterTable).omit({ id: true });
+export type InsertPartyMaster = z.infer<typeof insertPartyMasterSchema>;
+export type PartyMaster = typeof partyMasterTable.$inferSelect;
+
+export const machineMasterTable = pgTable("machine_master", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  machineNumber: text("machine_number").notNull(),
+});
+export const insertMachineMasterSchema = createInsertSchema(machineMasterTable).omit({ id: true });
+export type InsertMachineMaster = z.infer<typeof insertMachineMasterSchema>;
+export type MachineMaster = typeof machineMasterTable.$inferSelect;
+
+export const locationMasterTable = pgTable("location_master", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  code: text("code").notNull(),
+});
+export const insertLocationMasterSchema = createInsertSchema(locationMasterTable).omit({ id: true });
+export type InsertLocationMaster = z.infer<typeof insertLocationMasterSchema>;
+export type LocationMaster = typeof locationMasterTable.$inferSelect;
+
+export const yarnTypeMasterTable = pgTable("yarn_type_master", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  code: text("code").notNull(),
+});
+export const insertYarnTypeMasterSchema = createInsertSchema(yarnTypeMasterTable).omit({ id: true });
+export type InsertYarnTypeMaster = z.infer<typeof insertYarnTypeMasterSchema>;
+export type YarnTypeMaster = typeof yarnTypeMasterTable.$inferSelect;
+
+export const yarnCountMasterTable = pgTable("yarn_count_master", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  count: text("count").notNull(),
+});
+export const insertYarnCountMasterSchema = createInsertSchema(yarnCountMasterTable).omit({ id: true });
+export type InsertYarnCountMaster = z.infer<typeof insertYarnCountMasterSchema>;
+export type YarnCountMaster = typeof yarnCountMasterTable.$inferSelect;
+
+export const yarnBrandMasterTable = pgTable("yarn_brand_master", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  code: text("code").notNull(),
+});
+export const insertYarnBrandMasterSchema = createInsertSchema(yarnBrandMasterTable).omit({ id: true });
+export type InsertYarnBrandMaster = z.infer<typeof insertYarnBrandMasterSchema>;
+export type YarnBrandMaster = typeof yarnBrandMasterTable.$inferSelect;
+
+export const uomMasterTable = pgTable("uom_master", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  abbreviation: text("abbreviation").notNull(),
+});
+export const insertUomMasterSchema = createInsertSchema(uomMasterTable).omit({ id: true });
+export type InsertUomMaster = z.infer<typeof insertUomMasterSchema>;
+export type UomMaster = typeof uomMasterTable.$inferSelect;
+
+export const fabricTypeMasterTable = pgTable("fabric_type_master", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  code: text("code").notNull(),
+});
+export const insertFabricTypeMasterSchema = createInsertSchema(fabricTypeMasterTable).omit({ id: true });
+export type InsertFabricTypeMaster = z.infer<typeof insertFabricTypeMasterSchema>;
+export type FabricTypeMaster = typeof fabricTypeMasterTable.$inferSelect;
