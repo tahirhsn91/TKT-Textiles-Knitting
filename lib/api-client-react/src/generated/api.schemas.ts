@@ -9,10 +9,6 @@ export interface HealthStatus {
   status: string;
 }
 
-export interface ErrorResponse {
-  error: string;
-}
-
 export interface LookupItem {
   id: number;
   name: string;
@@ -57,6 +53,22 @@ export interface CreateUomBody {
   abbreviation: string;
 }
 
+export interface BadRequestResponse {
+  message: string;
+}
+
+export interface NotFoundResponse {
+  message: string;
+}
+
+export interface ConflictResponse {
+  message: string;
+}
+
+export interface ErrorResponse {
+  error: string;
+}
+
 export interface TransactionDetailItem {
   id: number;
   headerId: number;
@@ -64,6 +76,14 @@ export interface TransactionDetailItem {
   machineId?: number | null;
   /** @nullable */
   machineOperatorId?: number | null;
+  /** @nullable */
+  yarnTypeId?: number | null;
+  /** @nullable */
+  yarnCountId?: number | null;
+  /** @nullable */
+  yarnBrandId?: number | null;
+  /** @nullable */
+  uomId?: number | null;
   /** @nullable */
   quantity?: string | null;
   /** @nullable */
@@ -82,17 +102,9 @@ export interface TransactionSummary {
   /** @nullable */
   locationId?: number | null;
   /** @nullable */
-  yarnTypeId?: number | null;
-  /** @nullable */
-  yarnCountId?: number | null;
-  /** @nullable */
-  yarnBrandId?: number | null;
-  /** @nullable */
-  uomId?: number | null;
-  /** @nullable */
   fabricTypeId?: number | null;
   /** @nullable */
-  sl?: number | null;
+  sl?: string | null;
   /** @nullable */
   gsm?: number | null;
 }
@@ -109,17 +121,9 @@ export interface TransactionWithDetails {
   /** @nullable */
   locationId?: number | null;
   /** @nullable */
-  yarnTypeId?: number | null;
-  /** @nullable */
-  yarnCountId?: number | null;
-  /** @nullable */
-  yarnBrandId?: number | null;
-  /** @nullable */
-  uomId?: number | null;
-  /** @nullable */
   fabricTypeId?: number | null;
   /** @nullable */
-  sl?: number | null;
+  sl?: string | null;
   /** @nullable */
   gsm?: number | null;
   details: TransactionDetailItem[];
@@ -130,6 +134,14 @@ export interface CreateTransactionDetailBody {
   machineId?: number | null;
   /** @nullable */
   machineOperatorId?: number | null;
+  /** @nullable */
+  yarnTypeId?: number | null;
+  /** @nullable */
+  yarnCountId?: number | null;
+  /** @nullable */
+  yarnBrandId?: number | null;
+  /** @nullable */
+  uomId?: number | null;
   /** @nullable */
   quantity?: string | null;
   /** @nullable */
@@ -147,33 +159,10 @@ export interface CreateTransactionBody {
   /** @nullable */
   locationId?: number | null;
   /** @nullable */
-  yarnTypeId?: number | null;
-  /** @nullable */
-  yarnCountId?: number | null;
-  /** @nullable */
-  yarnBrandId?: number | null;
-  /** @nullable */
-  uomId?: number | null;
-  /** @nullable */
   fabricTypeId?: number | null;
   /** @nullable */
-  sl?: number | null;
+  sl?: string | null;
   /** @nullable */
   gsm?: number | null;
   details: CreateTransactionDetailBody[];
 }
-
-/**
- * Validation error
- */
-export type BadRequestResponse = ErrorResponse;
-
-/**
- * Not found
- */
-export type NotFoundResponse = ErrorResponse;
-
-/**
- * Duplicate code/name conflict
- */
-export type ConflictResponse = ErrorResponse;

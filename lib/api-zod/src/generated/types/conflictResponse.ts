@@ -5,9 +5,7 @@
  * Fabric Knitting Factory Management System API
  * OpenAPI spec version: 0.1.0
  */
-import type { ErrorResponse } from "./errorResponse";
 
-/**
- * Duplicate code/name conflict
- */
-export type ConflictResponse = ErrorResponse;
+export interface ConflictResponse {
+  message: string;
+}

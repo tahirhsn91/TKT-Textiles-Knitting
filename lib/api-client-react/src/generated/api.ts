@@ -24,7 +24,6 @@ import type {
   CreateTransactionBody,
   CreateUomBody,
   CreateYarnCountBody,
-  ErrorResponse,
   HealthStatus,
   LookupItem,
   MachineLookupItem,
@@ -45,11 +44,10 @@ type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const getHealthCheckUrl = () => {
-  return `/api/healthz`;
+  return `/api/health`;
 };
 
 export const healthCheck = async (
@@ -62,7 +60,7 @@ export const healthCheck = async (
 };
 
 export const getHealthCheckQueryKey = () => {
-  return [`/api/healthz`] as const;
+  return [`/api/health`] as const;
 };
 
 export const getHealthCheckQueryOptions = <
@@ -4753,7 +4751,7 @@ export const createTransaction = async (
 };
 
 export const getCreateTransactionMutationOptions = <
-  TError = ErrorType<ErrorResponse>,
+  TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -4794,13 +4792,13 @@ export type CreateTransactionMutationResult = NonNullable<
   Awaited<ReturnType<typeof createTransaction>>
 >;
 export type CreateTransactionMutationBody = BodyType<CreateTransactionBody>;
-export type CreateTransactionMutationError = ErrorType<ErrorResponse>;
+export type CreateTransactionMutationError = ErrorType<unknown>;
 
 /**
  * @summary Create a new transaction
  */
 export const useCreateTransaction = <
-  TError = ErrorType<ErrorResponse>,
+  TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -4820,7 +4818,7 @@ export const useCreateTransaction = <
 };
 
 /**
- * @summary Get a transaction by ID
+ * @summary Get a single transaction with details
  */
 export const getGetTransactionUrl = (id: number) => {
   return `/api/transactions/${id}`;
@@ -4842,7 +4840,7 @@ export const getGetTransactionQueryKey = (id: number) => {
 
 export const getGetTransactionQueryOptions = <
   TData = Awaited<ReturnType<typeof getTransaction>>,
-  TError = ErrorType<ErrorResponse>,
+  TError = ErrorType<NotFoundResponse>,
 >(
   id: number,
   options?: {
@@ -4877,15 +4875,15 @@ export const getGetTransactionQueryOptions = <
 export type GetTransactionQueryResult = NonNullable<
   Awaited<ReturnType<typeof getTransaction>>
 >;
-export type GetTransactionQueryError = ErrorType<ErrorResponse>;
+export type GetTransactionQueryError = ErrorType<NotFoundResponse>;
 
 /**
- * @summary Get a transaction by ID
+ * @summary Get a single transaction with details
  */
 
 export function useGetTransaction<
   TData = Awaited<ReturnType<typeof getTransaction>>,
-  TError = ErrorType<ErrorResponse>,
+  TError = ErrorType<NotFoundResponse>,
 >(
   id: number,
   options?: {
@@ -4927,7 +4925,7 @@ export const updateTransaction = async (
 };
 
 export const getUpdateTransactionMutationOptions = <
-  TError = ErrorType<ErrorResponse>,
+  TError = ErrorType<NotFoundResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -4968,13 +4966,13 @@ export type UpdateTransactionMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateTransaction>>
 >;
 export type UpdateTransactionMutationBody = BodyType<CreateTransactionBody>;
-export type UpdateTransactionMutationError = ErrorType<ErrorResponse>;
+export type UpdateTransactionMutationError = ErrorType<NotFoundResponse>;
 
 /**
  * @summary Update a transaction
  */
 export const useUpdateTransaction = <
-  TError = ErrorType<ErrorResponse>,
+  TError = ErrorType<NotFoundResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -5011,7 +5009,7 @@ export const deleteTransaction = async (
 };
 
 export const getDeleteTransactionMutationOptions = <
-  TError = ErrorType<ErrorResponse>,
+  TError = ErrorType<NotFoundResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -5052,13 +5050,13 @@ export type DeleteTransactionMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteTransaction>>
 >;
 
-export type DeleteTransactionMutationError = ErrorType<ErrorResponse>;
+export type DeleteTransactionMutationError = ErrorType<NotFoundResponse>;
 
 /**
  * @summary Delete a transaction
  */
 export const useDeleteTransaction = <
-  TError = ErrorType<ErrorResponse>,
+  TError = ErrorType<NotFoundResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<

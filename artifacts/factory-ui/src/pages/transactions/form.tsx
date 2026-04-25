@@ -58,6 +58,10 @@ const detailSchema = z.object({
   id: z.number().optional(),
   machineId: z.number().nullable(),
   machineOperatorId: z.number().nullable(),
+  yarnTypeId: z.number().nullable(),
+  yarnCountId: z.number().nullable(),
+  yarnBrandId: z.number().nullable(),
+  uomId: z.number().nullable(),
   quantity: z.string().nullable(),
   netWt: z.string().nullable(),
 });
@@ -69,12 +73,8 @@ const formSchema = z.object({
   jobId: z.number().nullable(),
   partyId: z.number().nullable(),
   locationId: z.number().nullable(),
-  yarnTypeId: z.number().nullable(),
-  yarnCountId: z.number().nullable(),
-  yarnBrandId: z.number().nullable(),
-  uomId: z.number().nullable(),
   fabricTypeId: z.number().nullable(),
-  sl: nullableInt,
+  sl: z.string().nullable(),
   gsm: nullableInt,
   details: z.array(detailSchema),
 });
@@ -84,6 +84,10 @@ type FormValues = z.infer<typeof formSchema>;
 const emptyDetail = (): z.infer<typeof detailSchema> => ({
   machineId: null,
   machineOperatorId: null,
+  yarnTypeId: null,
+  yarnCountId: null,
+  yarnBrandId: null,
+  uomId: null,
   quantity: null,
   netWt: null,
 });
@@ -124,10 +128,6 @@ export default function TransactionForm() {
       jobId: null,
       partyId: null,
       locationId: null,
-      yarnTypeId: null,
-      yarnCountId: null,
-      yarnBrandId: null,
-      uomId: null,
       fabricTypeId: null,
       sl: null,
       gsm: null,
@@ -143,7 +143,8 @@ export default function TransactionForm() {
   const lookupsReady = !!(
     jobMaster && partyMaster && machineMaster && locationMaster &&
     yarnTypeMaster && yarnCountMaster && yarnBrandMaster && uomMaster &&
-    fabricTypeMaster && machineOperatorMaster
+    fabricTypeMaster && machineOperatorMaster &&
+    transactionTypeMaster
   );
 
   useEffect(() => {
@@ -155,10 +156,6 @@ export default function TransactionForm() {
         jobId: transaction.jobId ?? null,
         partyId: transaction.partyId ?? null,
         locationId: transaction.locationId ?? null,
-        yarnTypeId: transaction.yarnTypeId ?? null,
-        yarnCountId: transaction.yarnCountId ?? null,
-        yarnBrandId: transaction.yarnBrandId ?? null,
-        uomId: transaction.uomId ?? null,
         fabricTypeId: transaction.fabricTypeId ?? null,
         sl: transaction.sl ?? null,
         gsm: transaction.gsm ?? null,
@@ -167,6 +164,10 @@ export default function TransactionForm() {
               id: d.id,
               machineId: d.machineId ?? null,
               machineOperatorId: d.machineOperatorId ?? null,
+              yarnTypeId: d.yarnTypeId ?? null,
+              yarnCountId: d.yarnCountId ?? null,
+              yarnBrandId: d.yarnBrandId ?? null,
+              uomId: d.uomId ?? null,
               quantity: d.quantity ?? null,
               netWt: d.netWt ?? null,
             }))
@@ -389,118 +390,7 @@ export default function TransactionForm() {
                   />
                 </div>
 
-                {/* Row 3: Yarn Type, Yarn Count, Yarn Brand, UOM */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="yarnTypeId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Yarn Type</FormLabel>
-                        <Select
-                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
-                          value={field.value?.toString() || "none"}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select yarn type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {yarnTypeMaster?.map(y => (
-                              <SelectItem key={y.id} value={y.id.toString()}>{y.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="yarnCountId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Yarn Count</FormLabel>
-                        <Select
-                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
-                          value={field.value?.toString() || "none"}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select count" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {yarnCountMaster?.map(y => (
-                              <SelectItem key={y.id} value={y.id.toString()}>{y.name} ({y.count})</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="yarnBrandId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Yarn Brand</FormLabel>
-                        <Select
-                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
-                          value={field.value?.toString() || "none"}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select brand" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {yarnBrandMaster?.map(y => (
-                              <SelectItem key={y.id} value={y.id.toString()}>{y.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="uomId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>UOM</FormLabel>
-                        <Select
-                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
-                          value={field.value?.toString() || "none"}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select UOM" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {uomMaster?.map(u => (
-                              <SelectItem key={u.id} value={u.id.toString()}>{u.abbreviation}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                {/* Row 4: Fabric Type, SL, GSM */}
+                {/* Row 3: Fabric Type, SL, GSM */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <FormField
                     control={form.control}
@@ -537,10 +427,10 @@ export default function TransactionForm() {
                         <FormLabel>SL</FormLabel>
                         <FormControl>
                           <Input
-                            type="number"
                             placeholder="SL"
                             {...field}
                             value={field.value ?? ""}
+                            onChange={(e) => field.onChange(e.target.value === "" ? null : e.target.value)}
                           />
                         </FormControl>
                         <FormMessage />
@@ -586,8 +476,12 @@ export default function TransactionForm() {
               </CardHeader>
               <CardContent className="p-0">
                 <ScrollArea className="w-full rounded-md">
-                  <div className="min-w-[600px] p-4 pt-0">
-                    <div className="grid grid-cols-[3fr_3fr_2fr_2fr_auto] gap-2 mb-2 font-medium text-sm text-muted-foreground">
+                  <div className="min-w-[1200px] p-4 pt-0">
+                    <div className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_auto] gap-2 mb-2 font-medium text-sm text-muted-foreground">
+                      <div>Yarn Type</div>
+                      <div>Yarn Count</div>
+                      <div>Yarn Brand</div>
+                      <div>UOM</div>
                       <div>Machine</div>
                       <div>Machine Operator</div>
                       <div>Qty</div>
@@ -597,7 +491,107 @@ export default function TransactionForm() {
 
                     <div className="space-y-2">
                       {fields.map((field, index) => (
-                        <div key={field.id} className="grid grid-cols-[3fr_3fr_2fr_2fr_auto] gap-2 items-start">
+                        <div key={field.id} className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_auto] gap-2 items-start">
+                          <FormField
+                            control={form.control}
+                            name={`details.${index}.yarnTypeId`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <Select
+                                  onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
+                                  value={field.value?.toString() || "none"}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="h-9">
+                                      <SelectValue placeholder="Type" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    {yarnTypeMaster?.map(y => (
+                                      <SelectItem key={y.id} value={y.id.toString()}>{y.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name={`details.${index}.yarnCountId`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <Select
+                                  onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
+                                  value={field.value?.toString() || "none"}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="h-9">
+                                      <SelectValue placeholder="Count" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    {yarnCountMaster?.map(y => (
+                                      <SelectItem key={y.id} value={y.id.toString()}>{y.name} ({y.count})</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name={`details.${index}.yarnBrandId`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <Select
+                                  onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
+                                  value={field.value?.toString() || "none"}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="h-9">
+                                      <SelectValue placeholder="Brand" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    {yarnBrandMaster?.map(y => (
+                                      <SelectItem key={y.id} value={y.id.toString()}>{y.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name={`details.${index}.uomId`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <Select
+                                  onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
+                                  value={field.value?.toString() || "none"}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="h-9">
+                                      <SelectValue placeholder="UOM" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    {uomMaster?.map(u => (
+                                      <SelectItem key={u.id} value={u.id.toString()}>{u.abbreviation}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+
                           <FormField
                             control={form.control}
                             name={`details.${index}.machineId`}

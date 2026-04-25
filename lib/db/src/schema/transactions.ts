@@ -32,12 +32,8 @@ export const transactionHeaderTable = pgTable("transaction_header", {
   jobId: integer("job_id").references(() => jobMasterTable.id),
   partyId: integer("party_id").references(() => partyMasterTable.id),
   locationId: integer("location_id").references(() => locationMasterTable.id),
-  yarnTypeId: integer("yarn_type_id").references(() => yarnTypeMasterTable.id),
-  yarnCountId: integer("yarn_count_id").references(() => yarnCountMasterTable.id),
-  yarnBrandId: integer("yarn_brand_id").references(() => yarnBrandMasterTable.id),
-  uomId: integer("uom_id").references(() => uomMasterTable.id),
   fabricTypeId: integer("fabric_type_id").references(() => fabricTypeMasterTable.id),
-  sl: integer("sl"),
+  sl: text("sl"),
   gsm: integer("gsm"),
 });
 
@@ -52,6 +48,10 @@ export const transactionDetailTable = pgTable("transaction_detail", {
     .references(() => transactionHeaderTable.id, { onDelete: "cascade" }),
   machineId: integer("machine_id").references(() => machineMasterTable.id),
   machineOperatorId: integer("machine_operator_id").references(() => machineOperatorMasterTable.id),
+  yarnTypeId: integer("yarn_type_id").references(() => yarnTypeMasterTable.id),
+  yarnCountId: integer("yarn_count_id").references(() => yarnCountMasterTable.id),
+  yarnBrandId: integer("yarn_brand_id").references(() => yarnBrandMasterTable.id),
+  uomId: integer("uom_id").references(() => uomMasterTable.id),
   quantity: numeric("quantity", { precision: 12, scale: 3 }),
   netWt: numeric("net_wt", { precision: 12, scale: 3 }),
 });

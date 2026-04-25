@@ -5,9 +5,7 @@
  * Fabric Knitting Factory Management System API
  * OpenAPI spec version: 0.1.0
  */
-import type { ErrorResponse } from "./errorResponse";
 
-/**
- * Validation error
- */
-export type BadRequestResponse = ErrorResponse;
+export interface BadRequestResponse {
+  message: string;
+}

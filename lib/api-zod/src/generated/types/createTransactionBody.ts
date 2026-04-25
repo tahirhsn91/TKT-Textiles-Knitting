@@ -18,17 +18,9 @@ export interface CreateTransactionBody {
   /** @nullable */
   locationId?: number | null;
   /** @nullable */
-  yarnTypeId?: number | null;
-  /** @nullable */
-  yarnCountId?: number | null;
-  /** @nullable */
-  yarnBrandId?: number | null;
-  /** @nullable */
-  uomId?: number | null;
-  /** @nullable */
   fabricTypeId?: number | null;
   /** @nullable */
-  sl?: number | null;
+  sl?: string | null;
   /** @nullable */
   gsm?: number | null;
   details: CreateTransactionDetailBody[];

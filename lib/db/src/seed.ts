@@ -171,10 +171,6 @@ async function seed() {
     jobKnitting &&
     loc1 &&
     party1 &&
-    yarnCotton &&
-    yc30 &&
-    yb1 &&
-    uomKg &&
     ft1
   ) {
     const [header] = await db
@@ -186,12 +182,8 @@ async function seed() {
         jobId: jobProduction?.id ?? null,
         partyId: party1.id,
         locationId: loc1.id,
-        yarnTypeId: yarnCotton.id,
-        yarnCountId: yc30.id,
-        yarnBrandId: yb1.id,
-        uomId: uomKg.id,
         fabricTypeId: ft1.id,
-        sl: 1,
+        sl: "1",
         gsm: 160,
       })
       .returning();
@@ -202,6 +194,10 @@ async function seed() {
           headerId: header.id,
           machineId: m1.id,
           machineOperatorId: op1?.id ?? null,
+          yarnTypeId: yarnCotton?.id ?? null,
+          yarnCountId: yc30?.id ?? null,
+          yarnBrandId: yb1?.id ?? null,
+          uomId: uomKg?.id ?? null,
           quantity: "250.500",
           netWt: "248.750",
         },
@@ -209,6 +205,10 @@ async function seed() {
           headerId: header.id,
           machineId: m2.id,
           machineOperatorId: op2?.id ?? null,
+          yarnTypeId: yarnCotton?.id ?? null,
+          yarnCountId: yc30?.id ?? null,
+          yarnBrandId: yb1?.id ?? null,
+          uomId: uomKg?.id ?? null,
           quantity: "120.000",
           netWt: "119.500",
         }] : []),

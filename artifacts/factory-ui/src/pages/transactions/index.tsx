@@ -7,7 +7,6 @@ import {
   useListJobMaster,
   useListPartyMaster,
   useListLocationMaster,
-  useListYarnTypeMaster,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -40,7 +39,6 @@ export default function TransactionList() {
   const { data: jobMaster } = useListJobMaster();
   const { data: partyMaster } = useListPartyMaster();
   const { data: locationMaster } = useListLocationMaster();
-  const { data: yarnTypeMaster } = useListYarnTypeMaster();
   const deleteTransaction = useDeleteTransaction();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -87,7 +85,6 @@ export default function TransactionList() {
                 <TableHead>Transaction Type</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Party</TableHead>
-                <TableHead>Yarn Type</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -107,7 +104,7 @@ export default function TransactionList() {
                 ))
               ) : transactions?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
                     No transactions found. Create one to get started.
                   </TableCell>
                 </TableRow>
@@ -118,7 +115,6 @@ export default function TransactionList() {
                     <TableCell>{lookupName(jobMaster, t.transactionTypeId)}</TableCell>
                     <TableCell>{new Date(t.date + "T00:00:00").toLocaleDateString()}</TableCell>
                     <TableCell>{lookupName(partyMaster, t.partyId)}</TableCell>
-                    <TableCell>{lookupName(yarnTypeMaster, t.yarnTypeId)}</TableCell>
                     <TableCell>{lookupName(locationMaster, t.locationId)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">

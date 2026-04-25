@@ -5,9 +5,7 @@
  * Fabric Knitting Factory Management System API
  * OpenAPI spec version: 0.1.0
  */
-import type { ErrorResponse } from "./errorResponse";
 
-/**
- * Not found
- */
-export type NotFoundResponse = ErrorResponse;
+export interface NotFoundResponse {
+  message: string;
+}
