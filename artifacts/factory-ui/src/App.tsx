@@ -6,6 +6,7 @@ import NotFound from "@/pages/not-found";
 import TransactionList from "@/pages/transactions";
 import TransactionForm from "@/pages/transactions/form";
 import MastersPage from "@/pages/masters";
+import ReportsPage from "@/pages/reports";
 
 const queryClient = new QueryClient();
 
@@ -16,6 +17,7 @@ function Router() {
       <Route path="/transactions/new" component={TransactionForm} />
       <Route path="/transactions/:id/edit" component={TransactionForm} />
       <Route path="/masters" component={MastersPage} />
+      <Route path="/reports" component={ReportsPage} />
       <Route component={NotFound} />
     </Switch>
   );
