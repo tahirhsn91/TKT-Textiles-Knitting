@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, lte, inArray, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   transactionHeaderTable,
@@ -29,17 +29,35 @@ router.get("/reports/data", async (req, res): Promise<void> => {
   if (q.year)     conditions.push(sql`EXTRACT(YEAR  FROM ${transactionHeaderTable.date}) = ${parseInt(q.year)}`);
   if (q.month)    conditions.push(sql`EXTRACT(MONTH FROM ${transactionHeaderTable.date}) = ${parseInt(q.month)}`);
 
-  if (q.transactionTypeId) conditions.push(eq(transactionHeaderTable.transactionTypeId, parseInt(q.transactionTypeId)));
-  if (q.jobId)             conditions.push(eq(transactionHeaderTable.jobId, parseInt(q.jobId)));
-  if (q.partyId)           conditions.push(eq(transactionHeaderTable.partyId, parseInt(q.partyId)));
-  if (q.locationId)        conditions.push(eq(transactionHeaderTable.locationId, parseInt(q.locationId)));
-  if (q.fabricTypeId)      conditions.push(eq(transactionHeaderTable.fabricTypeId, parseInt(q.fabricTypeId)));
-  if (q.yarnTypeId)        conditions.push(eq(transactionDetailTable.yarnTypeId, parseInt(q.yarnTypeId)));
-  if (q.yarnCountId)       conditions.push(eq(transactionDetailTable.yarnCountId, parseInt(q.yarnCountId)));
-  if (q.yarnBrandId)       conditions.push(eq(transactionDetailTable.yarnBrandId, parseInt(q.yarnBrandId)));
-  if (q.uomId)             conditions.push(eq(transactionDetailTable.uomId, parseInt(q.uomId)));
-  if (q.machineId)         conditions.push(eq(transactionDetailTable.machineId, parseInt(q.machineId)));
-  if (q.machineOperatorId) conditions.push(eq(transactionDetailTable.machineOperatorId, parseInt(q.machineOperatorId)));
+  function ids(raw: string | undefined): number[] | null {
+    if (!raw) return null;
+    const parsed = raw.split(",").map((s) => parseInt(s.trim())).filter((n) => !isNaN(n));
+    return parsed.length > 0 ? parsed : null;
+  }
+
+  const ttIds  = ids(q.transactionTypeId);
+  const jobIds = ids(q.jobId);
+  const pIds   = ids(q.partyId);
+  const locIds = ids(q.locationId);
+  const ftIds  = ids(q.fabricTypeId);
+  const ytIds  = ids(q.yarnTypeId);
+  const ycIds  = ids(q.yarnCountId);
+  const ybIds  = ids(q.yarnBrandId);
+  const uIds   = ids(q.uomId);
+  const mIds   = ids(q.machineId);
+  const moIds  = ids(q.machineOperatorId);
+
+  if (ttIds)  conditions.push(ttIds.length === 1  ? eq(transactionHeaderTable.transactionTypeId, ttIds[0])  : inArray(transactionHeaderTable.transactionTypeId, ttIds));
+  if (jobIds) conditions.push(jobIds.length === 1 ? eq(transactionHeaderTable.jobId, jobIds[0])            : inArray(transactionHeaderTable.jobId, jobIds));
+  if (pIds)   conditions.push(pIds.length === 1   ? eq(transactionHeaderTable.partyId, pIds[0])            : inArray(transactionHeaderTable.partyId, pIds));
+  if (locIds) conditions.push(locIds.length === 1 ? eq(transactionHeaderTable.locationId, locIds[0])       : inArray(transactionHeaderTable.locationId, locIds));
+  if (ftIds)  conditions.push(ftIds.length === 1  ? eq(transactionHeaderTable.fabricTypeId, ftIds[0])      : inArray(transactionHeaderTable.fabricTypeId, ftIds));
+  if (ytIds)  conditions.push(ytIds.length === 1  ? eq(transactionDetailTable.yarnTypeId, ytIds[0])        : inArray(transactionDetailTable.yarnTypeId, ytIds));
+  if (ycIds)  conditions.push(ycIds.length === 1  ? eq(transactionDetailTable.yarnCountId, ycIds[0])       : inArray(transactionDetailTable.yarnCountId, ycIds));
+  if (ybIds)  conditions.push(ybIds.length === 1  ? eq(transactionDetailTable.yarnBrandId, ybIds[0])       : inArray(transactionDetailTable.yarnBrandId, ybIds));
+  if (uIds)   conditions.push(uIds.length === 1   ? eq(transactionDetailTable.uomId, uIds[0])              : inArray(transactionDetailTable.uomId, uIds));
+  if (mIds)   conditions.push(mIds.length === 1   ? eq(transactionDetailTable.machineId, mIds[0])          : inArray(transactionDetailTable.machineId, mIds));
+  if (moIds)  conditions.push(moIds.length === 1  ? eq(transactionDetailTable.machineOperatorId, moIds[0]) : inArray(transactionDetailTable.machineOperatorId, moIds));
 
   const rows = await db
     .select({

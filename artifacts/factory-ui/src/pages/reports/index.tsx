@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MultiSelect } from "@/components/ui/multi-select";
 import {
   Tabs,
   TabsContent,
@@ -74,17 +75,17 @@ interface Filters {
   dateTo: string;
   year: string;
   month: string;
-  transactionTypeId: string;
-  jobId: string;
-  partyId: string;
-  locationId: string;
-  fabricTypeId: string;
-  yarnTypeId: string;
-  yarnCountId: string;
-  yarnBrandId: string;
-  uomId: string;
-  machineId: string;
-  machineOperatorId: string;
+  transactionTypeId: string[];
+  jobId: string[];
+  partyId: string[];
+  locationId: string[];
+  fabricTypeId: string[];
+  yarnTypeId: string[];
+  yarnCountId: string[];
+  yarnBrandId: string[];
+  uomId: string[];
+  machineId: string[];
+  machineOperatorId: string[];
 }
 
 type GroupByKey =
@@ -104,9 +105,9 @@ type GroupByKey =
 
 const EMPTY_FILTERS: Filters = {
   dateFrom: "", dateTo: "", year: "", month: "",
-  transactionTypeId: "", jobId: "", partyId: "", locationId: "", fabricTypeId: "",
-  yarnTypeId: "", yarnCountId: "", yarnBrandId: "", uomId: "",
-  machineId: "", machineOperatorId: "",
+  transactionTypeId: [], jobId: [], partyId: [], locationId: [], fabricTypeId: [],
+  yarnTypeId: [], yarnCountId: [], yarnBrandId: [], uomId: [],
+  machineId: [], machineOperatorId: [],
 };
 
 const GROUP_BY_OPTIONS: { value: GroupByKey; label: string }[] = [
@@ -182,34 +183,34 @@ function groupRows(rows: ReportRow[], key: GroupByKey) {
 
 function buildQueryString(f: Filters): string {
   const params = new URLSearchParams();
-  Object.entries(f).forEach(([k, v]) => { if (v) params.set(k, v); });
+  Object.entries(f).forEach(([k, v]) => {
+    if (Array.isArray(v)) {
+      if (v.length > 0) params.set(k, v.join(","));
+    } else if (v) {
+      params.set(k, v as string);
+    }
+  });
   return params.toString();
 }
 
 // ─── Filter Row helper component ────────────────────────────────────────────
 
-function FilterSelect({
-  label, value, onChange, options,
+function FilterMulti({
+  label, values, onChange, options,
 }: {
   label: string;
-  value: string;
-  onChange: (v: string) => void;
+  values: string[];
+  onChange: (v: string[]) => void;
   options: { id: number; name: string }[] | undefined;
 }) {
+  const opts = useMemo(
+    () => (options ?? []).map((o) => ({ value: o.id.toString(), label: o.name })),
+    [options]
+  );
   return (
     <div className="flex flex-col gap-1">
       <Label className="text-xs text-muted-foreground">{label}</Label>
-      <Select value={value || "all"} onValueChange={(v) => onChange(v === "all" ? "" : v)}>
-        <SelectTrigger className="h-8 text-sm">
-          <SelectValue placeholder={`All ${label}`} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All</SelectItem>
-          {options?.map((o) => (
-            <SelectItem key={o.id} value={o.id.toString()}>{o.name}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <MultiSelect options={opts} selected={values} onChange={onChange} placeholder={`All`} />
     </div>
   );
 }
@@ -247,7 +248,7 @@ export default function ReportsPage() {
     enabled: hasRun,
   });
 
-  function set(key: keyof Filters, val: string) {
+  function set(key: keyof Filters, val: string | string[]) {
     setFilters((prev) => ({ ...prev, [key]: val }));
   }
 
@@ -331,21 +332,21 @@ export default function ReportsPage() {
 
             {/* Header master filters */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              <FilterSelect label="Transaction Type" value={filters.transactionTypeId} onChange={(v) => set("transactionTypeId", v)} options={transactionTypes} />
-              <FilterSelect label="Job"              value={filters.jobId}             onChange={(v) => set("jobId", v)}             options={jobs} />
-              <FilterSelect label="Party"            value={filters.partyId}           onChange={(v) => set("partyId", v)}           options={parties} />
-              <FilterSelect label="Location"         value={filters.locationId}        onChange={(v) => set("locationId", v)}        options={locations} />
-              <FilterSelect label="Fabric Type"      value={filters.fabricTypeId}      onChange={(v) => set("fabricTypeId", v)}      options={fabricTypes} />
+              <FilterMulti label="Transaction Type" values={filters.transactionTypeId} onChange={(v) => set("transactionTypeId", v)} options={transactionTypes} />
+              <FilterMulti label="Job"              values={filters.jobId}             onChange={(v) => set("jobId", v)}             options={jobs} />
+              <FilterMulti label="Party"            values={filters.partyId}           onChange={(v) => set("partyId", v)}           options={parties} />
+              <FilterMulti label="Location"         values={filters.locationId}        onChange={(v) => set("locationId", v)}        options={locations} />
+              <FilterMulti label="Fabric Type"      values={filters.fabricTypeId}      onChange={(v) => set("fabricTypeId", v)}      options={fabricTypes} />
             </div>
 
             {/* Detail master filters */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              <FilterSelect label="Yarn Type"         value={filters.yarnTypeId}         onChange={(v) => set("yarnTypeId", v)}         options={yarnTypes} />
-              <FilterSelect label="Yarn Count"        value={filters.yarnCountId}        onChange={(v) => set("yarnCountId", v)}        options={yarnCounts} />
-              <FilterSelect label="Yarn Brand"        value={filters.yarnBrandId}        onChange={(v) => set("yarnBrandId", v)}        options={yarnBrands} />
-              <FilterSelect label="UOM"               value={filters.uomId}              onChange={(v) => set("uomId", v)}              options={uomOptions} />
-              <FilterSelect label="Machine"           value={filters.machineId}          onChange={(v) => set("machineId", v)}          options={machines} />
-              <FilterSelect label="Machine Operator"  value={filters.machineOperatorId}  onChange={(v) => set("machineOperatorId", v)}  options={machineOperators} />
+              <FilterMulti label="Yarn Type"         values={filters.yarnTypeId}         onChange={(v) => set("yarnTypeId", v)}         options={yarnTypes} />
+              <FilterMulti label="Yarn Count"        values={filters.yarnCountId}        onChange={(v) => set("yarnCountId", v)}        options={yarnCounts} />
+              <FilterMulti label="Yarn Brand"        values={filters.yarnBrandId}        onChange={(v) => set("yarnBrandId", v)}        options={yarnBrands} />
+              <FilterMulti label="UOM"               values={filters.uomId}              onChange={(v) => set("uomId", v)}              options={uomOptions} />
+              <FilterMulti label="Machine"           values={filters.machineId}          onChange={(v) => set("machineId", v)}          options={machines} />
+              <FilterMulti label="Machine Operator"  values={filters.machineOperatorId}  onChange={(v) => set("machineOperatorId", v)}  options={machineOperators} />
             </div>
 
             <div className="flex items-center gap-2 pt-1">
