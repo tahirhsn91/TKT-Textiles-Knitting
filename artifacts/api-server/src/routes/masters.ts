@@ -41,10 +41,10 @@ router.get("/masters/transaction-type", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/transaction-type", async (req, res): Promise<void> => {
-  const { name, code } = req.body;
+  const { name, code, action } = req.body;
   if (!name || !code) { res.status(400).json({ message: "name and code are required" }); return; }
   try {
-    const [row] = await db.insert(transactionTypeMasterTable).values({ name, code }).returning();
+    const [row] = await db.insert(transactionTypeMasterTable).values({ name, code, action: action || null }).returning();
     res.status(201).json(row);
   } catch (err) {
     if (isUniqueViolation(err)) { res.status(409).json({ message: "A record with that code already exists" }); return; }
@@ -55,10 +55,10 @@ router.post("/masters/transaction-type", async (req, res): Promise<void> => {
 router.put("/masters/transaction-type/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ message: "Invalid id" }); return; }
-  const { name, code } = req.body;
+  const { name, code, action } = req.body;
   if (!name || !code) { res.status(400).json({ message: "name and code are required" }); return; }
   try {
-    const [row] = await db.update(transactionTypeMasterTable).set({ name, code }).where(eq(transactionTypeMasterTable.id, id)).returning();
+    const [row] = await db.update(transactionTypeMasterTable).set({ name, code, action: action || null }).where(eq(transactionTypeMasterTable.id, id)).returning();
     if (!row) { res.status(404).json({ message: "Not found" }); return; }
     res.json(row);
   } catch (err) {

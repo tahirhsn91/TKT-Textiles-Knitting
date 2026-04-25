@@ -6,6 +6,7 @@ export const transactionTypeMasterTable = pgTable("transaction_type_master", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
+  action: text("action"),
 });
 export const insertTransactionTypeMasterSchema = createInsertSchema(transactionTypeMasterTable).omit({ id: true });
 export type InsertTransactionTypeMaster = z.infer<typeof insertTransactionTypeMasterSchema>;

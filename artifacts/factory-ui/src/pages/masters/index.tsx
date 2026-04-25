@@ -175,6 +175,7 @@ export default function MastersPage() {
               fields={[
                 { key: "name", label: "Name", placeholder: "e.g. Receipt" },
                 { key: "code", label: "Code", placeholder: "e.g. REC" },
+                { key: "action", label: "Action", placeholder: "e.g. IN" },
               ]}
               rows={txTypes as never}
               isLoading={txTypesLoading}
