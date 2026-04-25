@@ -4,7 +4,7 @@ import {
   useListTransactions,
   useDeleteTransaction,
   getListTransactionsQueryKey,
-  useListJobMaster,
+  useListTransactionTypeMaster,
   useListPartyMaster,
   useListLocationMaster,
 } from "@workspace/api-client-react";
@@ -36,7 +36,7 @@ import { Layout } from "@/components/layout";
 
 export default function TransactionList() {
   const { data: transactions, isLoading } = useListTransactions();
-  const { data: jobMaster } = useListJobMaster();
+  const { data: transactionTypeMaster } = useListTransactionTypeMaster();
   const { data: partyMaster } = useListPartyMaster();
   const { data: locationMaster } = useListLocationMaster();
   const deleteTransaction = useDeleteTransaction();
@@ -112,7 +112,7 @@ export default function TransactionList() {
                 transactions?.map((t) => (
                   <TableRow key={t.id}>
                     <TableCell className="font-medium">{t.docNumber}</TableCell>
-                    <TableCell>{lookupName(jobMaster, t.transactionTypeId)}</TableCell>
+                    <TableCell>{lookupName(transactionTypeMaster, t.transactionTypeId)}</TableCell>
                     <TableCell>{new Date(t.date + "T00:00:00").toLocaleDateString()}</TableCell>
                     <TableCell>{lookupName(partyMaster, t.partyId)}</TableCell>
                     <TableCell>{lookupName(locationMaster, t.locationId)}</TableCell>
