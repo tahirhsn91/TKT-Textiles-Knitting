@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useLocation, useParams } from "wouter";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -220,6 +220,22 @@ export default function TransactionForm() {
   };
 
   const isPending = createTx.isPending || updateTx.isPending;
+
+  const lineItemsRef = useRef<HTMLDivElement>(null);
+
+  const handleAddRow = useCallback(() => {
+    const details = form.getValues("details");
+    const last = details[details.length - 1];
+    const newRow = last
+      ? { ...last, id: undefined, quantity: "0", netWt: "0" }
+      : { ...emptyDetail(), quantity: "0", netWt: "0" };
+    append(newRow);
+    setTimeout(() => {
+      const inputs = lineItemsRef.current?.querySelectorAll<HTMLInputElement>("[data-qty-input]");
+      inputs?.[inputs.length - 1]?.focus();
+      inputs?.[inputs.length - 1]?.select();
+    }, 50);
+  }, [form, append]);
 
   if (isEditing && isLoadingTx) {
     return <Layout><div className="p-8 text-center text-muted-foreground">Loading...</div></Layout>;
@@ -473,7 +489,7 @@ export default function TransactionForm() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => append(emptyDetail())}
+                  onClick={handleAddRow}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Add Row
@@ -494,7 +510,7 @@ export default function TransactionForm() {
                       <div className="w-10"></div>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2" ref={lineItemsRef}>
                       {fields.map((field, index) => (
                         <div key={field.id} className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_auto] gap-2 items-start">
                           <FormField
@@ -662,8 +678,10 @@ export default function TransactionForm() {
                                     step="any"
                                     className="h-9"
                                     placeholder="Qty"
+                                    data-qty-input="true"
                                     {...field}
-                                    value={field.value || ""}
+                                    value={field.value ?? ""}
+                                    onFocus={(e) => e.target.select()}
                                   />
                                 </FormControl>
                               </FormItem>
