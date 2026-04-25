@@ -73,6 +73,7 @@ const formSchema = z.object({
   jobId: z.number().nullable(),
   partyId: z.number().nullable(),
   locationId: z.number().nullable(),
+  reference: z.string().nullable(),
   fabricTypeId: z.number().nullable(),
   sl: z.string().nullable(),
   gsm: nullableInt,
@@ -128,6 +129,7 @@ export default function TransactionForm() {
       jobId: null,
       partyId: null,
       locationId: null,
+      reference: null,
       fabricTypeId: null,
       sl: null,
       gsm: null,
@@ -156,6 +158,7 @@ export default function TransactionForm() {
         jobId: transaction.jobId ?? null,
         partyId: transaction.partyId ?? null,
         locationId: transaction.locationId ?? null,
+        reference: (transaction as { reference?: string | null }).reference ?? null,
         fabricTypeId: transaction.fabricTypeId ?? null,
         sl: transaction.sl ?? null,
         gsm: transaction.gsm ?? null,
@@ -351,7 +354,7 @@ export default function TransactionForm() {
                   />
                 </div>
 
-                {/* Row 2: Party, Location */}
+                {/* Row 2: Party, Location, Reference */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <FormField
                     control={form.control}
@@ -404,6 +407,25 @@ export default function TransactionForm() {
                             ))}
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="reference"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Reference</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Reference (optional)"
+                            {...field}
+                            value={field.value ?? ""}
+                            onChange={(e) => field.onChange(e.target.value === "" ? null : e.target.value)}
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

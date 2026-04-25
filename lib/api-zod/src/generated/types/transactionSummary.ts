@@ -23,4 +23,6 @@ export interface TransactionSummary {
   sl?: string | null;
   /** @nullable */
   gsm?: number | null;
+  /** @nullable */
+  reference?: string | null;
 }

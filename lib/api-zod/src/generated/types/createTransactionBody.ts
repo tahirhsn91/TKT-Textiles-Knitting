@@ -23,5 +23,7 @@ export interface CreateTransactionBody {
   sl?: string | null;
   /** @nullable */
   gsm?: number | null;
+  /** @nullable */
+  reference?: string | null;
   details: CreateTransactionDetailBody[];
 }

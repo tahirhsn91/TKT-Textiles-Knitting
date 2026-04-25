@@ -35,6 +35,7 @@ export const transactionHeaderTable = pgTable("transaction_header", {
   fabricTypeId: integer("fabric_type_id").references(() => fabricTypeMasterTable.id),
   sl: text("sl"),
   gsm: integer("gsm"),
+  reference: text("reference"),
 });
 
 export const insertTransactionHeaderSchema = createInsertSchema(transactionHeaderTable).omit({ id: true });

@@ -24,5 +24,7 @@ export interface TransactionWithDetails {
   sl?: string | null;
   /** @nullable */
   gsm?: number | null;
+  /** @nullable */
+  reference?: string | null;
   details: TransactionDetailItem[];
 }

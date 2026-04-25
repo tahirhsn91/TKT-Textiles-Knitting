@@ -649,6 +649,7 @@ export const ListTransactionsResponseItem = zod.object({
   fabricTypeId: zod.number().nullish(),
   sl: zod.string().nullish(),
   gsm: zod.number().nullish(),
+  reference: zod.string().nullish(),
 });
 export const ListTransactionsResponse = zod.array(ListTransactionsResponseItem);
 
@@ -665,6 +666,7 @@ export const CreateTransactionBody = zod.object({
   fabricTypeId: zod.number().nullish(),
   sl: zod.string().nullish(),
   gsm: zod.number().nullish(),
+  reference: zod.string().nullish(),
   details: zod.array(
     zod.object({
       machineId: zod.number().nullish(),
@@ -697,6 +699,7 @@ export const GetTransactionResponse = zod.object({
   fabricTypeId: zod.number().nullish(),
   sl: zod.string().nullish(),
   gsm: zod.number().nullish(),
+  reference: zod.string().nullish(),
   details: zod.array(
     zod.object({
       id: zod.number(),
@@ -730,6 +733,7 @@ export const UpdateTransactionBody = zod.object({
   fabricTypeId: zod.number().nullish(),
   sl: zod.string().nullish(),
   gsm: zod.number().nullish(),
+  reference: zod.string().nullish(),
   details: zod.array(
     zod.object({
       machineId: zod.number().nullish(),
@@ -755,6 +759,7 @@ export const UpdateTransactionResponse = zod.object({
   fabricTypeId: zod.number().nullish(),
   sl: zod.string().nullish(),
   gsm: zod.number().nullish(),
+  reference: zod.string().nullish(),
   details: zod.array(
     zod.object({
       id: zod.number(),
