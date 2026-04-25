@@ -182,7 +182,95 @@ paths:
                 items:
                   $ref: "#/components/schemas/LookupItem"
 
+  /lookups/transaction-type-master:
+    get:
+      operationId: listTransactionTypeMaster
+      tags: [lookups]
+      summary: List transaction type master entries
+      responses:
+        "200":
+          description: List of transaction type master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookupItem"
+
   # ─── MASTER CRUD ENDPOINTS ────────────────────────────────────────────────
+
+  # Transaction Type Master
+  /masters/transaction-type:
+    get:
+      operationId: listTransactionTypeMasterCrud
+      tags: [masters]
+      summary: List transaction type master entries (CRUD)
+      responses:
+        "200":
+          description: List of transaction type master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookupItem"
+    post:
+      operationId: createTransactionTypeMaster
+      tags: [masters]
+      summary: Create transaction type master entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLookupBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /masters/transaction-type/{id}:
+    put:
+      operationId: updateTransactionTypeMaster
+      tags: [masters]
+      summary: Update transaction type master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLookupBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LookupItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: deleteTransactionTypeMaster
+      tags: [masters]
+      summary: Delete transaction type master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   # Job Master
   /masters/job:

@@ -8,22 +8,25 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { jobMasterTable } from "./lookups";
-import { partyMasterTable } from "./lookups";
-import { machineMasterTable } from "./lookups";
-import { locationMasterTable } from "./lookups";
-import { yarnTypeMasterTable } from "./lookups";
-import { yarnCountMasterTable } from "./lookups";
-import { yarnBrandMasterTable } from "./lookups";
-import { uomMasterTable } from "./lookups";
-import { fabricTypeMasterTable } from "./lookups";
-import { machineOperatorMasterTable } from "./lookups";
+import {
+  transactionTypeMasterTable,
+  jobMasterTable,
+  partyMasterTable,
+  machineMasterTable,
+  locationMasterTable,
+  yarnTypeMasterTable,
+  yarnCountMasterTable,
+  yarnBrandMasterTable,
+  uomMasterTable,
+  fabricTypeMasterTable,
+  machineOperatorMasterTable,
+} from "./lookups";
 
 export const transactionHeaderTable = pgTable("transaction_header", {
   id: serial("id").primaryKey(),
   transactionTypeId: integer("transaction_type_id")
     .notNull()
-    .references(() => jobMasterTable.id),
+    .references(() => transactionTypeMasterTable.id),
   date: date("date").notNull(),
   docNumber: text("doc_number").notNull(),
   jobId: integer("job_id").references(() => jobMasterTable.id),

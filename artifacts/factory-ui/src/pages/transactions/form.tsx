@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 
 import {
+  useListTransactionTypeMaster,
   useListJobMaster,
   useListPartyMaster,
   useListMachineMaster,
@@ -99,6 +100,7 @@ export default function TransactionForm() {
     query: { enabled: isEditing, queryKey: getGetTransactionQueryKey(id!) }
   });
 
+  const { data: transactionTypeMaster } = useListTransactionTypeMaster();
   const { data: jobMaster } = useListJobMaster();
   const { data: partyMaster } = useListPartyMaster();
   const { data: machineMaster } = useListMachineMaster();
@@ -262,12 +264,12 @@ export default function TransactionForm() {
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select type" />
+                              <SelectValue placeholder="Select transaction type" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {jobMaster?.map(j => (
-                              <SelectItem key={`type-${j.id}`} value={j.id.toString()}>{j.name}</SelectItem>
+                            {transactionTypeMaster?.map(t => (
+                              <SelectItem key={`type-${t.id}`} value={t.id.toString()}>{t.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>

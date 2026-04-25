@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
+  transactionTypeMasterTable,
   jobMasterTable,
   partyMasterTable,
   machineMasterTable,
@@ -31,6 +32,48 @@ function isUniqueViolation(err: unknown): boolean {
     (err as { code: string }).code === "23505"
   );
 }
+
+// ─── Transaction Type Master ─────────────────────────────────────────────────
+
+router.get("/masters/transaction-type", async (_req, res): Promise<void> => {
+  const rows = await db.select().from(transactionTypeMasterTable).orderBy(transactionTypeMasterTable.name);
+  res.json(rows);
+});
+
+router.post("/masters/transaction-type", async (req, res): Promise<void> => {
+  const { name, code } = req.body;
+  if (!name || !code) { res.status(400).json({ message: "name and code are required" }); return; }
+  try {
+    const [row] = await db.insert(transactionTypeMasterTable).values({ name, code }).returning();
+    res.status(201).json(row);
+  } catch (err) {
+    if (isUniqueViolation(err)) { res.status(409).json({ message: "A record with that code already exists" }); return; }
+    throw err;
+  }
+});
+
+router.put("/masters/transaction-type/:id", async (req, res): Promise<void> => {
+  const id = idParam(req);
+  if (!id) { res.status(400).json({ message: "Invalid id" }); return; }
+  const { name, code } = req.body;
+  if (!name || !code) { res.status(400).json({ message: "name and code are required" }); return; }
+  try {
+    const [row] = await db.update(transactionTypeMasterTable).set({ name, code }).where(eq(transactionTypeMasterTable.id, id)).returning();
+    if (!row) { res.status(404).json({ message: "Not found" }); return; }
+    res.json(row);
+  } catch (err) {
+    if (isUniqueViolation(err)) { res.status(409).json({ message: "A record with that code already exists" }); return; }
+    throw err;
+  }
+});
+
+router.delete("/masters/transaction-type/:id", async (req, res): Promise<void> => {
+  const id = idParam(req);
+  if (!id) { res.status(400).json({ message: "Invalid id" }); return; }
+  const [row] = await db.delete(transactionTypeMasterTable).where(eq(transactionTypeMasterTable.id, id)).returning();
+  if (!row) { res.status(404).json({ message: "Not found" }); return; }
+  res.status(204).send();
+});
 
 // ─── Job Master ─────────────────────────────────────────────────────────────
 

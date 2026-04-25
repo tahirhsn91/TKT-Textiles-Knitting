@@ -872,6 +872,423 @@ export function useListMachineOperatorMaster<
 }
 
 /**
+ * @summary List transaction type master entries
+ */
+export const getListTransactionTypeMasterUrl = () => {
+  return `/api/lookups/transaction-type-master`;
+};
+
+export const listTransactionTypeMaster = async (
+  options?: RequestInit,
+): Promise<LookupItem[]> => {
+  return customFetch<LookupItem[]>(getListTransactionTypeMasterUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListTransactionTypeMasterQueryKey = () => {
+  return [`/api/lookups/transaction-type-master`] as const;
+};
+
+export const getListTransactionTypeMasterQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTransactionTypeMaster>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listTransactionTypeMaster>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListTransactionTypeMasterQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listTransactionTypeMaster>>
+  > = ({ signal }) => listTransactionTypeMaster({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTransactionTypeMaster>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListTransactionTypeMasterQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTransactionTypeMaster>>
+>;
+export type ListTransactionTypeMasterQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List transaction type master entries
+ */
+
+export function useListTransactionTypeMaster<
+  TData = Awaited<ReturnType<typeof listTransactionTypeMaster>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listTransactionTypeMaster>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListTransactionTypeMasterQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List transaction type master entries (CRUD)
+ */
+export const getListTransactionTypeMasterCrudUrl = () => {
+  return `/api/masters/transaction-type`;
+};
+
+export const listTransactionTypeMasterCrud = async (
+  options?: RequestInit,
+): Promise<LookupItem[]> => {
+  return customFetch<LookupItem[]>(getListTransactionTypeMasterCrudUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListTransactionTypeMasterCrudQueryKey = () => {
+  return [`/api/masters/transaction-type`] as const;
+};
+
+export const getListTransactionTypeMasterCrudQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTransactionTypeMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listTransactionTypeMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListTransactionTypeMasterCrudQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listTransactionTypeMasterCrud>>
+  > = ({ signal }) =>
+    listTransactionTypeMasterCrud({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTransactionTypeMasterCrud>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListTransactionTypeMasterCrudQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTransactionTypeMasterCrud>>
+>;
+export type ListTransactionTypeMasterCrudQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List transaction type master entries (CRUD)
+ */
+
+export function useListTransactionTypeMasterCrud<
+  TData = Awaited<ReturnType<typeof listTransactionTypeMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listTransactionTypeMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListTransactionTypeMasterCrudQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create transaction type master entry
+ */
+export const getCreateTransactionTypeMasterUrl = () => {
+  return `/api/masters/transaction-type`;
+};
+
+export const createTransactionTypeMaster = async (
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getCreateTransactionTypeMasterUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getCreateTransactionTypeMasterMutationOptions = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createTransactionTypeMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createTransactionTypeMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["createTransactionTypeMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createTransactionTypeMaster>>,
+    { data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createTransactionTypeMaster(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateTransactionTypeMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createTransactionTypeMaster>>
+>;
+export type CreateTransactionTypeMasterMutationBody =
+  BodyType<CreateLookupBody>;
+export type CreateTransactionTypeMasterMutationError = ErrorType<
+  BadRequestResponse | ConflictResponse
+>;
+
+/**
+ * @summary Create transaction type master entry
+ */
+export const useCreateTransactionTypeMaster = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createTransactionTypeMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createTransactionTypeMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getCreateTransactionTypeMasterMutationOptions(options));
+};
+
+/**
+ * @summary Update transaction type master entry
+ */
+export const getUpdateTransactionTypeMasterUrl = (id: number) => {
+  return `/api/masters/transaction-type/${id}`;
+};
+
+export const updateTransactionTypeMaster = async (
+  id: number,
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getUpdateTransactionTypeMasterUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getUpdateTransactionTypeMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateTransactionTypeMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateTransactionTypeMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["updateTransactionTypeMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateTransactionTypeMaster>>,
+    { id: number; data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateTransactionTypeMaster(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateTransactionTypeMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateTransactionTypeMaster>>
+>;
+export type UpdateTransactionTypeMasterMutationBody =
+  BodyType<CreateLookupBody>;
+export type UpdateTransactionTypeMasterMutationError = ErrorType<
+  NotFoundResponse | ConflictResponse
+>;
+
+/**
+ * @summary Update transaction type master entry
+ */
+export const useUpdateTransactionTypeMaster = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateTransactionTypeMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateTransactionTypeMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getUpdateTransactionTypeMasterMutationOptions(options));
+};
+
+/**
+ * @summary Delete transaction type master entry
+ */
+export const getDeleteTransactionTypeMasterUrl = (id: number) => {
+  return `/api/masters/transaction-type/${id}`;
+};
+
+export const deleteTransactionTypeMaster = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteTransactionTypeMasterUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteTransactionTypeMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteTransactionTypeMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteTransactionTypeMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteTransactionTypeMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteTransactionTypeMaster>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteTransactionTypeMaster(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteTransactionTypeMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteTransactionTypeMaster>>
+>;
+
+export type DeleteTransactionTypeMasterMutationError =
+  ErrorType<NotFoundResponse>;
+
+/**
+ * @summary Delete transaction type master entry
+ */
+export const useDeleteTransactionTypeMaster = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteTransactionTypeMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteTransactionTypeMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteTransactionTypeMasterMutationOptions(options));
+};
+
+/**
  * @summary List job master entries (CRUD)
  */
 export const getListJobMasterCrudUrl = () => {

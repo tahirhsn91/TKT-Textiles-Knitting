@@ -130,6 +130,63 @@ export const ListMachineOperatorMasterResponse = zod.array(
 );
 
 /**
+ * @summary List transaction type master entries
+ */
+export const ListTransactionTypeMasterResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+export const ListTransactionTypeMasterResponse = zod.array(
+  ListTransactionTypeMasterResponseItem,
+);
+
+/**
+ * @summary List transaction type master entries (CRUD)
+ */
+export const ListTransactionTypeMasterCrudResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+export const ListTransactionTypeMasterCrudResponse = zod.array(
+  ListTransactionTypeMasterCrudResponseItem,
+);
+
+/**
+ * @summary Create transaction type master entry
+ */
+export const CreateTransactionTypeMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Update transaction type master entry
+ */
+export const UpdateTransactionTypeMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateTransactionTypeMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+export const UpdateTransactionTypeMasterResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Delete transaction type master entry
+ */
+export const DeleteTransactionTypeMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary List job master entries (CRUD)
  */
 export const ListJobMasterCrudResponseItem = zod.object({

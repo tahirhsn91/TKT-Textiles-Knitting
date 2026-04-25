@@ -2,6 +2,15 @@ import { pgTable, text, serial, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
+export const transactionTypeMasterTable = pgTable("transaction_type_master", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+});
+export const insertTransactionTypeMasterSchema = createInsertSchema(transactionTypeMasterTable).omit({ id: true });
+export type InsertTransactionTypeMaster = z.infer<typeof insertTransactionTypeMasterSchema>;
+export type TransactionTypeMaster = typeof transactionTypeMasterTable.$inferSelect;
+
 export const jobMasterTable = pgTable("job_master", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),

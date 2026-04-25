@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import {
+  transactionTypeMasterTable,
   jobMasterTable,
   partyMasterTable,
   machineMasterTable,
@@ -13,6 +14,7 @@ import {
   machineOperatorMasterTable,
 } from "@workspace/db";
 import {
+  ListTransactionTypeMasterResponse,
   ListJobMasterResponse,
   ListPartyMasterResponse,
   ListMachineMasterResponse,
@@ -75,6 +77,11 @@ router.get("/lookups/fabric-type-master", async (_req, res): Promise<void> => {
 router.get("/lookups/machine-operator-master", async (_req, res): Promise<void> => {
   const rows = await db.select().from(machineOperatorMasterTable).orderBy(machineOperatorMasterTable.name);
   res.json(ListMachineOperatorMasterResponse.parse(rows));
+});
+
+router.get("/lookups/transaction-type-master", async (_req, res): Promise<void> => {
+  const rows = await db.select().from(transactionTypeMasterTable).orderBy(transactionTypeMasterTable.name);
+  res.json(ListTransactionTypeMasterResponse.parse(rows));
 });
 
 export default router;

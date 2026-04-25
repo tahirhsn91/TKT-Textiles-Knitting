@@ -1,5 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  useListTransactionTypeMasterCrud,
+  useCreateTransactionTypeMaster,
+  useUpdateTransactionTypeMaster,
+  useDeleteTransactionTypeMaster,
+  getListTransactionTypeMasterCrudQueryKey,
+  getListTransactionTypeMasterQueryKey,
   useListJobMasterCrud,
   useCreateJobMaster,
   useUpdateJobMaster,
@@ -73,6 +79,12 @@ export default function MastersPage() {
     qc.invalidateQueries({ queryKey: [...lookupKey] });
   };
 
+  // ── Transaction Type ─────────────────────────────────────────────────────
+  const { data: txTypes, isLoading: txTypesLoading } = useListTransactionTypeMasterCrud();
+  const createTxType = useCreateTransactionTypeMaster();
+  const updateTxType = useUpdateTransactionTypeMaster();
+  const deleteTxType = useDeleteTransactionTypeMaster();
+
   // ── Job ──────────────────────────────────────────────────────────────────
   const { data: jobs, isLoading: jobsLoading } = useListJobMasterCrud();
   const createJob = useCreateJobMaster();
@@ -141,8 +153,9 @@ export default function MastersPage() {
           <p className="text-muted-foreground mt-1">Manage all lookup tables used across the system.</p>
         </div>
 
-        <Tabs defaultValue="job">
+        <Tabs defaultValue="transaction-type">
           <TabsList className="flex-wrap h-auto gap-1">
+            <TabsTrigger value="transaction-type">Transaction Type</TabsTrigger>
             <TabsTrigger value="job">Job Types</TabsTrigger>
             <TabsTrigger value="party">Parties</TabsTrigger>
             <TabsTrigger value="machine">Machines</TabsTrigger>
@@ -154,6 +167,37 @@ export default function MastersPage() {
             <TabsTrigger value="fabric-type">Fabric Type</TabsTrigger>
             <TabsTrigger value="operator">Operators</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="transaction-type" className="mt-4">
+            <MasterTable
+              title="Transaction Types"
+              description="Types of transactions (e.g. Receipt, Issue, Transfer). Used as a mandatory field on every transaction."
+              fields={[
+                { key: "name", label: "Name", placeholder: "e.g. Receipt" },
+                { key: "code", label: "Code", placeholder: "e.g. REC" },
+              ]}
+              rows={txTypes as never}
+              isLoading={txTypesLoading}
+              onAdd={(data) => new Promise((res, rej) =>
+                createTxType.mutate({ data: data as never }, {
+                  onSuccess: () => { invalidateBoth(getListTransactionTypeMasterCrudQueryKey(), getListTransactionTypeMasterQueryKey()); res(); },
+                  onError: (e) => rej(e),
+                })
+              )}
+              onUpdate={(id, data) => new Promise((res, rej) =>
+                updateTxType.mutate({ id, data: data as never }, {
+                  onSuccess: () => { invalidateBoth(getListTransactionTypeMasterCrudQueryKey(), getListTransactionTypeMasterQueryKey()); res(); },
+                  onError: (e) => rej(e),
+                })
+              )}
+              onDelete={(id) => new Promise((res, rej) =>
+                deleteTxType.mutate({ id }, {
+                  onSuccess: () => { invalidateBoth(getListTransactionTypeMasterCrudQueryKey(), getListTransactionTypeMasterQueryKey()); res(); },
+                  onError: (e) => rej(e),
+                })
+              )}
+            />
+          </TabsContent>
 
           <TabsContent value="job" className="mt-4">
             <MasterTable
