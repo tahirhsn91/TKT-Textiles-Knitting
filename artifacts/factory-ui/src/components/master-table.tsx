@@ -28,6 +28,8 @@ export type Field = {
   key: string;
   label: string;
   placeholder?: string;
+  type?: string;
+  step?: string;
 };
 
 type Row = { id: number; [key: string]: string | number };
@@ -142,6 +144,8 @@ export function MasterTable({
                   <TableCell key={f.key}>
                     <Input
                       className="h-8 text-sm"
+                      type={f.type || "text"}
+                      step={f.step}
                       placeholder={f.placeholder || f.label}
                       value={addValues[f.key] || ""}
                       onChange={(e) => setAddValues((v) => ({ ...v, [f.key]: e.target.value }))}
@@ -188,6 +192,8 @@ export function MasterTable({
                     {editingId === row.id ? (
                       <Input
                         className="h-8 text-sm"
+                        type={f.type || "text"}
+                        step={f.step}
                         value={editValues[f.key] || ""}
                         onChange={(e) => setEditValues((v) => ({ ...v, [f.key]: e.target.value }))}
                         onKeyDown={(e) => { if (e.key === "Enter") handleSaveEdit(); if (e.key === "Escape") cancelEdit(); }}

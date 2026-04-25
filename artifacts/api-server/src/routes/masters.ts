@@ -125,10 +125,11 @@ router.get("/masters/party", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/party", async (req, res): Promise<void> => {
-  const { name, code } = req.body;
+  const { name, code, wastePercent } = req.body;
   if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const waste = wastePercent !== undefined && wastePercent !== "" ? String(parseFloat(wastePercent)) : "1.00";
   try {
-    const [row] = await db.insert(partyMasterTable).values({ name, code }).returning();
+    const [row] = await db.insert(partyMasterTable).values({ name, code, wastePercent: waste }).returning();
     res.status(201).json(row);
   } catch (err) {
     if (isUniqueViolation(err)) { res.status(409).json({ error: "Code already exists" }); return; }
@@ -139,10 +140,11 @@ router.post("/masters/party", async (req, res): Promise<void> => {
 router.put("/masters/party/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, code } = req.body;
+  const { name, code, wastePercent } = req.body;
   if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const waste = wastePercent !== undefined && wastePercent !== "" ? String(parseFloat(wastePercent)) : "1.00";
   try {
-    const [row] = await db.update(partyMasterTable).set({ name, code }).where(eq(partyMasterTable.id, id)).returning();
+    const [row] = await db.update(partyMasterTable).set({ name, code, wastePercent: waste }).where(eq(partyMasterTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
     res.json(row);
   } catch (err) {

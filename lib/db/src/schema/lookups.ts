@@ -1,4 +1,4 @@
-import { pgTable, text, serial, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, unique, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -25,6 +25,7 @@ export const partyMasterTable = pgTable("party_master", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
+  wastePercent: numeric("waste_percent", { precision: 5, scale: 2 }).default("1.00"),
 });
 export const insertPartyMasterSchema = createInsertSchema(partyMasterTable).omit({ id: true });
 export type InsertPartyMaster = z.infer<typeof insertPartyMasterSchema>;

@@ -238,6 +238,7 @@ export default function MastersPage() {
               fields={[
                 { key: "name", label: "Name", placeholder: "e.g. Sunrise Textiles" },
                 { key: "code", label: "Code", placeholder: "e.g. SUN" },
+                { key: "wastePercent", label: "Waste%", placeholder: "1.00", type: "number", step: "any" },
               ]}
               rows={parties as never}
               isLoading={partiesLoading}
