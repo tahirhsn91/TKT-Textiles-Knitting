@@ -558,10 +558,10 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
       .map(([name, value]) => ({ name, value: parseFloat(value.toFixed(3)) }));
   }, [rows]);
 
-  const byFabricType = useMemo(() => {
+  const byTransactionType = useMemo(() => {
     const map = new Map<string, number>();
     for (const r of rows) {
-      const k = r.fabricTypeName ?? "Unknown";
+      const k = r.transactionTypeName ?? "Unknown";
       map.set(k, (map.get(k) ?? 0) + signedNetWt(r));
     }
     return Array.from(map.entries())
@@ -683,17 +683,17 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
           </Card>
         )}
 
-        {/* Pie: Qty by Fabric Type */}
-        {byFabricType.length > 0 && (
+        {/* Pie: Net Wt by Transaction Type */}
+        {byTransactionType.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Net Wt by Fabric Type</CardTitle>
+              <CardTitle className="text-sm font-medium">Net Wt by Transaction Type</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
                   <Pie
-                    data={byFabricType}
+                    data={byTransactionType}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
@@ -702,7 +702,7 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
                     label={({ name, percent }) => `${name} (${(percent * 100).toFixed(1)}%)`}
                     labelLine={false}
                   >
-                    {byFabricType.map((_, i) => (
+                    {byTransactionType.map((_, i) => (
                       <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                     ))}
                   </Pie>
