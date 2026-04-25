@@ -266,6 +266,14 @@ export default function ReportsPage() {
   const totalQty  = useMemo(() => rows.reduce((s, r) => s + signedQty(r), 0), [rows]);
   const totalNetWt = useMemo(() => rows.reduce((s, r) => s + signedNetWt(r), 0), [rows]);
 
+  const runningBalances = useMemo(() => {
+    let bal = 0;
+    return rows.map((r) => {
+      bal += signedQty(r);
+      return bal;
+    });
+  }, [rows]);
+
   // Years available in data for the year dropdown
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 6 }, (_, i) => currentYear - i);
@@ -459,10 +467,11 @@ export default function ReportsPage() {
                           <TableHead className="whitespace-nowrap">Operator</TableHead>
                           <TableHead className="whitespace-nowrap text-right">Qty</TableHead>
                           <TableHead className="whitespace-nowrap text-right">Net Wt</TableHead>
+                          <TableHead className="whitespace-nowrap text-right">Running Balance</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {rows.map((r) => (
+                        {rows.map((r, idx) => (
                           <TableRow key={r.detailId}>
                             <TableCell className="whitespace-nowrap">{r.date}</TableCell>
                             <TableCell className="whitespace-nowrap">{r.docNumber}</TableCell>
@@ -484,6 +493,9 @@ export default function ReportsPage() {
                             </TableCell>
                             <TableCell className={`text-right whitespace-nowrap${getMultiplier(r.transactionTypeAction) < 0 ? " text-red-600" : ""}`}>
                               {r.netWt != null ? fmt(signedNetWt(r)) : "—"}
+                            </TableCell>
+                            <TableCell className={`text-right whitespace-nowrap font-medium${runningBalances[idx] < 0 ? " text-red-600" : " text-blue-700"}`}>
+                              {fmt(runningBalances[idx])}
                             </TableCell>
                           </TableRow>
                         ))}
