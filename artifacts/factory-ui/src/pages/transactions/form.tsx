@@ -539,7 +539,7 @@ export default function TransactionForm() {
                                   <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
                                     {yarnCountMaster?.map(y => (
-                                      <SelectItem key={y.id} value={y.id.toString()}>{y.name} ({y.count})</SelectItem>
+                                      <SelectItem key={y.id} value={y.id.toString()}>{y.name}</SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
@@ -615,7 +615,7 @@ export default function TransactionForm() {
                                     <SelectItem value="none">None</SelectItem>
                                     {machineMaster?.map(m => (
                                       <SelectItem key={m.id} value={m.id.toString()}>
-                                        {m.name} ({m.machineNumber})
+                                        {m.name}
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
@@ -659,7 +659,7 @@ export default function TransactionForm() {
                                 <FormControl>
                                   <Input
                                     type="number"
-                                    step="0.001"
+                                    step="any"
                                     className="h-9"
                                     placeholder="Qty"
                                     {...field}
@@ -678,7 +678,7 @@ export default function TransactionForm() {
                                 <FormControl>
                                   <Input
                                     type="number"
-                                    step="0.001"
+                                    step="any"
                                     className="h-9"
                                     placeholder="Net Wt"
                                     {...field}
