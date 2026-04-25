@@ -539,19 +539,19 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
     const map = new Map<string, number>();
     for (const r of rows) {
       const k = r.machineName ?? "Unknown";
-      map.set(k, (map.get(k) ?? 0) + signedQty(r));
+      map.set(k, (map.get(k) ?? 0) + signedNetWt(r));
     }
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 15)
-      .map(([name, qty]) => ({ name, qty: parseFloat(qty.toFixed(3)) }));
+      .map(([name, val]) => ({ name, netWt: parseFloat(val.toFixed(3)) }));
   }, [rows]);
 
   const byYarnType = useMemo(() => {
     const map = new Map<string, number>();
     for (const r of rows) {
       const k = r.yarnTypeName ?? "Unknown";
-      map.set(k, (map.get(k) ?? 0) + signedQty(r));
+      map.set(k, (map.get(k) ?? 0) + signedNetWt(r));
     }
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
@@ -562,7 +562,7 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
     const map = new Map<string, number>();
     for (const r of rows) {
       const k = r.fabricTypeName ?? "Unknown";
-      map.set(k, (map.get(k) ?? 0) + signedQty(r));
+      map.set(k, (map.get(k) ?? 0) + signedNetWt(r));
     }
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
@@ -586,11 +586,11 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
 
   return (
     <div className="space-y-6">
-      {/* Qty and Net Wt by Month */}
+      {/* Net Wt by Month */}
       {byMonth.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Qty and Net Wt by Month</CardTitle>
+            <CardTitle className="text-sm font-medium">Net Wt by Month</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
@@ -600,7 +600,6 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(v: number) => fmt(v)} />
                 <Legend />
-                <Bar dataKey="qty"   name="Qty"    fill={CHART_COLORS[0]} />
                 <Bar dataKey="netWt" name="Net Wt" fill={CHART_COLORS[1]} />
               </BarChart>
             </ResponsiveContainer>
@@ -608,11 +607,11 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
         </Card>
       )}
 
-      {/* Qty by Machine */}
+      {/* Net Wt by Machine */}
       {byMachine.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Qty by Machine</CardTitle>
+            <CardTitle className="text-sm font-medium">Net Wt by Machine</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
@@ -621,7 +620,7 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(v: number) => fmt(v)} />
-                <Bar dataKey="qty" name="Qty" fill={CHART_COLORS[2]}>
+                <Bar dataKey="netWt" name="Net Wt" fill={CHART_COLORS[2]}>
                   {byMachine.map((_, i) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
@@ -632,11 +631,11 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
         </Card>
       )}
 
-      {/* Qty by Party */}
+      {/* Net Wt by Party */}
       {byParty.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Qty and Net Wt by Party</CardTitle>
+            <CardTitle className="text-sm font-medium">Net Wt by Party</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
@@ -646,7 +645,6 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(v: number) => fmt(v)} />
                 <Legend />
-                <Bar dataKey="qty"   name="Qty"    fill={CHART_COLORS[3]} />
                 <Bar dataKey="netWt" name="Net Wt" fill={CHART_COLORS[4]} />
               </BarChart>
             </ResponsiveContainer>
@@ -659,7 +657,7 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
         {byYarnType.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Qty by Yarn Type</CardTitle>
+              <CardTitle className="text-sm font-medium">Net Wt by Yarn Type</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={240}>
@@ -689,7 +687,7 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
         {byFabricType.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Qty by Fabric Type</CardTitle>
+              <CardTitle className="text-sm font-medium">Net Wt by Fabric Type</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={240}>
