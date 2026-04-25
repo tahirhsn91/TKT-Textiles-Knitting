@@ -53,6 +53,7 @@ interface ReportRow {
   sl: string | null;
   gsm: number | null;
   transactionTypeName: string | null;
+  transactionTypeAction: string | null;
   jobName: string | null;
   partyName: string | null;
   locationName: string | null;
@@ -141,6 +142,19 @@ function toNum(s: string | null | undefined): number {
   return isNaN(n) ? 0 : n;
 }
 
+function getMultiplier(action: string | null | undefined): number {
+  if (!action) return 1;
+  return action.trim().toLowerCase() === "minus" ? -1 : 1;
+}
+
+function signedQty(row: ReportRow): number {
+  return toNum(row.quantity) * getMultiplier(row.transactionTypeAction);
+}
+
+function signedNetWt(row: ReportRow): number {
+  return toNum(row.netWt) * getMultiplier(row.transactionTypeAction);
+}
+
 function fmt(n: number): string {
   return n.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 }
@@ -156,8 +170,8 @@ function groupRows(rows: ReportRow[], key: GroupByKey) {
     const rawKey = key === "month" ? getMonthLabel(row.date) : (row[key] ?? "—");
     const k = String(rawKey);
     const existing = map.get(k) ?? { qty: 0, netWt: 0, count: 0 };
-    existing.qty   += toNum(row.quantity);
-    existing.netWt += toNum(row.netWt);
+    existing.qty   += signedQty(row);
+    existing.netWt += signedNetWt(row);
     existing.count += 1;
     map.set(k, existing);
   }
@@ -249,8 +263,8 @@ export default function ReportsPage() {
   }
 
   const grouped  = useMemo(() => groupRows(rows, groupBy), [rows, groupBy]);
-  const totalQty  = useMemo(() => rows.reduce((s, r) => s + toNum(r.quantity), 0), [rows]);
-  const totalNetWt = useMemo(() => rows.reduce((s, r) => s + toNum(r.netWt), 0), [rows]);
+  const totalQty  = useMemo(() => rows.reduce((s, r) => s + signedQty(r), 0), [rows]);
+  const totalNetWt = useMemo(() => rows.reduce((s, r) => s + signedNetWt(r), 0), [rows]);
 
   // Years available in data for the year dropdown
   const currentYear = new Date().getFullYear();
@@ -465,8 +479,12 @@ export default function ReportsPage() {
                             <TableCell>{r.uomName ?? "—"}</TableCell>
                             <TableCell className="whitespace-nowrap">{r.machineName ?? "—"}</TableCell>
                             <TableCell className="whitespace-nowrap">{r.machineOperatorName ?? "—"}</TableCell>
-                            <TableCell className="text-right whitespace-nowrap">{r.quantity ?? "—"}</TableCell>
-                            <TableCell className="text-right whitespace-nowrap">{r.netWt ?? "—"}</TableCell>
+                            <TableCell className={`text-right whitespace-nowrap${getMultiplier(r.transactionTypeAction) < 0 ? " text-red-600" : ""}`}>
+                              {r.quantity != null ? fmt(signedQty(r)) : "—"}
+                            </TableCell>
+                            <TableCell className={`text-right whitespace-nowrap${getMultiplier(r.transactionTypeAction) < 0 ? " text-red-600" : ""}`}>
+                              {r.netWt != null ? fmt(signedNetWt(r)) : "—"}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -495,8 +513,8 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
     for (const r of rows) {
       const k = getMonthLabel(r.date);
       const e = map.get(k) ?? { qty: 0, netWt: 0 };
-      e.qty   += toNum(r.quantity);
-      e.netWt += toNum(r.netWt);
+      e.qty   += signedQty(r);
+      e.netWt += signedNetWt(r);
       map.set(k, e);
     }
     return Array.from(map.entries())
@@ -508,7 +526,7 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
     const map = new Map<string, number>();
     for (const r of rows) {
       const k = r.machineName ?? "Unknown";
-      map.set(k, (map.get(k) ?? 0) + toNum(r.quantity));
+      map.set(k, (map.get(k) ?? 0) + signedQty(r));
     }
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
@@ -520,7 +538,7 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
     const map = new Map<string, number>();
     for (const r of rows) {
       const k = r.yarnTypeName ?? "Unknown";
-      map.set(k, (map.get(k) ?? 0) + toNum(r.quantity));
+      map.set(k, (map.get(k) ?? 0) + signedQty(r));
     }
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
@@ -531,7 +549,7 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
     const map = new Map<string, number>();
     for (const r of rows) {
       const k = r.fabricTypeName ?? "Unknown";
-      map.set(k, (map.get(k) ?? 0) + toNum(r.quantity));
+      map.set(k, (map.get(k) ?? 0) + signedQty(r));
     }
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
@@ -543,8 +561,8 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
     for (const r of rows) {
       const k = r.partyName ?? "Unknown";
       const e = map.get(k) ?? { qty: 0, netWt: 0 };
-      e.qty   += toNum(r.quantity);
-      e.netWt += toNum(r.netWt);
+      e.qty   += signedQty(r);
+      e.netWt += signedNetWt(r);
       map.set(k, e);
     }
     return Array.from(map.entries())
