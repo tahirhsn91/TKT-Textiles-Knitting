@@ -260,6 +260,7 @@ export default function TransactionForm() {
                       <FormItem>
                         <FormLabel>Transaction Type *</FormLabel>
                         <Select
+                          key={field.value?.toString() || "unset"}
                           onValueChange={(val) => field.onChange(parseInt(val))}
                           value={field.value?.toString() || ""}
                         >
@@ -312,6 +313,7 @@ export default function TransactionForm() {
                       <FormItem>
                         <FormLabel>Job</FormLabel>
                         <Select
+                          key={field.value?.toString() || "none"}
                           onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
                           value={field.value?.toString() || "none"}
                         >
@@ -342,6 +344,7 @@ export default function TransactionForm() {
                       <FormItem>
                         <FormLabel>Party</FormLabel>
                         <Select
+                          key={field.value?.toString() || "none"}
                           onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
                           value={field.value?.toString() || "none"}
                         >
@@ -369,6 +372,7 @@ export default function TransactionForm() {
                       <FormItem>
                         <FormLabel>Location</FormLabel>
                         <Select
+                          key={field.value?.toString() || "none"}
                           onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
                           value={field.value?.toString() || "none"}
                         >
@@ -399,6 +403,7 @@ export default function TransactionForm() {
                       <FormItem>
                         <FormLabel>Fabric Type</FormLabel>
                         <Select
+                          key={field.value?.toString() || "none"}
                           onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
                           value={field.value?.toString() || "none"}
                         >
