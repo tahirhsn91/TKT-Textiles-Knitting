@@ -547,10 +547,10 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
       .map(([name, val]) => ({ name, netWt: parseFloat(val.toFixed(3)) }));
   }, [rows]);
 
-  const byYarnType = useMemo(() => {
+  const byYarnCount = useMemo(() => {
     const map = new Map<string, number>();
     for (const r of rows) {
-      const k = r.yarnTypeName ?? "Unknown";
+      const k = r.yarnCountName ?? "Unknown";
       map.set(k, (map.get(k) ?? 0) + signedNetWt(r));
     }
     return Array.from(map.entries())
@@ -652,18 +652,18 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
         </Card>
       )}
 
-      {/* Pie: Qty by Yarn Type */}
+      {/* Pie: Net Wt by Yarn Count */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {byYarnType.length > 0 && (
+        {byYarnCount.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Net Wt by Yarn Type</CardTitle>
+              <CardTitle className="text-sm font-medium">Net Wt by Yarn Count</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
                   <Pie
-                    data={byYarnType}
+                    data={byYarnCount}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
@@ -672,7 +672,7 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
                     label={({ name, percent }) => `${name} (${(percent * 100).toFixed(1)}%)`}
                     labelLine={false}
                   >
-                    {byYarnType.map((_, i) => (
+                    {byYarnCount.map((_, i) => (
                       <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                     ))}
                   </Pie>
