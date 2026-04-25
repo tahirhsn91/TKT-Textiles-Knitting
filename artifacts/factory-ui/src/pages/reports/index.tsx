@@ -270,7 +270,7 @@ export default function ReportsPage() {
   const runningBalances = useMemo(() => {
     let bal = 0;
     return rows.map((r) => {
-      bal += signedQty(r);
+      bal += signedNetWt(r);
       return bal;
     });
   }, [rows]);
