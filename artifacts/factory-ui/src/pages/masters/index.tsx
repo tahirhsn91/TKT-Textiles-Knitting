@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useListTransactionTypeMasterCrud,
@@ -67,9 +68,18 @@ import {
   getListFabricTypeMasterQueryKey,
   getListMachineOperatorMasterQueryKey,
 } from "@workspace/api-client-react";
+import { X } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { MasterTable } from "@/components/master-table";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function MastersPage() {
   const qc = useQueryClient();
@@ -90,6 +100,10 @@ export default function MastersPage() {
   const createJob = useCreateJobMaster();
   const updateJob = useUpdateJobMaster();
   const deleteJob = useDeleteJobMaster();
+  const [jobPartyFilter, setJobPartyFilter] = useState<string>("");
+  const filteredJobs = jobPartyFilter
+    ? (jobs ?? []).filter((j) => String((j as { partyId?: number | null }).partyId ?? "") === jobPartyFilter)
+    : (jobs ?? []);
 
   // ── Party ────────────────────────────────────────────────────────────────
   const { data: parties, isLoading: partiesLoading } = useListPartyMasterCrud();
@@ -201,6 +215,39 @@ export default function MastersPage() {
           </TabsContent>
 
           <TabsContent value="job" className="mt-4">
+            {/* Party filter */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground font-medium">Filter by Party</span>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={jobPartyFilter || "__all__"}
+                    onValueChange={(v) => setJobPartyFilter(v === "__all__" ? "" : v)}
+                  >
+                    <SelectTrigger className="h-9 w-64">
+                      <SelectValue placeholder="All Parties" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">All Parties</SelectItem>
+                      {(parties ?? []).map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {jobPartyFilter && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                      onClick={() => setJobPartyFilter("")}
+                      title="Clear filter"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
             <MasterTable
               title="Job Types"
               description="Job types linked to a party. The combination of Party + Code must be unique."
@@ -216,7 +263,7 @@ export default function MastersPage() {
                 { key: "name", label: "Job Type", placeholder: "e.g. Knitting Order" },
                 { key: "code", label: "Code", placeholder: "e.g. KO" },
               ]}
-              rows={jobs as never}
+              rows={filteredJobs as never}
               isLoading={jobsLoading}
               onAdd={(data) => new Promise((res, rej) =>
                 createJob.mutate({ data: { ...data, partyId: data.partyId ? Number(data.partyId) : null } as never }, {
