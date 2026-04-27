@@ -142,6 +142,21 @@ export default function TransactionForm() {
     control: form.control,
   });
 
+  const watchedPartyId = form.watch("partyId");
+
+  const filteredJobMaster = jobMaster?.filter((j) =>
+    watchedPartyId == null ? true : j.partyId === watchedPartyId
+  );
+
+  useEffect(() => {
+    const currentJobId = form.getValues("jobId");
+    if (currentJobId == null) return;
+    const jobStillValid = filteredJobMaster?.some((j) => j.id === currentJobId);
+    if (!jobStillValid) {
+      form.setValue("jobId", null);
+    }
+  }, [watchedPartyId]);
+
   const lookupsReady = !!(
     jobMaster && partyMaster && machineMaster && locationMaster &&
     yarnTypeMaster && yarnCountMaster && yarnBrandMaster && uomMaster &&
@@ -332,19 +347,19 @@ export default function TransactionForm() {
                       <FormItem>
                         <FormLabel>Job</FormLabel>
                         <Select
-                          key={field.value?.toString() || "none"}
+                          key={`${watchedPartyId}-${field.value?.toString() || "none"}`}
                           onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
                           value={field.value?.toString() || "none"}
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select job" />
+                              <SelectValue placeholder={watchedPartyId ? "Select job" : "Select party first"} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="none">None</SelectItem>
-                            {jobMaster?.map(j => (
-                              <SelectItem key={`job-${j.id}`} value={j.id.toString()}>{j.name}</SelectItem>
+                            {filteredJobMaster?.map(j => (
+                              <SelectItem key={`job-${j.id}`} value={j.id.toString()}>{j.name} ({j.code})</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>

@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   transactionTypeMasterTable,
@@ -30,7 +31,17 @@ import {
 const router: IRouter = Router();
 
 router.get("/lookups/job-master", async (_req, res): Promise<void> => {
-  const rows = await db.select().from(jobMasterTable).orderBy(jobMasterTable.name);
+  const rows = await db
+    .select({
+      id:        jobMasterTable.id,
+      name:      jobMasterTable.name,
+      code:      jobMasterTable.code,
+      partyId:   jobMasterTable.partyId,
+      partyName: partyMasterTable.name,
+    })
+    .from(jobMasterTable)
+    .leftJoin(partyMasterTable, eq(jobMasterTable.partyId, partyMasterTable.id))
+    .orderBy(partyMasterTable.name, jobMasterTable.name);
   res.json(ListJobMasterResponse.parse(rows));
 });
 

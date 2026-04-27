@@ -21,6 +21,8 @@ export const ListJobMasterResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
   code: zod.string(),
+  partyId: zod.number().nullish(),
+  partyName: zod.string().nullish(),
 });
 export const ListJobMasterResponse = zod.array(ListJobMasterResponseItem);
 
@@ -192,6 +194,8 @@ export const ListJobMasterCrudResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
   code: zod.string(),
+  partyId: zod.number().nullish(),
+  partyName: zod.string().nullish(),
 });
 export const ListJobMasterCrudResponse = zod.array(
   ListJobMasterCrudResponseItem,
@@ -203,6 +207,7 @@ export const ListJobMasterCrudResponse = zod.array(
 export const CreateJobMasterBody = zod.object({
   name: zod.string(),
   code: zod.string(),
+  partyId: zod.number().nullish(),
 });
 
 /**
@@ -215,12 +220,15 @@ export const UpdateJobMasterParams = zod.object({
 export const UpdateJobMasterBody = zod.object({
   name: zod.string(),
   code: zod.string(),
+  partyId: zod.number().nullish(),
 });
 
 export const UpdateJobMasterResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
   code: zod.string(),
+  partyId: zod.number().nullish(),
+  partyName: zod.string().nullish(),
 });
 
 /**

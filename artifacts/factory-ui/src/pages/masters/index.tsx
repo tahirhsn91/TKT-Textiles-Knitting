@@ -203,21 +203,29 @@ export default function MastersPage() {
           <TabsContent value="job" className="mt-4">
             <MasterTable
               title="Job Types"
-              description="Transaction types used as job categories."
+              description="Job types linked to a party. The combination of Party + Code must be unique."
               fields={[
+                {
+                  key: "partyId",
+                  label: "Party",
+                  type: "select",
+                  displayKey: "partyName",
+                  placeholder: "Select party",
+                  options: (parties ?? []).map((p) => ({ value: String(p.id), label: p.name })),
+                },
                 { key: "name", label: "Name", placeholder: "e.g. Knitting Order" },
                 { key: "code", label: "Code", placeholder: "e.g. KO" },
               ]}
               rows={jobs as never}
               isLoading={jobsLoading}
               onAdd={(data) => new Promise((res, rej) =>
-                createJob.mutate({ data: data as never }, {
+                createJob.mutate({ data: { ...data, partyId: data.partyId ? Number(data.partyId) : null } as never }, {
                   onSuccess: () => { invalidateBoth(getListJobMasterCrudQueryKey(), getListJobMasterQueryKey()); res(); },
                   onError: (e) => rej(e),
                 })
               )}
               onUpdate={(id, data) => new Promise((res, rej) =>
-                updateJob.mutate({ id, data: data as never }, {
+                updateJob.mutate({ id, data: { ...data, partyId: data.partyId ? Number(data.partyId) : null } as never }, {
                   onSuccess: () => { invalidateBoth(getListJobMasterCrudQueryKey(), getListJobMasterQueryKey()); res(); },
                   onError: (e) => rej(e),
                 })

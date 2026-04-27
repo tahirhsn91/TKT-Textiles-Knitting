@@ -78,18 +78,33 @@ router.delete("/masters/transaction-type/:id", async (req, res): Promise<void> =
 // ─── Job Master ─────────────────────────────────────────────────────────────
 
 router.get("/masters/job", async (_req, res): Promise<void> => {
-  const rows = await db.select().from(jobMasterTable).orderBy(jobMasterTable.name);
+  const rows = await db
+    .select({
+      id:        jobMasterTable.id,
+      name:      jobMasterTable.name,
+      code:      jobMasterTable.code,
+      partyId:   jobMasterTable.partyId,
+      partyName: partyMasterTable.name,
+    })
+    .from(jobMasterTable)
+    .leftJoin(partyMasterTable, eq(jobMasterTable.partyId, partyMasterTable.id))
+    .orderBy(partyMasterTable.name, jobMasterTable.name);
   res.json(rows);
 });
 
 router.post("/masters/job", async (req, res): Promise<void> => {
-  const { name, code } = req.body;
+  const { name, code, partyId } = req.body;
   if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
   try {
-    const [row] = await db.insert(jobMasterTable).values({ name, code }).returning();
+    const [inserted] = await db.insert(jobMasterTable).values({ name, code, partyId: partyId ?? null }).returning();
+    const [row] = await db
+      .select({ id: jobMasterTable.id, name: jobMasterTable.name, code: jobMasterTable.code, partyId: jobMasterTable.partyId, partyName: partyMasterTable.name })
+      .from(jobMasterTable)
+      .leftJoin(partyMasterTable, eq(jobMasterTable.partyId, partyMasterTable.id))
+      .where(eq(jobMasterTable.id, inserted.id));
     res.status(201).json(row);
   } catch (err) {
-    if (isUniqueViolation(err)) { res.status(409).json({ error: "Code already exists" }); return; }
+    if (isUniqueViolation(err)) { res.status(409).json({ error: "Code already exists for this party" }); return; }
     throw err;
   }
 });
@@ -97,14 +112,19 @@ router.post("/masters/job", async (req, res): Promise<void> => {
 router.put("/masters/job/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, code } = req.body;
+  const { name, code, partyId } = req.body;
   if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
   try {
-    const [row] = await db.update(jobMasterTable).set({ name, code }).where(eq(jobMasterTable.id, id)).returning();
+    await db.update(jobMasterTable).set({ name, code, partyId: partyId ?? null }).where(eq(jobMasterTable.id, id));
+    const [row] = await db
+      .select({ id: jobMasterTable.id, name: jobMasterTable.name, code: jobMasterTable.code, partyId: jobMasterTable.partyId, partyName: partyMasterTable.name })
+      .from(jobMasterTable)
+      .leftJoin(partyMasterTable, eq(jobMasterTable.partyId, partyMasterTable.id))
+      .where(eq(jobMasterTable.id, id));
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
     res.json(row);
   } catch (err) {
-    if (isUniqueViolation(err)) { res.status(409).json({ error: "Code already exists" }); return; }
+    if (isUniqueViolation(err)) { res.status(409).json({ error: "Code already exists for this party" }); return; }
     throw err;
   }
 });

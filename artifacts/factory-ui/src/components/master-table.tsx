@@ -3,6 +3,13 @@ import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -24,15 +31,19 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 
+export type FieldOption = { value: string; label: string };
+
 export type Field = {
   key: string;
   label: string;
   placeholder?: string;
   type?: string;
   step?: string;
+  options?: FieldOption[];
+  displayKey?: string;
 };
 
-type Row = { id: number; [key: string]: string | number };
+type Row = { id: number; [key: string]: string | number | null | undefined };
 
 type Props = {
   title: string;
@@ -44,6 +55,62 @@ type Props = {
   onUpdate: (id: number, data: Record<string, string>) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
 };
+
+function FieldInput({
+  field,
+  value,
+  onChange,
+  autoFocus,
+  onEnter,
+  onEscape,
+}: {
+  field: Field;
+  value: string;
+  onChange: (v: string) => void;
+  autoFocus?: boolean;
+  onEnter?: () => void;
+  onEscape?: () => void;
+}) {
+  if (field.type === "select" && field.options) {
+    return (
+      <Select value={value || "__none__"} onValueChange={(v) => onChange(v === "__none__" ? "" : v)}>
+        <SelectTrigger className="h-8 text-sm">
+          <SelectValue placeholder={field.placeholder || `Select ${field.label}`} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">— None —</SelectItem>
+          {field.options.map((o) => (
+            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+  return (
+    <Input
+      className="h-8 text-sm"
+      type={field.type || "text"}
+      step={field.step}
+      placeholder={field.placeholder || field.label}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && onEnter) onEnter();
+        if (e.key === "Escape" && onEscape) onEscape();
+      }}
+      autoFocus={autoFocus}
+    />
+  );
+}
+
+function displayValue(field: Field, row: Row): string {
+  const raw = field.displayKey ? row[field.displayKey] : row[field.key];
+  if (field.type === "select" && field.options) {
+    const match = field.options.find((o) => o.value === String(row[field.key] ?? ""));
+    return match ? match.label : (raw != null ? String(raw) : "—");
+  }
+  return raw != null ? String(raw) : "";
+}
 
 export function MasterTable({
   title,
@@ -140,17 +207,15 @@ export function MasterTable({
             {/* Add row */}
             {showAddRow && (
               <TableRow className="bg-muted/30">
-                {fields.map((f) => (
+                {fields.map((f, i) => (
                   <TableCell key={f.key}>
-                    <Input
-                      className="h-8 text-sm"
-                      type={f.type || "text"}
-                      step={f.step}
-                      placeholder={f.placeholder || f.label}
+                    <FieldInput
+                      field={f}
                       value={addValues[f.key] || ""}
-                      onChange={(e) => setAddValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                      onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") { setShowAddRow(false); setAddValues({}); } }}
-                      autoFocus={f.key === fields[0].key}
+                      onChange={(v) => setAddValues((prev) => ({ ...prev, [f.key]: v }))}
+                      autoFocus={i === 0}
+                      onEnter={handleAdd}
+                      onEscape={() => { setShowAddRow(false); setAddValues({}); }}
                     />
                   </TableCell>
                 ))}
@@ -187,20 +252,19 @@ export function MasterTable({
             {/* Data rows */}
             {rows?.map((row) => (
               <TableRow key={row.id}>
-                {fields.map((f) => (
+                {fields.map((f, i) => (
                   <TableCell key={f.key}>
                     {editingId === row.id ? (
-                      <Input
-                        className="h-8 text-sm"
-                        type={f.type || "text"}
-                        step={f.step}
+                      <FieldInput
+                        field={f}
                         value={editValues[f.key] || ""}
-                        onChange={(e) => setEditValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleSaveEdit(); if (e.key === "Escape") cancelEdit(); }}
-                        autoFocus={f.key === fields[0].key}
+                        onChange={(v) => setEditValues((prev) => ({ ...prev, [f.key]: v }))}
+                        autoFocus={i === 0}
+                        onEnter={handleSaveEdit}
+                        onEscape={cancelEdit}
                       />
                     ) : (
-                      String(row[f.key] ?? "")
+                      displayValue(f, row)
                     )}
                   </TableCell>
                 ))}
