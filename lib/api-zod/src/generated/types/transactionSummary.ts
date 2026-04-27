@@ -25,4 +25,5 @@ export interface TransactionSummary {
   gsm?: number | null;
   /** @nullable */
   reference?: string | null;
+  yarnBrandIds?: number[];
 }

@@ -8,6 +8,8 @@ import {
   useListTransactionTypeMaster,
   useListPartyMaster,
   useListLocationMaster,
+  useListJobMaster,
+  useListYarnBrandMaster,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -21,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MultiSelect } from "@/components/ui/multi-select";
 import {
   Table,
   TableBody,
@@ -44,23 +47,38 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Layout } from "@/components/layout";
 
-const EMPTY_FILTERS = { transactionTypeId: "", partyId: "", dateFrom: "", dateTo: "" };
+const EMPTY_FILTERS = {
+  transactionTypeId: "",
+  partyId: "",
+  dateFrom: "",
+  dateTo: "",
+  jobId: [] as string[],
+  yarnBrandId: [] as string[],
+};
 
 export default function TransactionList() {
   const { data: transactions, isLoading } = useListTransactions();
   const { data: transactionTypeMaster } = useListTransactionTypeMaster();
   const { data: partyMaster } = useListPartyMaster();
   const { data: locationMaster } = useListLocationMaster();
+  const { data: jobMaster } = useListJobMaster();
+  const { data: yarnBrandMaster } = useListYarnBrandMaster();
   const deleteTransaction = useDeleteTransaction();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const [filters, setFilters] = useState(EMPTY_FILTERS);
 
-  const setFilter = (key: keyof typeof EMPTY_FILTERS, value: string) =>
+  const setFilter = (key: keyof typeof EMPTY_FILTERS, value: string | string[]) =>
     setFilters((f) => ({ ...f, [key]: value }));
 
-  const hasFilters = Object.values(filters).some(Boolean);
+  const hasFilters =
+    filters.transactionTypeId !== "" ||
+    filters.partyId !== "" ||
+    filters.dateFrom !== "" ||
+    filters.dateTo !== "" ||
+    filters.jobId.length > 0 ||
+    filters.yarnBrandId.length > 0;
 
   const filtered = useMemo(() => {
     if (!transactions) return [];
@@ -69,6 +87,11 @@ export default function TransactionList() {
       if (filters.partyId && String(t.partyId) !== filters.partyId) return false;
       if (filters.dateFrom && t.date < filters.dateFrom) return false;
       if (filters.dateTo && t.date > filters.dateTo) return false;
+      if (filters.jobId.length > 0 && !filters.jobId.includes(String(t.jobId ?? ""))) return false;
+      if (filters.yarnBrandId.length > 0) {
+        const brandIds = t.yarnBrandIds ?? [];
+        if (!filters.yarnBrandId.some((id) => brandIds.includes(Number(id)))) return false;
+      }
       return true;
     });
   }, [transactions, filters]);
@@ -108,7 +131,7 @@ export default function TransactionList() {
         </div>
 
         {/* Filter Bar */}
-        <div className="rounded-md border bg-card p-4">
+        <div className="rounded-md border bg-card p-4 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs text-muted-foreground">Transaction Type</Label>
@@ -179,8 +202,31 @@ export default function TransactionList() {
               </div>
             </div>
           </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs text-muted-foreground">Job</Label>
+              <MultiSelect
+                options={(jobMaster ?? []).map((j) => ({ value: String(j.id), label: j.name }))}
+                selected={filters.jobId}
+                onChange={(v) => setFilter("jobId", v)}
+                placeholder="All"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs text-muted-foreground">Yarn Brand</Label>
+              <MultiSelect
+                options={(yarnBrandMaster ?? []).map((b) => ({ value: String(b.id), label: b.name }))}
+                selected={filters.yarnBrandId}
+                onChange={(v) => setFilter("yarnBrandId", v)}
+                placeholder="All"
+              />
+            </div>
+          </div>
+
           {hasFilters && (
-            <p className="text-xs text-muted-foreground mt-2">
+            <p className="text-xs text-muted-foreground">
               Showing {filtered.length} of {transactions?.length ?? 0} transactions
             </p>
           )}

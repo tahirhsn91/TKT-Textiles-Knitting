@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { transactionHeaderTable, transactionDetailTable } from "@workspace/db";
 import {
@@ -36,8 +36,23 @@ function normalizeDetail<T extends DetailInput>(d: T): T {
 
 router.get("/transactions", async (_req, res): Promise<void> => {
   const rows = await db
-    .select()
+    .select({
+      id:                transactionHeaderTable.id,
+      transactionTypeId: transactionHeaderTable.transactionTypeId,
+      date:              transactionHeaderTable.date,
+      docNumber:         transactionHeaderTable.docNumber,
+      jobId:             transactionHeaderTable.jobId,
+      partyId:           transactionHeaderTable.partyId,
+      locationId:        transactionHeaderTable.locationId,
+      fabricTypeId:      transactionHeaderTable.fabricTypeId,
+      sl:                transactionHeaderTable.sl,
+      gsm:               transactionHeaderTable.gsm,
+      reference:         transactionHeaderTable.reference,
+      yarnBrandIds:      sql<number[]>`array_remove(array_agg(DISTINCT ${transactionDetailTable.yarnBrandId}), NULL)`,
+    })
     .from(transactionHeaderTable)
+    .leftJoin(transactionDetailTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
+    .groupBy(transactionHeaderTable.id)
     .orderBy(transactionHeaderTable.id);
   res.json(ListTransactionsResponse.parse(rows));
 });

@@ -650,6 +650,7 @@ export const ListTransactionsResponseItem = zod.object({
   sl: zod.string().nullish(),
   gsm: zod.number().nullish(),
   reference: zod.string().nullish(),
+  yarnBrandIds: zod.array(zod.number()).optional(),
 });
 export const ListTransactionsResponse = zod.array(ListTransactionsResponseItem);
 
