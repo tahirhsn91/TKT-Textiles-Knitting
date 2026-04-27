@@ -1,6 +1,6 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 import { useLocation, useParams } from "wouter";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Plus, Trash2, ArrowLeft } from "lucide-react";
@@ -143,6 +143,27 @@ export default function TransactionForm() {
   });
 
   const watchedPartyId = form.watch("partyId");
+
+  const watchedDetails = useWatch({ control: form.control, name: "details" });
+
+  const runTotals = useMemo(() => {
+    const result: number[] = [];
+    let running = 0;
+    let prevMachineId: number | null | undefined = undefined;
+    for (let i = 0; i < (watchedDetails?.length ?? 0); i++) {
+      const d = watchedDetails[i];
+      const machineId = d?.machineId ?? null;
+      const netWt = parseFloat(d?.netWt?.toString() ?? "0") || 0;
+      if (i === 0 || machineId !== prevMachineId) {
+        running = netWt;
+      } else {
+        running += netWt;
+      }
+      result.push(running);
+      prevMachineId = machineId;
+    }
+    return result;
+  }, [watchedDetails]);
 
   const filteredJobMaster = jobMaster?.filter((j) =>
     watchedPartyId == null ? true : j.partyId === watchedPartyId
@@ -534,8 +555,8 @@ export default function TransactionForm() {
               </CardHeader>
               <CardContent className="p-0">
                 <ScrollArea className="w-full rounded-md">
-                  <div className="min-w-[1200px] p-4 pt-0">
-                    <div className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_auto] gap-2 mb-2 font-medium text-sm text-muted-foreground">
+                  <div className="min-w-[1380px] p-4 pt-0">
+                    <div className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_1.5fr_auto] gap-2 mb-2 font-medium text-sm text-muted-foreground">
                       <div>Yarn Type</div>
                       <div>Yarn Count</div>
                       <div>Yarn Brand</div>
@@ -544,12 +565,13 @@ export default function TransactionForm() {
                       <div>Machine Operator</div>
                       <div>Qty</div>
                       <div>Net Wt</div>
+                      <div>Run_Total</div>
                       <div className="w-10"></div>
                     </div>
 
                     <div className="space-y-2" ref={lineItemsRef}>
                       {fields.map((field, index) => (
-                        <div key={field.id} className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_auto] gap-2 items-start">
+                        <div key={field.id} className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_1.5fr_auto] gap-2 items-start">
                           <FormField
                             control={form.control}
                             name={`details.${index}.yarnTypeId`}
@@ -743,6 +765,10 @@ export default function TransactionForm() {
                               </FormItem>
                             )}
                           />
+
+                          <div className="h-9 flex items-center px-3 rounded-md border border-input bg-muted text-sm font-medium text-muted-foreground">
+                            {(runTotals[index] ?? 0).toFixed(3)}
+                          </div>
 
                           <Button
                             type="button"
