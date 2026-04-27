@@ -213,7 +213,7 @@ export default function MastersPage() {
                   placeholder: "Select party",
                   options: (parties ?? []).map((p) => ({ value: String(p.id), label: p.name })),
                 },
-                { key: "name", label: "Name", placeholder: "e.g. Knitting Order" },
+                { key: "name", label: "Job Type", placeholder: "e.g. Knitting Order" },
                 { key: "code", label: "Code", placeholder: "e.g. KO" },
               ]}
               rows={jobs as never}
