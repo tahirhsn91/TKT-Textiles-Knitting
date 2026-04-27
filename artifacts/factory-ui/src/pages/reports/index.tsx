@@ -333,8 +333,8 @@ export default function ReportsPage() {
             {/* Header master filters */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               <FilterMulti label="Transaction Type" values={filters.transactionTypeId} onChange={(v) => set("transactionTypeId", v)} options={transactionTypes} />
-              <FilterMulti label="Job"              values={filters.jobId}             onChange={(v) => set("jobId", v)}             options={jobs} />
               <FilterMulti label="Party"            values={filters.partyId}           onChange={(v) => set("partyId", v)}           options={parties} />
+              <FilterMulti label="Job"              values={filters.jobId}             onChange={(v) => set("jobId", v)}             options={jobs} />
               <FilterMulti label="Location"         values={filters.locationId}        onChange={(v) => set("locationId", v)}        options={locations} />
               <FilterMulti label="Fabric Type"      values={filters.fabricTypeId}      onChange={(v) => set("fabricTypeId", v)}      options={fabricTypes} />
             </div>

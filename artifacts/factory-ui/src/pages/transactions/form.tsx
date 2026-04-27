@@ -285,7 +285,7 @@ export default function TransactionForm() {
                 <CardTitle className="text-lg">Header Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Row 1: Transaction Type, Date, Doc Number, Job */}
+                {/* Row 1: Transaction Type, Date, Doc Number, Party */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <FormField
                     control={form.control}
@@ -342,37 +342,6 @@ export default function TransactionForm() {
 
                   <FormField
                     control={form.control}
-                    name="jobId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Job</FormLabel>
-                        <Select
-                          key={`${watchedPartyId}-${field.value?.toString() || "none"}`}
-                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
-                          value={field.value?.toString() || "none"}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder={watchedPartyId ? "Select job" : "Select party first"} />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {filteredJobMaster?.map(j => (
-                              <SelectItem key={`job-${j.id}`} value={j.id.toString()}>{j.name} ({j.code})</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                {/* Row 2: Party, Location, Reference */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <FormField
-                    control={form.control}
                     name="partyId"
                     render={({ field }) => (
                       <FormItem>
@@ -391,6 +360,37 @@ export default function TransactionForm() {
                             <SelectItem value="none">None</SelectItem>
                             {partyMaster?.map(p => (
                               <SelectItem key={`party-${p.id}`} value={p.id.toString()}>{p.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Row 2: Job, Location, Reference */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="jobId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Job</FormLabel>
+                        <Select
+                          key={`${watchedPartyId}-${field.value?.toString() || "none"}`}
+                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
+                          value={field.value?.toString() || "none"}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder={watchedPartyId ? "Select job" : "Select party first"} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {filteredJobMaster?.map(j => (
+                              <SelectItem key={`job-${j.id}`} value={j.id.toString()}>{j.name} ({j.code})</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
