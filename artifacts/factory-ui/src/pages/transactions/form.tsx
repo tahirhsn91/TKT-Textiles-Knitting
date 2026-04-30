@@ -168,6 +168,25 @@ export default function TransactionForm() {
     return result;
   }, [watchedDetails]);
 
+  const mcRunTotals = useMemo(() => {
+    const result: number[] = [];
+    let running = 0;
+    let prevMachineId: number | null | undefined = undefined;
+    for (let i = 0; i < (watchedDetails?.length ?? 0); i++) {
+      const d = watchedDetails[i];
+      const machineId = d?.machineId ?? null;
+      const netWt = parseFloat(d?.netWt?.toString() ?? "0") || 0;
+      if (i === 0 || machineId !== prevMachineId) {
+        running = netWt;
+      } else {
+        running += netWt;
+      }
+      result.push(running);
+      prevMachineId = machineId;
+    }
+    return result;
+  }, [watchedDetails]);
+
   const filteredJobMaster = jobMaster?.filter((j) =>
     watchedPartyId == null ? true : j.partyId === watchedPartyId
   );
@@ -558,10 +577,10 @@ export default function TransactionForm() {
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                  <div className="min-w-[1380px]">
+                  <div className="min-w-[1560px]">
                     {/* Frozen column headers */}
                     <div className="px-4 pt-4 pb-2 border-b bg-card">
-                      <div className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_1.5fr_auto] gap-2 font-medium text-sm text-muted-foreground">
+                      <div className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_1.5fr_1.5fr_auto] gap-2 font-medium text-sm text-muted-foreground">
                         <div>Yarn Type</div>
                         <div>Yarn Count</div>
                         <div>Yarn Brand</div>
@@ -571,6 +590,7 @@ export default function TransactionForm() {
                         <div>Qty</div>
                         <div>Net Wt</div>
                         <div>Run_Total</div>
+                        <div>M/c_Run_Total</div>
                         <div className="w-10"></div>
                       </div>
                     </div>
@@ -579,7 +599,7 @@ export default function TransactionForm() {
                     <div className="overflow-y-auto max-h-[212px] px-4 py-2">
                     <div className="space-y-2" ref={lineItemsRef}>
                       {fields.map((field, index) => (
-                        <div key={field.id} className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_1.5fr_auto] gap-2 items-start">
+                        <div key={field.id} className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_1.5fr_1.5fr_auto] gap-2 items-start">
                           <FormField
                             control={form.control}
                             name={`details.${index}.yarnTypeId`}
@@ -776,6 +796,10 @@ export default function TransactionForm() {
 
                           <div className="h-9 flex items-center px-3 rounded-md border border-input bg-muted text-sm font-medium text-muted-foreground">
                             {(runTotals[index] ?? 0).toFixed(3)}
+                          </div>
+
+                          <div className="h-9 flex items-center px-3 rounded-md border border-input bg-muted text-sm font-medium text-muted-foreground">
+                            {(mcRunTotals[index] ?? 0).toFixed(3)}
                           </div>
 
                           <Button
