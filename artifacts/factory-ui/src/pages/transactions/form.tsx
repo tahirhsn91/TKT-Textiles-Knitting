@@ -150,17 +150,20 @@ export default function TransactionForm() {
     const result: number[] = [];
     let running = 0;
     let prevMachineId: number | null | undefined = undefined;
+    let prevOperatorId: number | null | undefined = undefined;
     for (let i = 0; i < (watchedDetails?.length ?? 0); i++) {
       const d = watchedDetails[i];
       const machineId = d?.machineId ?? null;
+      const operatorId = d?.machineOperatorId ?? null;
       const netWt = parseFloat(d?.netWt?.toString() ?? "0") || 0;
-      if (i === 0 || machineId !== prevMachineId) {
+      if (i === 0 || machineId !== prevMachineId || operatorId !== prevOperatorId) {
         running = netWt;
       } else {
         running += netWt;
       }
       result.push(running);
       prevMachineId = machineId;
+      prevOperatorId = operatorId;
     }
     return result;
   }, [watchedDetails]);
