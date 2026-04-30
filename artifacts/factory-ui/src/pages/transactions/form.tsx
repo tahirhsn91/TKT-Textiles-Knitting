@@ -47,7 +47,7 @@ import {
 import { DatePicker } from "@/components/ui/date-picker";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+
 
 const nullableInt = z.preprocess(
   (v) => (v === "" || v === null || v === undefined ? null : Number(v)),
@@ -554,21 +554,26 @@ export default function TransactionForm() {
                 </Button>
               </CardHeader>
               <CardContent className="p-0">
-                <ScrollArea className="w-full rounded-md">
-                  <div className="min-w-[1380px] p-4 pt-0">
-                    <div className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_1.5fr_auto] gap-2 mb-2 font-medium text-sm text-muted-foreground">
-                      <div>Yarn Type</div>
-                      <div>Yarn Count</div>
-                      <div>Yarn Brand</div>
-                      <div>UOM</div>
-                      <div>Machine</div>
-                      <div>Machine Operator</div>
-                      <div>Qty</div>
-                      <div>Net Wt</div>
-                      <div>Run_Total</div>
-                      <div className="w-10"></div>
+                <div className="overflow-x-auto">
+                  <div className="min-w-[1380px]">
+                    {/* Frozen column headers */}
+                    <div className="px-4 pt-4 pb-2 border-b bg-card">
+                      <div className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_1.5fr_auto] gap-2 font-medium text-sm text-muted-foreground">
+                        <div>Yarn Type</div>
+                        <div>Yarn Count</div>
+                        <div>Yarn Brand</div>
+                        <div>UOM</div>
+                        <div>Machine</div>
+                        <div>Machine Operator</div>
+                        <div>Qty</div>
+                        <div>Net Wt</div>
+                        <div>Run_Total</div>
+                        <div className="w-10"></div>
+                      </div>
                     </div>
 
+                    {/* Scrollable rows — 5 rows visible */}
+                    <div className="overflow-y-auto max-h-[212px] px-4 py-2">
                     <div className="space-y-2" ref={lineItemsRef}>
                       {fields.map((field, index) => (
                         <div key={field.id} className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_1.5fr_auto] gap-2 items-start">
@@ -782,9 +787,9 @@ export default function TransactionForm() {
                         </div>
                       ))}
                     </div>
+                    </div>
                   </div>
-                  <ScrollBar orientation="horizontal" />
-                </ScrollArea>
+                </div>
               </CardContent>
             </Card>
 
