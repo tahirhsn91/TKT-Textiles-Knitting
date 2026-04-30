@@ -72,6 +72,15 @@ export default function TransactionList() {
   const setFilter = (key: keyof typeof EMPTY_FILTERS, value: string | string[]) =>
     setFilters((f) => ({ ...f, [key]: value }));
 
+  // Jobs filtered by selected party (all jobs when no party chosen)
+  const filteredJobOptions = useMemo(
+    () =>
+      (jobMaster ?? [])
+        .filter((j) => !filters.partyId || j.partyId === Number(filters.partyId))
+        .map((j) => ({ value: String(j.id), label: j.name })),
+    [jobMaster, filters.partyId]
+  );
+
   const hasFilters =
     filters.transactionTypeId !== "" ||
     filters.partyId !== "" ||
@@ -155,7 +164,9 @@ export default function TransactionList() {
               <Label className="text-xs text-muted-foreground">Party</Label>
               <Select
                 value={filters.partyId || "all"}
-                onValueChange={(v) => setFilter("partyId", v === "all" ? "" : v)}
+                onValueChange={(v) => {
+                  setFilters((f) => ({ ...f, partyId: v === "all" ? "" : v, jobId: [] }));
+                }}
               >
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="All" />
@@ -205,12 +216,12 @@ export default function TransactionList() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs text-muted-foreground">Job</Label>
+              <Label className="text-xs text-muted-foreground">Job Type</Label>
               <MultiSelect
-                options={(jobMaster ?? []).map((j) => ({ value: String(j.id), label: j.name }))}
+                options={filteredJobOptions}
                 selected={filters.jobId}
                 onChange={(v) => setFilter("jobId", v)}
-                placeholder="All"
+                placeholder={filters.partyId ? "All" : "All"}
               />
             </div>
 

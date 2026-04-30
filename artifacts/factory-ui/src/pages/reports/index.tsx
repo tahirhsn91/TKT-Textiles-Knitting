@@ -329,6 +329,15 @@ export default function ReportsPage() {
   // UOM options need name
   const uomOptions = uoms?.map((u) => ({ id: u.id, name: u.name }));
 
+  // Job options filtered by selected parties (all if no party filter)
+  const filteredJobOptions = useMemo(
+    () =>
+      (jobs ?? []).filter((j) =>
+        filters.partyId.length === 0 ? true : filters.partyId.includes(String(j.partyId ?? ""))
+      ),
+    [jobs, filters.partyId]
+  );
+
   return (
     <Layout>
       <div className="space-y-4">
@@ -380,8 +389,8 @@ export default function ReportsPage() {
             {/* Header master filters */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               <FilterMulti label="Transaction Type" values={filters.transactionTypeId} onChange={(v) => set("transactionTypeId", v)} options={transactionTypes} />
-              <FilterMulti label="Party"            values={filters.partyId}           onChange={(v) => set("partyId", v)}           options={parties} />
-              <FilterMulti label="Job"              values={filters.jobId}             onChange={(v) => set("jobId", v)}             options={jobs} />
+              <FilterMulti label="Party"            values={filters.partyId}           onChange={(v) => { set("partyId", v); set("jobId", []); }} options={parties} />
+              <FilterMulti label="Job Type"         values={filters.jobId}             onChange={(v) => set("jobId", v)}             options={filteredJobOptions} />
               <FilterMulti label="Location"         values={filters.locationId}        onChange={(v) => set("locationId", v)}        options={locations} />
               <FilterMulti label="Fabric Type"      values={filters.fabricTypeId}      onChange={(v) => set("fabricTypeId", v)}      options={fabricTypes} />
             </div>

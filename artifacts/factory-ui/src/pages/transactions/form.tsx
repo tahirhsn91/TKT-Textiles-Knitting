@@ -419,7 +419,7 @@ export default function TransactionForm() {
                     name="jobId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Job</FormLabel>
+                        <FormLabel>Job Type</FormLabel>
                         <Select
                           key={`${watchedPartyId}-${field.value?.toString() || "none"}`}
                           onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
@@ -433,7 +433,7 @@ export default function TransactionForm() {
                           <SelectContent>
                             <SelectItem value="none">None</SelectItem>
                             {filteredJobMaster?.map(j => (
-                              <SelectItem key={`job-${j.id}`} value={j.id.toString()}>{j.name} ({j.code})</SelectItem>
+                              <SelectItem key={`job-${j.id}`} value={j.id.toString()}>{j.name}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
