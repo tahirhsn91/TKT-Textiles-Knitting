@@ -89,7 +89,7 @@ const emptyDetail = (): z.infer<typeof detailSchema> => ({
   yarnCountId: null,
   yarnBrandId: null,
   uomId: null,
-  quantity: null,
+  quantity: "1",
   netWt: null,
 });
 
@@ -563,17 +563,23 @@ export default function TransactionForm() {
 
             {/* Line Items Card */}
             <Card>
-              <CardHeader className="pb-4 flex flex-row items-center justify-between">
-                <CardTitle className="text-lg">Line Items</CardTitle>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddRow}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Row
-                </Button>
+              <CardHeader className="pb-4">
+                <div className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg">Line Items</CardTitle>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddRow}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Row
+                  </Button>
+                </div>
+                <div className="text-sm font-bold text-foreground mt-1">
+                  Total_Net Wt.:&nbsp;
+                  {(watchedDetails?.reduce((s, d) => s + (parseFloat(d?.netWt?.toString() ?? "0") || 0), 0) ?? 0).toFixed(3)}
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
