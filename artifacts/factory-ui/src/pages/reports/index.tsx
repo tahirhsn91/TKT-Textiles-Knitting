@@ -44,6 +44,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -215,6 +216,37 @@ function FilterMulti({
   );
 }
 
+// ─── Detail column definitions ───────────────────────────────────────────────
+
+type DetailColKey =
+  | "date" | "docNumber" | "sl" | "gsm" | "transactionTypeName"
+  | "jobName" | "partyName" | "locationName" | "fabricTypeName"
+  | "yarnTypeName" | "yarnCountName" | "yarnBrandName" | "uomName"
+  | "machineName" | "machineOperatorName" | "quantity" | "netWt" | "runningBalance";
+
+const DETAIL_COLUMNS: { key: DetailColKey; label: string }[] = [
+  { key: "date",                  label: "Date" },
+  { key: "docNumber",             label: "Doc Number" },
+  { key: "sl",                    label: "SL" },
+  { key: "gsm",                   label: "GSM" },
+  { key: "transactionTypeName",   label: "Txn Type" },
+  { key: "jobName",               label: "Job" },
+  { key: "partyName",             label: "Party" },
+  { key: "locationName",          label: "Location" },
+  { key: "fabricTypeName",        label: "Fabric Type" },
+  { key: "yarnTypeName",          label: "Yarn Type" },
+  { key: "yarnCountName",         label: "Yarn Count" },
+  { key: "yarnBrandName",         label: "Yarn Brand" },
+  { key: "uomName",               label: "UOM" },
+  { key: "machineName",           label: "Machine" },
+  { key: "machineOperatorName",   label: "Operator" },
+  { key: "quantity",              label: "Qty" },
+  { key: "netWt",                 label: "Net Wt" },
+  { key: "runningBalance",        label: "Running Balance" },
+];
+
+const ALL_DETAIL_KEYS = DETAIL_COLUMNS.map((c) => c.key);
+
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
@@ -222,6 +254,21 @@ export default function ReportsPage() {
   const [applied, setApplied]         = useState<Filters>(EMPTY_FILTERS);
   const [groupBy, setGroupBy]         = useState<GroupByKey>("date");
   const [hasRun, setHasRun]           = useState(false);
+  const [visibleCols, setVisibleCols] = useState<Set<DetailColKey>>(new Set(ALL_DETAIL_KEYS));
+
+  function toggleCol(key: DetailColKey) {
+    setVisibleCols((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) { next.delete(key); } else { next.add(key); }
+      return next;
+    });
+  }
+
+  function showAllCols()  { setVisibleCols(new Set(ALL_DETAIL_KEYS)); }
+  function hideAllCols()  { setVisibleCols(new Set()); }
+
+  const visibleColsList = DETAIL_COLUMNS.filter((c) => visibleCols.has(c.key));
+  const col = (key: DetailColKey) => visibleCols.has(key);
 
   // Master data for filter dropdowns
   const { data: transactionTypes }    = useListTransactionTypeMaster();
@@ -446,60 +493,95 @@ export default function ReportsPage() {
                 </TabsContent>
 
                 {/* ── Detail Tab ──────────────────────────── */}
-                <TabsContent value="detail" className="mt-3">
+                <TabsContent value="detail" className="mt-3 space-y-3">
+
+                  {/* Column visibility picker */}
+                  <Card className="border-dashed">
+                    <CardContent className="px-4 py-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Show / Hide Columns</span>
+                        <div className="flex gap-2">
+                          <button
+                            className="text-xs text-primary hover:underline"
+                            onClick={showAllCols}
+                          >Show All</button>
+                          <span className="text-xs text-muted-foreground">·</span>
+                          <button
+                            className="text-xs text-primary hover:underline"
+                            onClick={hideAllCols}
+                          >Hide All</button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-x-5 gap-y-2">
+                        {DETAIL_COLUMNS.map((c) => (
+                          <label
+                            key={c.key}
+                            className="flex items-center gap-1.5 cursor-pointer select-none"
+                          >
+                            <Checkbox
+                              checked={visibleCols.has(c.key)}
+                              onCheckedChange={() => toggleCol(c.key)}
+                            />
+                            <span className="text-xs">{c.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Detail table */}
                   <div className="rounded-md border overflow-auto max-h-[600px]">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="whitespace-nowrap">Date</TableHead>
-                          <TableHead className="whitespace-nowrap">Doc Number</TableHead>
-                          <TableHead className="whitespace-nowrap">SL</TableHead>
-                          <TableHead className="whitespace-nowrap">GSM</TableHead>
-                          <TableHead className="whitespace-nowrap">Txn Type</TableHead>
-                          <TableHead className="whitespace-nowrap">Job</TableHead>
-                          <TableHead className="whitespace-nowrap">Party</TableHead>
-                          <TableHead className="whitespace-nowrap">Location</TableHead>
-                          <TableHead className="whitespace-nowrap">Fabric Type</TableHead>
-                          <TableHead className="whitespace-nowrap">Yarn Type</TableHead>
-                          <TableHead className="whitespace-nowrap">Yarn Count</TableHead>
-                          <TableHead className="whitespace-nowrap">Yarn Brand</TableHead>
-                          <TableHead className="whitespace-nowrap">UOM</TableHead>
-                          <TableHead className="whitespace-nowrap">Machine</TableHead>
-                          <TableHead className="whitespace-nowrap">Operator</TableHead>
-                          <TableHead className="whitespace-nowrap text-right">Qty</TableHead>
-                          <TableHead className="whitespace-nowrap text-right">Net Wt</TableHead>
-                          <TableHead className="whitespace-nowrap text-right">Running Balance</TableHead>
+                          {visibleColsList.map((c) => (
+                            <TableHead
+                              key={c.key}
+                              className={`whitespace-nowrap${c.key === "quantity" || c.key === "netWt" || c.key === "runningBalance" ? " text-right" : ""}`}
+                            >
+                              {c.label}
+                            </TableHead>
+                          ))}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {rows.map((r, idx) => (
-                          <TableRow key={r.detailId}>
-                            <TableCell className="whitespace-nowrap">{r.date}</TableCell>
-                            <TableCell className="whitespace-nowrap">{r.docNumber}</TableCell>
-                            <TableCell>{r.sl ?? "—"}</TableCell>
-                            <TableCell>{r.gsm ?? "—"}</TableCell>
-                            <TableCell className="whitespace-nowrap">{r.transactionTypeName ?? "—"}</TableCell>
-                            <TableCell className="whitespace-nowrap">{r.jobName ?? "—"}</TableCell>
-                            <TableCell className="whitespace-nowrap">{r.partyName ?? "—"}</TableCell>
-                            <TableCell className="whitespace-nowrap">{r.locationName ?? "—"}</TableCell>
-                            <TableCell className="whitespace-nowrap">{r.fabricTypeName ?? "—"}</TableCell>
-                            <TableCell className="whitespace-nowrap">{r.yarnTypeName ?? "—"}</TableCell>
-                            <TableCell className="whitespace-nowrap">{r.yarnCountName ?? "—"}</TableCell>
-                            <TableCell className="whitespace-nowrap">{r.yarnBrandName ?? "—"}</TableCell>
-                            <TableCell>{r.uomName ?? "—"}</TableCell>
-                            <TableCell className="whitespace-nowrap">{r.machineName ?? "—"}</TableCell>
-                            <TableCell className="whitespace-nowrap">{r.machineOperatorName ?? "—"}</TableCell>
-                            <TableCell className={`text-right whitespace-nowrap${getMultiplier(r.transactionTypeAction) < 0 ? " text-red-600" : ""}`}>
-                              {r.quantity != null ? fmt(signedQty(r)) : "—"}
-                            </TableCell>
-                            <TableCell className={`text-right whitespace-nowrap${getMultiplier(r.transactionTypeAction) < 0 ? " text-red-600" : ""}`}>
-                              {r.netWt != null ? fmt(signedNetWt(r)) : "—"}
-                            </TableCell>
-                            <TableCell className={`text-right whitespace-nowrap font-medium${runningBalances[idx] < 0 ? " text-red-600" : " text-blue-700"}`}>
-                              {fmt(runningBalances[idx])}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {rows.map((r, idx) => {
+                          const neg = getMultiplier(r.transactionTypeAction) < 0;
+                          return (
+                            <TableRow key={r.detailId}>
+                              {col("date")                && <TableCell className="whitespace-nowrap">{r.date}</TableCell>}
+                              {col("docNumber")           && <TableCell className="whitespace-nowrap">{r.docNumber}</TableCell>}
+                              {col("sl")                  && <TableCell>{r.sl ?? "—"}</TableCell>}
+                              {col("gsm")                 && <TableCell>{r.gsm ?? "—"}</TableCell>}
+                              {col("transactionTypeName") && <TableCell className="whitespace-nowrap">{r.transactionTypeName ?? "—"}</TableCell>}
+                              {col("jobName")             && <TableCell className="whitespace-nowrap">{r.jobName ?? "—"}</TableCell>}
+                              {col("partyName")           && <TableCell className="whitespace-nowrap">{r.partyName ?? "—"}</TableCell>}
+                              {col("locationName")        && <TableCell className="whitespace-nowrap">{r.locationName ?? "—"}</TableCell>}
+                              {col("fabricTypeName")      && <TableCell className="whitespace-nowrap">{r.fabricTypeName ?? "—"}</TableCell>}
+                              {col("yarnTypeName")        && <TableCell className="whitespace-nowrap">{r.yarnTypeName ?? "—"}</TableCell>}
+                              {col("yarnCountName")       && <TableCell className="whitespace-nowrap">{r.yarnCountName ?? "—"}</TableCell>}
+                              {col("yarnBrandName")       && <TableCell className="whitespace-nowrap">{r.yarnBrandName ?? "—"}</TableCell>}
+                              {col("uomName")             && <TableCell>{r.uomName ?? "—"}</TableCell>}
+                              {col("machineName")         && <TableCell className="whitespace-nowrap">{r.machineName ?? "—"}</TableCell>}
+                              {col("machineOperatorName") && <TableCell className="whitespace-nowrap">{r.machineOperatorName ?? "—"}</TableCell>}
+                              {col("quantity")            && (
+                                <TableCell className={`text-right whitespace-nowrap${neg ? " text-red-600" : ""}`}>
+                                  {r.quantity != null ? fmt(signedQty(r)) : "—"}
+                                </TableCell>
+                              )}
+                              {col("netWt")               && (
+                                <TableCell className={`text-right whitespace-nowrap${neg ? " text-red-600" : ""}`}>
+                                  {r.netWt != null ? fmt(signedNetWt(r)) : "—"}
+                                </TableCell>
+                              )}
+                              {col("runningBalance")      && (
+                                <TableCell className={`text-right whitespace-nowrap font-medium${runningBalances[idx] < 0 ? " text-red-600" : " text-blue-700"}`}>
+                                  {fmt(runningBalances[idx])}
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
