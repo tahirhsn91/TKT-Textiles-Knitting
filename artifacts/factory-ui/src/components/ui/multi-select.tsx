@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Check, ChevronDown, X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -31,7 +31,9 @@ export function MultiSelect({
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false);
 
-  const allSelected = selected.length === 0;
+  const allSelected  = options.length > 0 && options.every((o) => selected.includes(o.value));
+  const someSelected = selected.length > 0 && !allSelected;
+  const noneSelected = selected.length === 0;
 
   function toggle(value: string) {
     if (selected.includes(value)) {
@@ -41,17 +43,26 @@ export function MultiSelect({
     }
   }
 
+  function toggleAll() {
+    if (allSelected) {
+      onChange([]);
+    } else {
+      onChange(options.map((o) => o.value));
+    }
+  }
+
   function clearAll() {
     onChange([]);
   }
 
   const label = React.useMemo(() => {
-    if (selected.length === 0) return placeholder;
+    if (noneSelected) return placeholder;
+    if (allSelected)  return "All selected";
     if (selected.length === 1) {
       return options.find((o) => o.value === selected[0])?.label ?? selected[0];
     }
     return `${selected.length} selected`;
-  }, [selected, options, placeholder]);
+  }, [selected, options, placeholder, noneSelected, allSelected]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -62,7 +73,7 @@ export function MultiSelect({
           aria-expanded={open}
           className={cn(
             "h-8 w-full justify-between text-sm font-normal px-2",
-            allSelected ? "text-muted-foreground" : "text-foreground",
+            noneSelected ? "text-muted-foreground" : "text-foreground",
             className
           )}
         >
@@ -85,12 +96,17 @@ export function MultiSelect({
       </PopoverTrigger>
       <PopoverContent className="w-[220px] p-0" align="start">
         <div className="max-h-60 overflow-y-auto py-1">
+          {/* Select All row */}
           <div
-            className="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-accent rounded-sm mx-1"
-            onClick={clearAll}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-accent rounded-sm mx-1 border-b border-border/50 mb-1 pb-2"
+            onClick={toggleAll}
           >
-            <Check className={cn("h-3.5 w-3.5", allSelected ? "opacity-100" : "opacity-0")} />
-            <span>All</span>
+            <Checkbox
+              checked={allSelected ? true : someSelected ? "indeterminate" : false}
+              onCheckedChange={toggleAll}
+              className="pointer-events-none"
+            />
+            <span className="font-medium">Select All</span>
           </div>
           {options.map((option) => {
             const checked = selected.includes(option.value);
