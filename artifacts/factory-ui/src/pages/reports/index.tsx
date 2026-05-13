@@ -116,6 +116,23 @@ type GroupByKey =
 type SummarySortKey = "label" | "count" | "qty" | "netWt";
 type SortDir        = "asc" | "desc";
 
+function toISODate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function defaultFilters(): Filters {
+  const today  = new Date();
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  return {
+    dateFrom: toISODate(startOfMonth),
+    dateTo:   toISODate(today),
+    year: "", month: "",
+    transactionTypeId: [], jobId: [], partyId: [], locationId: [], fabricTypeId: [],
+    yarnTypeId: [], yarnCountId: [], yarnBrandId: [], uomId: [],
+    machineId: [], machineOperatorId: [],
+  };
+}
+
 const EMPTY_FILTERS: Filters = {
   dateFrom: "", dateTo: "", year: "", month: "",
   transactionTypeId: [], jobId: [], partyId: [], locationId: [], fabricTypeId: [],
@@ -292,7 +309,7 @@ const ALL_DETAIL_KEYS = DETAIL_COLUMNS.map((c) => c.key);
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
-  const [filters, setFilters]         = useState<Filters>(EMPTY_FILTERS);
+  const [filters, setFilters]         = useState<Filters>(defaultFilters);
   const [applied, setApplied]         = useState<Filters>(EMPTY_FILTERS);
   const [groupBy, setGroupBy]         = useState<GroupByKey>("date");
   const [hasRun, setHasRun]           = useState(false);
