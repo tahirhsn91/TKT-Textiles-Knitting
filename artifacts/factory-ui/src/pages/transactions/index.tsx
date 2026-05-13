@@ -119,6 +119,9 @@ export default function TransactionList() {
     });
   }, [transactions, filters]);
 
+  const lookupName = (list: { id: number; name: string }[] | undefined, id: number | null | undefined) =>
+    id != null ? (list?.find((x) => x.id === id)?.name ?? String(id)) : "-";
+
   const sorted = useMemo(() => {
     const arr = [...filtered];
     arr.sort((a, b) => {
@@ -137,9 +140,6 @@ export default function TransactionList() {
     });
     return arr;
   }, [filtered, sort, transactionTypeMaster, partyMaster, locationMaster]);
-
-  const lookupName = (list: { id: number; name: string }[] | undefined, id: number | null | undefined) =>
-    id != null ? (list?.find((x) => x.id === id)?.name ?? String(id)) : "-";
 
   const handleDelete = (id: number) => {
     deleteTransaction.mutate(
