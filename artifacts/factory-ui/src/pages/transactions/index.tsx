@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
-import { Plus, Edit, Trash2, X } from "lucide-react";
+import { Plus, Edit, Trash2, X, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import {
   useListTransactions,
   useDeleteTransaction,
@@ -68,6 +68,20 @@ export default function TransactionList() {
   const { toast } = useToast();
 
   const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "date", dir: "desc" });
+
+  function handleSort(key: string) {
+    setSort((prev) =>
+      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }
+    );
+  }
+
+  function SortIcon({ col }: { col: string }) {
+    if (sort.key !== col) return <ChevronsUpDown className="inline h-3 w-3 opacity-35 ml-1" />;
+    return sort.dir === "asc"
+      ? <ChevronUp className="inline h-3 w-3 ml-1" />
+      : <ChevronDown className="inline h-3 w-3 ml-1" />;
+  }
 
   const setFilter = (key: keyof typeof EMPTY_FILTERS, value: string | string[]) =>
     setFilters((f) => ({ ...f, [key]: value }));
@@ -104,6 +118,25 @@ export default function TransactionList() {
       return true;
     });
   }, [transactions, filters]);
+
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      let av = "", bv = "";
+      switch (sort.key) {
+        case "docNumber":          av = a.docNumber ?? "";         bv = b.docNumber ?? "";         break;
+        case "date":               av = a.date ?? "";              bv = b.date ?? "";              break;
+        case "transactionType":    av = lookupName(transactionTypeMaster, a.transactionTypeId);
+                                   bv = lookupName(transactionTypeMaster, b.transactionTypeId); break;
+        case "party":              av = lookupName(partyMaster, a.partyId);
+                                   bv = lookupName(partyMaster, b.partyId);             break;
+        case "location":           av = lookupName(locationMaster, a.locationId);
+                                   bv = lookupName(locationMaster, b.locationId);        break;
+      }
+      return sort.dir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+    return arr;
+  }, [filtered, sort, transactionTypeMaster, partyMaster, locationMaster]);
 
   const lookupName = (list: { id: number; name: string }[] | undefined, id: number | null | undefined) =>
     id != null ? (list?.find((x) => x.id === id)?.name ?? String(id)) : "-";
@@ -247,11 +280,21 @@ export default function TransactionList() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Doc Number</TableHead>
-                <TableHead>Transaction Type</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Party</TableHead>
-                <TableHead>Location</TableHead>
+                {(["docNumber","transactionType","date","party","location"] as const).map((col, i) => {
+                  const labels: Record<string, string> = {
+                    docNumber: "Doc Number", transactionType: "Transaction Type",
+                    date: "Date", party: "Party", location: "Location",
+                  };
+                  return (
+                    <TableHead
+                      key={col}
+                      className="cursor-pointer select-none whitespace-nowrap"
+                      onClick={() => handleSort(col)}
+                    >
+                      {labels[col]}<SortIcon col={col} />
+                    </TableHead>
+                  );
+                })}
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -274,7 +317,7 @@ export default function TransactionList() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((t) => (
+                sorted.map((t) => (
                   <TableRow key={t.id}>
                     <TableCell className="font-medium">{t.docNumber}</TableCell>
                     <TableCell>{lookupName(transactionTypeMaster, t.transactionTypeId)}</TableCell>
