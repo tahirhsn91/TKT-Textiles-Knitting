@@ -847,6 +847,24 @@ export default function ReportsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
+                        {/* Opening Balance row */}
+                        <TableRow className="bg-muted/40 italic text-muted-foreground">
+                          {visibleColsList.map((c, i) => {
+                            if (c.key === "runningBalance") {
+                              return (
+                                <TableCell key={c.key} className="text-right whitespace-nowrap font-semibold not-italic text-blue-700">
+                                  {fmt(0)}
+                                </TableCell>
+                              );
+                            }
+                            return (
+                              <TableCell key={c.key} className="whitespace-nowrap">
+                                {i === 0 ? "Opening Balance" : ""}
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+
                         {sortedDetailRows.map(({ r, bal }) => {
                           const neg = getMultiplier(r.transactionTypeAction) < 0;
                           return (
