@@ -189,6 +189,13 @@ function signedNetWt(row: ReportRow): number {
   return toNum(row.netWt) * getMultiplier(row.transactionTypeAction);
 }
 
+/** For balance/running-total calculations: skip rows whose action is null/empty. */
+function balanceNetWt(row: ReportRow): number {
+  const action = row.transactionTypeAction;
+  if (!action || action.trim() === "") return 0;
+  return toNum(row.netWt) * (action.trim().toLowerCase() === "minus" ? -1 : 1);
+}
+
 function fmt(n: number): string {
   return n.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 }
@@ -501,7 +508,7 @@ export default function ReportsPage() {
   });
 
   const openingBalance = useMemo(
-    () => openingRows.reduce((s, r) => s + signedNetWt(r), 0),
+    () => openingRows.reduce((s, r) => s + balanceNetWt(r), 0),
     [openingRows]
   );
 
@@ -522,12 +529,12 @@ export default function ReportsPage() {
 
   const grouped  = useMemo(() => groupRows(rows, groupBy), [rows, groupBy]);
   const totalQty  = useMemo(() => rows.reduce((s, r) => s + signedQty(r), 0), [rows]);
-  const totalNetWt = useMemo(() => rows.reduce((s, r) => s + signedNetWt(r), 0), [rows]);
+  const totalNetWt = useMemo(() => rows.reduce((s, r) => s + balanceNetWt(r), 0), [rows]);
 
   const runningBalances = useMemo(() => {
     let bal = openingBalance;
     return rows.map((r) => {
-      bal += signedNetWt(r);
+      bal += balanceNetWt(r);
       return bal;
     });
   }, [rows, openingBalance]);
