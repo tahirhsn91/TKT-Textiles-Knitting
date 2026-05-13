@@ -480,6 +480,31 @@ export default function ReportsPage() {
     enabled: hasRun,
   });
 
+  // ── Opening Balance query ─────────────────────────────────────────────────
+  // Same filters as applied, but date range = everything BEFORE the dateFrom.
+  const openingQs = useMemo(() => {
+    if (!applied.dateFrom) return null; // no start date → opening balance is always 0
+    const d = new Date(applied.dateFrom + "T00:00:00");
+    d.setDate(d.getDate() - 1);
+    const dateTo = toISODate(d);
+    return buildQueryString({ ...applied, dateFrom: "", dateTo });
+  }, [applied]);
+
+  const { data: openingRows = [] } = useQuery<ReportRow[]>({
+    queryKey: ["reports/opening-balance", openingQs],
+    queryFn: async () => {
+      const res = await fetch(`/api/reports/data${openingQs ? `?${openingQs}` : ""}`);
+      if (!res.ok) throw new Error("Failed to fetch opening balance");
+      return res.json();
+    },
+    enabled: hasRun && openingQs !== null,
+  });
+
+  const openingBalance = useMemo(
+    () => openingRows.reduce((s, r) => s + signedNetWt(r), 0),
+    [openingRows]
+  );
+
   function set(key: keyof Filters, val: string | string[]) {
     setFilters((prev) => ({ ...prev, [key]: val }));
   }
@@ -500,12 +525,12 @@ export default function ReportsPage() {
   const totalNetWt = useMemo(() => rows.reduce((s, r) => s + signedNetWt(r), 0), [rows]);
 
   const runningBalances = useMemo(() => {
-    let bal = 0;
+    let bal = openingBalance;
     return rows.map((r) => {
       bal += signedNetWt(r);
       return bal;
     });
-  }, [rows]);
+  }, [rows, openingBalance]);
 
   function handleSortSummary(key: string) {
     const k = key as SummarySortKey;
@@ -852,8 +877,8 @@ export default function ReportsPage() {
                           {visibleColsList.map((c, i) => {
                             if (c.key === "runningBalance") {
                               return (
-                                <TableCell key={c.key} className="text-right whitespace-nowrap font-semibold not-italic text-blue-700">
-                                  {fmt(0)}
+                                <TableCell key={c.key} className={`text-right whitespace-nowrap font-semibold not-italic ${openingBalance < 0 ? "text-red-600" : "text-blue-700"}`}>
+                                  {fmt(openingBalance)}
                                 </TableCell>
                               );
                             }
