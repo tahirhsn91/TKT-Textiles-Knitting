@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   useListTransactionTypeMaster,
   useListJobMaster,
@@ -17,10 +19,17 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell, ResponsiveContainer,
 } from "recharts";
+import { Printer, Download, FileText, FileSpreadsheet } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -255,6 +264,7 @@ export default function ReportsPage() {
   const [groupBy, setGroupBy]         = useState<GroupByKey>("date");
   const [hasRun, setHasRun]           = useState(false);
   const [visibleCols, setVisibleCols] = useState<Set<DetailColKey>>(new Set(ALL_DETAIL_KEYS));
+  const [activeTab, setActiveTab]     = useState("summary");
 
   function toggleCol(key: DetailColKey) {
     setVisibleCols((prev) => {
@@ -269,6 +279,126 @@ export default function ReportsPage() {
 
   const visibleColsList = DETAIL_COLUMNS.filter((c) => visibleCols.has(c.key));
   const col = (key: DetailColKey) => visibleCols.has(key);
+
+  // ── Export helpers ────────────────────────────────────────────────────────
+
+  function downloadBlob(content: string, filename: string, mime: string) {
+    const blob = new Blob([content], { type: mime });
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement("a"), { href: url, download: filename });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function toCSV(headers: string[], dataRows: (string | number | null)[][]): string {
+    const escape = (v: string | number | null) => {
+      const s = String(v ?? "");
+      return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    return [headers, ...dataRows].map((row) => row.map(escape).join(",")).join("\r\n");
+  }
+
+  function exportSummaryCSV() {
+    const groupLabel = GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? groupBy;
+    const headers    = [groupLabel, "Rows", "Total Qty", "Total Net Wt"];
+    const data       = [
+      ...grouped.map((r) => [r.label, r.count, fmt(r.qty), fmt(r.netWt)]),
+      ["Total", rows.length, fmt(totalQty), fmt(totalNetWt)],
+    ];
+    downloadBlob(toCSV(headers, data), "report-summary.csv", "text/csv;charset=utf-8;");
+  }
+
+  function exportDetailCSV() {
+    const headers = visibleColsList.map((c) => c.label);
+    const data    = rows.map((r, idx) => {
+      return visibleColsList.map((c) => {
+        switch (c.key) {
+          case "date":                  return r.date;
+          case "docNumber":             return r.docNumber;
+          case "sl":                    return r.sl ?? "";
+          case "gsm":                   return r.gsm ?? "";
+          case "transactionTypeName":   return r.transactionTypeName ?? "";
+          case "jobName":               return r.jobName ?? "";
+          case "partyName":             return r.partyName ?? "";
+          case "locationName":          return r.locationName ?? "";
+          case "fabricTypeName":        return r.fabricTypeName ?? "";
+          case "yarnTypeName":          return r.yarnTypeName ?? "";
+          case "yarnCountName":         return r.yarnCountName ?? "";
+          case "yarnBrandName":         return r.yarnBrandName ?? "";
+          case "uomName":               return r.uomName ?? "";
+          case "machineName":           return r.machineName ?? "";
+          case "machineOperatorName":   return r.machineOperatorName ?? "";
+          case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "";
+          case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "";
+          case "runningBalance":        return fmt(runningBalances[idx]);
+          default:                      return "";
+        }
+      });
+    });
+    downloadBlob(toCSV(headers, data), "report-detail.csv", "text/csv;charset=utf-8;");
+  }
+
+  function exportSummaryPDF() {
+    const doc        = new jsPDF({ orientation: "landscape" });
+    const groupLabel = GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? groupBy;
+    doc.setFontSize(13);
+    doc.text(`Report Summary — grouped by ${groupLabel}`, 14, 14);
+    autoTable(doc, {
+      startY: 20,
+      head: [[groupLabel, "Rows", "Total Qty", "Total Net Wt"]],
+      body: [
+        ...grouped.map((r) => [r.label, r.count, fmt(r.qty), fmt(r.netWt)]),
+        ["Total", rows.length, fmt(totalQty), fmt(totalNetWt)],
+      ],
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [37, 99, 235] },
+      foot: [],
+    });
+    doc.save("report-summary.pdf");
+  }
+
+  function exportDetailPDF() {
+    const doc     = new jsPDF({ orientation: "landscape" });
+    const headers = visibleColsList.map((c) => c.label);
+    doc.setFontSize(13);
+    doc.text("Report — Detailed", 14, 14);
+    autoTable(doc, {
+      startY: 20,
+      head: [headers],
+      body: rows.map((r, idx) =>
+        visibleColsList.map((c) => {
+          switch (c.key) {
+            case "date":                  return r.date;
+            case "docNumber":             return r.docNumber;
+            case "sl":                    return r.sl ?? "—";
+            case "gsm":                   return String(r.gsm ?? "—");
+            case "transactionTypeName":   return r.transactionTypeName ?? "—";
+            case "jobName":               return r.jobName ?? "—";
+            case "partyName":             return r.partyName ?? "—";
+            case "locationName":          return r.locationName ?? "—";
+            case "fabricTypeName":        return r.fabricTypeName ?? "—";
+            case "yarnTypeName":          return r.yarnTypeName ?? "—";
+            case "yarnCountName":         return r.yarnCountName ?? "—";
+            case "yarnBrandName":         return r.yarnBrandName ?? "—";
+            case "uomName":               return r.uomName ?? "—";
+            case "machineName":           return r.machineName ?? "—";
+            case "machineOperatorName":   return r.machineOperatorName ?? "—";
+            case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "—";
+            case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "—";
+            case "runningBalance":        return fmt(runningBalances[idx]);
+            default:                      return "";
+          }
+        })
+      ),
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [37, 99, 235] },
+    });
+    doc.save("report-detail.pdf");
+  }
+
+  function handlePrint() { window.print(); }
 
   // Master data for filter dropdowns
   const { data: transactionTypes }    = useListTransactionTypeMaster();
@@ -448,12 +578,54 @@ export default function ReportsPage() {
             )}
 
             {rows.length > 0 && (
-              <Tabs defaultValue="summary">
-                <TabsList>
-                  <TabsTrigger value="summary">Summary</TabsTrigger>
-                  <TabsTrigger value="detail">Detailed</TabsTrigger>
-                  <TabsTrigger value="charts">Charts</TabsTrigger>
-                </TabsList>
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <TabsList>
+                    <TabsTrigger value="summary">Summary</TabsTrigger>
+                    <TabsTrigger value="detail">Detailed</TabsTrigger>
+                    <TabsTrigger value="charts">Charts</TabsTrigger>
+                  </TabsList>
+
+                  {/* Print / Export toolbar */}
+                  {activeTab !== "charts" && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handlePrint}
+                        className="gap-1.5"
+                      >
+                        <Printer className="h-3.5 w-3.5" />
+                        Print
+                      </Button>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm" className="gap-1.5">
+                            <Download className="h-3.5 w-3.5" />
+                            Export
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={activeTab === "summary" ? exportSummaryCSV : exportDetailCSV}
+                            className="gap-2"
+                          >
+                            <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                            Export as CSV
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={activeTab === "summary" ? exportSummaryPDF : exportDetailPDF}
+                            className="gap-2"
+                          >
+                            <FileText className="h-4 w-4 text-red-600" />
+                            Export as PDF
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
+                </div>
 
                 {/* ── Summary Tab ─────────────────────────── */}
                 <TabsContent value="summary" className="space-y-3 mt-3">
