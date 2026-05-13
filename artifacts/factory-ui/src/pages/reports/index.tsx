@@ -19,7 +19,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell, ResponsiveContainer,
 } from "recharts";
-import { Printer, Download, FileText, FileSpreadsheet } from "lucide-react";
+import { Printer, Download, FileText, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,6 +112,9 @@ type GroupByKey =
   | "yarnCountName"
   | "yarnBrandName"
   | "uomName";
+
+type SummarySortKey = "label" | "count" | "qty" | "netWt";
+type SortDir        = "asc" | "desc";
 
 const EMPTY_FILTERS: Filters = {
   dateFrom: "", dateTo: "", year: "", month: "",
@@ -225,6 +228,36 @@ function FilterMulti({
   );
 }
 
+// ─── Sortable column header ───────────────────────────────────────────────────
+
+function SortHead({
+  label, sortKey, sort, onSort, right,
+}: {
+  label: string;
+  sortKey: string;
+  sort: { key: string | null; dir: SortDir };
+  onSort: (key: string) => void;
+  right?: boolean;
+}) {
+  const active = sort.key === sortKey;
+  return (
+    <TableHead
+      className={`cursor-pointer select-none whitespace-nowrap${right ? " text-right" : ""}`}
+      onClick={() => onSort(sortKey)}
+    >
+      <span className={`inline-flex items-center gap-1${right ? " justify-end w-full" : ""}`}>
+        {label}
+        {active
+          ? sort.dir === "asc"
+            ? <ChevronUp className="h-3 w-3 shrink-0" />
+            : <ChevronDown className="h-3 w-3 shrink-0" />
+          : <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-35" />
+        }
+      </span>
+    </TableHead>
+  );
+}
+
 // ─── Detail column definitions ───────────────────────────────────────────────
 
 type DetailColKey =
@@ -265,6 +298,8 @@ export default function ReportsPage() {
   const [hasRun, setHasRun]           = useState(false);
   const [visibleCols, setVisibleCols] = useState<Set<DetailColKey>>(new Set(ALL_DETAIL_KEYS));
   const [activeTab, setActiveTab]     = useState("summary");
+  const [sortSummary, setSortSummary] = useState<{ key: SummarySortKey; dir: SortDir }>({ key: "label", dir: "asc" });
+  const [sortDetail,  setSortDetail]  = useState<{ key: DetailColKey | null; dir: SortDir }>({ key: null, dir: "asc" });
 
   function toggleCol(key: DetailColKey) {
     setVisibleCols((prev) => {
@@ -451,6 +486,65 @@ export default function ReportsPage() {
       return bal;
     });
   }, [rows]);
+
+  function handleSortSummary(key: string) {
+    const k = key as SummarySortKey;
+    setSortSummary((prev) =>
+      prev.key === k ? { key: k, dir: prev.dir === "asc" ? "desc" : "asc" } : { key: k, dir: "asc" }
+    );
+  }
+
+  function handleSortDetail(key: string) {
+    const k = key as DetailColKey;
+    setSortDetail((prev) =>
+      prev.key === k ? { key: k, dir: prev.dir === "asc" ? "desc" : "asc" } : { key: k, dir: "asc" }
+    );
+  }
+
+  const sortedGrouped = useMemo(() => {
+    const arr = [...grouped];
+    arr.sort((a, b) => {
+      let av: string | number, bv: string | number;
+      switch (sortSummary.key) {
+        case "count": av = a.count; bv = b.count; break;
+        case "qty":   av = a.qty;   bv = b.qty;   break;
+        case "netWt": av = a.netWt; bv = b.netWt; break;
+        default:      av = a.label; bv = b.label;
+      }
+      if (typeof av === "number")
+        return sortSummary.dir === "asc" ? av - (bv as number) : (bv as number) - av;
+      return sortSummary.dir === "asc"
+        ? av.localeCompare(bv as string)
+        : (bv as string).localeCompare(av);
+    });
+    return arr;
+  }, [grouped, sortSummary]);
+
+  const sortedDetailRows = useMemo(() => {
+    const indexed = rows.map((r, idx) => ({ r, idx, bal: runningBalances[idx] }));
+    if (!sortDetail.key) return indexed;
+    const key = sortDetail.key;
+    return [...indexed].sort((a, b) => {
+      let av: string | number, bv: string | number;
+      switch (key) {
+        case "runningBalance": av = a.bal;             bv = b.bal;             break;
+        case "quantity":       av = signedQty(a.r);    bv = signedQty(b.r);    break;
+        case "netWt":          av = signedNetWt(a.r);  bv = signedNetWt(b.r);  break;
+        case "gsm":            av = a.r.gsm ?? 0;      bv = b.r.gsm ?? 0;      break;
+        default: {
+          const rawA = a.r[key as keyof ReportRow];
+          const rawB = b.r[key as keyof ReportRow];
+          av = rawA != null ? String(rawA) : "";
+          bv = rawB != null ? String(rawB) : "";
+        }
+      }
+      if (typeof av === "number")
+        return sortDetail.dir === "asc" ? av - (bv as number) : (bv as number) - av;
+      return sortDetail.dir === "asc"
+        ? av.localeCompare(bv as string)
+        : (bv as string).localeCompare(av);
+    });
+  }, [rows, runningBalances, sortDetail]);
 
   // Years available in data for the year dropdown
   const currentYear = new Date().getFullYear();
@@ -647,14 +741,19 @@ export default function ReportsPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>{GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? groupBy}</TableHead>
-                          <TableHead className="text-right">Rows</TableHead>
-                          <TableHead className="text-right">Total Qty</TableHead>
-                          <TableHead className="text-right">Total Net Wt</TableHead>
+                          <SortHead
+                            label={GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? groupBy}
+                            sortKey="label"
+                            sort={sortSummary}
+                            onSort={handleSortSummary}
+                          />
+                          <SortHead label="Rows"         sortKey="count" sort={sortSummary} onSort={handleSortSummary} right />
+                          <SortHead label="Total Qty"    sortKey="qty"   sort={sortSummary} onSort={handleSortSummary} right />
+                          <SortHead label="Total Net Wt" sortKey="netWt" sort={sortSummary} onSort={handleSortSummary} right />
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {grouped.map((r) => (
+                        {sortedGrouped.map((r) => (
                           <TableRow key={r.label}>
                             <TableCell className="font-medium">{r.label}</TableCell>
                             <TableCell className="text-right">{r.count}</TableCell>
@@ -716,17 +815,19 @@ export default function ReportsPage() {
                       <TableHeader>
                         <TableRow>
                           {visibleColsList.map((c) => (
-                            <TableHead
+                            <SortHead
                               key={c.key}
-                              className={`whitespace-nowrap${c.key === "quantity" || c.key === "netWt" || c.key === "runningBalance" ? " text-right" : ""}`}
-                            >
-                              {c.label}
-                            </TableHead>
+                              label={c.label}
+                              sortKey={c.key}
+                              sort={sortDetail}
+                              onSort={handleSortDetail}
+                              right={c.key === "quantity" || c.key === "netWt" || c.key === "runningBalance"}
+                            />
                           ))}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {rows.map((r, idx) => {
+                        {sortedDetailRows.map(({ r, bal }) => {
                           const neg = getMultiplier(r.transactionTypeAction) < 0;
                           return (
                             <TableRow key={r.detailId}>
@@ -756,8 +857,8 @@ export default function ReportsPage() {
                                 </TableCell>
                               )}
                               {col("runningBalance")      && (
-                                <TableCell className={`text-right whitespace-nowrap font-medium${runningBalances[idx] < 0 ? " text-red-600" : " text-blue-700"}`}>
-                                  {fmt(runningBalances[idx])}
+                                <TableCell className={`text-right whitespace-nowrap font-medium${bal < 0 ? " text-red-600" : " text-blue-700"}`}>
+                                  {fmt(bal)}
                                 </TableCell>
                               )}
                             </TableRow>
