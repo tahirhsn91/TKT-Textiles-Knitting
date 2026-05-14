@@ -735,8 +735,8 @@ export default function ReportsPage() {
               </Card>
               <Card>
                 <CardContent className="pt-4 pb-3">
-                  <p className="text-xs text-muted-foreground">Total Net Wt</p>
-                  <p className="text-2xl font-semibold">{fmt(totalNetWt)}</p>
+                  <p className="text-xs text-muted-foreground">Running Total</p>
+                  <p className="text-2xl font-semibold">{fmt(openingBalance + totalNetWt)}</p>
                 </CardContent>
               </Card>
             </div>
