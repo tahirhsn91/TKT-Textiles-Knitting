@@ -207,14 +207,15 @@ function getMonthLabel(dateStr: string): string {
 }
 
 function groupRows(rows: ReportRow[], key: GroupByKey) {
-  const map = new Map<string, { qty: number; netWt: number; count: number }>();
+  const map = new Map<string, { qty: number; netWt: number; balNetWt: number; count: number }>();
   for (const row of rows) {
     const rawKey = key === "month" ? getMonthLabel(row.date) : (row[key] ?? "—");
     const k = String(rawKey);
-    const existing = map.get(k) ?? { qty: 0, netWt: 0, count: 0 };
-    existing.qty   += signedQty(row);
-    existing.netWt += signedNetWt(row);
-    existing.count += 1;
+    const existing = map.get(k) ?? { qty: 0, netWt: 0, balNetWt: 0, count: 0 };
+    existing.qty      += signedQty(row);
+    existing.netWt    += signedNetWt(row);
+    existing.balNetWt += balanceNetWt(row);
+    existing.count    += 1;
     map.set(k, existing);
   }
   return Array.from(map.entries())
@@ -371,7 +372,7 @@ export default function ReportsPage() {
     const data: (string | number)[][] = [
       ["Opening Balance", "", "", "", fmt(openingBalance)],
       ...sortedGrouped.map((r) => {
-        bal += r.netWt;
+        bal += r.balNetWt;
         return [r.label, r.count, fmt(r.qty), fmt(r.netWt), fmt(bal)];
       }),
       ["Total", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
@@ -425,7 +426,7 @@ export default function ReportsPage() {
       body: [
         ["Opening Balance", "", "", "", fmt(openingBalance)],
         ...sortedGrouped.map((r) => {
-          bal += r.netWt;
+          bal += r.balNetWt;
           return [r.label, r.count, fmt(r.qty), fmt(r.netWt), fmt(bal)];
         }),
         ["Total", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
@@ -595,11 +596,12 @@ export default function ReportsPage() {
     return arr;
   }, [grouped, sortSummary]);
 
-  /** Running total per group row in current display order, starting from openingBalance. */
+  /** Running total per group row in current display order, starting from openingBalance.
+   *  Uses balNetWt so null-action rows (e.g. Fabric Production) contribute 0. */
   const summaryRunningTotals = useMemo(() => {
     let bal = openingBalance;
     return sortedGrouped.map((r) => {
-      bal += r.netWt;
+      bal += r.balNetWt;
       return bal;
     });
   }, [sortedGrouped, openingBalance]);
