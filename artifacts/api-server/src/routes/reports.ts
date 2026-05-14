@@ -64,6 +64,7 @@ router.get("/reports/data", async (req, res): Promise<void> => {
       headerId:             transactionHeaderTable.id,
       date:                 transactionHeaderTable.date,
       docNumber:            transactionHeaderTable.docNumber,
+      reference:            transactionHeaderTable.reference,
       sl:                   transactionHeaderTable.sl,
       gsm:                  transactionHeaderTable.gsm,
       transactionTypeName:   transactionTypeMasterTable.name,

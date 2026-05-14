@@ -61,6 +61,7 @@ interface ReportRow {
   headerId: number;
   date: string;
   docNumber: string;
+  reference: string | null;
   sl: string | null;
   gsm: number | null;
   transactionTypeName: string | null;
@@ -101,6 +102,8 @@ interface Filters {
 type GroupByKey =
   | "date"
   | "month"
+  | "docNumber"
+  | "reference"
   | "transactionTypeName"
   | "partyName"
   | "jobName"
@@ -146,6 +149,8 @@ const EMPTY_FILTERS: Filters = {
 const GROUP_BY_OPTIONS: { value: GroupByKey; label: string }[] = [
   { value: "date",                label: "Date" },
   { value: "month",               label: "Month" },
+  { value: "docNumber",           label: "Doc Number" },
+  { value: "reference",           label: "Reference" },
   { value: "transactionTypeName", label: "Transaction Type" },
   { value: "partyName",           label: "Party" },
   { value: "jobName",             label: "Job" },
@@ -288,7 +293,7 @@ function SortHead({
 // ─── Detail column definitions ───────────────────────────────────────────────
 
 type DetailColKey =
-  | "date" | "docNumber" | "sl" | "gsm" | "transactionTypeName"
+  | "date" | "docNumber" | "reference" | "sl" | "gsm" | "transactionTypeName"
   | "jobName" | "partyName" | "locationName" | "fabricTypeName"
   | "yarnTypeName" | "yarnCountName" | "yarnBrandName" | "uomName"
   | "machineName" | "machineOperatorName" | "quantity" | "netWt" | "runningBalance";
@@ -296,6 +301,7 @@ type DetailColKey =
 const DETAIL_COLUMNS: { key: DetailColKey; label: string }[] = [
   { key: "date",                  label: "Date" },
   { key: "docNumber",             label: "Doc Number" },
+  { key: "reference",             label: "Reference" },
   { key: "sl",                    label: "SL" },
   { key: "gsm",                   label: "GSM" },
   { key: "transactionTypeName",   label: "Txn Type" },
@@ -384,6 +390,7 @@ export default function ReportsPage() {
         switch (c.key) {
           case "date":                  return r.date;
           case "docNumber":             return r.docNumber;
+          case "reference":             return r.reference ?? "";
           case "sl":                    return r.sl ?? "";
           case "gsm":                   return r.gsm ?? "";
           case "transactionTypeName":   return r.transactionTypeName ?? "";
@@ -939,6 +946,7 @@ export default function ReportsPage() {
                             <TableRow key={r.detailId}>
                               {col("date")                && <TableCell className="whitespace-nowrap">{r.date}</TableCell>}
                               {col("docNumber")           && <TableCell className="whitespace-nowrap">{r.docNumber}</TableCell>}
+                              {col("reference")           && <TableCell className="whitespace-nowrap">{r.reference ?? "—"}</TableCell>}
                               {col("sl")                  && <TableCell>{r.sl ?? "—"}</TableCell>}
                               {col("gsm")                 && <TableCell>{r.gsm ?? "—"}</TableCell>}
                               {col("transactionTypeName") && <TableCell className="whitespace-nowrap">{r.transactionTypeName ?? "—"}</TableCell>}
