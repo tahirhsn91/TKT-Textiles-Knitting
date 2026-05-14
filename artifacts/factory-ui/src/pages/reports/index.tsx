@@ -381,6 +381,9 @@ export default function ReportsPage() {
 
   function exportDetailCSV() {
     const headers = visibleColsList.map((c) => c.label);
+    const obRow   = visibleColsList.map((c, i) =>
+      i === 0 ? "Opening Balance" : c.key === "runningBalance" ? fmt(openingBalance) : ""
+    );
     const data    = rows.map((r, idx) => {
       return visibleColsList.map((c) => {
         switch (c.key) {
@@ -407,7 +410,7 @@ export default function ReportsPage() {
         }
       });
     });
-    downloadBlob(toCSV(headers, data), "report-detail.csv", "text/csv;charset=utf-8;");
+    downloadBlob(toCSV(headers, [obRow, ...data]), "report-detail.csv", "text/csv;charset=utf-8;");
   }
 
   function exportSummaryPDF() {
@@ -439,34 +442,41 @@ export default function ReportsPage() {
     const headers = visibleColsList.map((c) => c.label);
     doc.setFontSize(13);
     doc.text("Report — Detailed", 14, 14);
+    const obRow = visibleColsList.map((c, i) =>
+      i === 0 ? "Opening Balance" : c.key === "runningBalance" ? fmt(openingBalance) : "—"
+    );
     autoTable(doc, {
       startY: 20,
       head: [headers],
-      body: rows.map((r, idx) =>
-        visibleColsList.map((c) => {
-          switch (c.key) {
-            case "date":                  return r.date;
-            case "docNumber":             return r.docNumber;
-            case "sl":                    return r.sl ?? "—";
-            case "gsm":                   return String(r.gsm ?? "—");
-            case "transactionTypeName":   return r.transactionTypeName ?? "—";
-            case "jobName":               return r.jobName ?? "—";
-            case "partyName":             return r.partyName ?? "—";
-            case "locationName":          return r.locationName ?? "—";
-            case "fabricTypeName":        return r.fabricTypeName ?? "—";
-            case "yarnTypeName":          return r.yarnTypeName ?? "—";
-            case "yarnCountName":         return r.yarnCountName ?? "—";
-            case "yarnBrandName":         return r.yarnBrandName ?? "—";
-            case "uomName":               return r.uomName ?? "—";
-            case "machineName":           return r.machineName ?? "—";
-            case "machineOperatorName":   return r.machineOperatorName ?? "—";
-            case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "—";
-            case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "—";
-            case "runningBalance":        return fmt(runningBalances[idx]);
-            default:                      return "";
-          }
-        })
-      ),
+      body: [
+        obRow,
+        ...rows.map((r, idx) =>
+          visibleColsList.map((c) => {
+            switch (c.key) {
+              case "date":                  return r.date;
+              case "docNumber":             return r.docNumber;
+              case "reference":             return r.reference ?? "—";
+              case "sl":                    return r.sl ?? "—";
+              case "gsm":                   return String(r.gsm ?? "—");
+              case "transactionTypeName":   return r.transactionTypeName ?? "—";
+              case "jobName":               return r.jobName ?? "—";
+              case "partyName":             return r.partyName ?? "—";
+              case "locationName":          return r.locationName ?? "—";
+              case "fabricTypeName":        return r.fabricTypeName ?? "—";
+              case "yarnTypeName":          return r.yarnTypeName ?? "—";
+              case "yarnCountName":         return r.yarnCountName ?? "—";
+              case "yarnBrandName":         return r.yarnBrandName ?? "—";
+              case "uomName":               return r.uomName ?? "—";
+              case "machineName":           return r.machineName ?? "—";
+              case "machineOperatorName":   return r.machineOperatorName ?? "—";
+              case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "—";
+              case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "—";
+              case "runningBalance":        return fmt(runningBalances[idx]);
+              default:                      return "";
+            }
+          })
+        ),
+      ],
       styles: { fontSize: 7 },
       headStyles: { fillColor: [37, 99, 235] },
     });
@@ -901,7 +911,7 @@ export default function ReportsPage() {
                   </Card>
 
                   {/* Detail table */}
-                  <div className="rounded-md border overflow-auto max-h-[600px]">
+                  <div className="rounded-md border overflow-auto max-h-[600px] print:max-h-none print:overflow-visible">
                     <Table>
                       <TableHeader>
                         <TableRow>
