@@ -206,6 +206,16 @@ function getMonthLabel(dateStr: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** Extracts the group-by label for a single row. */
+function getGroupLabel(row: ReportRow, key: GroupByKey): string {
+  if (key === "month") return getMonthLabel(row.date);
+  return String((row as Record<string, unknown>)[key] ?? "—");
+}
+
+type DetailRenderItem =
+  | { kind: "data"; r: ReportRow; idx: number; bal: number }
+  | { kind: "subtotal"; label: string; qty: number; netWt: number };
+
 function groupRows(rows: ReportRow[], key: GroupByKey) {
   const map = new Map<string, { qty: number; netWt: number; balNetWt: number; count: number }>();
   for (const row of rows) {
@@ -385,33 +395,41 @@ export default function ReportsPage() {
     const obRow   = visibleColsList.map((c, i) =>
       i === 0 ? "Opening Balance" : c.key === "runningBalance" ? fmt(openingBalance) : ""
     );
-    const data    = rows.map((r, idx) => {
-      return visibleColsList.map((c) => {
-        switch (c.key) {
-          case "date":                  return r.date;
-          case "docNumber":             return r.docNumber;
-          case "reference":             return r.reference ?? "";
-          case "sl":                    return r.sl ?? "";
-          case "gsm":                   return r.gsm ?? "";
-          case "transactionTypeName":   return r.transactionTypeName ?? "";
-          case "jobName":               return r.jobName ?? "";
-          case "partyName":             return r.partyName ?? "";
-          case "locationName":          return r.locationName ?? "";
-          case "fabricTypeName":        return r.fabricTypeName ?? "";
-          case "yarnTypeName":          return r.yarnTypeName ?? "";
-          case "yarnCountName":         return r.yarnCountName ?? "";
-          case "yarnBrandName":         return r.yarnBrandName ?? "";
-          case "uomName":               return r.uomName ?? "";
-          case "machineName":           return r.machineName ?? "";
-          case "machineOperatorName":   return r.machineOperatorName ?? "";
-          case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "";
-          case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "";
-          case "runningBalance":        return fmt(runningBalances[idx]);
-          default:                      return "";
-        }
-      });
-    });
-    downloadBlob(toCSV(headers, [obRow, ...data]), "report-detail.csv", "text/csv;charset=utf-8;");
+    const bodyRows: (string | number)[][] = [];
+    for (const item of detailRenderRows) {
+      if (item.kind === "subtotal") {
+        bodyRows.push(visibleColsList.map((c, ci) =>
+          ci === 0 ? `Subtotal: ${item.label}` : c.key === "quantity" ? fmt(item.qty) : c.key === "netWt" ? fmt(item.netWt) : ""
+        ));
+      } else {
+        const { r, idx } = item;
+        bodyRows.push(visibleColsList.map((c) => {
+          switch (c.key) {
+            case "date":                  return r.date;
+            case "docNumber":             return r.docNumber;
+            case "reference":             return r.reference ?? "";
+            case "sl":                    return r.sl ?? "";
+            case "gsm":                   return r.gsm ?? "";
+            case "transactionTypeName":   return r.transactionTypeName ?? "";
+            case "jobName":               return r.jobName ?? "";
+            case "partyName":             return r.partyName ?? "";
+            case "locationName":          return r.locationName ?? "";
+            case "fabricTypeName":        return r.fabricTypeName ?? "";
+            case "yarnTypeName":          return r.yarnTypeName ?? "";
+            case "yarnCountName":         return r.yarnCountName ?? "";
+            case "yarnBrandName":         return r.yarnBrandName ?? "";
+            case "uomName":               return r.uomName ?? "";
+            case "machineName":           return r.machineName ?? "";
+            case "machineOperatorName":   return r.machineOperatorName ?? "";
+            case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "";
+            case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "";
+            case "runningBalance":        return fmt(runningBalances[idx]);
+            default:                      return "";
+          }
+        }));
+      }
+    }
+    downloadBlob(toCSV(headers, [obRow, ...bodyRows]), "report-detail.csv", "text/csv;charset=utf-8;");
   }
 
   function exportSummaryPDF() {
@@ -446,40 +464,52 @@ export default function ReportsPage() {
     const obRow = visibleColsList.map((c, i) =>
       i === 0 ? "Opening Balance" : c.key === "runningBalance" ? fmt(openingBalance) : "—"
     );
+    const bodyRows: string[][] = [];
+    for (const item of detailRenderRows) {
+      if (item.kind === "subtotal") {
+        bodyRows.push(visibleColsList.map((c, ci) =>
+          ci === 0 ? `Subtotal: ${item.label}` : c.key === "quantity" ? fmt(item.qty) : c.key === "netWt" ? fmt(item.netWt) : "—"
+        ));
+      } else {
+        const { r, idx } = item;
+        bodyRows.push(visibleColsList.map((c) => {
+          switch (c.key) {
+            case "date":                  return r.date;
+            case "docNumber":             return r.docNumber;
+            case "reference":             return r.reference ?? "—";
+            case "sl":                    return r.sl ?? "—";
+            case "gsm":                   return String(r.gsm ?? "—");
+            case "transactionTypeName":   return r.transactionTypeName ?? "—";
+            case "jobName":               return r.jobName ?? "—";
+            case "partyName":             return r.partyName ?? "—";
+            case "locationName":          return r.locationName ?? "—";
+            case "fabricTypeName":        return r.fabricTypeName ?? "—";
+            case "yarnTypeName":          return r.yarnTypeName ?? "—";
+            case "yarnCountName":         return r.yarnCountName ?? "—";
+            case "yarnBrandName":         return r.yarnBrandName ?? "—";
+            case "uomName":               return r.uomName ?? "—";
+            case "machineName":           return r.machineName ?? "—";
+            case "machineOperatorName":   return r.machineOperatorName ?? "—";
+            case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "—";
+            case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "—";
+            case "runningBalance":        return fmt(runningBalances[idx]);
+            default:                      return "";
+          }
+        }));
+      }
+    }
     autoTable(doc, {
       startY: 20,
       head: [headers],
-      body: [
-        obRow,
-        ...rows.map((r, idx) =>
-          visibleColsList.map((c) => {
-            switch (c.key) {
-              case "date":                  return r.date;
-              case "docNumber":             return r.docNumber;
-              case "reference":             return r.reference ?? "—";
-              case "sl":                    return r.sl ?? "—";
-              case "gsm":                   return String(r.gsm ?? "—");
-              case "transactionTypeName":   return r.transactionTypeName ?? "—";
-              case "jobName":               return r.jobName ?? "—";
-              case "partyName":             return r.partyName ?? "—";
-              case "locationName":          return r.locationName ?? "—";
-              case "fabricTypeName":        return r.fabricTypeName ?? "—";
-              case "yarnTypeName":          return r.yarnTypeName ?? "—";
-              case "yarnCountName":         return r.yarnCountName ?? "—";
-              case "yarnBrandName":         return r.yarnBrandName ?? "—";
-              case "uomName":               return r.uomName ?? "—";
-              case "machineName":           return r.machineName ?? "—";
-              case "machineOperatorName":   return r.machineOperatorName ?? "—";
-              case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "—";
-              case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "—";
-              case "runningBalance":        return fmt(runningBalances[idx]);
-              default:                      return "";
-            }
-          })
-        ),
-      ],
+      body: [obRow, ...bodyRows],
       styles: { fontSize: 7 },
       headStyles: { fillColor: [37, 99, 235] },
+      didParseCell: (data) => {
+        if (data.section === "body" && data.row.raw[0]?.toString().startsWith("Subtotal:")) {
+          data.cell.styles.fontStyle = "bold";
+          data.cell.styles.fillColor = [240, 240, 240];
+        }
+      },
     });
     doc.save("report-detail.pdf");
   }
@@ -631,6 +661,28 @@ export default function ReportsPage() {
         : (bv as string).localeCompare(av);
     });
   }, [rows, runningBalances, sortDetail]);
+
+  /** Sorted detail rows interleaved with a subtotal row after each group. */
+  const detailRenderRows = useMemo((): DetailRenderItem[] => {
+    const result: DetailRenderItem[] = [];
+    let curKey: string | null = null;
+    let gQty = 0, gNetWt = 0, gLabel = "";
+    const flush = () => {
+      if (curKey !== null) {
+        result.push({ kind: "subtotal", label: gLabel, qty: gQty, netWt: gNetWt });
+        gQty = 0; gNetWt = 0;
+      }
+    };
+    for (const item of sortedDetailRows) {
+      const k = getGroupLabel(item.r, groupBy);
+      if (k !== curKey) { flush(); curKey = k; gLabel = k; }
+      gQty   += signedQty(item.r);
+      gNetWt += signedNetWt(item.r);
+      result.push({ kind: "data", r: item.r, idx: item.idx, bal: item.bal });
+    }
+    flush();
+    return result;
+  }, [sortedDetailRows, groupBy]);
 
   // Years available in data for the year dropdown
   const currentYear = new Date().getFullYear();
@@ -948,7 +1000,20 @@ export default function ReportsPage() {
                           })}
                         </TableRow>
 
-                        {sortedDetailRows.map(({ r, bal }) => {
+                        {detailRenderRows.map((item, ri) => {
+                          if (item.kind === "subtotal") {
+                            return (
+                              <TableRow key={`sub-${ri}`} className="bg-muted/60 font-semibold border-t">
+                                {visibleColsList.map((c, ci) => {
+                                  if (ci === 0) return <TableCell key={c.key} className="whitespace-nowrap">Subtotal: {item.label}</TableCell>;
+                                  if (c.key === "quantity")  return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(item.qty)}</TableCell>;
+                                  if (c.key === "netWt")     return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(item.netWt)}</TableCell>;
+                                  return <TableCell key={c.key} />;
+                                })}
+                              </TableRow>
+                            );
+                          }
+                          const { r, bal } = item;
                           const neg = getMultiplier(r.transactionTypeAction) < 0;
                           return (
                             <TableRow key={r.detailId}>
