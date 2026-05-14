@@ -805,6 +805,15 @@ export default function ReportsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
+                        {/* Opening Balance row */}
+                        <TableRow className="bg-muted/40 italic text-muted-foreground">
+                          <TableCell className="whitespace-nowrap">Opening Balance</TableCell>
+                          <TableCell />
+                          <TableCell />
+                          <TableCell className={`text-right whitespace-nowrap font-semibold not-italic ${openingBalance < 0 ? "text-red-600" : "text-blue-700"}`}>
+                            {fmt(openingBalance)}
+                          </TableCell>
+                        </TableRow>
                         {sortedGrouped.map((r) => (
                           <TableRow key={r.label}>
                             <TableCell className="font-medium">{r.label}</TableCell>
