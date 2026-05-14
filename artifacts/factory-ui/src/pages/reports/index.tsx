@@ -378,14 +378,14 @@ export default function ReportsPage() {
         bal += r.netWt;
         return [r.label, r.count, fmt(r.qty), fmt(r.netWt), fmt(bal)];
       }),
-      ["Total", displayRows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
+      ["Total", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
     ];
     downloadBlob(toCSV(headers, data), "report-summary.csv", "text/csv;charset=utf-8;");
   }
 
   function exportDetailCSV() {
     const headers = visibleColsList.map((c) => c.label);
-    const data    = displayRows.map((r, idx) => {
+    const data    = rows.map((r, idx) => {
       return visibleColsList.map((c) => {
         switch (c.key) {
           case "date":                  return r.date;
@@ -429,7 +429,7 @@ export default function ReportsPage() {
           bal += r.netWt;
           return [r.label, r.count, fmt(r.qty), fmt(r.netWt), fmt(bal)];
         }),
-        ["Total", displayRows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
+        ["Total", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
       ],
       styles: { fontSize: 9 },
       headStyles: { fillColor: [37, 99, 235] },
@@ -529,15 +529,6 @@ export default function ReportsPage() {
     [openingRows]
   );
 
-  /**
-   * When dateFrom is set, exclude rows whose transaction type has no action
-   * (e.g. Fabric Production). When dateFrom is empty, show all rows.
-   */
-  const displayRows = useMemo(() => {
-    if (!applied.dateFrom) return rows;
-    return rows.filter((r) => r.transactionTypeAction && r.transactionTypeAction.trim() !== "");
-  }, [rows, applied.dateFrom]);
-
   function set(key: keyof Filters, val: string | string[]) {
     setFilters((prev) => ({ ...prev, [key]: val }));
   }
@@ -553,17 +544,17 @@ export default function ReportsPage() {
     setHasRun(false);
   }
 
-  const grouped  = useMemo(() => groupRows(displayRows, groupBy), [displayRows, groupBy]);
-  const totalQty  = useMemo(() => displayRows.reduce((s, r) => s + signedQty(r), 0), [displayRows]);
-  const totalNetWt = useMemo(() => displayRows.reduce((s, r) => s + balanceNetWt(r), 0), [displayRows]);
+  const grouped  = useMemo(() => groupRows(rows, groupBy), [rows, groupBy]);
+  const totalQty  = useMemo(() => rows.reduce((s, r) => s + signedQty(r), 0), [rows]);
+  const totalNetWt = useMemo(() => rows.reduce((s, r) => s + balanceNetWt(r), 0), [rows]);
 
   const runningBalances = useMemo(() => {
     let bal = openingBalance;
-    return displayRows.map((r) => {
+    return rows.map((r) => {
       bal += balanceNetWt(r);
       return bal;
     });
-  }, [displayRows, openingBalance]);
+  }, [rows, openingBalance]);
 
   function handleSortSummary(key: string) {
     const k = key as SummarySortKey;
@@ -608,7 +599,7 @@ export default function ReportsPage() {
   }, [sortedGrouped, openingBalance]);
 
   const sortedDetailRows = useMemo(() => {
-    const indexed = displayRows.map((r, idx) => ({ r, idx, bal: runningBalances[idx] }));
+    const indexed = rows.map((r, idx) => ({ r, idx, bal: runningBalances[idx] }));
     if (!sortDetail.key) return indexed;
     const key = sortDetail.key;
     return [...indexed].sort((a, b) => {
@@ -733,7 +724,7 @@ export default function ReportsPage() {
               <Card>
                 <CardContent className="pt-4 pb-3">
                   <p className="text-xs text-muted-foreground">Total Rows</p>
-                  <p className="text-2xl font-semibold">{displayRows.length.toLocaleString()}</p>
+                  <p className="text-2xl font-semibold">{rows.length.toLocaleString()}</p>
                 </CardContent>
               </Card>
               <Card>
@@ -754,11 +745,11 @@ export default function ReportsPage() {
               <p className="text-sm text-destructive">Failed to load report data. Please try again.</p>
             )}
 
-            {!isError && displayRows.length === 0 && !isFetching && (
+            {!isError && rows.length === 0 && !isFetching && (
               <p className="text-sm text-muted-foreground">No data found for the selected filters.</p>
             )}
 
-            {displayRows.length > 0 && (
+            {rows.length > 0 && (
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <TabsList>
@@ -864,7 +855,7 @@ export default function ReportsPage() {
                         ))}
                         <TableRow className="bg-muted/50 font-semibold">
                           <TableCell>Total</TableCell>
-                          <TableCell className="text-right">{displayRows.length}</TableCell>
+                          <TableCell className="text-right">{rows.length}</TableCell>
                           <TableCell className="text-right">{fmt(totalQty)}</TableCell>
                           <TableCell className="text-right">{fmt(totalNetWt)}</TableCell>
                           <TableCell className={`text-right whitespace-nowrap ${(openingBalance + totalNetWt) < 0 ? "text-red-600" : "text-blue-700"}`}>
