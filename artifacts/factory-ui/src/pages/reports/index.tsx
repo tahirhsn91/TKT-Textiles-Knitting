@@ -364,10 +364,15 @@ export default function ReportsPage() {
 
   function exportSummaryCSV() {
     const groupLabel = GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? groupBy;
-    const headers    = [groupLabel, "Rows", "Total Qty", "Total Net Wt"];
-    const data       = [
-      ...grouped.map((r) => [r.label, r.count, fmt(r.qty), fmt(r.netWt)]),
-      ["Total", rows.length, fmt(totalQty), fmt(totalNetWt)],
+    const headers    = [groupLabel, "Rows", "Total Qty", "Total Net Wt", "Running Total"];
+    let bal = openingBalance;
+    const data: (string | number)[][] = [
+      ["Opening Balance", "", "", "", fmt(openingBalance)],
+      ...sortedGrouped.map((r) => {
+        bal += r.netWt;
+        return [r.label, r.count, fmt(r.qty), fmt(r.netWt), fmt(bal)];
+      }),
+      ["Total", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
     ];
     downloadBlob(toCSV(headers, data), "report-summary.csv", "text/csv;charset=utf-8;");
   }
@@ -407,12 +412,17 @@ export default function ReportsPage() {
     const groupLabel = GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? groupBy;
     doc.setFontSize(13);
     doc.text(`Report Summary — grouped by ${groupLabel}`, 14, 14);
+    let bal = openingBalance;
     autoTable(doc, {
       startY: 20,
-      head: [[groupLabel, "Rows", "Total Qty", "Total Net Wt"]],
+      head: [[groupLabel, "Rows", "Total Qty", "Total Net Wt", "Running Total"]],
       body: [
-        ...grouped.map((r) => [r.label, r.count, fmt(r.qty), fmt(r.netWt)]),
-        ["Total", rows.length, fmt(totalQty), fmt(totalNetWt)],
+        ["Opening Balance", "", "", "", fmt(openingBalance)],
+        ...sortedGrouped.map((r) => {
+          bal += r.netWt;
+          return [r.label, r.count, fmt(r.qty), fmt(r.netWt), fmt(bal)];
+        }),
+        ["Total", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
       ],
       styles: { fontSize: 9 },
       headStyles: { fillColor: [37, 99, 235] },
@@ -571,6 +581,15 @@ export default function ReportsPage() {
     });
     return arr;
   }, [grouped, sortSummary]);
+
+  /** Running total per group row in current display order, starting from openingBalance. */
+  const summaryRunningTotals = useMemo(() => {
+    let bal = openingBalance;
+    return sortedGrouped.map((r) => {
+      bal += r.netWt;
+      return bal;
+    });
+  }, [sortedGrouped, openingBalance]);
 
   const sortedDetailRows = useMemo(() => {
     const indexed = rows.map((r, idx) => ({ r, idx, bal: runningBalances[idx] }));
@@ -799,9 +818,10 @@ export default function ReportsPage() {
                             sort={sortSummary}
                             onSort={handleSortSummary}
                           />
-                          <SortHead label="Rows"         sortKey="count" sort={sortSummary} onSort={handleSortSummary} right />
-                          <SortHead label="Total Qty"    sortKey="qty"   sort={sortSummary} onSort={handleSortSummary} right />
-                          <SortHead label="Total Net Wt" sortKey="netWt" sort={sortSummary} onSort={handleSortSummary} right />
+                          <SortHead label="Rows"          sortKey="count" sort={sortSummary} onSort={handleSortSummary} right />
+                          <SortHead label="Total Qty"     sortKey="qty"   sort={sortSummary} onSort={handleSortSummary} right />
+                          <SortHead label="Total Net Wt"  sortKey="netWt" sort={sortSummary} onSort={handleSortSummary} right />
+                          <TableHead className="text-right whitespace-nowrap">Running Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -810,16 +830,20 @@ export default function ReportsPage() {
                           <TableCell className="whitespace-nowrap">Opening Balance</TableCell>
                           <TableCell />
                           <TableCell />
+                          <TableCell />
                           <TableCell className={`text-right whitespace-nowrap font-semibold not-italic ${openingBalance < 0 ? "text-red-600" : "text-blue-700"}`}>
                             {fmt(openingBalance)}
                           </TableCell>
                         </TableRow>
-                        {sortedGrouped.map((r) => (
+                        {sortedGrouped.map((r, i) => (
                           <TableRow key={r.label}>
                             <TableCell className="font-medium">{r.label}</TableCell>
                             <TableCell className="text-right">{r.count}</TableCell>
                             <TableCell className="text-right">{fmt(r.qty)}</TableCell>
                             <TableCell className="text-right">{fmt(r.netWt)}</TableCell>
+                            <TableCell className={`text-right whitespace-nowrap font-semibold ${summaryRunningTotals[i] < 0 ? "text-red-600" : "text-blue-700"}`}>
+                              {fmt(summaryRunningTotals[i])}
+                            </TableCell>
                           </TableRow>
                         ))}
                         <TableRow className="bg-muted/50 font-semibold">
@@ -827,6 +851,9 @@ export default function ReportsPage() {
                           <TableCell className="text-right">{rows.length}</TableCell>
                           <TableCell className="text-right">{fmt(totalQty)}</TableCell>
                           <TableCell className="text-right">{fmt(totalNetWt)}</TableCell>
+                          <TableCell className={`text-right whitespace-nowrap ${(openingBalance + totalNetWt) < 0 ? "text-red-600" : "text-blue-700"}`}>
+                            {fmt(openingBalance + totalNetWt)}
+                          </TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>
