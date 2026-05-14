@@ -127,12 +127,8 @@ function toISODate(d: Date): string {
 }
 
 function defaultFilters(): Filters {
-  const today  = new Date();
-  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   return {
-    dateFrom: toISODate(startOfMonth),
-    dateTo:   toISODate(today),
-    year: "", month: "",
+    dateFrom: "", dateTo: "", year: "", month: "",
     transactionTypeId: [], jobId: [], partyId: [], locationId: [], fabricTypeId: [],
     yarnTypeId: [], yarnCountId: [], yarnBrandId: [], uomId: [],
     machineId: [], machineOperatorId: [],
@@ -304,7 +300,7 @@ const DETAIL_COLUMNS: { key: DetailColKey; label: string }[] = [
   { key: "reference",             label: "Reference" },
   { key: "sl",                    label: "SL" },
   { key: "gsm",                   label: "GSM" },
-  { key: "transactionTypeName",   label: "Txn Type" },
+  { key: "transactionTypeName",   label: "Trans Type" },
   { key: "jobName",               label: "Job" },
   { key: "partyName",             label: "Party" },
   { key: "locationName",          label: "Location" },
