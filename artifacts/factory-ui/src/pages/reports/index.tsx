@@ -234,7 +234,7 @@ function groupRows(rows: ReportRow[], key: GroupByKey) {
     existing.qty                  += signedQty(row);
     existing.netWt                += signedNetWt(row);
     existing.balNetWt             += balanceNetWt(row);
-    existing.balNetWtMinusWastage += balanceNetWt(row) - wastageWt(row);
+    existing.balNetWtMinusWastage += balanceNetWt(row) + wastageWt(row);
     existing.count                += 1;
     map.set(k, existing);
   }
@@ -602,7 +602,7 @@ export default function ReportsPage() {
   });
 
   const openingBalance = useMemo(
-    () => openingRows.reduce((s, r) => s + balanceNetWt(r) - wastageWt(r), 0),
+    () => openingRows.reduce((s, r) => s + balanceNetWt(r) + wastageWt(r), 0),
     [openingRows]
   );
 
@@ -624,7 +624,7 @@ export default function ReportsPage() {
   const grouped  = useMemo(() => groupRows(rows, groupBy), [rows, groupBy]);
   const totalQty  = useMemo(() => rows.reduce((s, r) => s + signedQty(r), 0), [rows]);
   /** Used for Summary running-total calculations — excludes null-action rows and subtracts wastage. */
-  const totalNetWt = useMemo(() => rows.reduce((s, r) => s + balanceNetWt(r) - wastageWt(r), 0), [rows]);
+  const totalNetWt = useMemo(() => rows.reduce((s, r) => s + balanceNetWt(r) + wastageWt(r), 0), [rows]);
   /** Grand-total Net Wt for the Detail table (signed display values). */
   const totalDisplayNetWt = useMemo(() => rows.reduce((s, r) => s + signedNetWt(r), 0), [rows]);
   /** Grand-total Wastage Wt for the Detail table. */
@@ -633,7 +633,7 @@ export default function ReportsPage() {
   const runningBalances = useMemo(() => {
     let bal = openingBalance;
     return rows.map((r) => {
-      bal += balanceNetWt(r) - wastageWt(r);
+      bal += balanceNetWt(r) + wastageWt(r);
       return bal;
     });
   }, [rows, openingBalance]);
