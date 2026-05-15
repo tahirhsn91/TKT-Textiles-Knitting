@@ -71,6 +71,7 @@ router.get("/reports/data", async (req, res): Promise<void> => {
       transactionTypeAction: transactionTypeMasterTable.action,
       jobName:              jobMasterTable.name,
       partyName:            partyMasterTable.name,
+      partyWastePercent:    partyMasterTable.wastePercent,
       locationName:         locationMasterTable.name,
       fabricTypeName:       fabricTypeMasterTable.name,
       detailId:             transactionDetailTable.id,

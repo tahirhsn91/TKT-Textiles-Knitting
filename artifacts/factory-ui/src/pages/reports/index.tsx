@@ -79,6 +79,7 @@ interface ReportRow {
   uomName: string | null;
   machineName: string | null;
   machineOperatorName: string | null;
+  partyWastePercent: string | null;
 }
 
 interface Filters {
@@ -197,6 +198,14 @@ function balanceNetWt(row: ReportRow): number {
   return toNum(row.netWt) * (action.trim().toLowerCase() === "minus" ? -1 : 1);
 }
 
+/** Wastage weight — only for "Fabric Delivery" and "Fabric Delivery Return" rows.
+ *  Carries the same sign as signedNetWt (action multiplier already applied). */
+function wastageWt(row: ReportRow): number {
+  const name = row.transactionTypeName;
+  if (name !== "Fabric Delivery" && name !== "Fabric Delivery Return") return 0;
+  return signedNetWt(row) * (toNum(row.partyWastePercent) / 100);
+}
+
 function fmt(n: number): string {
   return n.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 }
@@ -214,18 +223,19 @@ function getGroupLabel(row: ReportRow, key: GroupByKey): string {
 
 type DetailRenderItem =
   | { kind: "data"; r: ReportRow; idx: number; bal: number }
-  | { kind: "subtotal"; label: string; qty: number; netWt: number };
+  | { kind: "subtotal"; label: string; qty: number; netWt: number; wastageWt: number };
 
 function groupRows(rows: ReportRow[], key: GroupByKey) {
-  const map = new Map<string, { qty: number; netWt: number; balNetWt: number; count: number }>();
+  const map = new Map<string, { qty: number; netWt: number; balNetWt: number; balNetWtMinusWastage: number; count: number }>();
   for (const row of rows) {
     const rawKey = key === "month" ? getMonthLabel(row.date) : (row[key] ?? "—");
     const k = String(rawKey);
-    const existing = map.get(k) ?? { qty: 0, netWt: 0, balNetWt: 0, count: 0 };
-    existing.qty      += signedQty(row);
-    existing.netWt    += signedNetWt(row);
-    existing.balNetWt += balanceNetWt(row);
-    existing.count    += 1;
+    const existing = map.get(k) ?? { qty: 0, netWt: 0, balNetWt: 0, balNetWtMinusWastage: 0, count: 0 };
+    existing.qty                  += signedQty(row);
+    existing.netWt                += signedNetWt(row);
+    existing.balNetWt             += balanceNetWt(row);
+    existing.balNetWtMinusWastage += balanceNetWt(row) - wastageWt(row);
+    existing.count                += 1;
     map.set(k, existing);
   }
   return Array.from(map.entries())
@@ -303,7 +313,8 @@ type DetailColKey =
   | "date" | "docNumber" | "reference" | "sl" | "gsm" | "transactionTypeName"
   | "jobName" | "partyName" | "locationName" | "fabricTypeName"
   | "yarnTypeName" | "yarnCountName" | "yarnBrandName" | "uomName"
-  | "machineName" | "machineOperatorName" | "quantity" | "netWt" | "runningBalance";
+  | "machineName" | "machineOperatorName" | "quantity" | "netWt"
+  | "wastagePercent" | "wastageWt" | "runningBalance";
 
 const DETAIL_COLUMNS: { key: DetailColKey; label: string }[] = [
   { key: "date",                  label: "Date" },
@@ -324,6 +335,8 @@ const DETAIL_COLUMNS: { key: DetailColKey; label: string }[] = [
   { key: "machineOperatorName",   label: "Operator" },
   { key: "quantity",              label: "Qty" },
   { key: "netWt",                 label: "Net Wt" },
+  { key: "wastagePercent",        label: "Wastage%" },
+  { key: "wastageWt",             label: "Wastage Wt" },
   { key: "runningBalance",        label: "Running Balance" },
 ];
 
@@ -382,7 +395,7 @@ export default function ReportsPage() {
     const data: (string | number)[][] = [
       ["Opening Balance", "", "", "", fmt(openingBalance)],
       ...sortedGrouped.map((r) => {
-        bal += r.balNetWt;
+        bal += r.balNetWtMinusWastage;
         return [r.label, r.count, fmt(r.qty), fmt(r.netWt), fmt(bal)];
       }),
       ["Total", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
@@ -399,10 +412,15 @@ export default function ReportsPage() {
     for (const item of detailRenderRows) {
       if (item.kind === "subtotal") {
         bodyRows.push(visibleColsList.map((c, ci) =>
-          ci === 0 ? `Subtotal: ${item.label}` : c.key === "quantity" ? fmt(item.qty) : c.key === "netWt" ? fmt(item.netWt) : ""
+          ci === 0             ? `Subtotal: ${item.label}`
+          : c.key === "quantity"       ? fmt(item.qty)
+          : c.key === "netWt"          ? fmt(item.netWt)
+          : c.key === "wastageWt"      ? fmt(item.wastageWt)
+          : ""
         ));
       } else {
         const { r, idx } = item;
+        const wWt = wastageWt(r);
         bodyRows.push(visibleColsList.map((c) => {
           switch (c.key) {
             case "date":                  return r.date;
@@ -423,13 +441,21 @@ export default function ReportsPage() {
             case "machineOperatorName":   return r.machineOperatorName ?? "";
             case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "";
             case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "";
+            case "wastagePercent":        return wWt !== 0 ? (r.partyWastePercent ?? "") : "";
+            case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "";
             case "runningBalance":        return fmt(runningBalances[idx]);
             default:                      return "";
           }
         }));
       }
     }
-    downloadBlob(toCSV(headers, [obRow, ...bodyRows]), "report-detail.csv", "text/csv;charset=utf-8;");
+    const grandRow = visibleColsList.map((c, ci) =>
+      ci === 0               ? "Grand Total"
+      : c.key === "netWt"    ? fmt(totalDisplayNetWt)
+      : c.key === "wastageWt"? fmt(totalWastageWt)
+      : ""
+    );
+    downloadBlob(toCSV(headers, [obRow, ...bodyRows, grandRow]), "report-detail.csv", "text/csv;charset=utf-8;");
   }
 
   function exportSummaryPDF() {
@@ -444,7 +470,7 @@ export default function ReportsPage() {
       body: [
         ["Opening Balance", "", "", "", fmt(openingBalance)],
         ...sortedGrouped.map((r) => {
-          bal += r.balNetWt;
+          bal += r.balNetWtMinusWastage;
           return [r.label, r.count, fmt(r.qty), fmt(r.netWt), fmt(bal)];
         }),
         ["Total", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
@@ -468,10 +494,15 @@ export default function ReportsPage() {
     for (const item of detailRenderRows) {
       if (item.kind === "subtotal") {
         bodyRows.push(visibleColsList.map((c, ci) =>
-          ci === 0 ? `Subtotal: ${item.label}` : c.key === "quantity" ? fmt(item.qty) : c.key === "netWt" ? fmt(item.netWt) : "—"
+          ci === 0                     ? `Subtotal: ${item.label}`
+          : c.key === "quantity"       ? fmt(item.qty)
+          : c.key === "netWt"          ? fmt(item.netWt)
+          : c.key === "wastageWt"      ? fmt(item.wastageWt)
+          : "—"
         ));
       } else {
         const { r, idx } = item;
+        const wWt = wastageWt(r);
         bodyRows.push(visibleColsList.map((c) => {
           switch (c.key) {
             case "date":                  return r.date;
@@ -492,22 +523,31 @@ export default function ReportsPage() {
             case "machineOperatorName":   return r.machineOperatorName ?? "—";
             case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "—";
             case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "—";
+            case "wastagePercent":        return wWt !== 0 ? (r.partyWastePercent ?? "—") : "—";
+            case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "—";
             case "runningBalance":        return fmt(runningBalances[idx]);
             default:                      return "";
           }
         }));
       }
     }
+    const grandRow = visibleColsList.map((c, ci) =>
+      ci === 0                ? "Grand Total"
+      : c.key === "netWt"    ? fmt(totalDisplayNetWt)
+      : c.key === "wastageWt"? fmt(totalWastageWt)
+      : "—"
+    );
     autoTable(doc, {
       startY: 20,
       head: [headers],
-      body: [obRow, ...bodyRows],
+      body: [obRow, ...bodyRows, grandRow],
       styles: { fontSize: 7 },
       headStyles: { fillColor: [37, 99, 235] },
       didParseCell: (data) => {
-        if (data.section === "body" && data.row.raw[0]?.toString().startsWith("Subtotal:")) {
+        const label = data.row.raw[0]?.toString() ?? "";
+        if (data.section === "body" && (label.startsWith("Subtotal:") || label === "Grand Total")) {
           data.cell.styles.fontStyle = "bold";
-          data.cell.styles.fillColor = [240, 240, 240];
+          data.cell.styles.fillColor = label === "Grand Total" ? [220, 230, 255] : [240, 240, 240];
         }
       },
     });
@@ -562,7 +602,7 @@ export default function ReportsPage() {
   });
 
   const openingBalance = useMemo(
-    () => openingRows.reduce((s, r) => s + balanceNetWt(r), 0),
+    () => openingRows.reduce((s, r) => s + balanceNetWt(r) - wastageWt(r), 0),
     [openingRows]
   );
 
@@ -583,12 +623,17 @@ export default function ReportsPage() {
 
   const grouped  = useMemo(() => groupRows(rows, groupBy), [rows, groupBy]);
   const totalQty  = useMemo(() => rows.reduce((s, r) => s + signedQty(r), 0), [rows]);
-  const totalNetWt = useMemo(() => rows.reduce((s, r) => s + balanceNetWt(r), 0), [rows]);
+  /** Used for Summary running-total calculations — excludes null-action rows and subtracts wastage. */
+  const totalNetWt = useMemo(() => rows.reduce((s, r) => s + balanceNetWt(r) - wastageWt(r), 0), [rows]);
+  /** Grand-total Net Wt for the Detail table (signed display values). */
+  const totalDisplayNetWt = useMemo(() => rows.reduce((s, r) => s + signedNetWt(r), 0), [rows]);
+  /** Grand-total Wastage Wt for the Detail table. */
+  const totalWastageWt = useMemo(() => rows.reduce((s, r) => s + wastageWt(r), 0), [rows]);
 
   const runningBalances = useMemo(() => {
     let bal = openingBalance;
     return rows.map((r) => {
-      bal += balanceNetWt(r);
+      bal += balanceNetWt(r) - wastageWt(r);
       return bal;
     });
   }, [rows, openingBalance]);
@@ -627,11 +672,11 @@ export default function ReportsPage() {
   }, [grouped, sortSummary]);
 
   /** Running total per group row in current display order, starting from openingBalance.
-   *  Uses balNetWt so null-action rows (e.g. Fabric Production) contribute 0. */
+   *  Uses balNetWtMinusWastage so null-action rows and wastage are both excluded. */
   const summaryRunningTotals = useMemo(() => {
     let bal = openingBalance;
     return sortedGrouped.map((r) => {
-      bal += r.balNetWt;
+      bal += r.balNetWtMinusWastage;
       return bal;
     });
   }, [sortedGrouped, openingBalance]);
@@ -643,10 +688,12 @@ export default function ReportsPage() {
     return [...indexed].sort((a, b) => {
       let av: string | number, bv: string | number;
       switch (key) {
-        case "runningBalance": av = a.bal;             bv = b.bal;             break;
-        case "quantity":       av = signedQty(a.r);    bv = signedQty(b.r);    break;
-        case "netWt":          av = signedNetWt(a.r);  bv = signedNetWt(b.r);  break;
-        case "gsm":            av = a.r.gsm ?? 0;      bv = b.r.gsm ?? 0;      break;
+        case "runningBalance":  av = a.bal;                        bv = b.bal;                        break;
+        case "quantity":        av = signedQty(a.r);               bv = signedQty(b.r);               break;
+        case "netWt":           av = signedNetWt(a.r);             bv = signedNetWt(b.r);             break;
+        case "wastageWt":       av = wastageWt(a.r);               bv = wastageWt(b.r);               break;
+        case "wastagePercent":  av = toNum(a.r.partyWastePercent); bv = toNum(b.r.partyWastePercent); break;
+        case "gsm":             av = a.r.gsm ?? 0;                 bv = b.r.gsm ?? 0;                 break;
         default: {
           const rawA = a.r[key as keyof ReportRow];
           const rawB = b.r[key as keyof ReportRow];
@@ -666,18 +713,19 @@ export default function ReportsPage() {
   const detailRenderRows = useMemo((): DetailRenderItem[] => {
     const result: DetailRenderItem[] = [];
     let curKey: string | null = null;
-    let gQty = 0, gNetWt = 0, gLabel = "";
+    let gQty = 0, gNetWt = 0, gWastageWt = 0, gLabel = "";
     const flush = () => {
       if (curKey !== null) {
-        result.push({ kind: "subtotal", label: gLabel, qty: gQty, netWt: gNetWt });
-        gQty = 0; gNetWt = 0;
+        result.push({ kind: "subtotal", label: gLabel, qty: gQty, netWt: gNetWt, wastageWt: gWastageWt });
+        gQty = 0; gNetWt = 0; gWastageWt = 0;
       }
     };
     for (const item of sortedDetailRows) {
       const k = getGroupLabel(item.r, groupBy);
       if (k !== curKey) { flush(); curKey = k; gLabel = k; }
-      gQty   += signedQty(item.r);
-      gNetWt += signedNetWt(item.r);
+      gQty       += signedQty(item.r);
+      gNetWt     += signedNetWt(item.r);
+      gWastageWt += wastageWt(item.r);
       result.push({ kind: "data", r: item.r, idx: item.idx, bal: item.bal });
     }
     flush();
@@ -976,7 +1024,7 @@ export default function ReportsPage() {
                               sortKey={c.key}
                               sort={sortDetail}
                               onSort={handleSortDetail}
-                              right={c.key === "quantity" || c.key === "netWt" || c.key === "runningBalance"}
+                              right={c.key === "quantity" || c.key === "netWt" || c.key === "wastageWt" || c.key === "runningBalance"}
                             />
                           ))}
                         </TableRow>
@@ -1005,16 +1053,18 @@ export default function ReportsPage() {
                             return (
                               <TableRow key={`sub-${ri}`} className="bg-muted/60 font-semibold border-t">
                                 {visibleColsList.map((c, ci) => {
-                                  if (ci === 0) return <TableCell key={c.key} className="whitespace-nowrap">Subtotal: {item.label}</TableCell>;
-                                  if (c.key === "quantity")  return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(item.qty)}</TableCell>;
-                                  if (c.key === "netWt")     return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(item.netWt)}</TableCell>;
+                                  if (ci === 0)                return <TableCell key={c.key} className="whitespace-nowrap">Subtotal: {item.label}</TableCell>;
+                                  if (c.key === "quantity")    return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(item.qty)}</TableCell>;
+                                  if (c.key === "netWt")       return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(item.netWt)}</TableCell>;
+                                  if (c.key === "wastageWt")   return <TableCell key={c.key} className="text-right whitespace-nowrap">{item.wastageWt !== 0 ? fmt(item.wastageWt) : "—"}</TableCell>;
                                   return <TableCell key={c.key} />;
                                 })}
                               </TableRow>
                             );
                           }
                           const { r, bal } = item;
-                          const neg = getMultiplier(r.transactionTypeAction) < 0;
+                          const neg    = getMultiplier(r.transactionTypeAction) < 0;
+                          const wWt    = wastageWt(r);
                           return (
                             <TableRow key={r.detailId}>
                               {col("date")                && <TableCell className="whitespace-nowrap">{r.date}</TableCell>}
@@ -1043,6 +1093,16 @@ export default function ReportsPage() {
                                   {r.netWt != null ? fmt(signedNetWt(r)) : "—"}
                                 </TableCell>
                               )}
+                              {col("wastagePercent")      && (
+                                <TableCell className="text-right whitespace-nowrap text-amber-700">
+                                  {wWt !== 0 ? `${r.partyWastePercent ?? "—"}%` : "—"}
+                                </TableCell>
+                              )}
+                              {col("wastageWt")           && (
+                                <TableCell className={`text-right whitespace-nowrap${wWt < 0 ? " text-red-500" : wWt > 0 ? " text-amber-700" : ""}`}>
+                                  {wWt !== 0 ? fmt(wWt) : "—"}
+                                </TableCell>
+                              )}
                               {col("runningBalance")      && (
                                 <TableCell className={`text-right whitespace-nowrap font-medium${bal < 0 ? " text-red-600" : " text-blue-700"}`}>
                                   {fmt(bal)}
@@ -1051,6 +1111,16 @@ export default function ReportsPage() {
                             </TableRow>
                           );
                         })}
+
+                        {/* Grand Total row */}
+                        <TableRow className="bg-blue-50 font-bold border-t-2 text-blue-900">
+                          {visibleColsList.map((c, ci) => {
+                            if (ci === 0) return <TableCell key={c.key} className="whitespace-nowrap">Grand Total</TableCell>;
+                            if (c.key === "netWt")    return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(totalDisplayNetWt)}</TableCell>;
+                            if (c.key === "wastageWt") return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(totalWastageWt)}</TableCell>;
+                            return <TableCell key={c.key} />;
+                          })}
+                        </TableRow>
                       </TableBody>
                     </Table>
                   </div>
