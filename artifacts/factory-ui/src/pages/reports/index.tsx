@@ -281,18 +281,30 @@ function FilterMulti({
 
 function SortHead({
   label, sortKey, sort, onSort, right,
+  draggable, onDragStart, onDragOver, onDrop, onDragEnd, isDragging,
 }: {
   label: string;
   sortKey: string;
   sort: { key: string | null; dir: SortDir };
   onSort: (key: string) => void;
   right?: boolean;
+  draggable?: boolean;
+  onDragStart?: (e: React.DragEvent<HTMLTableCellElement>) => void;
+  onDragOver?: (e: React.DragEvent<HTMLTableCellElement>) => void;
+  onDrop?: (e: React.DragEvent<HTMLTableCellElement>) => void;
+  onDragEnd?: () => void;
+  isDragging?: boolean;
 }) {
   const active = sort.key === sortKey;
   return (
     <TableHead
-      className={`cursor-pointer select-none whitespace-nowrap${right ? " text-right" : ""}`}
+      className={`select-none whitespace-nowrap transition-opacity${right ? " text-right" : ""}${draggable ? " cursor-grab" : " cursor-pointer"}${isDragging ? " opacity-30" : ""}`}
       onClick={() => onSort(sortKey)}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
     >
       <span className={`inline-flex items-center gap-1${right ? " justify-end w-full" : ""}`}>
         {label}
@@ -353,6 +365,8 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab]     = useState("summary");
   const [sortSummary, setSortSummary] = useState<{ key: SummarySortKey; dir: SortDir }>({ key: "label", dir: "asc" });
   const [sortDetail,  setSortDetail]  = useState<{ key: DetailColKey | null; dir: SortDir }>({ key: null, dir: "asc" });
+  const [colOrder,    setColOrder]    = useState<DetailColKey[]>(ALL_DETAIL_KEYS);
+  const [dragCol,     setDragCol]     = useState<DetailColKey | null>(null);
 
   function toggleCol(key: DetailColKey) {
     setVisibleCols((prev) => {
@@ -365,7 +379,27 @@ export default function ReportsPage() {
   function showAllCols()  { setVisibleCols(new Set(ALL_DETAIL_KEYS)); }
   function hideAllCols()  { setVisibleCols(new Set()); }
 
-  const visibleColsList = DETAIL_COLUMNS.filter((c) => visibleCols.has(c.key));
+  function handleColDragStart(_e: React.DragEvent, key: DetailColKey) {
+    setDragCol(key);
+  }
+  function handleColDragOver(e: React.DragEvent, key: DetailColKey) {
+    e.preventDefault();
+    if (!dragCol || dragCol === key) return;
+    setColOrder((prev) => {
+      const next = [...prev];
+      const from = next.indexOf(dragCol);
+      const to   = next.indexOf(key);
+      if (from === -1 || to === -1) return prev;
+      next.splice(from, 1);
+      next.splice(to, 0, dragCol);
+      return next;
+    });
+  }
+  function handleColDragEnd() { setDragCol(null); }
+
+  const visibleColsList = colOrder
+    .map((k) => DETAIL_COLUMNS.find((c) => c.key === k)!)
+    .filter((c) => c && visibleCols.has(c.key));
   const col = (key: DetailColKey) => visibleCols.has(key);
 
   // ── Export helpers ────────────────────────────────────────────────────────
@@ -1025,6 +1059,12 @@ export default function ReportsPage() {
                               sort={sortDetail}
                               onSort={handleSortDetail}
                               right={c.key === "quantity" || c.key === "netWt" || c.key === "wastageWt" || c.key === "runningBalance"}
+                              draggable
+                              isDragging={dragCol === c.key}
+                              onDragStart={(e) => handleColDragStart(e, c.key)}
+                              onDragOver={(e) => handleColDragOver(e, c.key)}
+                              onDrop={(e) => e.preventDefault()}
+                              onDragEnd={handleColDragEnd}
                             />
                           ))}
                         </TableRow>
