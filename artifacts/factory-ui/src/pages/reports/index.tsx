@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -361,11 +361,33 @@ export default function ReportsPage() {
   const [applied, setApplied]         = useState<Filters>(EMPTY_FILTERS);
   const [groupBy, setGroupBy]         = useState<GroupByKey>("date");
   const [hasRun, setHasRun]           = useState(false);
-  const [visibleCols, setVisibleCols] = useState<Set<DetailColKey>>(new Set(ALL_DETAIL_KEYS));
+  const [visibleCols, setVisibleCols] = useState<Set<DetailColKey>>(() => {
+    try {
+      const saved = localStorage.getItem("report-visible-cols");
+      if (saved) {
+        const arr = JSON.parse(saved) as string[];
+        if (Array.isArray(arr)) return new Set(arr.filter(k => ALL_DETAIL_KEYS.includes(k as DetailColKey)) as DetailColKey[]);
+      }
+    } catch {}
+    return new Set(ALL_DETAIL_KEYS);
+  });
   const [activeTab, setActiveTab]     = useState("summary");
   const [sortSummary, setSortSummary] = useState<{ key: SummarySortKey; dir: SortDir }>({ key: "label", dir: "asc" });
   const [sortDetail,  setSortDetail]  = useState<{ key: DetailColKey | null; dir: SortDir }>({ key: null, dir: "asc" });
-  const [colOrder,    setColOrder]    = useState<DetailColKey[]>(ALL_DETAIL_KEYS);
+  const [colOrder,    setColOrder]    = useState<DetailColKey[]>(() => {
+    try {
+      const saved = localStorage.getItem("report-col-order");
+      if (saved) {
+        const arr = JSON.parse(saved) as string[];
+        if (Array.isArray(arr)) {
+          const valid = arr.filter(k => ALL_DETAIL_KEYS.includes(k as DetailColKey)) as DetailColKey[];
+          const missing = ALL_DETAIL_KEYS.filter(k => !valid.includes(k));
+          return [...valid, ...missing];
+        }
+      }
+    } catch {}
+    return ALL_DETAIL_KEYS;
+  });
   const [dragCol,     setDragCol]     = useState<DetailColKey | null>(null);
 
   function toggleCol(key: DetailColKey) {
@@ -396,6 +418,14 @@ export default function ReportsPage() {
     });
   }
   function handleColDragEnd() { setDragCol(null); }
+
+  useEffect(() => {
+    localStorage.setItem("report-visible-cols", JSON.stringify([...visibleCols]));
+  }, [visibleCols]);
+
+  useEffect(() => {
+    localStorage.setItem("report-col-order", JSON.stringify(colOrder));
+  }, [colOrder]);
 
   const visibleColsList = colOrder
     .map((k) => DETAIL_COLUMNS.find((c) => c.key === k)!)
