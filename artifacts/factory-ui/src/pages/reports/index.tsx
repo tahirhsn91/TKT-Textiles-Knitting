@@ -1103,51 +1103,78 @@ export default function ReportsPage() {
                             );
                           }
                           const { r, bal } = item;
-                          const neg    = getMultiplier(r.transactionTypeAction) < 0;
-                          const wWt    = wastageWt(r);
+                          const neg = getMultiplier(r.transactionTypeAction) < 0;
+                          const wWt = wastageWt(r);
                           return (
                             <TableRow key={r.detailId}>
-                              {col("date")                && <TableCell className="whitespace-nowrap">{r.date}</TableCell>}
-                              {col("docNumber")           && <TableCell className="whitespace-nowrap">{r.docNumber}</TableCell>}
-                              {col("reference")           && <TableCell className="whitespace-nowrap">{r.reference ?? "—"}</TableCell>}
-                              {col("sl")                  && <TableCell>{r.sl ?? "—"}</TableCell>}
-                              {col("gsm")                 && <TableCell>{r.gsm ?? "—"}</TableCell>}
-                              {col("transactionTypeName") && <TableCell className="whitespace-nowrap">{r.transactionTypeName ?? "—"}</TableCell>}
-                              {col("jobName")             && <TableCell className="whitespace-nowrap">{r.jobName ?? "—"}</TableCell>}
-                              {col("partyName")           && <TableCell className="whitespace-nowrap">{r.partyName ?? "—"}</TableCell>}
-                              {col("locationName")        && <TableCell className="whitespace-nowrap">{r.locationName ?? "—"}</TableCell>}
-                              {col("fabricTypeName")      && <TableCell className="whitespace-nowrap">{r.fabricTypeName ?? "—"}</TableCell>}
-                              {col("yarnTypeName")        && <TableCell className="whitespace-nowrap">{r.yarnTypeName ?? "—"}</TableCell>}
-                              {col("yarnCountName")       && <TableCell className="whitespace-nowrap">{r.yarnCountName ?? "—"}</TableCell>}
-                              {col("yarnBrandName")       && <TableCell className="whitespace-nowrap">{r.yarnBrandName ?? "—"}</TableCell>}
-                              {col("uomName")             && <TableCell>{r.uomName ?? "—"}</TableCell>}
-                              {col("machineName")         && <TableCell className="whitespace-nowrap">{r.machineName ?? "—"}</TableCell>}
-                              {col("machineOperatorName") && <TableCell className="whitespace-nowrap">{r.machineOperatorName ?? "—"}</TableCell>}
-                              {col("quantity")            && (
-                                <TableCell className={`text-right whitespace-nowrap${neg ? " text-red-600" : ""}`}>
-                                  {r.quantity != null ? fmt(signedQty(r)) : "—"}
-                                </TableCell>
-                              )}
-                              {col("netWt")               && (
-                                <TableCell className={`text-right whitespace-nowrap${neg ? " text-red-600" : ""}`}>
-                                  {r.netWt != null ? fmt(signedNetWt(r)) : "—"}
-                                </TableCell>
-                              )}
-                              {col("wastagePercent")      && (
-                                <TableCell className="text-right whitespace-nowrap text-amber-700">
-                                  {wWt !== 0 ? `${r.partyWastePercent ?? "—"}%` : "—"}
-                                </TableCell>
-                              )}
-                              {col("wastageWt")           && (
-                                <TableCell className={`text-right whitespace-nowrap${wWt < 0 ? " text-red-500" : wWt > 0 ? " text-amber-700" : ""}`}>
-                                  {wWt !== 0 ? fmt(wWt) : "—"}
-                                </TableCell>
-                              )}
-                              {col("runningBalance")      && (
-                                <TableCell className={`text-right whitespace-nowrap font-medium${bal < 0 ? " text-red-600" : " text-blue-700"}`}>
-                                  {fmt(bal)}
-                                </TableCell>
-                              )}
+                              {visibleColsList.map((c) => {
+                                switch (c.key) {
+                                  case "date":
+                                    return <TableCell key={c.key} className="whitespace-nowrap">{r.date}</TableCell>;
+                                  case "docNumber":
+                                    return <TableCell key={c.key} className="whitespace-nowrap">{r.docNumber}</TableCell>;
+                                  case "reference":
+                                    return <TableCell key={c.key} className="whitespace-nowrap">{r.reference ?? "—"}</TableCell>;
+                                  case "sl":
+                                    return <TableCell key={c.key}>{r.sl ?? "—"}</TableCell>;
+                                  case "gsm":
+                                    return <TableCell key={c.key}>{r.gsm ?? "—"}</TableCell>;
+                                  case "transactionTypeName":
+                                    return <TableCell key={c.key} className="whitespace-nowrap">{r.transactionTypeName ?? "—"}</TableCell>;
+                                  case "jobName":
+                                    return <TableCell key={c.key} className="whitespace-nowrap">{r.jobName ?? "—"}</TableCell>;
+                                  case "partyName":
+                                    return <TableCell key={c.key} className="whitespace-nowrap">{r.partyName ?? "—"}</TableCell>;
+                                  case "locationName":
+                                    return <TableCell key={c.key} className="whitespace-nowrap">{r.locationName ?? "—"}</TableCell>;
+                                  case "fabricTypeName":
+                                    return <TableCell key={c.key} className="whitespace-nowrap">{r.fabricTypeName ?? "—"}</TableCell>;
+                                  case "yarnTypeName":
+                                    return <TableCell key={c.key} className="whitespace-nowrap">{r.yarnTypeName ?? "—"}</TableCell>;
+                                  case "yarnCountName":
+                                    return <TableCell key={c.key} className="whitespace-nowrap">{r.yarnCountName ?? "—"}</TableCell>;
+                                  case "yarnBrandName":
+                                    return <TableCell key={c.key} className="whitespace-nowrap">{r.yarnBrandName ?? "—"}</TableCell>;
+                                  case "uomName":
+                                    return <TableCell key={c.key}>{r.uomName ?? "—"}</TableCell>;
+                                  case "machineName":
+                                    return <TableCell key={c.key} className="whitespace-nowrap">{r.machineName ?? "—"}</TableCell>;
+                                  case "machineOperatorName":
+                                    return <TableCell key={c.key} className="whitespace-nowrap">{r.machineOperatorName ?? "—"}</TableCell>;
+                                  case "quantity":
+                                    return (
+                                      <TableCell key={c.key} className={`text-right whitespace-nowrap${neg ? " text-red-600" : ""}`}>
+                                        {r.quantity != null ? fmt(signedQty(r)) : "—"}
+                                      </TableCell>
+                                    );
+                                  case "netWt":
+                                    return (
+                                      <TableCell key={c.key} className={`text-right whitespace-nowrap${neg ? " text-red-600" : ""}`}>
+                                        {r.netWt != null ? fmt(signedNetWt(r)) : "—"}
+                                      </TableCell>
+                                    );
+                                  case "wastagePercent":
+                                    return (
+                                      <TableCell key={c.key} className="text-right whitespace-nowrap text-amber-700">
+                                        {wWt !== 0 ? `${r.partyWastePercent ?? "—"}%` : "—"}
+                                      </TableCell>
+                                    );
+                                  case "wastageWt":
+                                    return (
+                                      <TableCell key={c.key} className={`text-right whitespace-nowrap${wWt < 0 ? " text-red-500" : wWt > 0 ? " text-amber-700" : ""}`}>
+                                        {wWt !== 0 ? fmt(wWt) : "—"}
+                                      </TableCell>
+                                    );
+                                  case "runningBalance":
+                                    return (
+                                      <TableCell key={c.key} className={`text-right whitespace-nowrap font-medium${bal < 0 ? " text-red-600" : " text-blue-700"}`}>
+                                        {fmt(bal)}
+                                      </TableCell>
+                                    );
+                                  default:
+                                    return <TableCell key={c.key} />;
+                                }
+                              })}
                             </TableRow>
                           );
                         })}
