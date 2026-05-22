@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, desc } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { transactionHeaderTable, transactionDetailTable } from "@workspace/db";
 import {
@@ -84,6 +84,23 @@ router.post("/transactions", async (req, res): Promise<void> => {
   });
 
   res.status(201).json(GetTransactionResponse.parse(result));
+});
+
+router.get("/transactions/suggestions", async (_req, res): Promise<void> => {
+  const rows = await db
+    .select({ docNumber: transactionHeaderTable.docNumber, reference: transactionHeaderTable.reference })
+    .from(transactionHeaderTable)
+    .orderBy(desc(transactionHeaderTable.id));
+
+  let maxNumeric = 0;
+  for (const r of rows) {
+    const n = parseInt(r.docNumber ?? "", 10);
+    if (!isNaN(n) && n > maxNumeric) maxNumeric = n;
+  }
+
+  const lastReference = rows.find((r) => r.reference != null && r.reference.trim() !== "")?.reference ?? null;
+
+  res.json({ nextDocNumber: String(maxNumeric + 1), lastReference });
 });
 
 router.get("/transactions/:id", async (req, res): Promise<void> => {

@@ -4,7 +4,7 @@ import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Plus, Trash2, ArrowLeft } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 
 import {
@@ -103,6 +103,13 @@ export default function TransactionForm() {
 
   const { data: transaction, isLoading: isLoadingTx } = useGetTransaction(id!, {
     query: { enabled: isEditing, queryKey: getGetTransactionQueryKey(id!) }
+  });
+
+  const { data: suggestions } = useQuery<{ nextDocNumber: string; lastReference: string | null }>({
+    queryKey: ["transaction-suggestions"],
+    queryFn: () => fetch(`${import.meta.env.BASE_URL}api/transactions/suggestions`).then((r) => r.json()),
+    enabled: !isEditing,
+    staleTime: 0,
   });
 
   const { data: transactionTypeMaster } = useListTransactionTypeMaster();
@@ -206,6 +213,15 @@ export default function TransactionForm() {
     fabricTypeMaster && machineOperatorMaster &&
     transactionTypeMaster
   );
+
+  useEffect(() => {
+    if (!isEditing && suggestions) {
+      form.setValue("docNumber", suggestions.nextDocNumber);
+      if (suggestions.lastReference) {
+        form.setValue("reference", suggestions.lastReference);
+      }
+    }
+  }, [isEditing, suggestions]);
 
   useEffect(() => {
     if (transaction && isEditing && lookupsReady) {
