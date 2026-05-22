@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq, gte, lte, inArray, sql } from "drizzle-orm";
+import { and, eq, gte, lte, inArray, ilike, sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import {
   transactionHeaderTable,
@@ -24,10 +24,12 @@ router.get("/reports/data", async (req, res): Promise<void> => {
 
   const conditions = [];
 
-  if (q.dateFrom) conditions.push(gte(transactionHeaderTable.date, q.dateFrom));
-  if (q.dateTo)   conditions.push(lte(transactionHeaderTable.date, q.dateTo));
-  if (q.year)     conditions.push(sql`EXTRACT(YEAR  FROM ${transactionHeaderTable.date}) = ${parseInt(q.year)}`);
-  if (q.month)    conditions.push(sql`EXTRACT(MONTH FROM ${transactionHeaderTable.date}) = ${parseInt(q.month)}`);
+  if (q.dateFrom)   conditions.push(gte(transactionHeaderTable.date, q.dateFrom));
+  if (q.dateTo)     conditions.push(lte(transactionHeaderTable.date, q.dateTo));
+  if (q.year)       conditions.push(sql`EXTRACT(YEAR  FROM ${transactionHeaderTable.date}) = ${parseInt(q.year)}`);
+  if (q.month)      conditions.push(sql`EXTRACT(MONTH FROM ${transactionHeaderTable.date}) = ${parseInt(q.month)}`);
+  if (q.docNumber)  conditions.push(ilike(transactionHeaderTable.docNumber, `%${q.docNumber}%`));
+  if (q.reference)  conditions.push(ilike(transactionHeaderTable.reference, `%${q.reference}%`));
 
   function ids(raw: string | undefined): number[] | null {
     if (!raw) return null;

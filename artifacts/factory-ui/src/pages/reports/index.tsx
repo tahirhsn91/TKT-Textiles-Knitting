@@ -87,6 +87,8 @@ interface Filters {
   dateTo: string;
   year: string;
   month: string;
+  docNumber: string;
+  reference: string;
   transactionTypeId: string[];
   jobId: string[];
   partyId: string[];
@@ -129,7 +131,7 @@ function toISODate(d: Date): string {
 
 function defaultFilters(): Filters {
   return {
-    dateFrom: "", dateTo: "", year: "", month: "",
+    dateFrom: "", dateTo: "", year: "", month: "", docNumber: "", reference: "",
     transactionTypeId: [], jobId: [], partyId: [], locationId: [], fabricTypeId: [],
     yarnTypeId: [], yarnCountId: [], yarnBrandId: [], uomId: [],
     machineId: [], machineOperatorId: [],
@@ -137,7 +139,7 @@ function defaultFilters(): Filters {
 }
 
 const EMPTY_FILTERS: Filters = {
-  dateFrom: "", dateTo: "", year: "", month: "",
+  dateFrom: "", dateTo: "", year: "", month: "", docNumber: "", reference: "",
   transactionTypeId: [], jobId: [], partyId: [], locationId: [], fabricTypeId: [],
   yarnTypeId: [], yarnCountId: [], yarnBrandId: [], uomId: [],
   machineId: [], machineOperatorId: [],
@@ -225,22 +227,51 @@ type DetailRenderItem =
   | { kind: "data"; r: ReportRow; idx: number; bal: number }
   | { kind: "subtotal"; label: string; qty: number; netWt: number; wastageWt: number };
 
-function groupRows(rows: ReportRow[], key: GroupByKey) {
-  const map = new Map<string, { qty: number; netWt: number; balNetWt: number; balNetWtMinusWastage: number; count: number }>();
+type GroupedRow = {
+  label: string;
+  count: number;
+  qty: number;
+  netWt: number;
+  balNetWt: number;
+  balNetWtMinusWastage: number;
+  docNums: string[];
+  refs: string[];
+};
+
+function groupRows(rows: ReportRow[], key: GroupByKey): GroupedRow[] {
+  const map = new Map<string, {
+    qty: number; netWt: number; balNetWt: number; balNetWtMinusWastage: number;
+    count: number; docNumSet: Set<string>; refSet: Set<string>;
+  }>();
   for (const row of rows) {
     const rawKey = key === "month" ? getMonthLabel(row.date) : (row[key] ?? "—");
     const k = String(rawKey);
-    const existing = map.get(k) ?? { qty: 0, netWt: 0, balNetWt: 0, balNetWtMinusWastage: 0, count: 0 };
+    const existing = map.get(k) ?? {
+      qty: 0, netWt: 0, balNetWt: 0, balNetWtMinusWastage: 0, count: 0,
+      docNumSet: new Set<string>(), refSet: new Set<string>(),
+    };
     existing.qty                  += signedQty(row);
     existing.netWt                += signedNetWt(row);
     existing.balNetWt             += balanceNetWt(row);
     existing.balNetWtMinusWastage += balanceNetWt(row) + wastageWt(row);
     existing.count                += 1;
+    if (row.docNumber) existing.docNumSet.add(row.docNumber);
+    if (row.reference) existing.refSet.add(row.reference);
     map.set(k, existing);
   }
   return Array.from(map.entries())
-    .map(([label, v]) => ({ label, ...v }))
+    .map(([label, v]) => ({
+      label, count: v.count, qty: v.qty, netWt: v.netWt,
+      balNetWt: v.balNetWt, balNetWtMinusWastage: v.balNetWtMinusWastage,
+      docNums: [...v.docNumSet], refs: [...v.refSet],
+    }))
     .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function abbrev(arr: string[], max = 3): string {
+  if (arr.length === 0) return "—";
+  const shown = arr.slice(0, max).join(", ");
+  return arr.length > max ? `${shown} …` : shown;
 }
 
 function buildQueryString(f: Filters): string {
@@ -454,15 +485,15 @@ export default function ReportsPage() {
 
   function exportSummaryCSV() {
     const groupLabel = GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? groupBy;
-    const headers    = [groupLabel, "Rows", "Total Qty", "Total Net Wt", "Running Total"];
+    const headers    = [groupLabel, "Doc Number(s)", "Reference(s)", "Rows", "Total Qty", "Total Net Wt", "Running Total"];
     let bal = openingBalance;
     const data: (string | number)[][] = [
-      ["Opening Balance", "", "", "", fmt(openingBalance)],
+      ["Opening Balance", "", "", "", "", "", fmt(openingBalance)],
       ...sortedGrouped.map((r) => {
         bal += r.balNetWtMinusWastage;
-        return [r.label, r.count, fmt(r.qty), fmt(r.netWt), fmt(bal)];
+        return [r.label, r.docNums.join(", "), r.refs.join(", "), r.count, fmt(r.qty), fmt(r.netWt), fmt(bal)];
       }),
-      ["Total", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
+      ["Total", "", "", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
     ];
     downloadBlob(toCSV(headers, data), "report-summary.csv", "text/csv;charset=utf-8;");
   }
@@ -530,14 +561,14 @@ export default function ReportsPage() {
     let bal = openingBalance;
     autoTable(doc, {
       startY: 20,
-      head: [[groupLabel, "Rows", "Total Qty", "Total Net Wt", "Running Total"]],
+      head: [[groupLabel, "Doc Number(s)", "Reference(s)", "Rows", "Total Qty", "Total Net Wt", "Running Total"]],
       body: [
-        ["Opening Balance", "", "", "", fmt(openingBalance)],
+        ["Opening Balance", "", "", "", "", "", fmt(openingBalance)],
         ...sortedGrouped.map((r) => {
           bal += r.balNetWtMinusWastage;
-          return [r.label, r.count, fmt(r.qty), fmt(r.netWt), fmt(bal)];
+          return [r.label, r.docNums.join(", "), r.refs.join(", "), r.count, fmt(r.qty), fmt(r.netWt), fmt(bal)];
         }),
-        ["Total", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
+        ["Total", "", "", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
       ],
       styles: { fontSize: 9 },
       headStyles: { fillColor: [37, 99, 235] },
@@ -829,7 +860,7 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent className="px-4 pb-4 space-y-4">
             {/* Date / Period row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <div className="flex flex-col gap-1">
                 <Label className="text-xs text-muted-foreground">Date From</Label>
                 <Input type="date" className="h-8 text-sm" value={filters.dateFrom} onChange={(e) => set("dateFrom", e.target.value)} />
@@ -857,6 +888,14 @@ export default function ReportsPage() {
                     {MONTHS.map((m, i) => <SelectItem key={i + 1} value={(i + 1).toString()}>{m}</SelectItem>)}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs text-muted-foreground">Document Number</Label>
+                <Input className="h-8 text-sm" placeholder="Search doc number…" value={filters.docNumber} onChange={(e) => set("docNumber", e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-xs text-muted-foreground">Reference</Label>
+                <Input className="h-8 text-sm" placeholder="Search reference…" value={filters.reference} onChange={(e) => set("reference", e.target.value)} />
               </div>
             </div>
 
@@ -997,6 +1036,8 @@ export default function ReportsPage() {
                             sort={sortSummary}
                             onSort={handleSortSummary}
                           />
+                          <TableHead className="whitespace-nowrap">Doc Number(s)</TableHead>
+                          <TableHead className="whitespace-nowrap">Reference(s)</TableHead>
                           <SortHead label="Rows"          sortKey="count" sort={sortSummary} onSort={handleSortSummary} right />
                           <SortHead label="Total Qty"     sortKey="qty"   sort={sortSummary} onSort={handleSortSummary} right />
                           <SortHead label="Total Net Wt"  sortKey="netWt" sort={sortSummary} onSort={handleSortSummary} right />
@@ -1010,13 +1051,21 @@ export default function ReportsPage() {
                           <TableCell />
                           <TableCell />
                           <TableCell />
+                          <TableCell />
+                          <TableCell />
                           <TableCell className={`text-right whitespace-nowrap font-semibold not-italic ${openingBalance < 0 ? "text-red-600" : "text-blue-700"}`}>
                             {fmt(openingBalance)}
                           </TableCell>
                         </TableRow>
                         {sortedGrouped.map((r, i) => (
                           <TableRow key={r.label}>
-                            <TableCell className="font-medium">{r.label}</TableCell>
+                            <TableCell className="font-medium whitespace-nowrap">{r.label}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap max-w-[180px] truncate" title={r.docNums.join(", ")}>
+                              {abbrev(r.docNums)}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap max-w-[180px] truncate" title={r.refs.join(", ")}>
+                              {abbrev(r.refs)}
+                            </TableCell>
                             <TableCell className="text-right">{r.count}</TableCell>
                             <TableCell className="text-right">{fmt(r.qty)}</TableCell>
                             <TableCell className="text-right">{fmt(r.netWt)}</TableCell>
@@ -1027,6 +1076,8 @@ export default function ReportsPage() {
                         ))}
                         <TableRow className="bg-muted/50 font-semibold">
                           <TableCell>Total</TableCell>
+                          <TableCell />
+                          <TableCell />
                           <TableCell className="text-right">{rows.length}</TableCell>
                           <TableCell className="text-right">{fmt(totalQty)}</TableCell>
                           <TableCell className="text-right">{fmt(totalNetWt)}</TableCell>
