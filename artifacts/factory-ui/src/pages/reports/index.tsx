@@ -483,6 +483,19 @@ export default function ReportsPage() {
     return [headers, ...dataRows].map((row) => row.map(escape).join(",")).join("\r\n");
   }
 
+  function reportDateRange(): string {
+    const f = filters.dateFrom;
+    const t = filters.dateTo;
+    if (f && t) return `From ${f}  Till ${t}`;
+    if (f)      return `From ${f}`;
+    if (t)      return `Till ${t}`;
+    return "All Dates";
+  }
+
+  function csvHeading(): string {
+    return `TKT Textiles (Knitting)\r\n${reportDateRange()}\r\n`;
+  }
+
   function exportSummaryCSV() {
     const groupLabel = GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? groupBy;
     const headers    = [groupLabel, "Doc Number(s)", "Reference(s)", "Rows", "Total Qty", "Total Net Wt", "Running Total"];
@@ -495,7 +508,7 @@ export default function ReportsPage() {
       }),
       ["Total", "", "", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
     ];
-    downloadBlob(toCSV(headers, data), "report-summary.csv", "text/csv;charset=utf-8;");
+    downloadBlob(csvHeading() + toCSV(headers, data), "report-summary.csv", "text/csv;charset=utf-8;");
   }
 
   function exportDetailCSV() {
@@ -550,17 +563,23 @@ export default function ReportsPage() {
       : c.key === "wastageWt"? fmt(totalWastageWt)
       : ""
     );
-    downloadBlob(toCSV(headers, [obRow, ...bodyRows, grandRow]), "report-detail.csv", "text/csv;charset=utf-8;");
+    downloadBlob(csvHeading() + toCSV(headers, [obRow, ...bodyRows, grandRow]), "report-detail.csv", "text/csv;charset=utf-8;");
   }
 
   function exportSummaryPDF() {
     const doc        = new jsPDF({ orientation: "landscape" });
     const groupLabel = GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? groupBy;
-    doc.setFontSize(13);
-    doc.text(`Report Summary — grouped by ${groupLabel}`, 14, 14);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("TKT Textiles (Knitting)", 14, 14);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(reportDateRange(), 14, 22);
+    doc.setFontSize(10);
+    doc.text(`Summary — grouped by ${groupLabel}`, 14, 30);
     let bal = openingBalance;
     autoTable(doc, {
-      startY: 20,
+      startY: 36,
       head: [[groupLabel, "Doc Number(s)", "Reference(s)", "Rows", "Total Qty", "Total Net Wt", "Running Total"]],
       body: [
         ["Opening Balance", "", "", "", "", "", fmt(openingBalance)],
@@ -580,8 +599,14 @@ export default function ReportsPage() {
   function exportDetailPDF() {
     const doc     = new jsPDF({ orientation: "landscape" });
     const headers = visibleColsList.map((c) => c.label);
-    doc.setFontSize(13);
-    doc.text("Report — Detailed", 14, 14);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("TKT Textiles (Knitting)", 14, 14);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(reportDateRange(), 14, 22);
+    doc.setFontSize(10);
+    doc.text("Detailed Report", 14, 30);
     const obRow = visibleColsList.map((c, i) =>
       i === 0 ? "Opening Balance" : c.key === "runningBalance" ? fmt(openingBalance) : "—"
     );
@@ -633,7 +658,7 @@ export default function ReportsPage() {
       : "—"
     );
     autoTable(doc, {
-      startY: 20,
+      startY: 36,
       head: [headers],
       body: [obRow, ...bodyRows, grandRow],
       styles: { fontSize: 7 },
@@ -851,6 +876,12 @@ export default function ReportsPage() {
             <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
             <p className="text-sm text-muted-foreground">Apply filters and run the report to see detailed and summary data with charts.</p>
           </div>
+        </div>
+
+        {/* ── Report Heading ───────────────────────────────── */}
+        <div className="text-center py-2 print:py-4">
+          <h2 className="text-2xl font-bold tracking-tight">TKT Textiles (Knitting)</h2>
+          <p className="text-sm text-muted-foreground mt-1 print:text-black">{reportDateRange()}</p>
         </div>
 
         {/* ── Filter Panel ─────────────────────────────────── */}
