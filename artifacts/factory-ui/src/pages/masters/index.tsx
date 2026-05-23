@@ -386,6 +386,7 @@ export default function MastersPage() {
               description="Types of yarn used in production (e.g. Cotton, Polyester)."
               fields={[
                 { key: "name", label: "Name", placeholder: "e.g. Cotton" },
+                { key: "makeRate", label: "Make Rate", placeholder: "e.g. 12.50", type: "number", step: "any" },
                 { key: "code", label: "Code", placeholder: "e.g. COT" },
               ]}
               rows={yarnTypes as never}

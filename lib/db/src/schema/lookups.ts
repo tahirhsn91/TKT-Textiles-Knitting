@@ -55,6 +55,7 @@ export type LocationMaster = typeof locationMasterTable.$inferSelect;
 export const yarnTypeMasterTable = pgTable("yarn_type_master", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  makeRate: numeric("make_rate"),
   code: text("code").notNull().unique(),
 });
 export const insertYarnTypeMasterSchema = createInsertSchema(yarnTypeMasterTable).omit({ id: true });
