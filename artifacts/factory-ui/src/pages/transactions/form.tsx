@@ -664,7 +664,9 @@ export default function TransactionForm() {
                                   <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
                                     {yarnCountMaster?.map(y => (
-                                      <SelectItem key={y.id} value={y.id.toString()}>{y.name}</SelectItem>
+                                      <SelectItem key={y.id} value={y.id.toString()}>
+                                        {y.name === y.count ? y.name : `${y.name} (${y.count})`}
+                                      </SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
