@@ -1,0 +1,982 @@
+{
+  "id": "e237c66f-5e9d-4e78-b5f2-23fa5dbb18fc",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.fabric_type_master": {
+      "name": "fabric_type_master",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "fabric_type_master_code_unique": {
+          "name": "fabric_type_master_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.job_master": {
+      "name": "job_master",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "party_id": {
+          "name": "party_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "job_master_party_code_unique": {
+          "name": "job_master_party_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "party_id",
+            "code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.location_master": {
+      "name": "location_master",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "location_master_code_unique": {
+          "name": "location_master_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.machine_master": {
+      "name": "machine_master",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "machine_number": {
+          "name": "machine_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "machine_master_machine_number_unique": {
+          "name": "machine_master_machine_number_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "machine_number"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.machine_operator_master": {
+      "name": "machine_operator_master",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "machine_operator_master_code_unique": {
+          "name": "machine_operator_master_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.operator_advances": {
+      "name": "operator_advances",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "operator_id": {
+          "name": "operator_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "operator_advances_operator_id_machine_operator_master_id_fk": {
+          "name": "operator_advances_operator_id_machine_operator_master_id_fk",
+          "tableFrom": "operator_advances",
+          "tableTo": "machine_operator_master",
+          "columnsFrom": [
+            "operator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.operator_salary_records": {
+      "name": "operator_salary_records",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "operator_id": {
+          "name": "operator_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base_wage": {
+          "name": "base_wage",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "commission": {
+          "name": "commission",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "final_salary": {
+          "name": "final_salary",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "operator_salary_records_operator_id_machine_operator_master_id_fk": {
+          "name": "operator_salary_records_operator_id_machine_operator_master_id_fk",
+          "tableFrom": "operator_salary_records",
+          "tableTo": "machine_operator_master",
+          "columnsFrom": [
+            "operator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "operator_salary_records_operator_id_date_unique": {
+          "name": "operator_salary_records_operator_id_date_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "operator_id",
+            "date"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.operator_salary_settings": {
+      "name": "operator_salary_settings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "operator_id": {
+          "name": "operator_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base_daily_wage": {
+          "name": "base_daily_wage",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "operator_salary_settings_operator_id_machine_operator_master_id_fk": {
+          "name": "operator_salary_settings_operator_id_machine_operator_master_id_fk",
+          "tableFrom": "operator_salary_settings",
+          "tableTo": "machine_operator_master",
+          "columnsFrom": [
+            "operator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "operator_salary_settings_operator_id_unique": {
+          "name": "operator_salary_settings_operator_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "operator_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.party_master": {
+      "name": "party_master",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "waste_percent": {
+          "name": "waste_percent",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'1.00'"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "party_master_code_unique": {
+          "name": "party_master_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.transaction_type_master": {
+      "name": "transaction_type_master",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "transaction_type_master_code_unique": {
+          "name": "transaction_type_master_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.uom_master": {
+      "name": "uom_master",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "abbreviation": {
+          "name": "abbreviation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "uom_master_abbreviation_unique": {
+          "name": "uom_master_abbreviation_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "abbreviation"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.yarn_brand_master": {
+      "name": "yarn_brand_master",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "yarn_brand_master_code_unique": {
+          "name": "yarn_brand_master_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.yarn_count_master": {
+      "name": "yarn_count_master",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "count": {
+          "name": "count",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "yarn_count_master_count_unique": {
+          "name": "yarn_count_master_count_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "count"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.yarn_type_master": {
+      "name": "yarn_type_master",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "make_rate": {
+          "name": "make_rate",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "yarn_type_master_code_unique": {
+          "name": "yarn_type_master_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.transaction_detail": {
+      "name": "transaction_detail",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "header_id": {
+          "name": "header_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "machine_id": {
+          "name": "machine_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "machine_operator_id": {
+          "name": "machine_operator_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "yarn_type_id": {
+          "name": "yarn_type_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "yarn_count_id": {
+          "name": "yarn_count_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "yarn_brand_id": {
+          "name": "yarn_brand_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "uom_id": {
+          "name": "uom_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "numeric(12, 3)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "net_wt": {
+          "name": "net_wt",
+          "type": "numeric(12, 3)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "transaction_detail_header_id_transaction_header_id_fk": {
+          "name": "transaction_detail_header_id_transaction_header_id_fk",
+          "tableFrom": "transaction_detail",
+          "tableTo": "transaction_header",
+          "columnsFrom": [
+            "header_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "transaction_detail_machine_id_machine_master_id_fk": {
+          "name": "transaction_detail_machine_id_machine_master_id_fk",
+          "tableFrom": "transaction_detail",
+          "tableTo": "machine_master",
+          "columnsFrom": [
+            "machine_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transaction_detail_machine_operator_id_machine_operator_master_id_fk": {
+          "name": "transaction_detail_machine_operator_id_machine_operator_master_id_fk",
+          "tableFrom": "transaction_detail",
+          "tableTo": "machine_operator_master",
+          "columnsFrom": [
+            "machine_operator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transaction_detail_yarn_type_id_yarn_type_master_id_fk": {
+          "name": "transaction_detail_yarn_type_id_yarn_type_master_id_fk",
+          "tableFrom": "transaction_detail",
+          "tableTo": "yarn_type_master",
+          "columnsFrom": [
+            "yarn_type_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transaction_detail_yarn_count_id_yarn_count_master_id_fk": {
+          "name": "transaction_detail_yarn_count_id_yarn_count_master_id_fk",
+          "tableFrom": "transaction_detail",
+          "tableTo": "yarn_count_master",
+          "columnsFrom": [
+            "yarn_count_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transaction_detail_yarn_brand_id_yarn_brand_master_id_fk": {
+          "name": "transaction_detail_yarn_brand_id_yarn_brand_master_id_fk",
+          "tableFrom": "transaction_detail",
+          "tableTo": "yarn_brand_master",
+          "columnsFrom": [
+            "yarn_brand_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transaction_detail_uom_id_uom_master_id_fk": {
+          "name": "transaction_detail_uom_id_uom_master_id_fk",
+          "tableFrom": "transaction_detail",
+          "tableTo": "uom_master",
+          "columnsFrom": [
+            "uom_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.transaction_header": {
+      "name": "transaction_header",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "transaction_type_id": {
+          "name": "transaction_type_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "doc_number": {
+          "name": "doc_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "job_id": {
+          "name": "job_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "party_id": {
+          "name": "party_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "location_id": {
+          "name": "location_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fabric_type_id": {
+          "name": "fabric_type_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sl": {
+          "name": "sl",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gsm": {
+          "name": "gsm",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reference": {
+          "name": "reference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "transaction_header_transaction_type_id_transaction_type_master_id_fk": {
+          "name": "transaction_header_transaction_type_id_transaction_type_master_id_fk",
+          "tableFrom": "transaction_header",
+          "tableTo": "transaction_type_master",
+          "columnsFrom": [
+            "transaction_type_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transaction_header_job_id_job_master_id_fk": {
+          "name": "transaction_header_job_id_job_master_id_fk",
+          "tableFrom": "transaction_header",
+          "tableTo": "job_master",
+          "columnsFrom": [
+            "job_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transaction_header_party_id_party_master_id_fk": {
+          "name": "transaction_header_party_id_party_master_id_fk",
+          "tableFrom": "transaction_header",
+          "tableTo": "party_master",
+          "columnsFrom": [
+            "party_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transaction_header_location_id_location_master_id_fk": {
+          "name": "transaction_header_location_id_location_master_id_fk",
+          "tableFrom": "transaction_header",
+          "tableTo": "location_master",
+          "columnsFrom": [
+            "location_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transaction_header_fabric_type_id_fabric_type_master_id_fk": {
+          "name": "transaction_header_fabric_type_id_fabric_type_master_id_fk",
+          "tableFrom": "transaction_header",
+          "tableTo": "fabric_type_master",
+          "columnsFrom": [
+            "fabric_type_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
