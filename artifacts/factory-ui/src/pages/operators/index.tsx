@@ -1,129 +1,200 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { Trash2, Save, Download, Pencil, Check, X } from "lucide-react";
 import { Layout } from "@/components/layout";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Check, X, Pencil, Trash2, Plus, FileDown, Save } from "lucide-react";
 
-const BASE = import.meta.env.BASE_URL;
-const api = (path: string) => `${BASE}api/${path}`;
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const MONTHS = [
-  { value: "1", label: "January" }, { value: "2", label: "February" },
-  { value: "3", label: "March" },   { value: "4", label: "April" },
-  { value: "5", label: "May" },     { value: "6", label: "June" },
-  { value: "7", label: "July" },    { value: "8", label: "August" },
-  { value: "9", label: "September" },{ value: "10", label: "October" },
-  { value: "11", label: "November" },{ value: "12", label: "December" },
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ];
-const NOW = new Date();
-const YEARS = Array.from({ length: 5 }, (_, i) => String(NOW.getFullYear() - 2 + i));
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-function fmt2(n: number) { return String(n).padStart(2, "0"); }
-function fmtNum(v: string | number | null | undefined) {
-  const n = parseFloat(String(v ?? "0"));
-  return isNaN(n) ? "0.00" : n.toFixed(2);
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 2 + i);
+
+function toNum(v: string | number | null | undefined): number {
+  const n = parseFloat(String(v ?? ""));
+  return isNaN(n) ? 0 : n;
 }
 
-function daysInMonth(year: number, month: number) {
-  return new Date(year, month, 0).getDate();
+function fmtMoney(n: number) {
+  return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-type Operator = { id: number; name: string; code: string };
-type SalarySetting = {
-  id: number; operatorId: number; baseDailyWage: string;
-  operatorName: string; operatorCode: string;
-};
-type SalaryRecord = {
-  id: number; operatorId: number; date: string;
-  baseWage: string; commission: string; finalSalary: string;
-};
-type Advance = {
-  id: number; operatorId: number; date: string;
-  amount: string; notes: string | null;
-};
-type PayrollSummaryRow = {
-  operatorId: number; operatorName: string; operatorCode: string;
-  daysRecorded: string; totalBaseWage: string; totalCommission: string;
-  totalSalary: string; totalAdvances: string; netPayable: string;
-  baseDailyWage: string;
-};
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr + "T00:00:00");
+  const day = String(d.getDate()).padStart(2, "0");
+  const mon = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
+  return `${day}/${mon}/${d.getFullYear()}`;
+}
+
+function getDayName(dateStr: string) {
+  const d = new Date(dateStr + "T00:00:00");
+  return ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][d.getDay()];
+}
+
+function getDaysInMonth(year: number, month: number): string[] {
+  const count = new Date(year, month, 0).getDate();
+  return Array.from({ length: count }, (_, i) => {
+    const d = i + 1;
+    return `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  });
+}
+
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface Operator {
+  operatorId: number;
+  operatorName: string;
+  operatorCode: string;
+  baseDailyWage: string | null;
+}
+
+interface SalaryRecord {
+  id: number;
+  operatorId: number;
+  date: string;
+  baseWage: string | null;
+  commission: string | null;
+  finalSalary: string | null;
+}
+
+interface Advance {
+  id: number;
+  operatorId: number;
+  operatorName: string;
+  date: string;
+  amount: string;
+  notes: string | null;
+}
+
+interface PayrollSummaryItem {
+  operatorId: number;
+  operatorName: string;
+  operatorCode: string;
+  totalDaysWorked: number;
+  totalSalary: number;
+  totalAdvances: number;
+  netPayable: number;
+  records: SalaryRecord[];
+  advances: Advance[];
+}
+
+// ─── API fetch helper ─────────────────────────────────────────────────────────
+
+async function apiFetch(path: string, opts?: RequestInit) {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...opts,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || body.message || `HTTP ${res.status}`);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
 
 // ─── Salary Settings Tab ─────────────────────────────────────────────────────
-function SalarySettingsTab({ operators }: { operators: Operator[] }) {
+
+function SalarySettingsTab() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editWage, setEditWage] = useState("");
+  const [editValue, setEditValue] = useState("");
 
-  const { data: settings = [], isLoading } = useQuery<SalarySetting[]>({
-    queryKey: ["operators/salary-settings"],
-    queryFn: () => fetch(api("operators/salary-settings")).then((r) => r.json()),
+  const { data: operators = [], isLoading } = useQuery<Operator[]>({
+    queryKey: ["operators-salary-settings"],
+    queryFn: () => apiFetch("/api/operators/salary-settings"),
   });
-
-  const settingsMap = useMemo(
-    () => new Map(settings.map((s) => [s.operatorId, s])),
-    [settings],
-  );
 
   const saveMutation = useMutation({
-    mutationFn: (body: { operatorId: number; baseDailyWage: string }) =>
-      fetch(api("operators/salary-settings"), {
+    mutationFn: ({ operatorId, baseDailyWage }: { operatorId: number; baseDailyWage: number }) =>
+      apiFetch("/api/operators/salary-settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }).then((r) => r.json()),
+        body: JSON.stringify({ operatorId, baseDailyWage }),
+      }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["operators/salary-settings"] });
+      qc.invalidateQueries({ queryKey: ["operators-salary-settings"] });
       setEditingId(null);
-      toast({ title: "Salary setting saved" });
+      toast({ title: "Saved", description: "Base daily wage updated." });
     },
-    onError: () => toast({ title: "Failed to save", variant: "destructive" }),
+    onError: (e: Error) => toast({ variant: "destructive", title: "Error", description: e.message }),
   });
 
-  const handleSave = (opId: number) => {
-    const wage = parseFloat(editWage);
-    if (isNaN(wage) || wage < 0) {
-      toast({ title: "Enter a valid wage", variant: "destructive" });
+  function startEdit(op: Operator) {
+    setEditingId(op.operatorId);
+    setEditValue(op.baseDailyWage ? String(parseFloat(op.baseDailyWage)) : "0");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditValue("");
+  }
+
+  function handleSave(op: Operator) {
+    const val = parseFloat(editValue);
+    if (isNaN(val) || val < 0) {
+      toast({ variant: "destructive", title: "Invalid", description: "Wage must be ≥ 0." });
       return;
     }
-    saveMutation.mutate({ operatorId: opId, baseDailyWage: editWage });
-  };
-
-  const startEdit = (op: Operator) => {
-    const s = settingsMap.get(op.id);
-    setEditingId(op.id);
-    setEditWage(s ? fmtNum(s.baseDailyWage) : "0.00");
-  };
+    saveMutation.mutate({ operatorId: op.operatorId, baseDailyWage: val });
+  }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Salary Settings</h2>
-        <p className="text-muted-foreground text-sm mt-0.5">Set base daily wage per operator.</p>
-      </div>
-      <div className="rounded-md border bg-card">
+    <Card>
+      <CardHeader>
+        <CardTitle>Salary Settings</CardTitle>
+        <p className="text-sm text-muted-foreground">Set the base daily wage for each operator.</p>
+      </CardHeader>
+      <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Operator</TableHead>
               <TableHead>Code</TableHead>
-              <TableHead className="w-40">Base Daily Wage (₹)</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead className="text-right">Base Daily Wage (₹)</TableHead>
               <TableHead className="w-24 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -133,56 +204,49 @@ function SalarySettingsTab({ operators }: { operators: Operator[] }) {
                 {[1,2,3,4].map((c) => <TableCell key={c}><Skeleton className="h-5 w-full" /></TableCell>)}
               </TableRow>
             ))}
-            {!isLoading && operators.map((op) => {
-              const s = settingsMap.get(op.id);
-              const editing = editingId === op.id;
-              return (
-                <TableRow key={op.id}>
-                  <TableCell className="font-medium">{op.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{op.code}</TableCell>
-                  <TableCell>
-                    {editing ? (
-                      <Input
-                        className="h-8 text-sm w-32"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={editWage}
-                        onChange={(e) => setEditWage(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleSave(op.id);
-                          if (e.key === "Escape") setEditingId(null);
-                        }}
-                        autoFocus
-                      />
-                    ) : (
-                      <span className={s ? "font-mono" : "text-muted-foreground"}>
-                        {s ? `₹ ${fmtNum(s.baseDailyWage)}` : "—"}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {editing ? (
-                      <div className="flex justify-end gap-1">
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600"
-                          onClick={() => handleSave(op.id)} disabled={saveMutation.isPending}>
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8"
-                          onClick={() => setEditingId(null)}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground"
-                        onClick={() => startEdit(op)}>
-                        <Pencil className="h-4 w-4" />
+            {!isLoading && operators.map((op) => (
+              <TableRow key={op.operatorId}>
+                <TableCell className="font-mono text-sm">{op.operatorCode}</TableCell>
+                <TableCell className="font-medium">{op.operatorName}</TableCell>
+                <TableCell className="text-right">
+                  {editingId === op.operatorId ? (
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="w-32 ml-auto text-right h-8"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleSave(op); if (e.key === "Escape") cancelEdit(); }}
+                      autoFocus
+                    />
+                  ) : (
+                    <span className={op.baseDailyWage ? "font-mono" : "text-muted-foreground"}>
+                      {op.baseDailyWage ? `₹ ${fmtMoney(toNum(op.baseDailyWage))}` : "—"}
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  {editingId === op.operatorId ? (
+                    <div className="flex justify-end gap-1">
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600"
+                        onClick={() => handleSave(op)} disabled={saveMutation.isPending}>
+                        <Check className="h-4 w-4" />
                       </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+                      <Button size="icon" variant="ghost" className="h-8 w-8"
+                        onClick={cancelEdit}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground"
+                      onClick={() => startEdit(op)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
             {!isLoading && operators.length === 0 && (
               <TableRow>
                 <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
@@ -192,634 +256,626 @@ function SalarySettingsTab({ operators }: { operators: Operator[] }) {
             )}
           </TableBody>
         </Table>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
 // ─── Salary Records Tab ───────────────────────────────────────────────────────
-function SalaryRecordsTab({ operators }: { operators: Operator[] }) {
+
+function SalaryRecordsTab() {
   const { toast } = useToast();
-  const [operatorId, setOperatorId] = useState<string>("");
-  const [month, setMonth] = useState(String(NOW.getMonth() + 1));
-  const [year, setYear] = useState(String(NOW.getFullYear()));
+  const qc = useQueryClient();
+  const [selectedOperator, setSelectedOperator] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState(String(new Date().getMonth() + 1));
+  const [selectedYear, setSelectedYear] = useState(String(CURRENT_YEAR));
   const [commissions, setCommissions] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
 
-  const { data: settings = [] } = useQuery<SalarySetting[]>({
-    queryKey: ["operators/salary-settings"],
-    queryFn: () => fetch(api("operators/salary-settings")).then((r) => r.json()),
-  });
-  const settingsMap = useMemo(
-    () => new Map(settings.map((s) => [s.operatorId, s])),
-    [settings],
-  );
-
-  const ready = !!operatorId && !!month && !!year;
-
-  const { data: records = [], isLoading: recordsLoading, refetch } = useQuery<SalaryRecord[]>({
-    queryKey: ["operators/salary-records", operatorId, month, year],
-    queryFn: () =>
-      fetch(api(`operators/salary-records?operatorId=${operatorId}&month=${month}&year=${year}`))
-        .then((r) => r.json()),
-    enabled: ready,
-    select: (rows) => {
-      const map: Record<string, string> = {};
-      rows.forEach((r) => { map[r.date] = r.commission; });
-      setCommissions((prev) => ({ ...map, ...prev }));
-      return rows;
-    },
+  const { data: operators = [] } = useQuery<Operator[]>({
+    queryKey: ["operators-salary-settings"],
+    queryFn: () => apiFetch("/api/operators/salary-settings"),
   });
 
-  const recordsMap = useMemo(
-    () => new Map(records.map((r) => [r.date, r])),
-    [records],
-  );
+  const selectedOp = operators.find((o) => String(o.operatorId) === selectedOperator);
+  const baseWage = toNum(selectedOp?.baseDailyWage);
+
+  const enabled = !!(selectedOperator && selectedMonth && selectedYear);
+
+  const { data: records, isLoading: recordsLoading } = useQuery<SalaryRecord[]>({
+    queryKey: ["salary-records", selectedOperator, selectedMonth, selectedYear],
+    queryFn: () => apiFetch(`/api/operators/salary-records?operatorId=${selectedOperator}&month=${selectedMonth}&year=${selectedYear}`),
+    enabled,
+  });
+
+  useEffect(() => {
+    const map: Record<string, string> = {};
+    for (const r of records ?? []) {
+      if (r.commission !== null) map[r.date] = String(parseFloat(r.commission));
+    }
+    setCommissions(map);
+  }, [records]);
 
   const days = useMemo(() => {
-    if (!ready) return [];
-    const count = daysInMonth(parseInt(year), parseInt(month));
-    return Array.from({ length: count }, (_, i) => {
-      const d = i + 1;
-      const dateStr = `${year}-${fmt2(parseInt(month))}-${fmt2(d)}`;
-      const dayName = DAY_NAMES[new Date(parseInt(year), parseInt(month) - 1, d).getDay()];
-      return { date: dateStr, dayName, day: d };
-    });
-  }, [ready, year, month]);
+    if (!enabled) return [];
+    return getDaysInMonth(parseInt(selectedYear), parseInt(selectedMonth));
+  }, [enabled, selectedYear, selectedMonth]);
 
-  const baseWage = operatorId
-    ? fmtNum(settingsMap.get(parseInt(operatorId))?.baseDailyWage ?? "0")
-    : "0.00";
+  const bulkMutation = useMutation({
+    mutationFn: (entries: { operatorId: number; date: string; commission: number }[]) =>
+      apiFetch("/api/operators/salary-records/bulk", { method: "POST", body: JSON.stringify(entries) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["salary-records", selectedOperator, selectedMonth, selectedYear] });
+      toast({ title: "Saved", description: "Salary records saved successfully." });
+    },
+    onError: (e: Error) => toast({ variant: "destructive", title: "Error", description: e.message }),
+  });
 
-  const handleSave = async () => {
-    if (!operatorId) return;
-    setSaving(true);
-    try {
-      const rowsToSave = days.map(({ date }) => {
-        const comm = parseFloat(commissions[date] ?? "0") || 0;
-        const base = parseFloat(baseWage);
-        const final = base + comm;
-        return {
-          date,
-          baseWage: baseWage,
-          commission: comm.toFixed(2),
-          finalSalary: final.toFixed(2),
-        };
-      });
-      const resp = await fetch(api("operators/salary-records/bulk"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ operatorId: parseInt(operatorId), records: rowsToSave }),
-      });
-      if (!resp.ok) throw new Error("Failed");
-      await refetch();
-      toast({ title: "Salary records saved" });
-    } catch {
-      toast({ title: "Failed to save records", variant: "destructive" });
-    } finally {
-      setSaving(false);
+  function handleSave() {
+    const entries = Object.entries(commissions)
+      .filter(([, v]) => v !== "" && v !== undefined)
+      .map(([date, v]) => ({
+        operatorId: parseInt(selectedOperator),
+        date,
+        commission: parseFloat(v) || 0,
+      }))
+      .filter((e) => e.commission >= 0);
+    if (entries.length === 0) {
+      toast({ variant: "destructive", title: "Nothing to save", description: "Enter at least one commission value." });
+      return;
     }
-  };
-
-  const totals = useMemo(() => {
-    let totalBase = 0, totalComm = 0, totalFinal = 0;
-    days.forEach(({ date }) => {
-      const base = parseFloat(baseWage);
-      const comm = parseFloat(commissions[date] ?? "0") || 0;
-      totalBase += base;
-      totalComm += comm;
-      totalFinal += base + comm;
-    });
-    return { totalBase, totalComm, totalFinal };
-  }, [days, baseWage, commissions]);
+    bulkMutation.mutate(entries);
+  }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Salary Records</h2>
-          <p className="text-muted-foreground text-sm mt-0.5">Enter daily commissions for each operator.</p>
+    <Card>
+      <CardHeader>
+        <CardTitle>Salary Records</CardTitle>
+        <p className="text-sm text-muted-foreground">Select an operator and month to enter daily commission/production amounts.</p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap gap-4">
+          <div className="flex flex-col gap-1">
+            <Label>Operator</Label>
+            <Select value={selectedOperator} onValueChange={setSelectedOperator}>
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder="Select operator" />
+              </SelectTrigger>
+              <SelectContent>
+                {operators.map((op) => (
+                  <SelectItem key={op.operatorId} value={String(op.operatorId)}>{op.operatorName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label>Month</Label>
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS.map((m, i) => (
+                  <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label>Year</Label>
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="w-28">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {YEARS.map((y) => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        {ready && (
-          <Button onClick={handleSave} disabled={saving} size="sm">
-            <Save className="mr-2 h-4 w-4" />
-            {saving ? "Saving…" : "Save All"}
-          </Button>
+
+        {!enabled && (
+          <p className="text-muted-foreground text-sm">Select an operator and month to view the grid.</p>
         )}
-      </div>
 
-      <div className="flex gap-3 flex-wrap">
-        <Select value={operatorId} onValueChange={(v) => { setOperatorId(v); setCommissions({}); }}>
-          <SelectTrigger className="w-52">
-            <SelectValue placeholder="Select operator" />
-          </SelectTrigger>
-          <SelectContent>
-            {operators.map((op) => (
-              <SelectItem key={op.id} value={String(op.id)}>{op.name} ({op.code})</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={month} onValueChange={setMonth}>
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder="Month" />
-          </SelectTrigger>
-          <SelectContent>
-            {MONTHS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={year} onValueChange={setYear}>
-          <SelectTrigger className="w-24">
-            <SelectValue placeholder="Year" />
-          </SelectTrigger>
-          <SelectContent>
-            {YEARS.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {!ready && (
-        <p className="text-muted-foreground text-sm py-8 text-center">
-          Select an operator and month to enter salary records.
-        </p>
-      )}
-
-      {ready && (
-        <div className="rounded-md border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-28">Date</TableHead>
-                <TableHead className="w-16">Day</TableHead>
-                <TableHead className="w-32 text-right">Base Wage (₹)</TableHead>
-                <TableHead className="w-40 text-right">Commission (₹)</TableHead>
-                <TableHead className="text-right">Final Salary (₹)</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recordsLoading && Array.from({ length: 7 }).map((_, i) => (
-                <TableRow key={i}>
-                  {[1,2,3,4,5].map((c) => <TableCell key={c}><Skeleton className="h-5 w-full" /></TableCell>)}
-                </TableRow>
-              ))}
-              {!recordsLoading && days.map(({ date, dayName }) => {
-                const comm = parseFloat(commissions[date] ?? recordsMap.get(date)?.commission ?? "0") || 0;
-                const base = parseFloat(baseWage);
-                const final = base + comm;
-                const isSunday = new Date(date).getDay() === 0;
-                return (
-                  <TableRow key={date} className={isSunday ? "bg-muted/30" : undefined}>
-                    <TableCell className="font-mono text-sm">{date}</TableCell>
-                    <TableCell className={`text-sm ${isSunday ? "text-red-500 font-medium" : "text-muted-foreground"}`}>{dayName}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">₹ {baseWage}</TableCell>
-                    <TableCell className="text-right">
-                      <Input
-                        className="h-7 text-sm text-right w-28 ml-auto font-mono"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={commissions[date] ?? (recordsMap.get(date)?.commission ?? "")}
-                        onChange={(e) => setCommissions((prev) => ({ ...prev, [date]: e.target.value }))}
-                        placeholder="0"
-                      />
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-sm font-medium">
-                      ₹ {final.toFixed(2)}
-                    </TableCell>
+        {enabled && (
+          <>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Day</TableHead>
+                    <TableHead className="text-right">Base Wage (₹)</TableHead>
+                    <TableHead className="text-right">Commission / Production (₹)</TableHead>
+                    <TableHead className="text-right">Final Amount (₹)</TableHead>
                   </TableRow>
-                );
-              })}
-              {!recordsLoading && (
-                <TableRow className="bg-muted/50 font-semibold">
-                  <TableCell colSpan={2} className="text-right text-sm">Total</TableCell>
-                  <TableCell className="text-right font-mono text-sm">₹ {totals.totalBase.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-mono text-sm">₹ {totals.totalComm.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-mono text-sm">₹ {totals.totalFinal.toFixed(2)}</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-    </div>
+                </TableHeader>
+                <TableBody>
+                  {recordsLoading && Array.from({ length: 7 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {[1,2,3,4,5].map((c) => <TableCell key={c}><Skeleton className="h-5 w-full" /></TableCell>)}
+                    </TableRow>
+                  ))}
+                  {!recordsLoading && days.map((date) => {
+                    const commStr = commissions[date] ?? "";
+                    const commVal = commStr !== "" ? parseFloat(commStr) : 0;
+                    const finalAmt = Math.max(baseWage, isNaN(commVal) ? 0 : commVal);
+                    return (
+                      <TableRow key={date}>
+                        <TableCell className="font-mono text-sm whitespace-nowrap">{formatDate(date)}</TableCell>
+                        <TableCell className="text-sm">{getDayName(date)}</TableCell>
+                        <TableCell className="text-right text-sm">{fmtMoney(baseWage)}</TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            className="w-32 ml-auto text-right h-8"
+                            value={commissions[date] ?? ""}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setCommissions((prev) => {
+                                if (v === "") {
+                                  const next = { ...prev };
+                                  delete next[date];
+                                  return next;
+                                }
+                                return { ...prev, [date]: v };
+                              });
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {commStr !== "" ? fmtMoney(finalAmt) : "—"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex justify-end pt-2">
+              <Button onClick={handleSave} disabled={bulkMutation.isPending} className="gap-2">
+                <Save className="h-4 w-4" />
+                {bulkMutation.isPending ? "Saving…" : "Save Records"}
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
 // ─── Advances Tab ─────────────────────────────────────────────────────────────
-function AdvancesTab({ operators }: { operators: Operator[] }) {
+
+function AdvancesTab() {
   const { toast } = useToast();
-  const [operatorId, setOperatorId] = useState<string>("");
-  const [month, setMonth] = useState(String(NOW.getMonth() + 1));
-  const [year, setYear] = useState(String(NOW.getFullYear()));
-  const [newDate, setNewDate] = useState(new Date().toISOString().slice(0, 10));
-  const [newAmount, setNewAmount] = useState("");
-  const [newNotes, setNewNotes] = useState("");
-  const [adding, setAdding] = useState(false);
+  const qc = useQueryClient();
 
-  const ready = !!operatorId;
+  const [form, setForm] = useState({ operatorId: "", date: todayStr(), amount: "", notes: "" });
+  const [filterOp, setFilterOp] = useState("__all__");
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
 
-  const { data: advances = [], isLoading, refetch } = useQuery<Advance[]>({
-    queryKey: ["operators/advances", operatorId, month, year],
-    queryFn: () =>
-      fetch(api(`operators/advances?operatorId=${operatorId}&month=${month}&year=${year}`))
-        .then((r) => r.json()),
-    enabled: ready,
+  const { data: operators = [] } = useQuery<Operator[]>({
+    queryKey: ["operators-salary-settings"],
+    queryFn: () => apiFetch("/api/operators/salary-settings"),
   });
 
-  const total = useMemo(
-    () => advances.reduce((s, a) => s + parseFloat(a.amount), 0),
-    [advances],
-  );
+  const advanceParams = new URLSearchParams();
+  if (filterOp !== "__all__") advanceParams.set("operatorId", filterOp);
+  if (filterFrom) advanceParams.set("dateFrom", filterFrom);
+  if (filterTo) advanceParams.set("dateTo", filterTo);
 
-  const handleAdd = async () => {
-    if (!newAmount || parseFloat(newAmount) <= 0) {
-      toast({ title: "Enter a valid amount", variant: "destructive" }); return;
-    }
-    setAdding(true);
-    try {
-      const resp = await fetch(api("operators/advances"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ operatorId: parseInt(operatorId), date: newDate, amount: newAmount, notes: newNotes }),
-      });
-      if (!resp.ok) throw new Error();
-      await refetch();
-      setNewAmount("");
-      setNewNotes("");
-      toast({ title: "Advance added" });
-    } catch {
-      toast({ title: "Failed to add advance", variant: "destructive" });
-    } finally {
-      setAdding(false);
-    }
-  };
+  const { data: advances = [], isLoading } = useQuery<Advance[]>({
+    queryKey: ["operator-advances", filterOp, filterFrom, filterTo],
+    queryFn: () => apiFetch(`/api/operators/advances?${advanceParams.toString()}`),
+  });
 
-  const handleDelete = async (id: number) => {
-    try {
-      const resp = await fetch(api(`operators/advances/${id}`), { method: "DELETE" });
-      if (!resp.ok && resp.status !== 204) throw new Error();
-      await refetch();
-      toast({ title: "Advance deleted" });
-    } catch {
-      toast({ title: "Failed to delete", variant: "destructive" });
+  const addMutation = useMutation({
+    mutationFn: (data: object) => apiFetch("/api/operators/advances", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["operator-advances"] });
+      setForm({ operatorId: "", date: todayStr(), amount: "", notes: "" });
+      toast({ title: "Advance recorded." });
+    },
+    onError: (e: Error) => toast({ variant: "destructive", title: "Error", description: e.message }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiFetch(`/api/operators/advances/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["operator-advances"] });
+      toast({ title: "Advance deleted." });
+    },
+    onError: (e: Error) => toast({ variant: "destructive", title: "Error", description: e.message }),
+  });
+
+  function handleAdd() {
+    if (!form.operatorId || !form.date || form.amount === "") {
+      toast({ variant: "destructive", title: "Validation", description: "Operator, date, and amount are required." });
+      return;
     }
-  };
+    const amt = parseFloat(form.amount);
+    if (isNaN(amt) || amt < 0) {
+      toast({ variant: "destructive", title: "Validation", description: "Amount must be ≥ 0." });
+      return;
+    }
+    addMutation.mutate({ operatorId: parseInt(form.operatorId), date: form.date, amount: amt, notes: form.notes || null });
+  }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Advances</h2>
-        <p className="text-muted-foreground text-sm mt-0.5">Track advance payments to operators.</p>
-      </div>
-
-      <div className="flex gap-3 flex-wrap">
-        <Select value={operatorId} onValueChange={setOperatorId}>
-          <SelectTrigger className="w-52">
-            <SelectValue placeholder="Select operator" />
-          </SelectTrigger>
-          <SelectContent>
-            {operators.map((op) => (
-              <SelectItem key={op.id} value={String(op.id)}>{op.name} ({op.code})</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={month} onValueChange={setMonth}>
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder="Month" />
-          </SelectTrigger>
-          <SelectContent>
-            {MONTHS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={year} onValueChange={setYear}>
-          <SelectTrigger className="w-24">
-            <SelectValue placeholder="Year" />
-          </SelectTrigger>
-          <SelectContent>
-            {YEARS.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {!ready && (
-        <p className="text-muted-foreground text-sm py-8 text-center">Select an operator to view advances.</p>
-      )}
-
-      {ready && (
-        <>
-          <div className="rounded-md border bg-card p-4 flex gap-3 flex-wrap items-end">
+    <div className="space-y-6">
+      <Card>
+        <CardHeader><CardTitle>Add Advance</CardTitle></CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4 items-end">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground">Date</label>
-              <Input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} className="h-8 w-40 text-sm" />
+              <Label>Operator</Label>
+              <Select value={form.operatorId} onValueChange={(v) => setForm((p) => ({ ...p, operatorId: v }))}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Select operator" />
+                </SelectTrigger>
+                <SelectContent>
+                  {operators.map((op) => (
+                    <SelectItem key={op.operatorId} value={String(op.operatorId)}>{op.operatorName}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground">Amount (₹)</label>
-              <Input type="number" step="0.01" min="0" value={newAmount}
-                onChange={(e) => setNewAmount(e.target.value)}
-                placeholder="0.00" className="h-8 w-32 text-sm font-mono" />
+              <Label>Date</Label>
+              <Input type="date" className="w-40" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label>Amount (₹)</Label>
+              <Input type="number" min="0" step="0.01" className="w-32" placeholder="0.00"
+                value={form.amount} onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))} />
             </div>
             <div className="flex flex-col gap-1 flex-1 min-w-40">
-              <label className="text-xs font-medium text-muted-foreground">Notes (optional)</label>
-              <Input value={newNotes} onChange={(e) => setNewNotes(e.target.value)}
-                placeholder="Reason / description" className="h-8 text-sm" />
+              <Label>Notes (optional)</Label>
+              <Input placeholder="e.g. Festival advance" value={form.notes}
+                onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
             </div>
-            <Button size="sm" onClick={handleAdd} disabled={adding}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Advance
+            <Button onClick={handleAdd} disabled={addMutation.isPending}>
+              {addMutation.isPending ? "Adding…" : "Add Advance"}
             </Button>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="rounded-md border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Amount (₹)</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead className="w-16 text-right">Del</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading && Array.from({ length: 3 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {[1,2,3,4].map((c) => <TableCell key={c}><Skeleton className="h-5 w-full" /></TableCell>)}
-                  </TableRow>
+      <Card>
+        <CardHeader>
+          <CardTitle>Advance History</CardTitle>
+          <div className="flex flex-wrap gap-4 mt-2">
+            <Select value={filterOp} onValueChange={setFilterOp}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="All operators" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Operators</SelectItem>
+                {operators.map((op) => (
+                  <SelectItem key={op.operatorId} value={String(op.operatorId)}>{op.operatorName}</SelectItem>
                 ))}
-                {!isLoading && advances.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                      No advances for this period.
-                    </TableCell>
-                  </TableRow>
-                )}
-                {!isLoading && advances.map((a) => (
-                  <TableRow key={a.id}>
-                    <TableCell className="font-mono text-sm">{a.date}</TableCell>
-                    <TableCell className="text-right font-mono text-sm">₹ {fmtNum(a.amount)}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{a.notes ?? "—"}</TableCell>
-                    <TableCell className="text-right">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete advance?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently remove the ₹{fmtNum(a.amount)} advance on {a.date}.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              onClick={() => handleDelete(a.id)}>
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {!isLoading && advances.length > 0 && (
-                  <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell className="text-right text-sm">Total</TableCell>
-                    <TableCell className="text-right font-mono text-sm">₹ {total.toFixed(2)}</TableCell>
-                    <TableCell colSpan={2} />
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs">From</Label>
+              <Input type="date" className="w-36 h-8" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs">To</Label>
+              <Input type="date" className="w-36 h-8" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
+            </div>
           </div>
-        </>
-      )}
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Operator</TableHead>
+                <TableHead className="text-right">Amount (₹)</TableHead>
+                <TableHead>Notes</TableHead>
+                <TableHead className="w-16"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading && Array.from({ length: 4 }).map((_, i) => (
+                <TableRow key={i}>
+                  {[1,2,3,4,5].map((c) => <TableCell key={c}><Skeleton className="h-5 w-full" /></TableCell>)}
+                </TableRow>
+              ))}
+              {!isLoading && advances.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No advances found.</TableCell>
+                </TableRow>
+              )}
+              {!isLoading && advances.map((a) => (
+                <TableRow key={a.id}>
+                  <TableCell className="font-mono text-sm">{formatDate(a.date)}</TableCell>
+                  <TableCell>{a.operatorName}</TableCell>
+                  <TableCell className="text-right font-mono">{fmtMoney(toNum(a.amount))}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{a.notes || "—"}</TableCell>
+                  <TableCell>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Advance</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Delete ₹{fmtMoney(toNum(a.amount))} advance for {a.operatorName} on {formatDate(a.date)}? This cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => deleteMutation.mutate(a.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
 // ─── Payroll Summary Tab ──────────────────────────────────────────────────────
-function PayrollSummaryTab({ operators }: { operators: Operator[] }) {
-  const { toast } = useToast();
-  const [month, setMonth] = useState(String(NOW.getMonth() + 1));
-  const [year, setYear] = useState(String(NOW.getFullYear()));
-  const [filterOperatorId, setFilterOperatorId] = useState<string>("all");
 
-  const { data: summary = [], isLoading } = useQuery<PayrollSummaryRow[]>({
-    queryKey: ["operators/payroll-summary", month, year, filterOperatorId],
-    queryFn: () => {
-      const opParam = filterOperatorId !== "all" ? `&operatorId=${filterOperatorId}` : "";
-      return fetch(api(`operators/payroll-summary?month=${month}&year=${year}${opParam}`))
-        .then((r) => r.json());
-    },
-    enabled: !!month && !!year,
+function PayrollSummaryTab() {
+  const { toast } = useToast();
+  const [month, setMonth] = useState(String(new Date().getMonth() + 1));
+  const [year, setYear] = useState(String(CURRENT_YEAR));
+  const [operatorId, setOperatorId] = useState("__all__");
+  const [hasRun, setHasRun] = useState(false);
+
+  const { data: operators = [] } = useQuery<Operator[]>({
+    queryKey: ["operators-salary-settings"],
+    queryFn: () => apiFetch("/api/operators/salary-settings"),
   });
 
-  const monthLabel = MONTHS.find((m) => m.value === month)?.label ?? month;
+  const params = new URLSearchParams({ month, year });
+  if (operatorId !== "__all__") params.set("operatorId", operatorId);
 
-  const handleExportPDF = async () => {
+  const { data: summary = [], isLoading } = useQuery<PayrollSummaryItem[]>({
+    queryKey: ["payroll-summary", month, year, operatorId],
+    queryFn: () => apiFetch(`/api/operators/payroll-summary?${params.toString()}`),
+    enabled: hasRun,
+  });
+
+  function exportPDF() {
     if (summary.length === 0) {
-      toast({ title: "No data to export", variant: "destructive" }); return;
+      toast({ variant: "destructive", title: "No data", description: "Run the summary first." });
+      return;
     }
-    try {
-      const { default: jsPDF } = await import("jspdf");
-      const { default: autoTable } = await import("jspdf-autotable");
-      const doc = new jsPDF({ orientation: "landscape" });
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const monthName = MONTHS[parseInt(month) - 1];
+    const title = `Payroll Summary — ${monthName} ${year}`;
+    doc.setFontSize(16);
+    doc.text(title, 14, 18);
 
-      doc.setFontSize(16);
-      doc.text("TKT Textiles (Knitting)", 14, 16);
-      doc.setFontSize(11);
-      doc.setTextColor(100);
-      doc.text(`Payroll Summary — ${monthLabel} ${year}`, 14, 24);
-      doc.setTextColor(0);
+    autoTable(doc, {
+      startY: 26,
+      head: [["Operator", "Days Worked", "Total Salary (₹)", "Total Advances (₹)", "Net Payable (₹)"]],
+      body: summary.map((s) => [
+        s.operatorName,
+        s.totalDaysWorked,
+        fmtMoney(s.totalSalary),
+        fmtMoney(s.totalAdvances),
+        fmtMoney(s.netPayable),
+      ]),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [37, 99, 235] },
+    });
 
-      const rows = summary.map((r) => [
-        r.operatorName,
-        r.operatorCode,
-        r.daysRecorded,
-        `₹ ${fmtNum(r.totalBaseWage)}`,
-        `₹ ${fmtNum(r.totalCommission)}`,
-        `₹ ${fmtNum(r.totalSalary)}`,
-        `₹ ${fmtNum(r.totalAdvances)}`,
-        `₹ ${fmtNum(r.netPayable)}`,
-      ]);
+    let yOffset = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
+
+    for (const s of summary) {
+      if (yOffset > 250) { doc.addPage(); yOffset = 14; }
+      doc.setFontSize(12);
+      doc.text(`${s.operatorName} (${s.operatorCode}) — Daily Breakdown`, 14, yOffset);
+      yOffset += 4;
 
       autoTable(doc, {
-        head: [["Operator", "Code", "Days", "Base Wage", "Commission", "Total Salary", "Advances", "Net Payable"]],
-        body: rows,
-        startY: 30,
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [37, 99, 235] },
-        columnStyles: {
-          2: { halign: "right" },
-          3: { halign: "right" },
-          4: { halign: "right" },
-          5: { halign: "right" },
-          6: { halign: "right" },
-          7: { halign: "right", fontStyle: "bold" },
-        },
+        startY: yOffset,
+        head: [["Date", "Day", "Base Wage", "Commission", "Final Amount"]],
+        body: s.records.map((r) => [
+          formatDate(r.date),
+          getDayName(r.date),
+          fmtMoney(toNum(r.baseWage)),
+          fmtMoney(toNum(r.commission)),
+          fmtMoney(toNum(r.finalSalary)),
+        ]),
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [100, 116, 139] },
       });
 
-      doc.save(`payroll-${year}-${fmt2(parseInt(month))}.pdf`);
-    } catch {
-      toast({ title: "PDF export failed", variant: "destructive" });
-    }
-  };
+      yOffset = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4;
 
-  const grandTotal = useMemo(() => ({
-    days: summary.reduce((s, r) => s + parseInt(r.daysRecorded), 0),
-    base: summary.reduce((s, r) => s + parseFloat(r.totalBaseWage), 0),
-    comm: summary.reduce((s, r) => s + parseFloat(r.totalCommission), 0),
-    salary: summary.reduce((s, r) => s + parseFloat(r.totalSalary), 0),
-    advances: summary.reduce((s, r) => s + parseFloat(r.totalAdvances), 0),
-    net: summary.reduce((s, r) => s + parseFloat(r.netPayable), 0),
-  }), [summary]);
+      if (s.advances.length > 0) {
+        doc.setFontSize(10);
+        doc.text("Advances", 14, yOffset);
+        yOffset += 3;
+        autoTable(doc, {
+          startY: yOffset,
+          head: [["Date", "Amount", "Notes"]],
+          body: s.advances.map((a) => [
+            formatDate(a.date),
+            fmtMoney(toNum(a.amount)),
+            a.notes || "",
+          ]),
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [220, 38, 38] },
+        });
+        yOffset = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4;
+      }
+
+      doc.setFontSize(9);
+      doc.text(`Net Payable: ₹${fmtMoney(s.netPayable)}`, 14, yOffset);
+      yOffset += 10;
+    }
+
+    doc.save(`payroll-${year}-${String(month).padStart(2, "0")}.pdf`);
+  }
+
+  const grandTotal = summary.reduce((acc, s) => ({
+    days: acc.days + s.totalDaysWorked,
+    salary: acc.salary + s.totalSalary,
+    advances: acc.advances + s.totalAdvances,
+    net: acc.net + s.netPayable,
+  }), { days: 0, salary: 0, advances: 0, net: 0 });
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Payroll Summary</h2>
-          <p className="text-muted-foreground text-sm mt-0.5">Monthly payroll overview per operator.</p>
+    <Card>
+      <CardHeader>
+        <CardTitle>Payroll Summary</CardTitle>
+        <p className="text-sm text-muted-foreground">View monthly payroll for all or individual operators.</p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap gap-4 items-end">
+          <div className="flex flex-col gap-1">
+            <Label>Month</Label>
+            <Select value={month} onValueChange={setMonth}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS.map((m, i) => (
+                  <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label>Year</Label>
+            <Select value={year} onValueChange={setYear}>
+              <SelectTrigger className="w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {YEARS.map((y) => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label>Operator (optional)</Label>
+            <Select value={operatorId} onValueChange={setOperatorId}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="All Operators" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Operators</SelectItem>
+                {operators.map((op) => (
+                  <SelectItem key={op.operatorId} value={String(op.operatorId)}>{op.operatorName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={() => { setHasRun(true); }} variant="outline">Run Summary</Button>
+          <Button onClick={exportPDF} className="gap-2">
+            <Download className="h-4 w-4" />
+            Download PDF
+          </Button>
         </div>
-        <Button variant="outline" size="sm" onClick={handleExportPDF}>
-          <FileDown className="mr-2 h-4 w-4" />
-          Export PDF
-        </Button>
-      </div>
 
-      <div className="flex gap-3 flex-wrap">
-        <Select value={month} onValueChange={setMonth}>
-          <SelectTrigger className="w-36"><SelectValue placeholder="Month" /></SelectTrigger>
-          <SelectContent>
-            {MONTHS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={year} onValueChange={setYear}>
-          <SelectTrigger className="w-24"><SelectValue placeholder="Year" /></SelectTrigger>
-          <SelectContent>
-            {YEARS.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={filterOperatorId} onValueChange={setFilterOperatorId}>
-          <SelectTrigger className="w-52"><SelectValue placeholder="All operators" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Operators</SelectItem>
-            {operators.map((op) => (
-              <SelectItem key={op.id} value={String(op.id)}>{op.name} ({op.code})</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+        {hasRun && isLoading && (
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+          </div>
+        )}
 
-      <div className="rounded-md border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Operator</TableHead>
-              <TableHead>Code</TableHead>
-              <TableHead className="text-right">Days</TableHead>
-              <TableHead className="text-right">Base Wage (₹)</TableHead>
-              <TableHead className="text-right">Commission (₹)</TableHead>
-              <TableHead className="text-right">Total Salary (₹)</TableHead>
-              <TableHead className="text-right">Advances (₹)</TableHead>
-              <TableHead className="text-right font-semibold">Net Payable (₹)</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading && Array.from({ length: 4 }).map((_, i) => (
-              <TableRow key={i}>
-                {[1,2,3,4,5,6,7,8].map((c) => <TableCell key={c}><Skeleton className="h-5 w-full" /></TableCell>)}
-              </TableRow>
-            ))}
-            {!isLoading && summary.length === 0 && (
+        {hasRun && !isLoading && (
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
-                  No payroll data for {monthLabel} {year}.
-                </TableCell>
+                <TableHead>Operator</TableHead>
+                <TableHead className="text-right">Days Worked</TableHead>
+                <TableHead className="text-right">Total Salary (₹)</TableHead>
+                <TableHead className="text-right">Total Advances (₹)</TableHead>
+                <TableHead className="text-right">Net Payable (₹)</TableHead>
               </TableRow>
-            )}
-            {!isLoading && summary.map((r) => (
-              <TableRow key={r.operatorId}>
-                <TableCell className="font-medium">{r.operatorName}</TableCell>
-                <TableCell className="text-muted-foreground">{r.operatorCode}</TableCell>
-                <TableCell className="text-right font-mono text-sm">{r.daysRecorded}</TableCell>
-                <TableCell className="text-right font-mono text-sm">₹ {fmtNum(r.totalBaseWage)}</TableCell>
-                <TableCell className="text-right font-mono text-sm">₹ {fmtNum(r.totalCommission)}</TableCell>
-                <TableCell className="text-right font-mono text-sm">₹ {fmtNum(r.totalSalary)}</TableCell>
-                <TableCell className="text-right font-mono text-sm text-orange-600">
-                  ₹ {fmtNum(r.totalAdvances)}
-                </TableCell>
-                <TableCell className="text-right font-mono text-sm font-bold text-green-700">
-                  ₹ {fmtNum(r.netPayable)}
-                </TableCell>
-              </TableRow>
-            ))}
-            {!isLoading && summary.length > 0 && (
-              <TableRow className="bg-muted/50 font-semibold">
-                <TableCell colSpan={2} className="text-right text-sm">Total</TableCell>
-                <TableCell className="text-right font-mono text-sm">{grandTotal.days}</TableCell>
-                <TableCell className="text-right font-mono text-sm">₹ {grandTotal.base.toFixed(2)}</TableCell>
-                <TableCell className="text-right font-mono text-sm">₹ {grandTotal.comm.toFixed(2)}</TableCell>
-                <TableCell className="text-right font-mono text-sm">₹ {grandTotal.salary.toFixed(2)}</TableCell>
-                <TableCell className="text-right font-mono text-sm text-orange-600">₹ {grandTotal.advances.toFixed(2)}</TableCell>
-                <TableCell className="text-right font-mono text-sm text-green-700">₹ {grandTotal.net.toFixed(2)}</TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
+            </TableHeader>
+            <TableBody>
+              {summary.map((s) => (
+                <TableRow key={s.operatorId}>
+                  <TableCell className="font-medium">{s.operatorName} <span className="text-muted-foreground text-xs">({s.operatorCode})</span></TableCell>
+                  <TableCell className="text-right">{s.totalDaysWorked}</TableCell>
+                  <TableCell className="text-right">{fmtMoney(s.totalSalary)}</TableCell>
+                  <TableCell className="text-right text-red-600">{fmtMoney(s.totalAdvances)}</TableCell>
+                  <TableCell className={`text-right font-semibold ${s.netPayable < 0 ? "text-red-600" : "text-green-700"}`}>
+                    {fmtMoney(s.netPayable)}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {summary.length > 1 && (
+                <TableRow className="border-t-2 font-bold bg-muted/30">
+                  <TableCell>Total</TableCell>
+                  <TableCell className="text-right">{grandTotal.days}</TableCell>
+                  <TableCell className="text-right">{fmtMoney(grandTotal.salary)}</TableCell>
+                  <TableCell className="text-right text-red-600">{fmtMoney(grandTotal.advances)}</TableCell>
+                  <TableCell className={`text-right ${grandTotal.net < 0 ? "text-red-600" : "text-green-700"}`}>
+                    {fmtMoney(grandTotal.net)}
+                  </TableCell>
+                </TableRow>
+              )}
+              {summary.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No data for selected period.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export default function OperatorsPage() {
-  const { data: operators = [], isLoading: opsLoading } = useQuery<Operator[]>({
-    queryKey: ["masters/machine-operator"],
-    queryFn: () => fetch(api("masters/machine-operator")).then((r) => r.json()),
-  });
 
+export default function OperatorsPage() {
   return (
     <Layout>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Operators</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage salary settings, daily records, advances and payroll summaries.
-          </p>
+          <p className="text-muted-foreground mt-1">Manage operator wages, salary records, advances, and payroll.</p>
         </div>
-
-        {opsLoading ? (
-          <div className="flex flex-col gap-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-8 w-full" />
-            ))}
-          </div>
-        ) : (
-          <Tabs defaultValue="salary-settings">
-            <TabsList className="mb-2">
-              <TabsTrigger value="salary-settings">Salary Settings</TabsTrigger>
-              <TabsTrigger value="salary-records">Salary Records</TabsTrigger>
-              <TabsTrigger value="advances">Advances</TabsTrigger>
-              <TabsTrigger value="payroll-summary">Payroll Summary</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="salary-settings" className="mt-4">
-              <SalarySettingsTab operators={operators} />
-            </TabsContent>
-            <TabsContent value="salary-records" className="mt-4">
-              <SalaryRecordsTab operators={operators} />
-            </TabsContent>
-            <TabsContent value="advances" className="mt-4">
-              <AdvancesTab operators={operators} />
-            </TabsContent>
-            <TabsContent value="payroll-summary" className="mt-4">
-              <PayrollSummaryTab operators={operators} />
-            </TabsContent>
-          </Tabs>
-        )}
+        <Tabs defaultValue="salary-settings">
+          <TabsList>
+            <TabsTrigger value="salary-settings">Salary Settings</TabsTrigger>
+            <TabsTrigger value="salary-records">Salary Records</TabsTrigger>
+            <TabsTrigger value="advances">Advances</TabsTrigger>
+            <TabsTrigger value="payroll-summary">Payroll Summary</TabsTrigger>
+          </TabsList>
+          <TabsContent value="salary-settings" className="mt-4">
+            <SalarySettingsTab />
+          </TabsContent>
+          <TabsContent value="salary-records" className="mt-4">
+            <SalaryRecordsTab />
+          </TabsContent>
+          <TabsContent value="advances" className="mt-4">
+            <AdvancesTab />
+          </TabsContent>
+          <TabsContent value="payroll-summary" className="mt-4">
+            <PayrollSummaryTab />
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );
