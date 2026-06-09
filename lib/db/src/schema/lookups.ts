@@ -1,4 +1,4 @@
-import { pgTable, text, serial, unique, numeric, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, unique, numeric, integer, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -106,3 +106,40 @@ export const machineOperatorMasterTable = pgTable("machine_operator_master", {
 export const insertMachineOperatorMasterSchema = createInsertSchema(machineOperatorMasterTable).omit({ id: true });
 export type InsertMachineOperatorMaster = z.infer<typeof insertMachineOperatorMasterSchema>;
 export type MachineOperatorMaster = typeof machineOperatorMasterTable.$inferSelect;
+
+// ─── Operator Salary Settings ──────────────────────────────────────────────
+export const operatorSalarySettingsTable = pgTable("operator_salary_settings", {
+  id: serial("id").primaryKey(),
+  operatorId: integer("operator_id").notNull().unique().references(() => machineOperatorMasterTable.id),
+  baseDailyWage: numeric("base_daily_wage").notNull().default("0"),
+});
+export const insertOperatorSalarySettingsSchema = createInsertSchema(operatorSalarySettingsTable).omit({ id: true });
+export type InsertOperatorSalarySettings = z.infer<typeof insertOperatorSalarySettingsSchema>;
+export type OperatorSalarySettings = typeof operatorSalarySettingsTable.$inferSelect;
+
+// ─── Operator Salary Records ───────────────────────────────────────────────
+export const operatorSalaryRecordsTable = pgTable("operator_salary_records", {
+  id: serial("id").primaryKey(),
+  operatorId: integer("operator_id").notNull().references(() => machineOperatorMasterTable.id),
+  date: text("date").notNull(),
+  baseWage: numeric("base_wage").notNull(),
+  commission: numeric("commission").notNull().default("0"),
+  finalSalary: numeric("final_salary").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({ uniq: unique().on(t.operatorId, t.date) }));
+export const insertOperatorSalaryRecordsSchema = createInsertSchema(operatorSalaryRecordsTable).omit({ id: true, createdAt: true });
+export type InsertOperatorSalaryRecord = z.infer<typeof insertOperatorSalaryRecordsSchema>;
+export type OperatorSalaryRecord = typeof operatorSalaryRecordsTable.$inferSelect;
+
+// ─── Operator Advances ─────────────────────────────────────────────────────
+export const operatorAdvancesTable = pgTable("operator_advances", {
+  id: serial("id").primaryKey(),
+  operatorId: integer("operator_id").notNull().references(() => machineOperatorMasterTable.id),
+  date: text("date").notNull(),
+  amount: numeric("amount").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertOperatorAdvancesSchema = createInsertSchema(operatorAdvancesTable).omit({ id: true, createdAt: true });
+export type InsertOperatorAdvance = z.infer<typeof insertOperatorAdvancesSchema>;
+export type OperatorAdvance = typeof operatorAdvancesTable.$inferSelect;

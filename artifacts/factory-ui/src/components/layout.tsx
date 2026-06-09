@@ -1,12 +1,13 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Factory, FileText, Database, BarChart2 } from "lucide-react";
+import { Factory, FileText, Database, BarChart2, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Transactions", icon: FileText },
   { href: "/masters", label: "Master Data", icon: Database },
   { href: "/reports", label: "Reports", icon: BarChart2 },
+  { href: "/operators", label: "Operators", icon: Users },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {

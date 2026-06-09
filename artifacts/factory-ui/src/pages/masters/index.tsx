@@ -87,6 +87,7 @@ export default function MastersPage() {
   const invalidateBoth = (crudKey: readonly unknown[], lookupKey: readonly unknown[]) => {
     qc.invalidateQueries({ queryKey: [...crudKey] });
     qc.invalidateQueries({ queryKey: [...lookupKey] });
+    void qc.refetchQueries({ queryKey: [...lookupKey], type: "all" });
   };
 
   // ── Transaction Type ─────────────────────────────────────────────────────
