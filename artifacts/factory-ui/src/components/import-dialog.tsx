@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Upload, AlertCircle, CheckCircle2, SkipForward, XCircle } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle2, SkipForward, XCircle, FileText } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -64,6 +64,7 @@ export interface CsvRow {
 }
 
 export interface ImportPreview {
+  totalRows: number;
   toImport: number;
   duplicates: number;
   errors: { docNumber: string; message: string }[];
@@ -71,6 +72,7 @@ export interface ImportPreview {
 }
 
 export interface ImportResult {
+  totalRows: number;
   imported: number;
   skipped: number;
   errors: { docNumber: string; message: string }[];
@@ -232,7 +234,7 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
 
       toast({
         title: "Import complete",
-        description: `${data.imported} row${data.imported !== 1 ? "s" : ""} imported, ${data.skipped} duplicate${data.skipped !== 1 ? "s" : ""} skipped${data.errors.length > 0 ? `, ${data.errors.length} error${data.errors.length !== 1 ? "s" : ""}` : ""}.`,
+        description: `${data.imported} transaction${data.imported !== 1 ? "s" : ""} imported, ${data.skipped} duplicate${data.skipped !== 1 ? "s" : ""} skipped${data.errors.length > 0 ? `, ${data.errors.length} lookup error${data.errors.length !== 1 ? "s" : ""}` : ""}.`,
       });
 
       onSuccess();
@@ -295,7 +297,12 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
           {/* Preview summary */}
           {preview && step !== "idle" && (
             <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-3">
+                <div className="rounded-md border p-3 text-center">
+                  <FileText className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-xl font-semibold">{preview.totalRows}</p>
+                  <p className="text-xs text-muted-foreground">Total rows</p>
+                </div>
                 <div className="rounded-md border p-3 text-center">
                   <CheckCircle2 className="h-4 w-4 mx-auto mb-1 text-green-600" />
                   <p className="text-xl font-semibold text-green-700">{preview.toImport}</p>
@@ -368,7 +375,9 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
               <CheckCircle2 className="h-8 w-8 mx-auto text-green-600" />
               <p className="font-semibold text-green-700">Import complete!</p>
               <p className="text-sm text-muted-foreground">
-                {result.imported} imported · {result.skipped} skipped · {result.errors.length} error{result.errors.length !== 1 ? "s" : ""}
+                {result.imported} transaction{result.imported !== 1 ? "s" : ""} imported
+                {result.skipped > 0 ? ` · ${result.skipped} duplicate${result.skipped !== 1 ? "s" : ""} skipped` : ""}
+                {result.errors.length > 0 ? ` · ${result.errors.length} error${result.errors.length !== 1 ? "s" : ""}` : ""}
               </p>
             </div>
           )}
@@ -384,7 +393,7 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
                 onClick={handleImport}
                 disabled={!canImport || isLoading}
               >
-                {isLoading && step === "importing" ? "Importing…" : `Import ${preview?.toImport ?? ""} rows`}
+                {isLoading && step === "importing" ? "Importing…" : `Import ${preview?.toImport ?? ""} transaction${preview?.toImport !== 1 ? "s" : ""}`}
               </Button>
             </>
           )}

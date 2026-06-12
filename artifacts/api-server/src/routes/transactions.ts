@@ -71,9 +71,17 @@ interface ImportCsvRow {
   netWt?: string;
 }
 
-function lookupOptional(map: Map<string, number>, name: string | undefined): number | null {
-  if (!name || !name.trim()) return null;
-  return map.get(name.toLowerCase().trim()) ?? null;
+/** Returns the ID for a non-empty name, or null if name is blank.
+ *  If name is non-empty but not found, returns { id: null, error: message }. */
+function resolveLookup(
+  map: Map<string, number>,
+  name: string | undefined,
+  fieldLabel: string,
+): { id: number | null; error: string | null } {
+  if (!name || !name.trim()) return { id: null, error: null };
+  const id = map.get(name.toLowerCase().trim());
+  if (id == null) return { id: null, error: `Unknown ${fieldLabel}: "${name.trim()}"` };
+  return { id, error: null };
 }
 
 function parseImportNumeric(s: string | undefined): string | null {
@@ -121,6 +129,8 @@ async function buildMasterMaps() {
 async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
   const maps = await buildMasterMaps();
 
+  const totalRows = rows.length;
+
   // Group by docNumber — each group becomes one header + N details
   const groups = new Map<string, { first: ImportCsvRow; rows: ImportCsvRow[] }>();
   for (const row of rows) {
@@ -142,8 +152,8 @@ async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
     existingSet = new Set(existing.map((r) => r.docNumber));
   }
 
-  let toImport  = 0;
-  let imported  = 0;
+  let toImport   = 0;
+  let imported   = 0;
   let duplicates = 0;
   const errors: { docNumber: string; message: string }[] = [];
 
@@ -157,9 +167,39 @@ async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
       continue;
     }
 
+    // Resolve all header lookups — non-empty names that can't be matched are errors
     const transTypeId = maps.transTypes.get((first.transTypeName ?? "").toLowerCase().trim());
     if (!transTypeId) {
       errors.push({ docNumber: docNum, message: `Unknown transaction type: "${first.transTypeName ?? ""}"` });
+      continue;
+    }
+
+    const jobR         = resolveLookup(maps.jobs,        first.jobName,        "job");
+    const partyR       = resolveLookup(maps.parties,     first.partyName,      "party");
+    const locationR    = resolveLookup(maps.locations,   first.locationName,   "location");
+    const fabricTypeR  = resolveLookup(maps.fabricTypes, first.fabricTypeName, "fabric type");
+
+    // Resolve detail lookups per-row — collect all resolution errors across all detail rows
+    const detailResults = group.rows.map((r, ri) => {
+      const yarnTypeR  = resolveLookup(maps.yarnTypes,  r.yarnTypeName,  "yarn type");
+      const yarnCountR = resolveLookup(maps.yarnCounts, r.yarnCountName, "yarn count");
+      const yarnBrandR = resolveLookup(maps.yarnBrands, r.yarnBrandName, "yarn brand");
+      const uomR       = resolveLookup(maps.uoms,       r.uomName,       "UOM");
+      const machineR   = resolveLookup(maps.machines,   r.machineName,   "machine");
+      const operatorR  = resolveLookup(maps.operators,  r.operatorName,  "operator");
+      const rowErrors  = [yarnTypeR, yarnCountR, yarnBrandR, uomR, machineR, operatorR]
+        .filter((x) => x.error)
+        .map((x) => `(row ${ri + 1}) ${x.error}`);
+      return { yarnTypeR, yarnCountR, yarnBrandR, uomR, machineR, operatorR, rowErrors };
+    });
+
+    const allErrors = [
+      ...[jobR, partyR, locationR, fabricTypeR].filter((x) => x.error).map((x) => x.error as string),
+      ...detailResults.flatMap((d) => d.rowErrors),
+    ];
+
+    if (allErrors.length > 0) {
+      errors.push({ docNumber: docNum, message: allErrors.join("; ") });
       continue;
     }
 
@@ -178,25 +218,25 @@ async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
               reference:         first.reference?.trim() || null,
               sl:                first.sl?.trim() || null,
               gsm:               gsmVal && !isNaN(gsmVal) ? gsmVal : null,
-              jobId:             lookupOptional(maps.jobs,        first.jobName),
-              partyId:           lookupOptional(maps.parties,     first.partyName),
-              locationId:        lookupOptional(maps.locations,   first.locationName),
-              fabricTypeId:      lookupOptional(maps.fabricTypes, first.fabricTypeName),
+              jobId:             jobR.id,
+              partyId:           partyR.id,
+              locationId:        locationR.id,
+              fabricTypeId:      fabricTypeR.id,
             })
             .returning();
 
           if (group.rows.length > 0) {
             await tx.insert(transactionDetailTable).values(
-              group.rows.map((r) => ({
+              detailResults.map((d, i) => ({
                 headerId:          header.id,
-                yarnTypeId:        lookupOptional(maps.yarnTypes,  r.yarnTypeName),
-                yarnCountId:       lookupOptional(maps.yarnCounts, r.yarnCountName),
-                yarnBrandId:       lookupOptional(maps.yarnBrands, r.yarnBrandName),
-                uomId:             lookupOptional(maps.uoms,       r.uomName),
-                machineId:         lookupOptional(maps.machines,   r.machineName),
-                machineOperatorId: lookupOptional(maps.operators,  r.operatorName),
-                quantity:          parseImportNumeric(r.quantity),
-                netWt:             parseImportNumeric(r.netWt),
+                yarnTypeId:        d.yarnTypeR.id,
+                yarnCountId:       d.yarnCountR.id,
+                yarnBrandId:       d.yarnBrandR.id,
+                uomId:             d.uomR.id,
+                machineId:         d.machineR.id,
+                machineOperatorId: d.operatorR.id,
+                quantity:          parseImportNumeric(group.rows[i].quantity),
+                netWt:             parseImportNumeric(group.rows[i].netWt),
               }))
             );
           }
@@ -208,7 +248,7 @@ async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
     }
   }
 
-  return { toImport, imported, duplicates, errors, previewRows: rows.slice(0, 10) };
+  return { totalRows, toImport, imported, duplicates, errors, previewRows: rows.slice(0, 10) };
 }
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
@@ -292,6 +332,7 @@ router.post("/transactions/import/preview", async (req, res): Promise<void> => {
   }
   const result = await processImport(rows as ImportCsvRow[], false);
   res.json({
+    totalRows:   result.totalRows,
     toImport:    result.toImport,
     duplicates:  result.duplicates,
     errors:      result.errors,
@@ -307,9 +348,10 @@ router.post("/transactions/import", async (req, res): Promise<void> => {
   }
   const result = await processImport(rows as ImportCsvRow[], true);
   res.json({
-    imported:   result.imported,
-    skipped:    result.duplicates,
-    errors:     result.errors,
+    totalRows: result.totalRows,
+    imported:  result.imported,
+    skipped:   result.duplicates,
+    errors:    result.errors,
   });
 });
 
