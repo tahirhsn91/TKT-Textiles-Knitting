@@ -1,0 +1,395 @@
+import { useState, useRef } from "react";
+import { Upload, AlertCircle, CheckCircle2, SkipForward, XCircle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { toast } from "@/hooks/use-toast";
+
+// ─── CSV Column mapping ──────────────────────────────────────────────────────
+
+const HEADER_MAP: Record<string, string> = {
+  "date":          "date",
+  "doc number":    "docNumber",
+  "reference":     "reference",
+  "sl":            "sl",
+  "gsm":           "gsm",
+  "trans type":    "transTypeName",
+  "job":           "jobName",
+  "party":         "partyName",
+  "location":      "locationName",
+  "fabric type":   "fabricTypeName",
+  "yarn type":     "yarnTypeName",
+  "yarn count":    "yarnCountName",
+  "yarn brand":    "yarnBrandName",
+  "uom":           "uomName",
+  "machine":       "machineName",
+  "operator":      "operatorName",
+  "qty":           "quantity",
+  "net wt":        "netWt",
+};
+
+export interface CsvRow {
+  date?: string;
+  docNumber?: string;
+  reference?: string;
+  sl?: string;
+  gsm?: string;
+  transTypeName?: string;
+  jobName?: string;
+  partyName?: string;
+  locationName?: string;
+  fabricTypeName?: string;
+  yarnTypeName?: string;
+  yarnCountName?: string;
+  yarnBrandName?: string;
+  uomName?: string;
+  machineName?: string;
+  operatorName?: string;
+  quantity?: string;
+  netWt?: string;
+}
+
+export interface ImportPreview {
+  toImport: number;
+  duplicates: number;
+  errors: { docNumber: string; message: string }[];
+  previewRows: CsvRow[];
+}
+
+export interface ImportResult {
+  imported: number;
+  skipped: number;
+  errors: { docNumber: string; message: string }[];
+}
+
+// ─── CSV parser ──────────────────────────────────────────────────────────────
+
+function parseCsvField(line: string, start: number): { value: string; end: number } {
+  if (line[start] === '"') {
+    let i = start + 1;
+    let value = "";
+    while (i < line.length) {
+      if (line[i] === '"') {
+        if (line[i + 1] === '"') { value += '"'; i += 2; }
+        else { i++; break; }
+      } else {
+        value += line[i++];
+      }
+    }
+    while (i < line.length && line[i] !== ',') i++;
+    return { value, end: i + 1 };
+  }
+  const end = line.indexOf(',', start);
+  if (end === -1) return { value: line.slice(start), end: line.length + 1 };
+  return { value: line.slice(start, end), end: end + 1 };
+}
+
+function parseCsvLine(line: string): string[] {
+  const fields: string[] = [];
+  let pos = 0;
+  while (pos <= line.length) {
+    const { value, end } = parseCsvField(line, pos);
+    fields.push(value);
+    pos = end;
+    if (pos > line.length + 1) break;
+  }
+  return fields;
+}
+
+function parseCsv(text: string): CsvRow[] {
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  if (lines.length < 3) return [];
+
+  // Line 0: company name, Line 1: date range, Line 2: column headers
+  const headers = parseCsvLine(lines[2]).map((h) => h.trim().toLowerCase());
+  const fieldNames = headers.map((h) => HEADER_MAP[h] ?? null);
+
+  const rows: CsvRow[] = [];
+  for (let i = 3; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    const fields = parseCsvLine(line);
+    const firstVal = (fields[0] ?? "").trim();
+
+    if (
+      firstVal === "Opening Balance" ||
+      firstVal.startsWith("Subtotal:") ||
+      firstVal === "Grand Total"
+    ) continue;
+
+    const row: Record<string, string> = {};
+    fieldNames.forEach((name, idx) => {
+      if (name && fields[idx] != null) row[name] = fields[idx].trim();
+    });
+
+    if (!row.date && !row.docNumber) continue;
+    rows.push(row as CsvRow);
+  }
+
+  return rows;
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
+interface ImportDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}
+
+export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProps) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [step, setStep]       = useState<"idle" | "preview" | "importing" | "done">("idle");
+  const [fileName, setFileName] = useState("");
+  const [parsedRows, setParsedRows] = useState<CsvRow[]>([]);
+  const [preview, setPreview]   = useState<ImportPreview | null>(null);
+  const [result, setResult]     = useState<ImportResult | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [parseError, setParseError] = useState("");
+
+  function handleClose() {
+    onOpenChange(false);
+    setTimeout(reset, 300);
+  }
+
+  function reset() {
+    setStep("idle");
+    setFileName("");
+    setParsedRows([]);
+    setPreview(null);
+    setResult(null);
+    setIsLoading(false);
+    setParseError("");
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setFileName(file.name);
+    setParseError("");
+    setPreview(null);
+
+    const text = await file.text();
+    const rows = parseCsv(text);
+
+    if (rows.length === 0) {
+      setParseError("No data rows found. Make sure you upload a Detailed CSV exported from this app.");
+      return;
+    }
+
+    setParsedRows(rows);
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/transactions/import/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json() as ImportPreview;
+      setPreview(data);
+      setStep("preview");
+    } catch (err) {
+      setParseError(`Preview failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleImport() {
+    if (!parsedRows.length) return;
+    setIsLoading(true);
+    setStep("importing");
+
+    try {
+      const res = await fetch("/api/transactions/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: parsedRows }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json() as ImportResult;
+      setResult(data);
+      setStep("done");
+
+      toast({
+        title: "Import complete",
+        description: `${data.imported} row${data.imported !== 1 ? "s" : ""} imported, ${data.skipped} duplicate${data.skipped !== 1 ? "s" : ""} skipped${data.errors.length > 0 ? `, ${data.errors.length} error${data.errors.length !== 1 ? "s" : ""}` : ""}.`,
+      });
+
+      onSuccess();
+    } catch (err) {
+      toast({
+        title: "Import failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+      setStep("preview");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  const canImport = preview && preview.toImport > 0 && step === "preview";
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Import from CSV</DialogTitle>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto space-y-4 py-2">
+          {/* File picker */}
+          <div
+            className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
+            onClick={() => fileRef.current?.click()}
+          >
+            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+            <p className="text-sm font-medium">
+              {fileName ? fileName : "Click to select a CSV file"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Upload a Detailed CSV exported using the Export button
+            </p>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+          </div>
+
+          {/* Parse error */}
+          {parseError && (
+            <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 rounded-md p-3">
+              <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>{parseError}</span>
+            </div>
+          )}
+
+          {/* Loading */}
+          {isLoading && (
+            <p className="text-sm text-muted-foreground text-center animate-pulse">Analysing file…</p>
+          )}
+
+          {/* Preview summary */}
+          {preview && step !== "idle" && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-md border p-3 text-center">
+                  <CheckCircle2 className="h-4 w-4 mx-auto mb-1 text-green-600" />
+                  <p className="text-xl font-semibold text-green-700">{preview.toImport}</p>
+                  <p className="text-xs text-muted-foreground">Ready to import</p>
+                </div>
+                <div className="rounded-md border p-3 text-center">
+                  <SkipForward className="h-4 w-4 mx-auto mb-1 text-yellow-600" />
+                  <p className="text-xl font-semibold text-yellow-700">{preview.duplicates}</p>
+                  <p className="text-xs text-muted-foreground">Duplicates (skip)</p>
+                </div>
+                <div className="rounded-md border p-3 text-center">
+                  <AlertCircle className="h-4 w-4 mx-auto mb-1 text-red-500" />
+                  <p className="text-xl font-semibold text-red-600">{preview.errors.length}</p>
+                  <p className="text-xs text-muted-foreground">Lookup errors</p>
+                </div>
+              </div>
+
+              {/* Errors list */}
+              {preview.errors.length > 0 && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-1 max-h-36 overflow-y-auto">
+                  <p className="text-xs font-semibold text-destructive mb-1">Lookup errors (these rows will be skipped):</p>
+                  {preview.errors.map((e, i) => (
+                    <p key={i} className="text-xs text-destructive">
+                      Doc #{e.docNumber}: {e.message}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {/* Preview rows table */}
+              {preview.previewRows.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">
+                    Preview (first {preview.previewRows.length} rows):
+                  </p>
+                  <div className="rounded-md border overflow-auto max-h-48">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs whitespace-nowrap">Date</TableHead>
+                          <TableHead className="text-xs whitespace-nowrap">Doc #</TableHead>
+                          <TableHead className="text-xs whitespace-nowrap">Trans Type</TableHead>
+                          <TableHead className="text-xs whitespace-nowrap">Party</TableHead>
+                          <TableHead className="text-xs whitespace-nowrap">Qty</TableHead>
+                          <TableHead className="text-xs whitespace-nowrap">Net Wt</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {preview.previewRows.map((r, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="text-xs">{r.date ?? "—"}</TableCell>
+                            <TableCell className="text-xs">{r.docNumber ?? "—"}</TableCell>
+                            <TableCell className="text-xs">{r.transTypeName ?? "—"}</TableCell>
+                            <TableCell className="text-xs">{r.partyName ?? "—"}</TableCell>
+                            <TableCell className="text-xs">{r.quantity ?? "—"}</TableCell>
+                            <TableCell className="text-xs">{r.netWt ?? "—"}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Done state */}
+          {step === "done" && result && (
+            <div className="rounded-md border border-green-200 bg-green-50 p-4 text-center space-y-1">
+              <CheckCircle2 className="h-8 w-8 mx-auto text-green-600" />
+              <p className="font-semibold text-green-700">Import complete!</p>
+              <p className="text-sm text-muted-foreground">
+                {result.imported} imported · {result.skipped} skipped · {result.errors.length} error{result.errors.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="gap-2 flex-shrink-0">
+          {step === "done" ? (
+            <Button onClick={handleClose}>Close</Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={handleClose} disabled={isLoading}>Cancel</Button>
+              <Button
+                onClick={handleImport}
+                disabled={!canImport || isLoading}
+              >
+                {isLoading && step === "importing" ? "Importing…" : `Import ${preview?.toImport ?? ""} rows`}
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

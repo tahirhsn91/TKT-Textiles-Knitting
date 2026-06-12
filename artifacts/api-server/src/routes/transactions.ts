@@ -1,7 +1,21 @@
 import { Router, type IRouter } from "express";
-import { eq, sql, desc } from "drizzle-orm";
+import { eq, sql, desc, inArray } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { transactionHeaderTable, transactionDetailTable } from "@workspace/db";
+import {
+  transactionHeaderTable,
+  transactionDetailTable,
+  transactionTypeMasterTable,
+  jobMasterTable,
+  partyMasterTable,
+  locationMasterTable,
+  fabricTypeMasterTable,
+  yarnTypeMasterTable,
+  yarnCountMasterTable,
+  yarnBrandMasterTable,
+  uomMasterTable,
+  machineMasterTable,
+  machineOperatorMasterTable,
+} from "@workspace/db";
 import {
   ListTransactionsResponse,
   GetTransactionResponse,
@@ -33,6 +47,171 @@ function normalizeDetail<T extends DetailInput>(d: T): T {
     netWt: normalizeNumericString(d.netWt),
   };
 }
+
+// ─── CSV Import helpers ────────────────────────────────────────────────────────
+
+interface ImportCsvRow {
+  date?: string;
+  docNumber?: string;
+  reference?: string;
+  sl?: string;
+  gsm?: string;
+  transTypeName?: string;
+  jobName?: string;
+  partyName?: string;
+  locationName?: string;
+  fabricTypeName?: string;
+  yarnTypeName?: string;
+  yarnCountName?: string;
+  yarnBrandName?: string;
+  uomName?: string;
+  machineName?: string;
+  operatorName?: string;
+  quantity?: string;
+  netWt?: string;
+}
+
+function lookupOptional(map: Map<string, number>, name: string | undefined): number | null {
+  if (!name || !name.trim()) return null;
+  return map.get(name.toLowerCase().trim()) ?? null;
+}
+
+function parseImportNumeric(s: string | undefined): string | null {
+  if (!s || !s.trim()) return null;
+  const clean = s.replace(/,/g, "");
+  const n = parseFloat(clean);
+  if (isNaN(n)) return null;
+  return String(Math.abs(n));
+}
+
+async function buildMasterMaps() {
+  const [transTypes, jobs, parties, locations, fabricTypes, yarnTypes, yarnCounts, yarnBrands, uoms, machines, operators] =
+    await Promise.all([
+      db.select({ id: transactionTypeMasterTable.id, name: transactionTypeMasterTable.name }).from(transactionTypeMasterTable),
+      db.select({ id: jobMasterTable.id, name: jobMasterTable.name }).from(jobMasterTable),
+      db.select({ id: partyMasterTable.id, name: partyMasterTable.name }).from(partyMasterTable),
+      db.select({ id: locationMasterTable.id, name: locationMasterTable.name }).from(locationMasterTable),
+      db.select({ id: fabricTypeMasterTable.id, name: fabricTypeMasterTable.name }).from(fabricTypeMasterTable),
+      db.select({ id: yarnTypeMasterTable.id, name: yarnTypeMasterTable.name }).from(yarnTypeMasterTable),
+      db.select({ id: yarnCountMasterTable.id, name: yarnCountMasterTable.name }).from(yarnCountMasterTable),
+      db.select({ id: yarnBrandMasterTable.id, name: yarnBrandMasterTable.name }).from(yarnBrandMasterTable),
+      db.select({ id: uomMasterTable.id, name: uomMasterTable.name }).from(uomMasterTable),
+      db.select({ id: machineMasterTable.id, name: machineMasterTable.name }).from(machineMasterTable),
+      db.select({ id: machineOperatorMasterTable.id, name: machineOperatorMasterTable.name }).from(machineOperatorMasterTable),
+    ]);
+
+  const toMap = (rows: { id: number; name: string }[]) =>
+    new Map(rows.map((r) => [r.name.toLowerCase().trim(), r.id]));
+
+  return {
+    transTypes:  toMap(transTypes),
+    jobs:        toMap(jobs),
+    parties:     toMap(parties),
+    locations:   toMap(locations),
+    fabricTypes: toMap(fabricTypes),
+    yarnTypes:   toMap(yarnTypes),
+    yarnCounts:  toMap(yarnCounts),
+    yarnBrands:  toMap(yarnBrands),
+    uoms:        toMap(uoms),
+    machines:    toMap(machines),
+    operators:   toMap(operators),
+  };
+}
+
+async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
+  const maps = await buildMasterMaps();
+
+  // Group by docNumber — each group becomes one header + N details
+  const groups = new Map<string, { first: ImportCsvRow; rows: ImportCsvRow[] }>();
+  for (const row of rows) {
+    const key = (row.docNumber ?? "").trim();
+    if (!key) continue;
+    if (!groups.has(key)) groups.set(key, { first: row, rows: [] });
+    groups.get(key)!.rows.push(row);
+  }
+
+  const docNumbers = [...groups.keys()];
+
+  // Duplicate check
+  let existingSet = new Set<string>();
+  if (docNumbers.length > 0) {
+    const existing = await db
+      .select({ docNumber: transactionHeaderTable.docNumber })
+      .from(transactionHeaderTable)
+      .where(inArray(transactionHeaderTable.docNumber, docNumbers));
+    existingSet = new Set(existing.map((r) => r.docNumber));
+  }
+
+  let toImport  = 0;
+  let imported  = 0;
+  let duplicates = 0;
+  const errors: { docNumber: string; message: string }[] = [];
+
+  for (const [docNum, group] of groups) {
+    if (existingSet.has(docNum)) { duplicates++; continue; }
+
+    const first = group.first;
+
+    if (!first.date || !first.date.trim()) {
+      errors.push({ docNumber: docNum, message: "Missing date" });
+      continue;
+    }
+
+    const transTypeId = maps.transTypes.get((first.transTypeName ?? "").toLowerCase().trim());
+    if (!transTypeId) {
+      errors.push({ docNumber: docNum, message: `Unknown transaction type: "${first.transTypeName ?? ""}"` });
+      continue;
+    }
+
+    toImport++;
+
+    if (doInsert) {
+      try {
+        await db.transaction(async (tx) => {
+          const gsmVal = first.gsm ? parseInt(first.gsm, 10) : null;
+          const [header] = await tx
+            .insert(transactionHeaderTable)
+            .values({
+              transactionTypeId: transTypeId,
+              date:              first.date!.trim(),
+              docNumber:         docNum,
+              reference:         first.reference?.trim() || null,
+              sl:                first.sl?.trim() || null,
+              gsm:               gsmVal && !isNaN(gsmVal) ? gsmVal : null,
+              jobId:             lookupOptional(maps.jobs,        first.jobName),
+              partyId:           lookupOptional(maps.parties,     first.partyName),
+              locationId:        lookupOptional(maps.locations,   first.locationName),
+              fabricTypeId:      lookupOptional(maps.fabricTypes, first.fabricTypeName),
+            })
+            .returning();
+
+          if (group.rows.length > 0) {
+            await tx.insert(transactionDetailTable).values(
+              group.rows.map((r) => ({
+                headerId:          header.id,
+                yarnTypeId:        lookupOptional(maps.yarnTypes,  r.yarnTypeName),
+                yarnCountId:       lookupOptional(maps.yarnCounts, r.yarnCountName),
+                yarnBrandId:       lookupOptional(maps.yarnBrands, r.yarnBrandName),
+                uomId:             lookupOptional(maps.uoms,       r.uomName),
+                machineId:         lookupOptional(maps.machines,   r.machineName),
+                machineOperatorId: lookupOptional(maps.operators,  r.operatorName),
+                quantity:          parseImportNumeric(r.quantity),
+                netWt:             parseImportNumeric(r.netWt),
+              }))
+            );
+          }
+        });
+        imported++;
+      } catch (err) {
+        errors.push({ docNumber: docNum, message: `Insert failed: ${err instanceof Error ? err.message : String(err)}` });
+      }
+    }
+  }
+
+  return { toImport, imported, duplicates, errors, previewRows: rows.slice(0, 10) };
+}
+
+// ─── Routes ───────────────────────────────────────────────────────────────────
 
 router.get("/transactions", async (_req, res): Promise<void> => {
   const rows = await db
@@ -102,6 +281,39 @@ router.get("/transactions/suggestions", async (_req, res): Promise<void> => {
 
   res.json({ nextDocNumber: String(maxNumeric + 1), lastReference });
 });
+
+// ─── CSV Import endpoints (must be before /:id) ───────────────────────────────
+
+router.post("/transactions/import/preview", async (req, res): Promise<void> => {
+  const { rows } = req.body as { rows?: unknown };
+  if (!Array.isArray(rows)) {
+    res.status(400).json({ error: "rows must be an array" });
+    return;
+  }
+  const result = await processImport(rows as ImportCsvRow[], false);
+  res.json({
+    toImport:    result.toImport,
+    duplicates:  result.duplicates,
+    errors:      result.errors,
+    previewRows: result.previewRows,
+  });
+});
+
+router.post("/transactions/import", async (req, res): Promise<void> => {
+  const { rows } = req.body as { rows?: unknown };
+  if (!Array.isArray(rows)) {
+    res.status(400).json({ error: "rows must be an array" });
+    return;
+  }
+  const result = await processImport(rows as ImportCsvRow[], true);
+  res.json({
+    imported:   result.imported,
+    skipped:    result.duplicates,
+    errors:     result.errors,
+  });
+});
+
+// ─── Single-transaction CRUD ──────────────────────────────────────────────────
 
 router.get("/transactions/:id", async (req, res): Promise<void> => {
   const params = GetTransactionParams.safeParse(req.params);

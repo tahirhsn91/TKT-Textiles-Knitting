@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
@@ -19,7 +19,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell, ResponsiveContainer,
 } from "recharts";
-import { Printer, Download, FileText, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { Printer, Download, FileText, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown, Upload } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +54,7 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ImportDialog } from "@/components/import-dialog";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -388,6 +389,8 @@ const ALL_DETAIL_KEYS = DETAIL_COLUMNS.map((c) => c.key);
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
+  const queryClient = useQueryClient();
+  const [importOpen, setImportOpen]   = useState(false);
   const [filters, setFilters]         = useState<Filters>(defaultFilters);
   const [applied, setApplied]         = useState<Filters>(EMPTY_FILTERS);
   const [groupBy, setGroupBy]         = useState<GroupByKey>("date");
@@ -954,6 +957,10 @@ export default function ReportsPage() {
                 {isFetching ? "Loading..." : "Run Report"}
               </Button>
               <Button variant="outline" size="sm" onClick={resetFilters}>Reset</Button>
+              <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="gap-1.5 ml-auto">
+                <Upload className="h-3.5 w-3.5" />
+                Import CSV
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -1000,9 +1007,19 @@ export default function ReportsPage() {
                     <TabsTrigger value="charts">Charts</TabsTrigger>
                   </TabsList>
 
-                  {/* Print / Export toolbar */}
+                  {/* Print / Export / Import toolbar */}
                   {activeTab !== "charts" && (
                     <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setImportOpen(true)}
+                        className="gap-1.5"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        Import
+                      </Button>
+
                       <Button
                         variant="outline"
                         size="sm"
@@ -1314,6 +1331,12 @@ export default function ReportsPage() {
           </>
         )}
       </div>
+
+      <ImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["reports/data"] })}
+      />
     </Layout>
   );
 }
