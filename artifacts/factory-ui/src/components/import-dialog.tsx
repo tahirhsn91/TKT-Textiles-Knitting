@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import * as XLSX from "xlsx";
 import { Upload, AlertCircle, CheckCircle2, SkipForward, XCircle, FileText } from "lucide-react";
 import {
   Dialog,
@@ -76,6 +77,121 @@ export interface ImportResult {
   imported: number;
   skipped: number;
   errors: { docNumber: string; message: string }[];
+}
+
+// ─── Excel parser ────────────────────────────────────────────────────────────
+
+/**
+ * Normalise an Excel-sourced date string to YYYY-MM-DD.
+ * SheetJS with raw:false formats dates using the cell's own format string,
+ * which can vary (M/D/YYYY, DD-MM-YYYY, etc.).  We parse common patterns
+ * and re-emit a canonical YYYY-MM-DD string the server expects.
+ * Returns the input unchanged if it already looks like YYYY-MM-DD or
+ * cannot be parsed (graceful degradation).
+ */
+function normalizeExcelDate(raw: string): string {
+  const s = raw.trim();
+  if (!s) return s;
+
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  // MM/DD/YYYY or M/D/YYYY
+  const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mdy) {
+    const [, m, d, y] = mdy;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+
+  // DD-MM-YYYY or DD/MM/YYYY with 2-digit day/month (European)
+  const dmy = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    const month = parseInt(m, 10);
+    const day   = parseInt(d, 10);
+    // Heuristic: if day > 12 it can only be day-first
+    if (day > 12) return `${y}-${m}-${d}`;
+  }
+
+  // D-MMM-YYYY or D MMM YYYY (e.g. "5 Jan 2024")
+  const dmonthy = s.match(/^(\d{1,2})[\s\-]([A-Za-z]{3})[\s\-](\d{4})$/);
+  if (dmonthy) {
+    const months: Record<string, string> = {
+      jan:"01", feb:"02", mar:"03", apr:"04", may:"05", jun:"06",
+      jul:"07", aug:"08", sep:"09", oct:"10", nov:"11", dec:"12",
+    };
+    const [, d, mon, y] = dmonthy;
+    const m = months[mon.toLowerCase()];
+    if (m) return `${y}-${m}-${d.padStart(2, "0")}`;
+  }
+
+  return s;
+}
+
+async function parseXlsx(file: File): Promise<CsvRow[]> {
+  const arrayBuffer = await file.arrayBuffer();
+  // cellDates: false keeps dates as numeric serials so we can reformat them
+  // via dateNF after detecting which cells are dates.
+  const workbook = XLSX.read(arrayBuffer, { type: "array", cellDates: false });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  if (!sheet) return [];
+
+  // raw:false + dateNF tells SheetJS to format ALL cells as strings, using
+  // "yyyy-mm-dd" for any cell whose type is 'd' (date serial) — this prevents
+  // date serials like 45234 from being returned as bare numbers.
+  const raw = XLSX.utils.sheet_to_json<string[]>(sheet, {
+    header: 1,
+    defval: "",
+    raw: false,
+    dateNF: "yyyy-mm-dd",
+  });
+
+  // Find the header row: the first row whose cells contain known column names
+  let headerRowIdx = -1;
+  let fieldNames: (string | null)[] = [];
+
+  for (let i = 0; i < Math.min(raw.length, 10); i++) {
+    const candidates = (raw[i] as unknown[]).map((c) =>
+      String(c ?? "").trim().toLowerCase()
+    );
+    const mapped = candidates.map((h) => HEADER_MAP[h] ?? null);
+    const matchCount = mapped.filter(Boolean).length;
+    if (matchCount >= 3) {
+      headerRowIdx = i;
+      fieldNames = mapped;
+      break;
+    }
+  }
+
+  if (headerRowIdx === -1) return [];
+
+  const rows: CsvRow[] = [];
+  for (let i = headerRowIdx + 1; i < raw.length; i++) {
+    const cells = raw[i] as unknown[];
+    const firstVal = String(cells[0] ?? "").trim();
+
+    if (
+      firstVal === "Opening Balance" ||
+      firstVal.startsWith("Subtotal:") ||
+      firstVal === "Grand Total" ||
+      firstVal === ""
+    ) continue;
+
+    const row: Record<string, string> = {};
+    fieldNames.forEach((name, idx) => {
+      if (name) {
+        let val = String(cells[idx] ?? "").trim();
+        // Normalise date fields to YYYY-MM-DD regardless of cell format
+        if (name === "date" && val) val = normalizeExcelDate(val);
+        if (val !== "") row[name] = val;
+      }
+    });
+
+    if (!row.date && !row.docNumber) continue;
+    rows.push(row as CsvRow);
+  }
+
+  return rows;
 }
 
 // ─── CSV parser ──────────────────────────────────────────────────────────────
@@ -188,11 +304,23 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
     setParseError("");
     setPreview(null);
 
-    const text = await file.text();
-    const rows = parseCsv(text);
+    const isXlsx = file.name.toLowerCase().endsWith(".xlsx");
+    let rows: CsvRow[];
+
+    try {
+      if (isXlsx) {
+        rows = await parseXlsx(file);
+      } else {
+        const text = await file.text();
+        rows = parseCsv(text);
+      }
+    } catch {
+      setParseError("Failed to read the file. Make sure it is a valid CSV or Excel (.xlsx) file.");
+      return;
+    }
 
     if (rows.length === 0) {
-      setParseError("No data rows found. Make sure you upload a Detailed CSV exported from this app.");
+      setParseError("No data rows found. Make sure you upload a Detailed CSV or Excel file exported from this app.");
       return;
     }
 
@@ -256,7 +384,7 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Import from CSV</DialogTitle>
+          <DialogTitle>Import from CSV or Excel</DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4 py-2">
@@ -267,15 +395,15 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
           >
             <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
             <p className="text-sm font-medium">
-              {fileName ? fileName : "Click to select a CSV file"}
+              {fileName ? fileName : "Click to select a CSV or Excel file"}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Upload a Detailed CSV exported using the Export button
+              Upload a Detailed CSV or Excel (.xlsx) file exported using the Export button
             </p>
             <input
               ref={fileRef}
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               className="hidden"
               onChange={handleFileChange}
             />
