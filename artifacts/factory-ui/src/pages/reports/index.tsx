@@ -876,7 +876,7 @@ export default function ReportsPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Yarn Balance Report</h1>
             <p className="text-sm text-muted-foreground">Apply filters and run the report to see detailed and summary data with charts.</p>
           </div>
         </div>
