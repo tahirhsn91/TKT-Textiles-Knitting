@@ -6,7 +6,8 @@ import NotFound from "@/pages/not-found";
 import TransactionList from "@/pages/transactions";
 import TransactionForm from "@/pages/transactions/form";
 import MastersPage from "@/pages/masters";
-import ReportsPage from "@/pages/reports";
+import YarnBalancePage from "@/pages/reports/index";
+import YarnToFabricPage from "@/pages/reports/yarn-to-fabric";
 import OperatorsPage from "@/pages/operators";
 import DashboardPage from "@/pages/dashboard";
 
@@ -21,7 +22,9 @@ function Router() {
       <Route path="/transactions/new" component={TransactionForm} />
       <Route path="/transactions/:id/edit" component={TransactionForm} />
       <Route path="/masters" component={MastersPage} />
-      <Route path="/reports" component={ReportsPage} />
+      <Route path="/reports" component={() => <Redirect to="/reports/yarn-balance" />} />
+      <Route path="/reports/yarn-balance" component={YarnBalancePage} />
+      <Route path="/reports/yarn-to-fabric" component={YarnToFabricPage} />
       <Route path="/operators" component={OperatorsPage} />
       <Route component={NotFound} />
     </Switch>
