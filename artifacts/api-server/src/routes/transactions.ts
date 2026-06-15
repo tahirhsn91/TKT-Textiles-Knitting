@@ -71,17 +71,25 @@ interface ImportCsvRow {
   netWt?: string;
 }
 
+export interface ImportError {
+  docNumber: string;
+  row: number | null;
+  field: string;
+  value: string;
+  reason: string;
+}
+
 /** Returns the ID for a non-empty name, or null if name is blank.
- *  If name is non-empty but not found, returns { id: null, error: message }. */
+ *  If name is non-empty but not found, returns structured error info. */
 function resolveLookup(
   map: Map<string, number>,
   name: string | undefined,
   fieldLabel: string,
-): { id: number | null; error: string | null } {
-  if (!name || !name.trim()) return { id: null, error: null };
+): { id: number | null; field: string | null; value: string | null } {
+  if (!name || !name.trim()) return { id: null, field: null, value: null };
   const id = map.get(name.toLowerCase().trim());
-  if (id == null) return { id: null, error: `Unknown ${fieldLabel}: "${name.trim()}"` };
-  return { id, error: null };
+  if (id == null) return { id: null, field: fieldLabel, value: name.trim() };
+  return { id, field: null, value: null };
 }
 
 function parseImportNumeric(s: string | undefined): string | null {
@@ -155,7 +163,7 @@ async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
   let toImport   = 0;
   let imported   = 0;
   let duplicates = 0;
-  const errors: { docNumber: string; message: string }[] = [];
+  const errors: ImportError[] = [];
 
   for (const [docNum, group] of groups) {
     if (existingSet.has(docNum)) { duplicates++; continue; }
@@ -163,43 +171,67 @@ async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
     const first = group.first;
 
     if (!first.date || !first.date.trim()) {
-      errors.push({ docNumber: docNum, message: "Missing date" });
+      errors.push({ docNumber: docNum, row: null, field: "Date", value: "", reason: "Missing date" });
       continue;
     }
 
     // Resolve all header lookups — non-empty names that can't be matched are errors
     const transTypeId = maps.transTypes.get((first.transTypeName ?? "").toLowerCase().trim());
     if (!transTypeId) {
-      errors.push({ docNumber: docNum, message: `Unknown transaction type: "${first.transTypeName ?? ""}"` });
+      errors.push({
+        docNumber: docNum,
+        row: null,
+        field: "Trans Type",
+        value: first.transTypeName?.trim() ?? "",
+        reason: "Not found in master list",
+      });
       continue;
     }
 
-    const jobR         = resolveLookup(maps.jobs,        first.jobName,        "job");
-    const partyR       = resolveLookup(maps.parties,     first.partyName,      "party");
-    const locationR    = resolveLookup(maps.locations,   first.locationName,   "location");
-    const fabricTypeR  = resolveLookup(maps.fabricTypes, first.fabricTypeName, "fabric type");
+    const jobR         = resolveLookup(maps.jobs,        first.jobName,        "Job");
+    const partyR       = resolveLookup(maps.parties,     first.partyName,      "Party");
+    const locationR    = resolveLookup(maps.locations,   first.locationName,   "Location");
+    const fabricTypeR  = resolveLookup(maps.fabricTypes, first.fabricTypeName, "Fabric Type");
 
     // Resolve detail lookups per-row — collect all resolution errors across all detail rows
     const detailResults = group.rows.map((r, ri) => {
-      const yarnTypeR  = resolveLookup(maps.yarnTypes,  r.yarnTypeName,  "yarn type");
-      const yarnCountR = resolveLookup(maps.yarnCounts, r.yarnCountName, "yarn count");
-      const yarnBrandR = resolveLookup(maps.yarnBrands, r.yarnBrandName, "yarn brand");
+      const yarnTypeR  = resolveLookup(maps.yarnTypes,  r.yarnTypeName,  "Yarn Type");
+      const yarnCountR = resolveLookup(maps.yarnCounts, r.yarnCountName, "Yarn Count");
+      const yarnBrandR = resolveLookup(maps.yarnBrands, r.yarnBrandName, "Yarn Brand");
       const uomR       = resolveLookup(maps.uoms,       r.uomName,       "UOM");
-      const machineR   = resolveLookup(maps.machines,   r.machineName,   "machine");
-      const operatorR  = resolveLookup(maps.operators,  r.operatorName,  "operator");
-      const rowErrors  = [yarnTypeR, yarnCountR, yarnBrandR, uomR, machineR, operatorR]
-        .filter((x) => x.error)
-        .map((x) => `(row ${ri + 1}) ${x.error}`);
+      const machineR   = resolveLookup(maps.machines,   r.machineName,   "Machine");
+      const operatorR  = resolveLookup(maps.operators,  r.operatorName,  "Operator");
+      const rowErrors: ImportError[] = [yarnTypeR, yarnCountR, yarnBrandR, uomR, machineR, operatorR]
+        .filter((x) => x.field !== null)
+        .map((x) => ({
+          docNumber: docNum,
+          row: ri + 1,
+          field: x.field as string,
+          value: x.value as string,
+          reason: "Not found in master list",
+        }));
       return { yarnTypeR, yarnCountR, yarnBrandR, uomR, machineR, operatorR, rowErrors };
     });
 
-    const allErrors = [
-      ...[jobR, partyR, locationR, fabricTypeR].filter((x) => x.error).map((x) => x.error as string),
-      ...detailResults.flatMap((d) => d.rowErrors),
-    ];
+    const headerErrors: ImportError[] = [
+      { r: jobR,        field: "Job" },
+      { r: partyR,      field: "Party" },
+      { r: locationR,   field: "Location" },
+      { r: fabricTypeR, field: "Fabric Type" },
+    ]
+      .filter(({ r }) => r.field !== null)
+      .map(({ r }) => ({
+        docNumber: docNum,
+        row: null,
+        field: r.field as string,
+        value: r.value as string,
+        reason: "Not found in master list",
+      }));
+
+    const allErrors = [...headerErrors, ...detailResults.flatMap((d) => d.rowErrors)];
 
     if (allErrors.length > 0) {
-      errors.push({ docNumber: docNum, message: allErrors.join("; ") });
+      errors.push(...allErrors);
       continue;
     }
 
@@ -243,7 +275,13 @@ async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
         });
         imported++;
       } catch (err) {
-        errors.push({ docNumber: docNum, message: `Insert failed: ${err instanceof Error ? err.message : String(err)}` });
+        errors.push({
+          docNumber: docNum,
+          row: null,
+          field: "",
+          value: "",
+          reason: `Insert failed: ${err instanceof Error ? err.message : String(err)}`,
+        });
       }
     }
   }

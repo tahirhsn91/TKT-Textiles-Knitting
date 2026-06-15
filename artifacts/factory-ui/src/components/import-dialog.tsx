@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
-import { Upload, AlertCircle, CheckCircle2, SkipForward, XCircle, FileText } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle2, SkipForward, XCircle, FileText, Download } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -64,11 +64,19 @@ export interface CsvRow {
   netWt?: string;
 }
 
+export interface ImportError {
+  docNumber: string;
+  row: number | null;
+  field: string;
+  value: string;
+  reason: string;
+}
+
 export interface ImportPreview {
   totalRows: number;
   toImport: number;
   duplicates: number;
-  errors: { docNumber: string; message: string }[];
+  errors: ImportError[];
   previewRows: CsvRow[];
 }
 
@@ -76,7 +84,7 @@ export interface ImportResult {
   totalRows: number;
   imported: number;
   skipped: number;
-  errors: { docNumber: string; message: string }[];
+  errors: ImportError[];
 }
 
 // ─── Excel parser ────────────────────────────────────────────────────────────
@@ -378,6 +386,32 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
     }
   }
 
+  function downloadErrorReport(errors: ImportError[]) {
+    const csvEscape = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const header = ["Doc Number", "Row", "Field", "Value", "Reason"];
+    const lines = [
+      header.map(csvEscape).join(","),
+      ...errors.map((e) =>
+        [
+          e.docNumber,
+          e.row != null ? String(e.row) : "",
+          e.field,
+          e.value,
+          e.reason,
+        ]
+          .map(csvEscape)
+          .join(",")
+      ),
+    ];
+    const blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "import-errors.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const canImport = preview && preview.toImport > 0 && step === "preview";
 
   return (
@@ -450,13 +484,26 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
 
               {/* Errors list */}
               {preview.errors.length > 0 && (
-                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-1 max-h-36 overflow-y-auto">
-                  <p className="text-xs font-semibold text-destructive mb-1">Lookup errors (these rows will be skipped):</p>
-                  {preview.errors.map((e, i) => (
-                    <p key={i} className="text-xs text-destructive">
-                      Doc #{e.docNumber}: {e.message}
-                    </p>
-                  ))}
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs font-semibold text-destructive">Lookup errors (these rows will be skipped):</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                      onClick={() => downloadErrorReport(preview.errors)}
+                    >
+                      <Download className="h-3 w-3 mr-1" />
+                      Download error report
+                    </Button>
+                  </div>
+                  <div className="max-h-36 overflow-y-auto space-y-0.5">
+                    {preview.errors.map((e, i) => (
+                      <p key={i} className="text-xs text-destructive">
+                        Doc #{e.docNumber}{e.row != null ? ` row ${e.row}` : ""} — {e.field}{e.value ? `: "${e.value}"` : ""} — {e.reason}
+                      </p>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -499,14 +546,42 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
 
           {/* Done state */}
           {step === "done" && result && (
-            <div className="rounded-md border border-green-200 bg-green-50 p-4 text-center space-y-1">
-              <CheckCircle2 className="h-8 w-8 mx-auto text-green-600" />
-              <p className="font-semibold text-green-700">Import complete!</p>
-              <p className="text-sm text-muted-foreground">
-                {result.imported} transaction{result.imported !== 1 ? "s" : ""} imported
-                {result.skipped > 0 ? ` · ${result.skipped} duplicate${result.skipped !== 1 ? "s" : ""} skipped` : ""}
-                {result.errors.length > 0 ? ` · ${result.errors.length} error${result.errors.length !== 1 ? "s" : ""}` : ""}
-              </p>
+            <div className="space-y-3">
+              <div className="rounded-md border border-green-200 bg-green-50 p-4 text-center space-y-1">
+                <CheckCircle2 className="h-8 w-8 mx-auto text-green-600" />
+                <p className="font-semibold text-green-700">Import complete!</p>
+                <p className="text-sm text-muted-foreground">
+                  {result.imported} transaction{result.imported !== 1 ? "s" : ""} imported
+                  {result.skipped > 0 ? ` · ${result.skipped} duplicate${result.skipped !== 1 ? "s" : ""} skipped` : ""}
+                  {result.errors.length > 0 ? ` · ${result.errors.length} row${result.errors.length !== 1 ? "s" : ""} rejected` : ""}
+                </p>
+              </div>
+
+              {result.errors.length > 0 && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-destructive">
+                      {result.errors.length} row{result.errors.length !== 1 ? "s" : ""} were rejected — fix and re-import:
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-3 text-xs border-destructive/40 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => downloadErrorReport(result.errors)}
+                    >
+                      <Download className="h-3 w-3 mr-1.5" />
+                      Download error report
+                    </Button>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto space-y-0.5">
+                    {result.errors.map((e, i) => (
+                      <p key={i} className="text-xs text-destructive">
+                        Doc #{e.docNumber}{e.row != null ? ` row ${e.row}` : ""} — {e.field}{e.value ? `: "${e.value}"` : ""} — {e.reason}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
