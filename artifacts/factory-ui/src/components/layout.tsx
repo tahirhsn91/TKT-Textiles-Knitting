@@ -27,7 +27,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-[100dvh] flex w-full flex-col bg-background">
-      <header className="sticky top-0 z-10 flex h-14 items-center gap-6 border-b bg-card px-6 shadow-sm">
+      <header className="sticky top-0 z-10 flex h-14 items-center gap-6 border-b bg-card px-6 shadow-sm print:hidden">
         <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-primary transition-colors hover:text-primary/80 shrink-0">
           <Factory className="h-5 w-5" />
           <span>FactoryOps ERP</span>
@@ -81,7 +81,7 @@ export function Layout({ children }: { children: ReactNode }) {
           </DropdownMenu>
         </nav>
       </header>
-      <main className="flex-1 p-4 md:p-6 w-full max-w-7xl mx-auto">
+      <main className="flex-1 p-4 md:p-6 w-full max-w-7xl mx-auto print:p-0 print:max-w-none">
         {children}
       </main>
     </div>

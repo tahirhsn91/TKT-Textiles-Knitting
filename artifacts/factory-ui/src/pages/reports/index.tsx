@@ -888,7 +888,7 @@ export default function ReportsPage() {
         </div>
 
         {/* ── Filter Panel ─────────────────────────────────── */}
-        <Card>
+        <Card className="print:hidden">
           <CardHeader className="pb-3 pt-4 px-4">
             <CardTitle className="text-base">Filters</CardTitle>
           </CardHeader>
@@ -1000,7 +1000,7 @@ export default function ReportsPage() {
 
             {rows.length > 0 && (
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center justify-between gap-2 flex-wrap print:hidden">
                   <TabsList>
                     <TabsTrigger value="summary">Summary</TabsTrigger>
                     <TabsTrigger value="detail">Detailed</TabsTrigger>
@@ -1060,7 +1060,7 @@ export default function ReportsPage() {
 
                 {/* ── Summary Tab ─────────────────────────── */}
                 <TabsContent value="summary" className="space-y-3 mt-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 print:hidden">
                     <Label className="text-sm shrink-0">Group By:</Label>
                     <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupByKey)}>
                       <SelectTrigger className="h-8 w-52 text-sm">
@@ -1074,7 +1074,7 @@ export default function ReportsPage() {
                     </Select>
                   </div>
 
-                  <div className="rounded-md border overflow-auto max-h-[500px]">
+                  <div className="rounded-md border overflow-auto max-h-[500px] print:max-h-none print:overflow-visible">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1142,7 +1142,7 @@ export default function ReportsPage() {
                 <TabsContent value="detail" className="mt-3 space-y-3">
 
                   {/* Column visibility picker */}
-                  <Card className="border-dashed">
+                  <Card className="border-dashed print:hidden">
                     <CardContent className="px-4 py-3">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Show / Hide Columns</span>

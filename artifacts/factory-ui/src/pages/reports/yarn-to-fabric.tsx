@@ -902,13 +902,14 @@ export default function YarnToFabricPage() {
           <p className="text-sm text-muted-foreground">Track fabric production, deliveries, and running balances.</p>
         </div>
 
-        <div className="text-center py-2">
-          <p className="text-lg font-semibold">TKT Textiles (Knitting)</p>
-          <p className="text-sm text-muted-foreground">{reportDateRange()}</p>
+        <div className="text-center py-2 print:py-4">
+          <p className="text-lg font-bold">TKT Textiles (Knitting)</p>
+          <p className="text-sm text-muted-foreground print:text-black">{reportDateRange()}</p>
+          <p className="text-sm font-medium print:block hidden">Yarn to Fabric Movement Report</p>
         </div>
 
         {/* ── Filters ───────────────────────────────────────── */}
-        <Card>
+        <Card className="print:hidden">
           <CardContent className="pt-4 space-y-3">
             <p className="text-sm font-semibold">Filters</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -1015,7 +1016,7 @@ export default function YarnToFabricPage() {
 
             {rows.length > 0 && (
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center justify-between gap-2 flex-wrap print:hidden">
                   <TabsList>
                     <TabsTrigger value="summary">Summary</TabsTrigger>
                     <TabsTrigger value="detail">Detailed</TabsTrigger>
@@ -1056,7 +1057,7 @@ export default function YarnToFabricPage() {
 
                 {/* ── Summary Tab ─────────────────────────── */}
                 <TabsContent value="summary" className="space-y-3 mt-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 print:hidden">
                     <Label className="text-sm shrink-0">Group By:</Label>
                     <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupByKey)}>
                       <SelectTrigger className="h-8 w-52 text-sm"><SelectValue /></SelectTrigger>
@@ -1068,7 +1069,7 @@ export default function YarnToFabricPage() {
                     </Select>
                   </div>
 
-                  <div className="rounded-md border overflow-auto max-h-[520px]">
+                  <div className="rounded-md border overflow-auto max-h-[520px] print:max-h-none print:overflow-visible">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1122,7 +1123,7 @@ export default function YarnToFabricPage() {
 
                 {/* ── Detail Tab ──────────────────────────── */}
                 <TabsContent value="detail" className="mt-3 space-y-3">
-                  <Card className="border-dashed">
+                  <Card className="border-dashed print:hidden">
                     <CardContent className="px-4 py-3">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Show / Hide Columns</span>

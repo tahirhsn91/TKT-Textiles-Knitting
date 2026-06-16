@@ -229,6 +229,55 @@
  * Even without handling focused or not, this is six possible combinations that
  * need to be distinguished from eachother visually.
  */
+@media print {
+  @page {
+    margin: 1.5cm;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+
+  table {
+    page-break-inside: auto;
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  td, th {
+    padding: 3pt 6pt !important;
+    font-size: 9pt !important;
+    white-space: nowrap;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+
+  .print\:max-h-none {
+    max-height: none !important;
+  }
+
+  .print\:overflow-visible {
+    overflow: visible !important;
+  }
+}
+
 @layer utilities {
 
   /* Hide ugly search cancel button in Chrome until we can style it properly */
