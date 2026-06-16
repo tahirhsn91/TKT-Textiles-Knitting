@@ -183,12 +183,6 @@ function signedNetWt(row: ReportRow): number {
   return toNum(row.netWt) * getMultiplier(row.transactionTypeAction);
 }
 
-function balanceNetWt(row: ReportRow): number {
-  const action = row.transactionTypeAction;
-  if (!action || action.trim() === "") return 0;
-  return toNum(row.netWt) * (action.trim().toLowerCase() === "minus" ? -1 : 1);
-}
-
 function wastageWt(row: ReportRow): number {
   const name = row.transactionTypeName;
   if (name !== "Fabric Delivery" && name !== "Fabric Delivery Return") return 0;
@@ -205,9 +199,13 @@ function fabricBalanceDelta(row: ReportRow): number {
   return 0;
 }
 
-/** Returns netWt (absolute) if the row matches the given transaction type name, else null. */
-function netWtIfType(row: ReportRow, typeName: string): number | null {
-  return row.transactionTypeName === typeName ? toNum(row.netWt) : null;
+/**
+ * Returns signedNetWt if the row matches the given transaction type name, else null.
+ * Fabric Delivery rows will return a negative value (action = Minus).
+ * Fabric Delivery Return rows will return a positive value (action = Add).
+ */
+function signedNetWtIfType(row: ReportRow, typeName: string): number | null {
+  return row.transactionTypeName === typeName ? signedNetWt(row) : null;
 }
 
 function fmt(n: number): string {
@@ -249,9 +247,8 @@ type DetailColKey =
   | "jobName" | "partyName" | "locationName" | "fabricTypeName"
   | "yarnTypeName" | "yarnCountName" | "yarnBrandName" | "uomName"
   | "machineName" | "machineOperatorName" | "quantity"
-  | "yarnReceipt" | "yarnReturn" | "fabricDelivery" | "fabricDeliveryReturn"
-  | "wastagePercent" | "wastageWt" | "fabricProduction"
-  | "runningBalance" | "runningFabricBalance";
+  | "fabricProduction" | "fabricDelivery" | "wastageWt"
+  | "fabricDeliveryReturn" | "runningFabricBalance";
 
 const DETAIL_COLUMNS: { key: DetailColKey; label: string }[] = [
   { key: "date",                  label: "Date" },
@@ -271,22 +268,18 @@ const DETAIL_COLUMNS: { key: DetailColKey; label: string }[] = [
   { key: "machineName",           label: "Machine" },
   { key: "machineOperatorName",   label: "Operator" },
   { key: "quantity",              label: "Qty" },
-  { key: "yarnReceipt",           label: "Yarn Receipt" },
-  { key: "yarnReturn",            label: "Yarn Return" },
-  { key: "fabricDelivery",        label: "Fabric Delivery" },
-  { key: "fabricDeliveryReturn",  label: "Fabric Del. Return" },
-  { key: "wastagePercent",        label: "Wastage%" },
-  { key: "wastageWt",             label: "Wastage Wt" },
   { key: "fabricProduction",      label: "Fabric Production" },
-  { key: "runningBalance",        label: "Running Yarn Bal." },
-  { key: "runningFabricBalance",  label: "Running Fabric Bal." },
+  { key: "fabricDelivery",        label: "Fabric Delivery" },
+  { key: "wastageWt",             label: "Wastage Wt" },
+  { key: "fabricDeliveryReturn",  label: "Fab Del Return" },
+  { key: "runningFabricBalance",  label: "Run Fabric Bal." },
 ];
 
 const ALL_DETAIL_KEYS = DETAIL_COLUMNS.map((c) => c.key);
 
 const RIGHT_ALIGNED: Set<DetailColKey> = new Set([
-  "quantity", "yarnReceipt", "yarnReturn", "fabricDelivery", "fabricDeliveryReturn",
-  "wastageWt", "fabricProduction", "runningBalance", "runningFabricBalance",
+  "quantity", "fabricProduction", "fabricDelivery", "wastageWt",
+  "fabricDeliveryReturn", "runningFabricBalance",
 ]);
 
 // ─── Grouped Row ─────────────────────────────────────────────────────────────
@@ -295,13 +288,10 @@ type Y2FGroupedRow = {
   label: string;
   count: number;
   qty: number;
-  yarnReceipt: number;
-  yarnReturn: number;
-  fabricDelivery: number;
-  fabricDeliveryReturn: number;
-  wastageWt: number;
   fabricProduction: number;
-  balNetWtMinusWastage: number;
+  fabricDelivery: number;
+  wastageWt: number;
+  fabricDeliveryReturn: number;
   fabricDelta: number;
   docNums: string[];
   refs: string[];
@@ -310,10 +300,9 @@ type Y2FGroupedRow = {
 function groupRows(rows: ReportRow[], key: GroupByKey): Y2FGroupedRow[] {
   const map = new Map<string, {
     count: number; qty: number;
-    yarnReceipt: number; yarnReturn: number;
-    fabricDelivery: number; fabricDeliveryReturn: number;
-    wastageWt: number; fabricProduction: number;
-    balNetWtMinusWastage: number; fabricDelta: number;
+    fabricProduction: number; fabricDelivery: number;
+    wastageWt: number; fabricDeliveryReturn: number;
+    fabricDelta: number;
     docNumSet: Set<string>; refSet: Set<string>;
   }>();
 
@@ -322,23 +311,18 @@ function groupRows(rows: ReportRow[], key: GroupByKey): Y2FGroupedRow[] {
     const k = String(rawKey);
     const e = map.get(k) ?? {
       count: 0, qty: 0,
-      yarnReceipt: 0, yarnReturn: 0,
-      fabricDelivery: 0, fabricDeliveryReturn: 0,
-      wastageWt: 0, fabricProduction: 0,
-      balNetWtMinusWastage: 0, fabricDelta: 0,
+      fabricProduction: 0, fabricDelivery: 0,
+      wastageWt: 0, fabricDeliveryReturn: 0,
+      fabricDelta: 0,
       docNumSet: new Set<string>(), refSet: new Set<string>(),
     };
     e.count += 1;
     e.qty   += signedQty(row);
-    e.balNetWtMinusWastage += balanceNetWt(row) + wastageWt(row);
-    e.fabricDelta          += fabricBalanceDelta(row);
+    e.fabricDelta += fabricBalanceDelta(row);
     const name = row.transactionTypeName;
-    const wt = toNum(row.netWt);
-    if (name === "Yarn Receipt")           e.yarnReceipt          += wt;
-    if (name === "Yarn Return")            e.yarnReturn           += wt;
-    if (name === "Fabric Delivery")        e.fabricDelivery       += wt;
-    if (name === "Fabric Delivery Return") e.fabricDeliveryReturn += wt;
-    if (name === "Fabric Production")      e.fabricProduction     += wt;
+    if (name === "Fabric Production")      e.fabricProduction     += signedNetWt(row);
+    if (name === "Fabric Delivery")        e.fabricDelivery       += signedNetWt(row);
+    if (name === "Fabric Delivery Return") e.fabricDeliveryReturn += signedNetWt(row);
     e.wastageWt += wastageWt(row);
     if (row.docNumber) e.docNumSet.add(row.docNumber);
     if (row.reference) e.refSet.add(row.reference);
@@ -348,10 +332,11 @@ function groupRows(rows: ReportRow[], key: GroupByKey): Y2FGroupedRow[] {
   return Array.from(map.entries())
     .map(([label, v]) => ({
       label, count: v.count, qty: v.qty,
-      yarnReceipt: v.yarnReceipt, yarnReturn: v.yarnReturn,
-      fabricDelivery: v.fabricDelivery, fabricDeliveryReturn: v.fabricDeliveryReturn,
-      wastageWt: v.wastageWt, fabricProduction: v.fabricProduction,
-      balNetWtMinusWastage: v.balNetWtMinusWastage, fabricDelta: v.fabricDelta,
+      fabricProduction: v.fabricProduction,
+      fabricDelivery: v.fabricDelivery,
+      wastageWt: v.wastageWt,
+      fabricDeliveryReturn: v.fabricDeliveryReturn,
+      fabricDelta: v.fabricDelta,
       docNums: [...v.docNumSet], refs: [...v.refSet],
     }))
     .sort((a, b) => a.label.localeCompare(b.label));
@@ -360,8 +345,8 @@ function groupRows(rows: ReportRow[], key: GroupByKey): Y2FGroupedRow[] {
 // ─── Detail render item ───────────────────────────────────────────────────────
 
 type DetailRenderItem =
-  | { kind: "data"; r: ReportRow; idx: number; yarnBal: number; fabricBal: number }
-  | { kind: "subtotal"; label: string; qty: number; yarnReceipt: number; yarnReturn: number; fabricDelivery: number; fabricDeliveryReturn: number; wastageWt: number; fabricProduction: number };
+  | { kind: "data"; r: ReportRow; idx: number; fabricBal: number }
+  | { kind: "subtotal"; label: string; qty: number; fabricProduction: number; fabricDelivery: number; wastageWt: number; fabricDeliveryReturn: number };
 
 // ─── Shared sub-components ────────────────────────────────────────────────────
 
@@ -540,13 +525,7 @@ export default function YarnToFabricPage() {
     enabled: hasRun && openingQs !== null,
   });
 
-  // Opening yarn balance = same logic as Yarn Balance Report
-  const openingYarnBalance = useMemo(
-    () => openingRows.reduce((s, r) => s + balanceNetWt(r) + wastageWt(r), 0),
-    [openingRows]
-  );
-
-  // Opening fabric balance = sum of fabricBalanceDelta for opening rows
+  // Opening fabric balance = Σ(Fabric Production signed) + Σ(Fabric Delivery signed + Wastage) + Σ(Fab Del Return signed + Wastage)
   const openingFabricBalance = useMemo(
     () => openingRows.reduce((s, r) => s + fabricBalanceDelta(r), 0),
     [openingRows]
@@ -554,24 +533,23 @@ export default function YarnToFabricPage() {
 
   // ── Computed values ───────────────────────────────────────────────────────
 
-  const totalQty            = useMemo(() => rows.reduce((s, r) => s + signedQty(r),              0), [rows]);
-  const totalYarnReceipt    = useMemo(() => rows.reduce((s, r) => s + (r.transactionTypeName === "Yarn Receipt"           ? toNum(r.netWt) : 0), 0), [rows]);
-  const totalYarnReturn     = useMemo(() => rows.reduce((s, r) => s + (r.transactionTypeName === "Yarn Return"            ? toNum(r.netWt) : 0), 0), [rows]);
-  const totalFabricDelivery = useMemo(() => rows.reduce((s, r) => s + (r.transactionTypeName === "Fabric Delivery"        ? toNum(r.netWt) : 0), 0), [rows]);
-  const totalFabricDelRtn   = useMemo(() => rows.reduce((s, r) => s + (r.transactionTypeName === "Fabric Delivery Return" ? toNum(r.netWt) : 0), 0), [rows]);
-  const totalFabricProd     = useMemo(() => rows.reduce((s, r) => s + (r.transactionTypeName === "Fabric Production"      ? toNum(r.netWt) : 0), 0), [rows]);
-  const totalWastageWt      = useMemo(() => rows.reduce((s, r) => s + wastageWt(r),              0), [rows]);
-
-  // Running balances (per original row index)
-  const runningYarnBalances = useMemo(() => {
-    let bal = openingYarnBalance;
-    return rows.map((r) => { bal += balanceNetWt(r) + wastageWt(r); return bal; });
-  }, [rows, openingYarnBalance]);
+  const totalQty            = useMemo(() => rows.reduce((s, r) => s + signedQty(r), 0), [rows]);
+  const totalFabricProd     = useMemo(() => rows.reduce((s, r) => s + (r.transactionTypeName === "Fabric Production"      ? signedNetWt(r) : 0), 0), [rows]);
+  const totalFabricDelivery = useMemo(() => rows.reduce((s, r) => s + (r.transactionTypeName === "Fabric Delivery"        ? signedNetWt(r) : 0), 0), [rows]);
+  const totalFabricDelRtn   = useMemo(() => rows.reduce((s, r) => s + (r.transactionTypeName === "Fabric Delivery Return" ? signedNetWt(r) : 0), 0), [rows]);
+  const totalWastageWt      = useMemo(() => rows.reduce((s, r) => s + wastageWt(r), 0), [rows]);
 
   const runningFabricBalances = useMemo(() => {
     let bal = openingFabricBalance;
     return rows.map((r) => { bal += fabricBalanceDelta(r); return bal; });
   }, [rows, openingFabricBalance]);
+
+  const currentFabricBalance = useMemo(
+    () => runningFabricBalances.length > 0
+      ? runningFabricBalances[runningFabricBalances.length - 1]
+      : openingFabricBalance,
+    [runningFabricBalances, openingFabricBalance]
+  );
 
   // Grouped summary rows
   const grouped = useMemo(() => groupRows(rows, groupBy), [rows, groupBy]);
@@ -594,11 +572,6 @@ export default function YarnToFabricPage() {
     return arr;
   }, [grouped, sortSummary]);
 
-  const summaryYarnRunning = useMemo(() => {
-    let bal = openingYarnBalance;
-    return sortedGrouped.map((r) => { bal += r.balNetWtMinusWastage; return bal; });
-  }, [sortedGrouped, openingYarnBalance]);
-
   const summaryFabricRunning = useMemo(() => {
     let bal = openingFabricBalance;
     return sortedGrouped.map((r) => { bal += r.fabricDelta; return bal; });
@@ -607,24 +580,20 @@ export default function YarnToFabricPage() {
   // Sorted detail rows
   const sortedDetailRows = useMemo(() => {
     const indexed = rows.map((r, idx) => ({
-      r, idx, yarnBal: runningYarnBalances[idx], fabricBal: runningFabricBalances[idx],
+      r, idx, fabricBal: runningFabricBalances[idx],
     }));
     if (!sortDetail.key) return indexed;
     const key = sortDetail.key;
     return [...indexed].sort((a, b) => {
       let av: string | number = 0, bv: string | number = 0;
       switch (key) {
-        case "runningBalance":       av = a.yarnBal;                          bv = b.yarnBal;                          break;
-        case "runningFabricBalance": av = a.fabricBal;                        bv = b.fabricBal;                        break;
-        case "quantity":             av = signedQty(a.r);                     bv = signedQty(b.r);                     break;
-        case "yarnReceipt":          av = netWtIfType(a.r, "Yarn Receipt")           ?? 0; bv = netWtIfType(b.r, "Yarn Receipt")           ?? 0; break;
-        case "yarnReturn":           av = netWtIfType(a.r, "Yarn Return")            ?? 0; bv = netWtIfType(b.r, "Yarn Return")            ?? 0; break;
-        case "fabricDelivery":       av = netWtIfType(a.r, "Fabric Delivery")        ?? 0; bv = netWtIfType(b.r, "Fabric Delivery")        ?? 0; break;
-        case "fabricDeliveryReturn": av = netWtIfType(a.r, "Fabric Delivery Return") ?? 0; bv = netWtIfType(b.r, "Fabric Delivery Return") ?? 0; break;
-        case "fabricProduction":     av = netWtIfType(a.r, "Fabric Production")      ?? 0; bv = netWtIfType(b.r, "Fabric Production")      ?? 0; break;
-        case "wastageWt":            av = wastageWt(a.r);                     bv = wastageWt(b.r);                     break;
-        case "wastagePercent":       av = toNum(a.r.partyWastePercent);       bv = toNum(b.r.partyWastePercent);       break;
-        case "gsm":                  av = a.r.gsm ?? 0;                       bv = b.r.gsm ?? 0;                       break;
+        case "runningFabricBalance": av = a.fabricBal;                          bv = b.fabricBal;                          break;
+        case "quantity":             av = signedQty(a.r);                       bv = signedQty(b.r);                       break;
+        case "fabricProduction":     av = signedNetWtIfType(a.r, "Fabric Production")      ?? 0; bv = signedNetWtIfType(b.r, "Fabric Production")      ?? 0; break;
+        case "fabricDelivery":       av = signedNetWtIfType(a.r, "Fabric Delivery")        ?? 0; bv = signedNetWtIfType(b.r, "Fabric Delivery")        ?? 0; break;
+        case "fabricDeliveryReturn": av = signedNetWtIfType(a.r, "Fabric Delivery Return") ?? 0; bv = signedNetWtIfType(b.r, "Fabric Delivery Return") ?? 0; break;
+        case "wastageWt":            av = wastageWt(a.r);                       bv = wastageWt(b.r);                       break;
+        case "gsm":                  av = a.r.gsm ?? 0;                         bv = b.r.gsm ?? 0;                         break;
         default: {
           const rawA = a.r[key as keyof ReportRow];
           const rawB = b.r[key as keyof ReportRow];
@@ -638,24 +607,23 @@ export default function YarnToFabricPage() {
         ? av.localeCompare(bv as string)
         : (bv as string).localeCompare(av);
     });
-  }, [rows, runningYarnBalances, runningFabricBalances, sortDetail]);
+  }, [rows, runningFabricBalances, sortDetail]);
 
   // Detail rows interleaved with subtotals
   const detailRenderRows = useMemo((): DetailRenderItem[] => {
     const result: DetailRenderItem[] = [];
     let curKey: string | null = null;
     let gLabel = "";
-    let gQty = 0, gYR = 0, gYRtn = 0, gFD = 0, gFDR = 0, gWWt = 0, gFP = 0;
+    let gQty = 0, gFP = 0, gFD = 0, gWWt = 0, gFDR = 0;
 
     const flush = () => {
       if (curKey !== null) {
         result.push({
           kind: "subtotal", label: gLabel, qty: gQty,
-          yarnReceipt: gYR, yarnReturn: gYRtn,
-          fabricDelivery: gFD, fabricDeliveryReturn: gFDR,
-          wastageWt: gWWt, fabricProduction: gFP,
+          fabricProduction: gFP, fabricDelivery: gFD,
+          wastageWt: gWWt, fabricDeliveryReturn: gFDR,
         });
-        gQty = 0; gYR = 0; gYRtn = 0; gFD = 0; gFDR = 0; gWWt = 0; gFP = 0;
+        gQty = 0; gFP = 0; gFD = 0; gWWt = 0; gFDR = 0;
       }
     };
 
@@ -664,14 +632,11 @@ export default function YarnToFabricPage() {
       if (k !== curKey) { flush(); curKey = k; gLabel = k; }
       gQty += signedQty(item.r);
       const name = item.r.transactionTypeName;
-      const wt = toNum(item.r.netWt);
-      if (name === "Yarn Receipt")           gYR   += wt;
-      if (name === "Yarn Return")            gYRtn += wt;
-      if (name === "Fabric Delivery")        gFD   += wt;
-      if (name === "Fabric Delivery Return") gFDR  += wt;
-      if (name === "Fabric Production")      gFP   += wt;
+      if (name === "Fabric Production")      gFP  += signedNetWt(item.r);
+      if (name === "Fabric Delivery")        gFD  += signedNetWt(item.r);
+      if (name === "Fabric Delivery Return") gFDR += signedNetWt(item.r);
       gWWt += wastageWt(item.r);
-      result.push({ kind: "data", r: item.r, idx: item.idx, yarnBal: item.yarnBal, fabricBal: item.fabricBal });
+      result.push({ kind: "data", r: item.r, idx: item.idx, fabricBal: item.fabricBal });
     }
     flush();
     return result;
@@ -743,16 +708,15 @@ export default function YarnToFabricPage() {
 
   function exportSummaryCSV() {
     const groupLabel = GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? groupBy;
-    const headers = [groupLabel, "Doc Number(s)", "Rows", "Qty", "Yarn Receipt", "Yarn Return", "Fabric Delivery", "Fab Del Return", "Wastage Wt", "Fabric Production", "Running Yarn Bal.", "Running Fabric Bal."];
-    let yarnBal = openingYarnBalance, fabricBal = openingFabricBalance;
+    const headers = [groupLabel, "Doc Number(s)", "Rows", "Qty", "Fabric Production", "Fabric Delivery", "Wastage Wt", "Fab Del Return", "Run Fabric Bal."];
+    let fabricBal = openingFabricBalance;
     const data: (string | number)[][] = [
-      ["Opening Balance", "", "", "", "", "", "", "", "", "", fmt(openingYarnBalance), fmt(openingFabricBalance)],
+      ["Opening Balance", "", "", "", "", "", "", "", fmt(openingFabricBalance)],
       ...sortedGrouped.map((r) => {
-        yarnBal   += r.balNetWtMinusWastage;
         fabricBal += r.fabricDelta;
-        return [r.label, r.docNums.join(", "), r.count, fmt(r.qty), fmt(r.yarnReceipt), fmt(r.yarnReturn), fmt(r.fabricDelivery), fmt(r.fabricDeliveryReturn), fmt(r.wastageWt), fmt(r.fabricProduction), fmt(yarnBal), fmt(fabricBal)];
+        return [r.label, r.docNums.join(", "), r.count, fmt(r.qty), fmt(r.fabricProduction), fmt(r.fabricDelivery), fmt(r.wastageWt), fmt(r.fabricDeliveryReturn), fmt(fabricBal)];
       }),
-      ["Total", "", rows.length, fmt(totalQty), fmt(totalYarnReceipt), fmt(totalYarnReturn), fmt(totalFabricDelivery), fmt(totalFabricDelRtn), fmt(totalWastageWt), fmt(totalFabricProd), "", ""],
+      ["Total", "", rows.length, fmt(totalQty), fmt(totalFabricProd), fmt(totalFabricDelivery), fmt(totalWastageWt), fmt(totalFabricDelRtn), ""],
     ];
     downloadBlob(csvHeading() + toCSV(headers, data), "ytf-summary.csv", "text/csv;charset=utf-8;");
   }
@@ -761,7 +725,6 @@ export default function YarnToFabricPage() {
     const headers = visibleColsList.map((c) => c.label);
     const obRow   = visibleColsList.map((c, i) =>
       i === 0 ? "Opening Balance"
-      : c.key === "runningBalance"       ? fmt(openingYarnBalance)
       : c.key === "runningFabricBalance" ? fmt(openingFabricBalance)
       : ""
     );
@@ -771,12 +734,10 @@ export default function YarnToFabricPage() {
         bodyRows.push(visibleColsList.map((c, ci) =>
           ci === 0                           ? `Subtotal: ${item.label}`
           : c.key === "quantity"             ? fmt(item.qty)
-          : c.key === "yarnReceipt"          ? (item.yarnReceipt    > 0 ? fmt(item.yarnReceipt)          : "")
-          : c.key === "yarnReturn"           ? (item.yarnReturn     > 0 ? fmt(item.yarnReturn)           : "")
-          : c.key === "fabricDelivery"       ? (item.fabricDelivery > 0 ? fmt(item.fabricDelivery)       : "")
-          : c.key === "fabricDeliveryReturn" ? (item.fabricDeliveryReturn > 0 ? fmt(item.fabricDeliveryReturn) : "")
-          : c.key === "wastageWt"            ? (item.wastageWt      !== 0 ? fmt(item.wastageWt)          : "")
-          : c.key === "fabricProduction"     ? (item.fabricProduction > 0 ? fmt(item.fabricProduction)   : "")
+          : c.key === "fabricProduction"     ? (item.fabricProduction !== 0 ? fmt(item.fabricProduction) : "")
+          : c.key === "fabricDelivery"       ? (item.fabricDelivery   !== 0 ? fmt(item.fabricDelivery)   : "")
+          : c.key === "wastageWt"            ? (item.wastageWt        !== 0 ? fmt(item.wastageWt)        : "")
+          : c.key === "fabricDeliveryReturn" ? (item.fabricDeliveryReturn !== 0 ? fmt(item.fabricDeliveryReturn) : "")
           : ""
         ));
       } else {
@@ -801,14 +762,10 @@ export default function YarnToFabricPage() {
             case "machineName":           return r.machineName ?? "";
             case "machineOperatorName":   return r.machineOperatorName ?? "";
             case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "";
-            case "yarnReceipt":           { const v = netWtIfType(r, "Yarn Receipt");           return v != null ? fmt(v) : ""; }
-            case "yarnReturn":            { const v = netWtIfType(r, "Yarn Return");            return v != null ? fmt(v) : ""; }
-            case "fabricDelivery":        { const v = netWtIfType(r, "Fabric Delivery");        return v != null ? fmt(v) : ""; }
-            case "fabricDeliveryReturn":  { const v = netWtIfType(r, "Fabric Delivery Return"); return v != null ? fmt(v) : ""; }
-            case "wastagePercent":        return wWt !== 0 ? (r.partyWastePercent ?? "") : "";
+            case "fabricProduction":      { const v = signedNetWtIfType(r, "Fabric Production");      return v != null ? fmt(v) : ""; }
+            case "fabricDelivery":        { const v = signedNetWtIfType(r, "Fabric Delivery");        return v != null ? fmt(v) : ""; }
             case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "";
-            case "fabricProduction":      { const v = netWtIfType(r, "Fabric Production");      return v != null ? fmt(v) : ""; }
-            case "runningBalance":        return fmt(runningYarnBalances[idx]);
+            case "fabricDeliveryReturn":  { const v = signedNetWtIfType(r, "Fabric Delivery Return"); return v != null ? fmt(v) : ""; }
             case "runningFabricBalance":  return fmt(runningFabricBalances[idx]);
             default:                      return "";
           }
@@ -817,12 +774,10 @@ export default function YarnToFabricPage() {
     }
     const grandRow = visibleColsList.map((c, ci) =>
       ci === 0                           ? "Grand Total"
-      : c.key === "yarnReceipt"          ? fmt(totalYarnReceipt)
-      : c.key === "yarnReturn"           ? fmt(totalYarnReturn)
-      : c.key === "fabricDelivery"       ? fmt(totalFabricDelivery)
-      : c.key === "fabricDeliveryReturn" ? fmt(totalFabricDelRtn)
-      : c.key === "wastageWt"            ? fmt(totalWastageWt)
       : c.key === "fabricProduction"     ? fmt(totalFabricProd)
+      : c.key === "fabricDelivery"       ? fmt(totalFabricDelivery)
+      : c.key === "wastageWt"            ? fmt(totalWastageWt)
+      : c.key === "fabricDeliveryReturn" ? fmt(totalFabricDelRtn)
       : ""
     );
     downloadBlob(csvHeading() + toCSV(headers, [obRow, ...bodyRows, grandRow]), "ytf-detail.csv", "text/csv;charset=utf-8;");
@@ -837,18 +792,17 @@ export default function YarnToFabricPage() {
     doc.text(reportDateRange(), 14, 22);
     doc.setFontSize(10);
     doc.text(`Summary — grouped by ${groupLabel}`, 14, 30);
-    let yarnBal = openingYarnBalance, fabricBal = openingFabricBalance;
+    let fabricBal = openingFabricBalance;
     autoTable(doc, {
       startY: 36,
-      head: [[groupLabel, "Rows", "Qty", "Yarn Receipt", "Yarn Return", "Fab Delivery", "Fab Del Rtn", "Wastage Wt", "Fab Production", "Run Yarn Bal.", "Run Fabric Bal."]],
+      head: [[groupLabel, "Rows", "Qty", "Fabric Production", "Fabric Delivery", "Wastage Wt", "Fab Del Return", "Run Fabric Bal."]],
       body: [
-        ["Opening Balance", "", "", "", "", "", "", "", "", fmt(openingYarnBalance), fmt(openingFabricBalance)],
+        ["Opening Balance", "", "", "", "", "", "", fmt(openingFabricBalance)],
         ...sortedGrouped.map((r) => {
-          yarnBal   += r.balNetWtMinusWastage;
           fabricBal += r.fabricDelta;
-          return [r.label, r.count, fmt(r.qty), fmt(r.yarnReceipt), fmt(r.yarnReturn), fmt(r.fabricDelivery), fmt(r.fabricDeliveryReturn), fmt(r.wastageWt), fmt(r.fabricProduction), fmt(yarnBal), fmt(fabricBal)];
+          return [r.label, r.count, fmt(r.qty), fmt(r.fabricProduction), fmt(r.fabricDelivery), fmt(r.wastageWt), fmt(r.fabricDeliveryReturn), fmt(fabricBal)];
         }),
-        ["Total", rows.length, fmt(totalQty), fmt(totalYarnReceipt), fmt(totalYarnReturn), fmt(totalFabricDelivery), fmt(totalFabricDelRtn), fmt(totalWastageWt), fmt(totalFabricProd), "", ""],
+        ["Total", rows.length, fmt(totalQty), fmt(totalFabricProd), fmt(totalFabricDelivery), fmt(totalWastageWt), fmt(totalFabricDelRtn), ""],
       ],
       styles: { fontSize: 8 },
       headStyles: { fillColor: [37, 99, 235] },
@@ -866,7 +820,6 @@ export default function YarnToFabricPage() {
     doc.setFontSize(10); doc.text("Detailed Report", 14, 30);
     const obRow = visibleColsList.map((c, i) =>
       i === 0 ? "Opening Balance"
-      : c.key === "runningBalance"       ? fmt(openingYarnBalance)
       : c.key === "runningFabricBalance" ? fmt(openingFabricBalance)
       : "—"
     );
@@ -876,12 +829,10 @@ export default function YarnToFabricPage() {
         bodyRows.push(visibleColsList.map((c, ci) =>
           ci === 0                           ? `Subtotal: ${item.label}`
           : c.key === "quantity"             ? fmt(item.qty)
-          : c.key === "yarnReceipt"          ? (item.yarnReceipt    > 0 ? fmt(item.yarnReceipt)          : "—")
-          : c.key === "yarnReturn"           ? (item.yarnReturn     > 0 ? fmt(item.yarnReturn)           : "—")
-          : c.key === "fabricDelivery"       ? (item.fabricDelivery > 0 ? fmt(item.fabricDelivery)       : "—")
-          : c.key === "fabricDeliveryReturn" ? (item.fabricDeliveryReturn > 0 ? fmt(item.fabricDeliveryReturn) : "—")
-          : c.key === "wastageWt"            ? (item.wastageWt !== 0 ? fmt(item.wastageWt) : "—")
-          : c.key === "fabricProduction"     ? (item.fabricProduction > 0 ? fmt(item.fabricProduction)   : "—")
+          : c.key === "fabricProduction"     ? (item.fabricProduction !== 0 ? fmt(item.fabricProduction) : "—")
+          : c.key === "fabricDelivery"       ? (item.fabricDelivery   !== 0 ? fmt(item.fabricDelivery)   : "—")
+          : c.key === "wastageWt"            ? (item.wastageWt        !== 0 ? fmt(item.wastageWt)        : "—")
+          : c.key === "fabricDeliveryReturn" ? (item.fabricDeliveryReturn !== 0 ? fmt(item.fabricDeliveryReturn) : "—")
           : "—"
         ));
       } else {
@@ -906,14 +857,10 @@ export default function YarnToFabricPage() {
             case "machineName":           return r.machineName ?? "—";
             case "machineOperatorName":   return r.machineOperatorName ?? "—";
             case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "—";
-            case "yarnReceipt":           { const v = netWtIfType(r, "Yarn Receipt");           return v != null ? fmt(v) : "—"; }
-            case "yarnReturn":            { const v = netWtIfType(r, "Yarn Return");            return v != null ? fmt(v) : "—"; }
-            case "fabricDelivery":        { const v = netWtIfType(r, "Fabric Delivery");        return v != null ? fmt(v) : "—"; }
-            case "fabricDeliveryReturn":  { const v = netWtIfType(r, "Fabric Delivery Return"); return v != null ? fmt(v) : "—"; }
-            case "wastagePercent":        return wWt !== 0 ? `${r.partyWastePercent ?? "—"}%` : "—";
+            case "fabricProduction":      { const v = signedNetWtIfType(r, "Fabric Production");      return v != null ? fmt(v) : "—"; }
+            case "fabricDelivery":        { const v = signedNetWtIfType(r, "Fabric Delivery");        return v != null ? fmt(v) : "—"; }
             case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "—";
-            case "fabricProduction":      { const v = netWtIfType(r, "Fabric Production");      return v != null ? fmt(v) : "—"; }
-            case "runningBalance":        return fmt(runningYarnBalances[idx]);
+            case "fabricDeliveryReturn":  { const v = signedNetWtIfType(r, "Fabric Delivery Return"); return v != null ? fmt(v) : "—"; }
             case "runningFabricBalance":  return fmt(runningFabricBalances[idx]);
             default:                      return "";
           }
@@ -922,12 +869,10 @@ export default function YarnToFabricPage() {
     }
     const grandRow = visibleColsList.map((c, ci) =>
       ci === 0                           ? "Grand Total"
-      : c.key === "yarnReceipt"          ? fmt(totalYarnReceipt)
-      : c.key === "yarnReturn"           ? fmt(totalYarnReturn)
-      : c.key === "fabricDelivery"       ? fmt(totalFabricDelivery)
-      : c.key === "fabricDeliveryReturn" ? fmt(totalFabricDelRtn)
-      : c.key === "wastageWt"            ? fmt(totalWastageWt)
       : c.key === "fabricProduction"     ? fmt(totalFabricProd)
+      : c.key === "fabricDelivery"       ? fmt(totalFabricDelivery)
+      : c.key === "wastageWt"            ? fmt(totalWastageWt)
+      : c.key === "fabricDeliveryReturn" ? fmt(totalFabricDelRtn)
       : "—"
     );
     autoTable(doc, {
@@ -947,29 +892,25 @@ export default function YarnToFabricPage() {
     doc.save("ytf-detail.pdf");
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── JSX ───────────────────────────────────────────────────────────────────
 
   return (
     <Layout>
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Yarn to Fabric Movement Report</h1>
-            <p className="text-sm text-muted-foreground">Track yarn receipts, fabric production, deliveries, and running balances.</p>
-          </div>
+      <div className="space-y-4 p-4 md:p-6 max-w-[1600px] mx-auto">
+        <div>
+          <h1 className="text-2xl font-bold">Yarn to Fabric Movement Report</h1>
+          <p className="text-sm text-muted-foreground">Track fabric production, deliveries, and running balances.</p>
         </div>
 
-        <div className="text-center py-2 print:py-4">
-          <h2 className="text-2xl font-bold tracking-tight">TKT Textiles (Knitting)</h2>
-          <p className="text-sm text-muted-foreground mt-1 print:text-black">{reportDateRange()}</p>
+        <div className="text-center py-2">
+          <p className="text-lg font-semibold">TKT Textiles (Knitting)</p>
+          <p className="text-sm text-muted-foreground">{reportDateRange()}</p>
         </div>
 
-        {/* ── Filter Panel ─────────────────────────────────── */}
+        {/* ── Filters ───────────────────────────────────────── */}
         <Card>
-          <CardHeader className="pb-3 pt-4 px-4">
-            <CardTitle className="text-base">Filters</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4 space-y-4">
+          <CardContent className="pt-4 space-y-3">
+            <p className="text-sm font-semibold">Filters</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <div className="flex flex-col gap-1">
                 <Label className="text-xs text-muted-foreground">Date From</Label>
@@ -981,21 +922,21 @@ export default function YarnToFabricPage() {
               </div>
               <div className="flex flex-col gap-1">
                 <Label className="text-xs text-muted-foreground">Year</Label>
-                <Select value={filters.year || "all"} onValueChange={(v) => set("year", v === "all" ? "" : v)}>
+                <Select value={filters.year} onValueChange={(v) => set("year", v === "all" ? "" : v)}>
                   <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="All Years" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Years</SelectItem>
-                    {years.map((y) => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
+                    {years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="flex flex-col gap-1">
                 <Label className="text-xs text-muted-foreground">Month</Label>
-                <Select value={filters.month || "all"} onValueChange={(v) => set("month", v === "all" ? "" : v)}>
+                <Select value={filters.month} onValueChange={(v) => set("month", v === "all" ? "" : v)}>
                   <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="All Months" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Months</SelectItem>
-                    {MONTHS.map((m, i) => <SelectItem key={i + 1} value={(i + 1).toString()}>{m}</SelectItem>)}
+                    {MONTHS.map((m, i) => <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -1051,12 +992,6 @@ export default function YarnToFabricPage() {
               </Card>
               <Card>
                 <CardContent className="pt-4 pb-3">
-                  <p className="text-xs text-muted-foreground">Yarn Receipt</p>
-                  <p className="text-2xl font-semibold">{fmt(totalYarnReceipt)}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-4 pb-3">
                   <p className="text-xs text-muted-foreground">Fabric Production</p>
                   <p className="text-2xl font-semibold">{fmt(totalFabricProd)}</p>
                 </CardContent>
@@ -1064,7 +999,13 @@ export default function YarnToFabricPage() {
               <Card>
                 <CardContent className="pt-4 pb-3">
                   <p className="text-xs text-muted-foreground">Fabric Delivered</p>
-                  <p className="text-2xl font-semibold">{fmt(totalFabricDelivery)}</p>
+                  <p className={`text-2xl font-semibold${totalFabricDelivery < 0 ? " text-red-600" : ""}`}>{fmt(totalFabricDelivery)}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4 pb-3">
+                  <p className="text-xs text-muted-foreground">Run Fabric Bal.</p>
+                  <p className={`text-2xl font-semibold${currentFabricBalance < 0 ? " text-red-600" : " text-emerald-700"}`}>{fmt(currentFabricBalance)}</p>
                 </CardContent>
               </Card>
             </div>
@@ -1135,21 +1076,18 @@ export default function YarnToFabricPage() {
                           <TableHead className="whitespace-nowrap">Doc Number(s)</TableHead>
                           <SortHead label="Rows" sortKey="count" sort={sortSummary} onSort={handleSortSummary} right />
                           <SortHead label="Qty"  sortKey="qty"   sort={sortSummary} onSort={handleSortSummary} right />
-                          <TableHead className="text-right whitespace-nowrap">Yarn Receipt</TableHead>
-                          <TableHead className="text-right whitespace-nowrap">Yarn Return</TableHead>
-                          <TableHead className="text-right whitespace-nowrap">Fabric Delivery</TableHead>
-                          <TableHead className="text-right whitespace-nowrap">Fab Del Return</TableHead>
-                          <TableHead className="text-right whitespace-nowrap">Wastage Wt</TableHead>
                           <TableHead className="text-right whitespace-nowrap">Fabric Production</TableHead>
-                          <TableHead className="text-right whitespace-nowrap">Run Yarn Bal.</TableHead>
+                          <TableHead className="text-right whitespace-nowrap">Fabric Delivery</TableHead>
+                          <TableHead className="text-right whitespace-nowrap">Wastage Wt</TableHead>
+                          <TableHead className="text-right whitespace-nowrap">Fab Del Return</TableHead>
                           <TableHead className="text-right whitespace-nowrap">Run Fabric Bal.</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
+                        {/* Opening Balance row */}
                         <TableRow className="bg-muted/40 italic text-muted-foreground">
                           <TableCell className="whitespace-nowrap">Opening Balance</TableCell>
-                          <TableCell /><TableCell /><TableCell /><TableCell /><TableCell /><TableCell /><TableCell /><TableCell /><TableCell />
-                          <TableCell className={`text-right whitespace-nowrap font-semibold not-italic ${openingYarnBalance < 0 ? "text-red-600" : "text-blue-700"}`}>{fmt(openingYarnBalance)}</TableCell>
+                          <TableCell /><TableCell /><TableCell /><TableCell /><TableCell /><TableCell /><TableCell />
                           <TableCell className={`text-right whitespace-nowrap font-semibold not-italic ${openingFabricBalance < 0 ? "text-red-600" : "text-emerald-700"}`}>{fmt(openingFabricBalance)}</TableCell>
                         </TableRow>
 
@@ -1159,13 +1097,10 @@ export default function YarnToFabricPage() {
                             <TableCell className="text-xs text-muted-foreground whitespace-nowrap max-w-[180px] truncate" title={r.docNums.join(", ")}>{abbrev(r.docNums)}</TableCell>
                             <TableCell className="text-right">{r.count}</TableCell>
                             <TableCell className="text-right">{fmt(r.qty)}</TableCell>
-                            <TableCell className="text-right">{r.yarnReceipt    > 0 ? fmt(r.yarnReceipt)          : "—"}</TableCell>
-                            <TableCell className="text-right">{r.yarnReturn     > 0 ? fmt(r.yarnReturn)           : "—"}</TableCell>
-                            <TableCell className="text-right">{r.fabricDelivery > 0 ? fmt(r.fabricDelivery)       : "—"}</TableCell>
-                            <TableCell className="text-right">{r.fabricDeliveryReturn > 0 ? fmt(r.fabricDeliveryReturn) : "—"}</TableCell>
+                            <TableCell className="text-right">{r.fabricProduction !== 0 ? fmt(r.fabricProduction) : "—"}</TableCell>
+                            <TableCell className={`text-right${r.fabricDelivery < 0 ? " text-red-600" : ""}`}>{r.fabricDelivery !== 0 ? fmt(r.fabricDelivery) : "—"}</TableCell>
                             <TableCell className={`text-right ${r.wastageWt !== 0 ? "text-amber-700" : ""}`}>{r.wastageWt !== 0 ? fmt(r.wastageWt) : "—"}</TableCell>
-                            <TableCell className="text-right">{r.fabricProduction > 0 ? fmt(r.fabricProduction)   : "—"}</TableCell>
-                            <TableCell className={`text-right whitespace-nowrap font-semibold ${summaryYarnRunning[i] < 0 ? "text-red-600" : "text-blue-700"}`}>{fmt(summaryYarnRunning[i])}</TableCell>
+                            <TableCell className={`text-right${r.fabricDeliveryReturn > 0 ? " text-green-700" : ""}`}>{r.fabricDeliveryReturn !== 0 ? fmt(r.fabricDeliveryReturn) : "—"}</TableCell>
                             <TableCell className={`text-right whitespace-nowrap font-semibold ${summaryFabricRunning[i] < 0 ? "text-red-600" : "text-emerald-700"}`}>{fmt(summaryFabricRunning[i])}</TableCell>
                           </TableRow>
                         ))}
@@ -1174,13 +1109,11 @@ export default function YarnToFabricPage() {
                           <TableCell>Total</TableCell>
                           <TableCell /><TableCell className="text-right">{rows.length}</TableCell>
                           <TableCell className="text-right">{fmt(totalQty)}</TableCell>
-                          <TableCell className="text-right">{fmt(totalYarnReceipt)}</TableCell>
-                          <TableCell className="text-right">{fmt(totalYarnReturn)}</TableCell>
-                          <TableCell className="text-right">{fmt(totalFabricDelivery)}</TableCell>
-                          <TableCell className="text-right">{fmt(totalFabricDelRtn)}</TableCell>
-                          <TableCell className="text-right text-amber-700">{fmt(totalWastageWt)}</TableCell>
                           <TableCell className="text-right">{fmt(totalFabricProd)}</TableCell>
-                          <TableCell /><TableCell />
+                          <TableCell className={`text-right${totalFabricDelivery < 0 ? " text-red-600" : ""}`}>{fmt(totalFabricDelivery)}</TableCell>
+                          <TableCell className="text-right text-amber-700">{fmt(totalWastageWt)}</TableCell>
+                          <TableCell className="text-right">{fmt(totalFabricDelRtn)}</TableCell>
+                          <TableCell />
                         </TableRow>
                       </TableBody>
                     </Table>
@@ -1236,9 +1169,6 @@ export default function YarnToFabricPage() {
                         {/* Opening Balance row */}
                         <TableRow className="bg-muted/40 italic text-muted-foreground">
                           {visibleColsList.map((c, i) => {
-                            if (c.key === "runningBalance") {
-                              return <TableCell key={c.key} className={`text-right whitespace-nowrap font-semibold not-italic ${openingYarnBalance < 0 ? "text-red-600" : "text-blue-700"}`}>{fmt(openingYarnBalance)}</TableCell>;
-                            }
                             if (c.key === "runningFabricBalance") {
                               return <TableCell key={c.key} className={`text-right whitespace-nowrap font-semibold not-italic ${openingFabricBalance < 0 ? "text-red-600" : "text-emerald-700"}`}>{fmt(openingFabricBalance)}</TableCell>;
                             }
@@ -1253,19 +1183,17 @@ export default function YarnToFabricPage() {
                                 {visibleColsList.map((c, ci) => {
                                   if (ci === 0)                           return <TableCell key={c.key} className="whitespace-nowrap">Subtotal: {item.label}</TableCell>;
                                   if (c.key === "quantity")               return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(item.qty)}</TableCell>;
-                                  if (c.key === "yarnReceipt")            return <TableCell key={c.key} className="text-right whitespace-nowrap">{item.yarnReceipt    > 0 ? fmt(item.yarnReceipt)          : "—"}</TableCell>;
-                                  if (c.key === "yarnReturn")             return <TableCell key={c.key} className="text-right whitespace-nowrap">{item.yarnReturn     > 0 ? fmt(item.yarnReturn)           : "—"}</TableCell>;
-                                  if (c.key === "fabricDelivery")         return <TableCell key={c.key} className="text-right whitespace-nowrap">{item.fabricDelivery > 0 ? fmt(item.fabricDelivery)       : "—"}</TableCell>;
-                                  if (c.key === "fabricDeliveryReturn")   return <TableCell key={c.key} className="text-right whitespace-nowrap">{item.fabricDeliveryReturn > 0 ? fmt(item.fabricDeliveryReturn) : "—"}</TableCell>;
+                                  if (c.key === "fabricProduction")       return <TableCell key={c.key} className="text-right whitespace-nowrap">{item.fabricProduction !== 0 ? fmt(item.fabricProduction) : "—"}</TableCell>;
+                                  if (c.key === "fabricDelivery")         return <TableCell key={c.key} className={`text-right whitespace-nowrap${item.fabricDelivery < 0 ? " text-red-600" : ""}`}>{item.fabricDelivery !== 0 ? fmt(item.fabricDelivery) : "—"}</TableCell>;
                                   if (c.key === "wastageWt")              return <TableCell key={c.key} className="text-right whitespace-nowrap text-amber-700">{item.wastageWt !== 0 ? fmt(item.wastageWt) : "—"}</TableCell>;
-                                  if (c.key === "fabricProduction")       return <TableCell key={c.key} className="text-right whitespace-nowrap">{item.fabricProduction > 0 ? fmt(item.fabricProduction)   : "—"}</TableCell>;
+                                  if (c.key === "fabricDeliveryReturn")   return <TableCell key={c.key} className={`text-right whitespace-nowrap${item.fabricDeliveryReturn > 0 ? " text-green-700" : ""}`}>{item.fabricDeliveryReturn !== 0 ? fmt(item.fabricDeliveryReturn) : "—"}</TableCell>;
                                   return <TableCell key={c.key} />;
                                 })}
                               </TableRow>
                             );
                           }
 
-                          const { r, idx, yarnBal, fabricBal } = item;
+                          const { r, idx, fabricBal } = item;
                           const wWt = wastageWt(r);
 
                           return (
@@ -1289,32 +1217,20 @@ export default function YarnToFabricPage() {
                                   case "machineName":          return <TableCell key={c.key} className="whitespace-nowrap">{r.machineName ?? "—"}</TableCell>;
                                   case "machineOperatorName":  return <TableCell key={c.key} className="whitespace-nowrap">{r.machineOperatorName ?? "—"}</TableCell>;
                                   case "quantity":             return <TableCell key={c.key} className="text-right whitespace-nowrap">{r.quantity != null ? fmt(signedQty(r)) : "—"}</TableCell>;
-                                  case "yarnReceipt": {
-                                    const v = netWtIfType(r, "Yarn Receipt");
-                                    return <TableCell key={c.key} className="text-right whitespace-nowrap text-blue-700">{v != null ? fmt(v) : "—"}</TableCell>;
-                                  }
-                                  case "yarnReturn": {
-                                    const v = netWtIfType(r, "Yarn Return");
-                                    return <TableCell key={c.key} className="text-right whitespace-nowrap text-red-600">{v != null ? fmt(v) : "—"}</TableCell>;
-                                  }
-                                  case "fabricDelivery": {
-                                    const v = netWtIfType(r, "Fabric Delivery");
-                                    return <TableCell key={c.key} className="text-right whitespace-nowrap text-orange-600">{v != null ? fmt(v) : "—"}</TableCell>;
-                                  }
-                                  case "fabricDeliveryReturn": {
-                                    const v = netWtIfType(r, "Fabric Delivery Return");
-                                    return <TableCell key={c.key} className="text-right whitespace-nowrap text-green-600">{v != null ? fmt(v) : "—"}</TableCell>;
-                                  }
-                                  case "wastagePercent":
-                                    return <TableCell key={c.key} className="text-right whitespace-nowrap text-amber-700">{wWt !== 0 ? `${r.partyWastePercent ?? "—"}%` : "—"}</TableCell>;
-                                  case "wastageWt":
-                                    return <TableCell key={c.key} className={`text-right whitespace-nowrap${wWt < 0 ? " text-red-500" : wWt > 0 ? " text-amber-700" : ""}`}>{wWt !== 0 ? fmt(wWt) : "—"}</TableCell>;
                                   case "fabricProduction": {
-                                    const v = netWtIfType(r, "Fabric Production");
+                                    const v = signedNetWtIfType(r, "Fabric Production");
                                     return <TableCell key={c.key} className="text-right whitespace-nowrap text-emerald-700">{v != null ? fmt(v) : "—"}</TableCell>;
                                   }
-                                  case "runningBalance":
-                                    return <TableCell key={c.key} className={`text-right whitespace-nowrap font-medium${yarnBal < 0 ? " text-red-600" : " text-blue-700"}`}>{fmt(yarnBal)}</TableCell>;
+                                  case "fabricDelivery": {
+                                    const v = signedNetWtIfType(r, "Fabric Delivery");
+                                    return <TableCell key={c.key} className={`text-right whitespace-nowrap${v != null && v < 0 ? " text-red-600" : " text-orange-600"}`}>{v != null ? fmt(v) : "—"}</TableCell>;
+                                  }
+                                  case "wastageWt":
+                                    return <TableCell key={c.key} className={`text-right whitespace-nowrap${wWt < 0 ? " text-red-500" : wWt > 0 ? " text-amber-700" : ""}`}>{wWt !== 0 ? fmt(wWt) : "—"}</TableCell>;
+                                  case "fabricDeliveryReturn": {
+                                    const v = signedNetWtIfType(r, "Fabric Delivery Return");
+                                    return <TableCell key={c.key} className="text-right whitespace-nowrap text-green-600">{v != null ? fmt(v) : "—"}</TableCell>;
+                                  }
                                   case "runningFabricBalance":
                                     return <TableCell key={c.key} className={`text-right whitespace-nowrap font-medium${fabricBal < 0 ? " text-red-600" : " text-emerald-700"}`}>{fmt(fabricBal)}</TableCell>;
                                   default:
@@ -1329,12 +1245,10 @@ export default function YarnToFabricPage() {
                         <TableRow className="bg-blue-50 font-bold border-t-2 text-blue-900">
                           {visibleColsList.map((c, ci) => {
                             if (ci === 0)                           return <TableCell key={c.key} className="whitespace-nowrap">Grand Total</TableCell>;
-                            if (c.key === "yarnReceipt")            return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(totalYarnReceipt)}</TableCell>;
-                            if (c.key === "yarnReturn")             return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(totalYarnReturn)}</TableCell>;
-                            if (c.key === "fabricDelivery")         return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(totalFabricDelivery)}</TableCell>;
-                            if (c.key === "fabricDeliveryReturn")   return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(totalFabricDelRtn)}</TableCell>;
-                            if (c.key === "wastageWt")              return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(totalWastageWt)}</TableCell>;
                             if (c.key === "fabricProduction")       return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(totalFabricProd)}</TableCell>;
+                            if (c.key === "fabricDelivery")         return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(totalFabricDelivery)}</TableCell>;
+                            if (c.key === "wastageWt")              return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(totalWastageWt)}</TableCell>;
+                            if (c.key === "fabricDeliveryReturn")   return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(totalFabricDelRtn)}</TableCell>;
                             return <TableCell key={c.key} />;
                           })}
                         </TableRow>
@@ -1377,21 +1291,6 @@ function YtfChartSection({
   runningFabricBalances: number[];
   openingFabricBalance: number;
 }) {
-  // Yarn Receipt vs Return by Month
-  const yarnByMonth = useMemo(() => {
-    const map = new Map<string, { receipt: number; return_: number }>();
-    for (const r of rows) {
-      const k = getMonthLabel(r.date);
-      const e = map.get(k) ?? { receipt: 0, return_: 0 };
-      if (r.transactionTypeName === "Yarn Receipt") e.receipt  += toNum(r.netWt);
-      if (r.transactionTypeName === "Yarn Return")  e.return_  += toNum(r.netWt);
-      map.set(k, e);
-    }
-    return Array.from(map.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([month, v]) => ({ month, "Yarn Receipt": +v.receipt.toFixed(3), "Yarn Return": +v.return_.toFixed(3) }));
-  }, [rows]);
-
   // Fabric Production vs Delivery by Month
   const fabricByMonth = useMemo(() => {
     const map = new Map<string, { production: number; delivery: number }>();
@@ -1437,27 +1336,6 @@ function YtfChartSection({
 
   return (
     <div className="space-y-6">
-      {yarnByMonth.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Yarn Receipt vs Return by Month</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={yarnByMonth} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 3 })} />
-                <Legend />
-                <Bar dataKey="Yarn Receipt" fill={CHART_COLORS[0]} />
-                <Bar dataKey="Yarn Return"  fill={CHART_COLORS[2]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
-
       {fabricByMonth.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
