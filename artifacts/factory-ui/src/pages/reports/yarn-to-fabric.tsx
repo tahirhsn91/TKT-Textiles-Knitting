@@ -109,8 +109,9 @@ type GroupByKey =
   | "machineName" | "machineOperatorName"
   | "yarnTypeName" | "yarnCountName" | "yarnBrandName" | "uomName";
 
-type SummarySortKey = "label" | "count" | "qty";
-type SortDir        = "asc" | "desc";
+type SummarySortKey      = "label" | "count" | "qty";
+type PartyBalanceSortKey = "party" | "fabricDelivery" | "wastage" | "fabricReturn" | "netOutstanding";
+type SortDir             = "asc" | "desc";
 
 function toISODate(d: Date): string {
   const y  = d.getFullYear();
@@ -430,8 +431,9 @@ export default function YarnToFabricPage() {
     return new Set(ALL_DETAIL_KEYS);
   });
   const [activeTab, setActiveTab]     = useState("summary");
-  const [sortSummary, setSortSummary] = useState<{ key: SummarySortKey; dir: SortDir }>({ key: "label", dir: "asc" });
-  const [sortDetail,  setSortDetail]  = useState<{ key: DetailColKey | null; dir: SortDir }>({ key: null, dir: "asc" });
+  const [sortSummary,      setSortSummary]      = useState<{ key: SummarySortKey; dir: SortDir }>({ key: "label", dir: "asc" });
+  const [sortDetail,       setSortDetail]       = useState<{ key: DetailColKey | null; dir: SortDir }>({ key: null, dir: "asc" });
+  const [sortPartyBalance, setSortPartyBalance] = useState<{ key: PartyBalanceSortKey; dir: SortDir }>({ key: "party", dir: "asc" });
   const [colOrder,    setColOrder]    = useState<DetailColKey[]>(() => {
     try {
       const saved = localStorage.getItem("ytf-col-order");
@@ -550,6 +552,71 @@ export default function YarnToFabricPage() {
       : openingFabricBalance,
     [runningFabricBalances, openingFabricBalance]
   );
+
+  // ── Party Balance (cumulative: opening + filtered rows) ───────────────────
+
+  const partyBalanceRows = useMemo(() => {
+    const map = new Map<string, {
+      fabricDelivery: number;
+      wastage: number;
+      fabricReturn: number;
+    }>();
+
+    const allRows = [...openingRows, ...rows];
+
+    for (const r of allRows) {
+      const name = r.transactionTypeName;
+      if (name !== "Fabric Delivery" && name !== "Fabric Delivery Return") continue;
+      const party = r.partyName ?? "—";
+      const e = map.get(party) ?? { fabricDelivery: 0, wastage: 0, fabricReturn: 0 };
+      const sNetWt = signedNetWt(r);
+      const wWt    = wastageWt(r);
+      if (name === "Fabric Delivery") {
+        e.fabricDelivery += sNetWt;
+        e.wastage        += wWt;
+      } else {
+        e.fabricReturn += sNetWt;
+        e.wastage      += wWt;
+      }
+      map.set(party, e);
+    }
+
+    return Array.from(map.entries()).map(([party, v]) => ({
+      party,
+      fabricDelivery: v.fabricDelivery,
+      wastage:        v.wastage,
+      fabricReturn:   v.fabricReturn,
+      netOutstanding: v.fabricDelivery + v.wastage + v.fabricReturn,
+    }));
+  }, [openingRows, rows]);
+
+  const sortedPartyBalance = useMemo(() => {
+    const arr = [...partyBalanceRows];
+    arr.sort((a, b) => {
+      const av = a[sortPartyBalance.key];
+      const bv = b[sortPartyBalance.key];
+      if (typeof av === "number")
+        return sortPartyBalance.dir === "asc" ? av - (bv as number) : (bv as number) - av;
+      return sortPartyBalance.dir === "asc"
+        ? (av as string).localeCompare(bv as string)
+        : (bv as string).localeCompare(av as string);
+    });
+    return arr;
+  }, [partyBalanceRows, sortPartyBalance]);
+
+  const partyBalanceTotals = useMemo(() => ({
+    fabricDelivery: partyBalanceRows.reduce((s, r) => s + r.fabricDelivery, 0),
+    wastage:        partyBalanceRows.reduce((s, r) => s + r.wastage,        0),
+    fabricReturn:   partyBalanceRows.reduce((s, r) => s + r.fabricReturn,   0),
+    netOutstanding: partyBalanceRows.reduce((s, r) => s + r.netOutstanding, 0),
+  }), [partyBalanceRows]);
+
+  function handleSortPartyBalance(key: string) {
+    const k = key as PartyBalanceSortKey;
+    setSortPartyBalance((prev) =>
+      prev.key === k ? { key: k, dir: prev.dir === "asc" ? "desc" : "asc" } : { key: k, dir: "asc" }
+    );
+  }
 
   // Grouped summary rows
   const grouped = useMemo(() => groupRows(rows, groupBy), [rows, groupBy]);
@@ -810,6 +877,42 @@ export default function YarnToFabricPage() {
     doc.save("ytf-summary.pdf");
   }
 
+  function exportPartyBalanceCSV() {
+    const headers = ["Party", "Fabric Delivered", "Wastage Wt", "Fab Del Return", "Net Outstanding"];
+    const data: (string | number)[][] = [
+      ...sortedPartyBalance.map((r) => [r.party, fmt(r.fabricDelivery), fmt(r.wastage), fmt(r.fabricReturn), fmt(r.netOutstanding)]),
+      ["Total", fmt(partyBalanceTotals.fabricDelivery), fmt(partyBalanceTotals.wastage), fmt(partyBalanceTotals.fabricReturn), fmt(partyBalanceTotals.netOutstanding)],
+    ];
+    downloadBlob(csvHeading() + toCSV(headers, data), "ytf-party-balance.csv", "text/csv;charset=utf-8;");
+  }
+
+  function exportPartyBalancePDF() {
+    const doc = new jsPDF({ orientation: "landscape" });
+    doc.setFontSize(16); doc.setFont("helvetica", "bold");
+    doc.text("TKT Textiles (Knitting) — Yarn to Fabric Movement", 14, 14);
+    doc.setFontSize(11); doc.setFont("helvetica", "normal");
+    doc.text(reportDateRange(), 14, 22);
+    doc.setFontSize(10); doc.text("Party Balance Report", 14, 30);
+    autoTable(doc, {
+      startY: 36,
+      head: [["Party", "Fabric Delivered", "Wastage Wt", "Fab Del Return", "Net Outstanding"]],
+      body: [
+        ...sortedPartyBalance.map((r) => [r.party, fmt(r.fabricDelivery), fmt(r.wastage), fmt(r.fabricReturn), fmt(r.netOutstanding)]),
+        ["Total", fmt(partyBalanceTotals.fabricDelivery), fmt(partyBalanceTotals.wastage), fmt(partyBalanceTotals.fabricReturn), fmt(partyBalanceTotals.netOutstanding)],
+      ],
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [37, 99, 235] },
+      columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } },
+      didParseCell: (data) => {
+        if (data.section === "body" && data.row.raw[0] === "Total") {
+          data.cell.styles.fontStyle = "bold";
+          data.cell.styles.fillColor = [220, 230, 255];
+        }
+      },
+    });
+    doc.save("ytf-party-balance.pdf");
+  }
+
   function exportDetailPDF() {
     const doc     = new jsPDF({ orientation: "landscape" });
     const headers = visibleColsList.map((c) => c.label);
@@ -1020,6 +1123,7 @@ export default function YarnToFabricPage() {
                   <TabsList>
                     <TabsTrigger value="summary">Summary</TabsTrigger>
                     <TabsTrigger value="detail">Detailed</TabsTrigger>
+                    <TabsTrigger value="party-balance">Party Balance</TabsTrigger>
                     <TabsTrigger value="charts">Charts</TabsTrigger>
                   </TabsList>
 
@@ -1041,11 +1145,11 @@ export default function YarnToFabricPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={activeTab === "summary" ? exportSummaryCSV : exportDetailCSV} className="gap-2">
+                          <DropdownMenuItem onClick={activeTab === "summary" ? exportSummaryCSV : activeTab === "party-balance" ? exportPartyBalanceCSV : exportDetailCSV} className="gap-2">
                             <FileSpreadsheet className="h-4 w-4 text-green-600" />
                             Export as CSV
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={activeTab === "summary" ? exportSummaryPDF : exportDetailPDF} className="gap-2">
+                          <DropdownMenuItem onClick={activeTab === "summary" ? exportSummaryPDF : activeTab === "party-balance" ? exportPartyBalancePDF : exportDetailPDF} className="gap-2">
                             <FileText className="h-4 w-4 text-red-600" />
                             Export as PDF
                           </DropdownMenuItem>
@@ -1256,6 +1360,51 @@ export default function YarnToFabricPage() {
                       </TableBody>
                     </Table>
                   </div>
+                </TabsContent>
+
+                {/* ── Party Balance Tab ───────────────────── */}
+                <TabsContent value="party-balance" className="mt-3 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      Cumulative fabric balance per party — includes all data up to the selected end date.
+                      <span className="ml-1 font-medium text-amber-700">Wastage</span> is included in the net outstanding.
+                    </p>
+                  </div>
+                  {partyBalanceRows.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No Fabric Delivery or Fabric Delivery Return transactions found.</p>
+                  ) : (
+                    <div className="rounded-md border overflow-auto max-h-[560px] print:max-h-none print:overflow-visible">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <SortHead label="Party"            sortKey="party"          sort={sortPartyBalance} onSort={handleSortPartyBalance} />
+                            <SortHead label="Fabric Delivered" sortKey="fabricDelivery" sort={sortPartyBalance} onSort={handleSortPartyBalance} right />
+                            <SortHead label="Wastage Wt"       sortKey="wastage"        sort={sortPartyBalance} onSort={handleSortPartyBalance} right />
+                            <SortHead label="Fab Del Return"   sortKey="fabricReturn"   sort={sortPartyBalance} onSort={handleSortPartyBalance} right />
+                            <SortHead label="Net Outstanding"  sortKey="netOutstanding" sort={sortPartyBalance} onSort={handleSortPartyBalance} right />
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {sortedPartyBalance.map((r) => (
+                            <TableRow key={r.party}>
+                              <TableCell className="font-medium whitespace-nowrap">{r.party}</TableCell>
+                              <TableCell className={`text-right whitespace-nowrap${r.fabricDelivery < 0 ? " text-red-600" : ""}`}>{fmt(r.fabricDelivery)}</TableCell>
+                              <TableCell className={`text-right whitespace-nowrap${r.wastage !== 0 ? " text-amber-700" : ""}`}>{r.wastage !== 0 ? fmt(r.wastage) : "—"}</TableCell>
+                              <TableCell className={`text-right whitespace-nowrap${r.fabricReturn > 0 ? " text-green-700" : ""}`}>{r.fabricReturn !== 0 ? fmt(r.fabricReturn) : "—"}</TableCell>
+                              <TableCell className={`text-right whitespace-nowrap font-semibold${r.netOutstanding < 0 ? " text-red-600" : " text-emerald-700"}`}>{fmt(r.netOutstanding)}</TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow className="bg-blue-50 font-bold border-t-2 text-blue-900">
+                            <TableCell className="whitespace-nowrap">Total</TableCell>
+                            <TableCell className="text-right whitespace-nowrap">{fmt(partyBalanceTotals.fabricDelivery)}</TableCell>
+                            <TableCell className="text-right whitespace-nowrap">{fmt(partyBalanceTotals.wastage)}</TableCell>
+                            <TableCell className="text-right whitespace-nowrap">{fmt(partyBalanceTotals.fabricReturn)}</TableCell>
+                            <TableCell className={`text-right whitespace-nowrap${partyBalanceTotals.netOutstanding < 0 ? " text-red-600" : " text-emerald-700"}`}>{fmt(partyBalanceTotals.netOutstanding)}</TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
                 </TabsContent>
 
                 {/* ── Charts Tab ──────────────────────────── */}
