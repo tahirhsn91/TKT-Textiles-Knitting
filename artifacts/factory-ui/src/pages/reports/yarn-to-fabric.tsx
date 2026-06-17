@@ -737,6 +737,16 @@ export default function YarnToFabricPage() {
   function resetFilters() { setFilters(EMPTY_FILTERS); setApplied(EMPTY_FILTERS); setHasRun(false); }
   function handlePrint() { window.print(); }
 
+  function printCharts() {
+    document.body.classList.add("charts-print");
+    const cleanup = () => {
+      document.body.classList.remove("charts-print");
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
+    window.print();
+  }
+
   function handleSortSummary(key: string) {
     const k = key as SummarySortKey;
     setSortSummary((prev) =>
@@ -1146,7 +1156,14 @@ export default function YarnToFabricPage() {
                     <TabsTrigger value="charts">Charts</TabsTrigger>
                   </TabsList>
 
-                  {activeTab !== "charts" && (
+                  {activeTab === "charts" ? (
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={printCharts} className="gap-1.5">
+                        <Printer className="h-3.5 w-3.5" />
+                        Print Charts
+                      </Button>
+                    </div>
+                  ) : (
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="gap-1.5">
                         <Upload className="h-3.5 w-3.5" />
@@ -1504,7 +1521,7 @@ function YtfChartSection({
   }, [rows, runningFabricBalances, openingFabricBalance]);
 
   return (
-    <div className="space-y-6">
+    <div id="charts-print-area" className="space-y-6">
       {fabricByMonth.length > 0 && (
         <Card>
           <CardHeader className="pb-2">

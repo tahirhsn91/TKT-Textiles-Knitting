@@ -240,6 +240,23 @@
     font-size: 11pt;
   }
 
+  body.charts-print {
+    visibility: hidden;
+  }
+
+  body.charts-print #charts-print-area,
+  body.charts-print #charts-print-area * {
+    visibility: visible;
+  }
+
+  body.charts-print #charts-print-area {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: white;
+  }
+
   thead {
     display: table-header-group;
   }

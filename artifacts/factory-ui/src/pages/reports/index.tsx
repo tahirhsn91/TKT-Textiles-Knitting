@@ -679,6 +679,16 @@ export default function ReportsPage() {
 
   function handlePrint() { window.print(); }
 
+  function printCharts() {
+    document.body.classList.add("charts-print");
+    const cleanup = () => {
+      document.body.classList.remove("charts-print");
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
+    window.print();
+  }
+
   // Master data for filter dropdowns
   const { data: transactionTypes }    = useListTransactionTypeMaster();
   const { data: jobs }                = useListJobMaster();
@@ -1008,7 +1018,19 @@ export default function ReportsPage() {
                   </TabsList>
 
                   {/* Print / Export / Import toolbar */}
-                  {activeTab !== "charts" && (
+                  {activeTab === "charts" ? (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={printCharts}
+                        className="gap-1.5"
+                      >
+                        <Printer className="h-3.5 w-3.5" />
+                        Print Charts
+                      </Button>
+                    </div>
+                  ) : (
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
@@ -1408,7 +1430,7 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
   }, [rows]);
 
   return (
-    <div className="space-y-6">
+    <div id="charts-print-area" className="space-y-6">
       {/* Net Wt by Month */}
       {byMonth.length > 0 && (
         <Card>
