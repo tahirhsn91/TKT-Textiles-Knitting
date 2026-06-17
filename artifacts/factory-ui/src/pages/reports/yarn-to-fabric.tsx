@@ -164,6 +164,13 @@ const MONTHS = [
   "July","August","September","October","November","December",
 ];
 
+// Transaction types shown in this report — all others are excluded
+const FABRIC_TX_TYPES = new Set([
+  "Fabric Production",
+  "Fabric Delivery",
+  "Fabric Delivery Return",
+]);
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function toNum(s: string | null | undefined): number {
@@ -499,7 +506,7 @@ export default function YarnToFabricPage() {
 
   const qs = useMemo(() => buildQueryString(applied), [applied]);
 
-  const { data: rows = [], isFetching, isError } = useQuery<ReportRow[]>({
+  const { data: rawRows = [], isFetching, isError } = useQuery<ReportRow[]>({
     queryKey: ["ytf-reports/data", qs],
     queryFn: async () => {
       const res = await fetch(`/api/reports/data${qs ? `?${qs}` : ""}`);
@@ -509,6 +516,12 @@ export default function YarnToFabricPage() {
     enabled: hasRun,
   });
 
+  // Restrict to fabric-related transaction types only
+  const rows = useMemo(
+    () => rawRows.filter((r) => FABRIC_TX_TYPES.has(r.transactionTypeName ?? "")),
+    [rawRows]
+  );
+
   // Opening balance: all data before dateFrom
   const openingQs = useMemo(() => {
     if (!applied.dateFrom) return null;
@@ -517,7 +530,7 @@ export default function YarnToFabricPage() {
     return buildQueryString({ ...applied, dateFrom: "", dateTo: toISODate(d) });
   }, [applied]);
 
-  const { data: openingRows = [] } = useQuery<ReportRow[]>({
+  const { data: rawOpeningRows = [] } = useQuery<ReportRow[]>({
     queryKey: ["ytf-reports/opening", openingQs],
     queryFn: async () => {
       const res = await fetch(`/api/reports/data${openingQs ? `?${openingQs}` : ""}`);
@@ -526,6 +539,12 @@ export default function YarnToFabricPage() {
     },
     enabled: hasRun && openingQs !== null,
   });
+
+  // Restrict opening rows to fabric-related transaction types only
+  const openingRows = useMemo(
+    () => rawOpeningRows.filter((r) => FABRIC_TX_TYPES.has(r.transactionTypeName ?? "")),
+    [rawOpeningRows]
+  );
 
   // Opening fabric balance = Σ(Fabric Production signed) + Σ(Fabric Delivery signed + Wastage) + Σ(Fab Del Return signed + Wastage)
   const openingFabricBalance = useMemo(
