@@ -714,7 +714,7 @@ export default function ReportsPage() {
 
   const qs = useMemo(() => buildQueryString(applied), [applied]);
 
-  const { data: rows = [], isFetching, isError } = useQuery<ReportRow[]>({
+  const { data: rawRows = [], isFetching, isError } = useQuery<ReportRow[]>({
     queryKey: ["reports/data", qs],
     queryFn: async () => {
       const res = await fetch(`/api/reports/data${qs ? `?${qs}` : ""}`);
@@ -723,6 +723,16 @@ export default function ReportsPage() {
     },
     enabled: hasRun,
   });
+
+  // When "All" transaction types are selected, exclude Fabric Production rows
+  // (they belong to the Yarn to Fabric report, not the Yarn Balance report).
+  const rows = useMemo(
+    () =>
+      applied.transactionTypeId.length === 0
+        ? rawRows.filter((r) => r.transactionTypeName !== "Fabric Production")
+        : rawRows,
+    [rawRows, applied.transactionTypeId]
+  );
 
   // ── Opening Balance query ─────────────────────────────────────────────────
   // Same filters as applied, but date range = everything BEFORE the dateFrom.
@@ -734,7 +744,7 @@ export default function ReportsPage() {
     return buildQueryString({ ...applied, dateFrom: "", dateTo });
   }, [applied]);
 
-  const { data: openingRows = [] } = useQuery<ReportRow[]>({
+  const { data: rawOpeningRows = [] } = useQuery<ReportRow[]>({
     queryKey: ["reports/opening-balance", openingQs],
     queryFn: async () => {
       const res = await fetch(`/api/reports/data${openingQs ? `?${openingQs}` : ""}`);
@@ -743,6 +753,15 @@ export default function ReportsPage() {
     },
     enabled: hasRun && openingQs !== null,
   });
+
+  // Same exclusion for opening-balance rows
+  const openingRows = useMemo(
+    () =>
+      applied.transactionTypeId.length === 0
+        ? rawOpeningRows.filter((r) => r.transactionTypeName !== "Fabric Production")
+        : rawOpeningRows,
+    [rawOpeningRows, applied.transactionTypeId]
+  );
 
   const openingBalance = useMemo(
     () => openingRows.reduce((s, r) => s + balanceNetWt(r) + wastageWt(r), 0),
