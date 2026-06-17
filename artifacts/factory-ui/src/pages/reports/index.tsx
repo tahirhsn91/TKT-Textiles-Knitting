@@ -19,7 +19,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell, ResponsiveContainer,
 } from "recharts";
-import { Printer, Download, FileText, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown, Upload } from "lucide-react";
+import html2canvas from "html2canvas";
+import { Printer, Download, FileText, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown, Upload, Image } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -699,6 +700,17 @@ export default function ReportsPage() {
     window.print();
   }
 
+  async function exportChartsAsPNG() {
+    const el = document.getElementById("charts-print-area");
+    if (!el) return;
+    const canvas = await html2canvas(el, { backgroundColor: "#ffffff", scale: 2, useCORS: true });
+    const url = canvas.toDataURL("image/png");
+    const a = Object.assign(document.createElement("a"), { href: url, download: "yarn-balance-charts.png" });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
   // Master data for filter dropdowns
   const { data: transactionTypes }    = useListTransactionTypeMaster();
   const { data: jobs }                = useListJobMaster();
@@ -1049,6 +1061,15 @@ export default function ReportsPage() {
                   {/* Print / Export / Import toolbar */}
                   {activeTab === "charts" ? (
                     <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={exportChartsAsPNG}
+                        className="gap-1.5"
+                      >
+                        <Image className="h-3.5 w-3.5" />
+                        Export PNG
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"

@@ -19,7 +19,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   LineChart, Line, ResponsiveContainer,
 } from "recharts";
-import { Printer, Download, FileText, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown, Upload } from "lucide-react";
+import html2canvas from "html2canvas";
+import { Printer, Download, FileText, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown, Upload, Image } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -754,6 +755,17 @@ export default function YarnToFabricPage() {
     window.print();
   }
 
+  async function exportChartsAsPNG() {
+    const el = document.getElementById("charts-print-area");
+    if (!el) return;
+    const canvas = await html2canvas(el, { backgroundColor: "#ffffff", scale: 2, useCORS: true });
+    const url = canvas.toDataURL("image/png");
+    const a = Object.assign(document.createElement("a"), { href: url, download: "yarn-to-fabric-charts.png" });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
   function handleSortSummary(key: string) {
     const k = key as SummarySortKey;
     setSortSummary((prev) =>
@@ -1165,6 +1177,10 @@ export default function YarnToFabricPage() {
 
                   {activeTab === "charts" ? (
                     <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={exportChartsAsPNG} className="gap-1.5">
+                        <Image className="h-3.5 w-3.5" />
+                        Export PNG
+                      </Button>
                       <Button variant="outline" size="sm" onClick={printCharts} className="gap-1.5">
                         <Printer className="h-3.5 w-3.5" />
                         Print Charts
