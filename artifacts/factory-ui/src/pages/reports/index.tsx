@@ -1404,7 +1404,12 @@ export default function ReportsPage() {
 
                 {/* ── Charts Tab ──────────────────────────── */}
                 <TabsContent value="charts" className="mt-3 space-y-6">
-                  <ChartSection rows={rows} />
+                  <ChartSection rows={rows} dateRange={
+                    applied.dateFrom && applied.dateTo ? `From ${applied.dateFrom}  Till ${applied.dateTo}`
+                    : applied.dateFrom ? `From ${applied.dateFrom}`
+                    : applied.dateTo   ? `Till ${applied.dateTo}`
+                    : "All Dates"
+                  } />
                 </TabsContent>
               </Tabs>
             )}
@@ -1423,7 +1428,7 @@ export default function ReportsPage() {
 
 // ─── Charts Section ──────────────────────────────────────────────────────────
 
-function ChartSection({ rows }: { rows: ReportRow[] }) {
+function ChartSection({ rows, dateRange }: { rows: ReportRow[]; dateRange: string }) {
   const byMonth = useMemo(() => {
     const map = new Map<string, { qty: number; netWt: number }>();
     for (const r of rows) {
@@ -1489,6 +1494,12 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
 
   return (
     <div id="charts-print-area" className="space-y-6">
+      {/* Print-only header */}
+      <div className="hidden print:block mb-4">
+        <h1 className="text-xl font-bold">TKT Textiles (Knitting) — Yarn Balance Report</h1>
+        <p className="text-sm text-gray-600 mt-0.5">{dateRange}</p>
+      </div>
+
       {/* Net Wt by Month */}
       {byMonth.length > 0 && (
         <Card>

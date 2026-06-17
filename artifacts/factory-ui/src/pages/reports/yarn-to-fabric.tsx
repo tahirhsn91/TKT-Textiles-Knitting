@@ -1472,6 +1472,7 @@ export default function YarnToFabricPage() {
                     rows={rows}
                     runningFabricBalances={runningFabricBalances}
                     openingFabricBalance={openingFabricBalance}
+                    dateRange={reportDateRange()}
                   />
                 </TabsContent>
               </Tabs>
@@ -1495,10 +1496,12 @@ function YtfChartSection({
   rows,
   runningFabricBalances,
   openingFabricBalance,
+  dateRange,
 }: {
   rows: ReportRow[];
   runningFabricBalances: number[];
   openingFabricBalance: number;
+  dateRange: string;
 }) {
   // Fabric Production vs Delivery by Month
   const fabricByMonth = useMemo(() => {
@@ -1545,6 +1548,12 @@ function YtfChartSection({
 
   return (
     <div id="charts-print-area" className="space-y-6">
+      {/* Print-only header */}
+      <div className="hidden print:block mb-4">
+        <h1 className="text-xl font-bold">TKT Textiles (Knitting) — Yarn to Fabric Report</h1>
+        <p className="text-sm text-gray-600 mt-0.5">{dateRange}</p>
+      </div>
+
       {fabricByMonth.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
