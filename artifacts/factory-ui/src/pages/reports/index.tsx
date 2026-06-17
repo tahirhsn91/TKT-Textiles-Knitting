@@ -234,6 +234,7 @@ type GroupedRow = {
   count: number;
   qty: number;
   netWt: number;
+  wastageWt: number;
   balNetWt: number;
   balNetWtMinusWastage: number;
   docNums: string[];
@@ -242,18 +243,19 @@ type GroupedRow = {
 
 function groupRows(rows: ReportRow[], key: GroupByKey): GroupedRow[] {
   const map = new Map<string, {
-    qty: number; netWt: number; balNetWt: number; balNetWtMinusWastage: number;
+    qty: number; netWt: number; wastageWt: number; balNetWt: number; balNetWtMinusWastage: number;
     count: number; docNumSet: Set<string>; refSet: Set<string>;
   }>();
   for (const row of rows) {
     const rawKey = key === "month" ? getMonthLabel(row.date) : (row[key] ?? "—");
     const k = String(rawKey);
     const existing = map.get(k) ?? {
-      qty: 0, netWt: 0, balNetWt: 0, balNetWtMinusWastage: 0, count: 0,
+      qty: 0, netWt: 0, wastageWt: 0, balNetWt: 0, balNetWtMinusWastage: 0, count: 0,
       docNumSet: new Set<string>(), refSet: new Set<string>(),
     };
     existing.qty                  += signedQty(row);
     existing.netWt                += signedNetWt(row);
+    existing.wastageWt            += wastageWt(row);
     existing.balNetWt             += balanceNetWt(row);
     existing.balNetWtMinusWastage += balanceNetWt(row) + wastageWt(row);
     existing.count                += 1;
@@ -263,7 +265,7 @@ function groupRows(rows: ReportRow[], key: GroupByKey): GroupedRow[] {
   }
   return Array.from(map.entries())
     .map(([label, v]) => ({
-      label, count: v.count, qty: v.qty, netWt: v.netWt,
+      label, count: v.count, qty: v.qty, netWt: v.netWt, wastageWt: v.wastageWt,
       balNetWt: v.balNetWt, balNetWtMinusWastage: v.balNetWtMinusWastage,
       docNums: [...v.docNumSet], refs: [...v.refSet],
     }))
@@ -512,15 +514,15 @@ export default function ReportsPage() {
 
   function exportSummaryCSV() {
     const groupLabel = GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? groupBy;
-    const headers    = [groupLabel, "Doc Number(s)", "Reference(s)", "Rows", "Total Qty", "Total Net Wt", "Running Total"];
+    const headers    = [groupLabel, "Doc Number(s)", "Reference(s)", "Rows", "Total Qty", "Total Net Wt", "Total Wastage Wt", "Running Total"];
     let bal = openingBalance;
     const data: (string | number)[][] = [
-      ["Opening Balance", "", "", "", "", "", fmt(openingBalance)],
+      ["Opening Balance", "", "", "", "", "", "", fmt(openingBalance)],
       ...sortedGrouped.map((r) => {
         bal += r.balNetWtMinusWastage;
-        return [r.label, r.docNums.join(", "), r.refs.join(", "), r.count, fmt(r.qty), fmt(r.netWt), fmt(bal)];
+        return [r.label, r.docNums.join(", "), r.refs.join(", "), r.count, fmt(r.qty), fmt(r.netWt), r.wastageWt !== 0 ? fmt(r.wastageWt) : "", fmt(bal)];
       }),
-      ["Total", "", "", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
+      ["Total", "", "", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(totalWastageWt), fmt(openingBalance + totalNetWt)],
     ];
     downloadBlob(csvHeading() + toCSV(headers, data), "report-summary.csv", "text/csv;charset=utf-8;");
   }
@@ -594,14 +596,14 @@ export default function ReportsPage() {
     let bal = openingBalance;
     autoTable(doc, {
       startY: 36,
-      head: [[groupLabel, "Doc Number(s)", "Reference(s)", "Rows", "Total Qty", "Total Net Wt", "Running Total"]],
+      head: [[groupLabel, "Doc Number(s)", "Reference(s)", "Rows", "Total Qty", "Total Net Wt", "Total Wastage Wt", "Running Total"]],
       body: [
-        ["Opening Balance", "", "", "", "", "", fmt(openingBalance)],
+        ["Opening Balance", "", "", "", "", "", "", fmt(openingBalance)],
         ...sortedGrouped.map((r) => {
           bal += r.balNetWtMinusWastage;
-          return [r.label, r.docNums.join(", "), r.refs.join(", "), r.count, fmt(r.qty), fmt(r.netWt), fmt(bal)];
+          return [r.label, r.docNums.join(", "), r.refs.join(", "), r.count, fmt(r.qty), fmt(r.netWt), r.wastageWt !== 0 ? fmt(r.wastageWt) : "", fmt(bal)];
         }),
-        ["Total", "", "", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
+        ["Total", "", "", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(totalWastageWt), fmt(openingBalance + totalNetWt)],
       ],
       styles: { fontSize: 9 },
       headStyles: { fillColor: [37, 99, 235] },
@@ -1161,6 +1163,7 @@ export default function ReportsPage() {
                           <SortHead label="Rows"          sortKey="count" sort={sortSummary} onSort={handleSortSummary} right />
                           <SortHead label="Total Qty"     sortKey="qty"   sort={sortSummary} onSort={handleSortSummary} right />
                           <SortHead label="Total Net Wt"  sortKey="netWt" sort={sortSummary} onSort={handleSortSummary} right />
+                          <TableHead className="text-right whitespace-nowrap">Total Wastage Wt</TableHead>
                           <TableHead className="text-right whitespace-nowrap">Running Total</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1168,6 +1171,7 @@ export default function ReportsPage() {
                         {/* Opening Balance row */}
                         <TableRow className="bg-muted/40 italic text-muted-foreground">
                           <TableCell className="whitespace-nowrap">Opening Balance</TableCell>
+                          <TableCell />
                           <TableCell />
                           <TableCell />
                           <TableCell />
@@ -1189,6 +1193,9 @@ export default function ReportsPage() {
                             <TableCell className="text-right">{r.count}</TableCell>
                             <TableCell className="text-right">{fmt(r.qty)}</TableCell>
                             <TableCell className="text-right">{fmt(r.netWt)}</TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {r.wastageWt !== 0 ? fmt(r.wastageWt) : "—"}
+                            </TableCell>
                             <TableCell className={`text-right whitespace-nowrap font-semibold ${summaryRunningTotals[i] < 0 ? "text-red-600" : "text-blue-700"}`}>
                               {fmt(summaryRunningTotals[i])}
                             </TableCell>
@@ -1201,6 +1208,7 @@ export default function ReportsPage() {
                           <TableCell className="text-right">{rows.length}</TableCell>
                           <TableCell className="text-right">{fmt(totalQty)}</TableCell>
                           <TableCell className="text-right">{fmt(totalNetWt)}</TableCell>
+                          <TableCell className="text-right">{fmt(totalWastageWt)}</TableCell>
                           <TableCell className={`text-right whitespace-nowrap ${(openingBalance + totalNetWt) < 0 ? "text-red-600" : "text-blue-700"}`}>
                             {fmt(openingBalance + totalNetWt)}
                           </TableCell>
