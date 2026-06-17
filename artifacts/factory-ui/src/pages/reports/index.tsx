@@ -140,6 +140,24 @@ function defaultFilters(): Filters {
   };
 }
 
+function loadSavedFilters(storageKey: string): Filters {
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed === "object") {
+        const defaults = defaultFilters();
+        const result: Filters = { ...defaults };
+        for (const k of Object.keys(defaults) as (keyof Filters)[]) {
+          if (k in parsed) (result as unknown as Record<string, unknown>)[k] = parsed[k];
+        }
+        return result;
+      }
+    }
+  } catch {}
+  return defaultFilters();
+}
+
 const EMPTY_FILTERS: Filters = {
   dateFrom: "", dateTo: "", year: "", month: "", docNumber: "", reference: "",
   transactionTypeId: [], jobId: [], partyId: [], locationId: [], fabricTypeId: [],
@@ -394,7 +412,7 @@ const ALL_DETAIL_KEYS = DETAIL_COLUMNS.map((c) => c.key);
 export default function ReportsPage() {
   const queryClient = useQueryClient();
   const [importOpen, setImportOpen]   = useState(false);
-  const [filters, setFilters]         = useState<Filters>(defaultFilters);
+  const [filters, setFilters]         = useState<Filters>(() => loadSavedFilters("report-filters"));
   const [applied, setApplied]         = useState<Filters>(EMPTY_FILTERS);
   const [groupBy, setGroupBy]         = useState<GroupByKey>(() => {
     try {
@@ -787,6 +805,7 @@ export default function ReportsPage() {
   }
 
   function runReport() {
+    try { localStorage.setItem("report-filters", JSON.stringify(filters)); } catch {}
     setApplied(filters);
     setHasRun(true);
   }
