@@ -425,7 +425,13 @@ export default function YarnToFabricPage() {
   const [importOpen, setImportOpen]   = useState(false);
   const [filters, setFilters]         = useState<Filters>(defaultFilters);
   const [applied, setApplied]         = useState<Filters>(EMPTY_FILTERS);
-  const [groupBy, setGroupBy]         = useState<GroupByKey>("date");
+  const [groupBy, setGroupBy]         = useState<GroupByKey>(() => {
+    try {
+      const saved = localStorage.getItem("ytf-group-by");
+      if (saved) return saved as GroupByKey;
+    } catch {}
+    return "date";
+  });
   const [hasRun, setHasRun]           = useState(false);
   const [visibleCols, setVisibleCols] = useState<Set<DetailColKey>>(() => {
     try {
@@ -485,6 +491,7 @@ export default function YarnToFabricPage() {
 
   useEffect(() => { localStorage.setItem("ytf-visible-cols", JSON.stringify([...visibleCols])); }, [visibleCols]);
   useEffect(() => { localStorage.setItem("ytf-col-order",    JSON.stringify(colOrder)); },        [colOrder]);
+  useEffect(() => { localStorage.setItem("ytf-group-by",     groupBy); },                         [groupBy]);
 
   const visibleColsList = colOrder
     .map((k) => DETAIL_COLUMNS.find((c) => c.key === k)!)

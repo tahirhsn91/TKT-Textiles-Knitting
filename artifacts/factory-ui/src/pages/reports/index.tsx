@@ -393,7 +393,13 @@ export default function ReportsPage() {
   const [importOpen, setImportOpen]   = useState(false);
   const [filters, setFilters]         = useState<Filters>(defaultFilters);
   const [applied, setApplied]         = useState<Filters>(EMPTY_FILTERS);
-  const [groupBy, setGroupBy]         = useState<GroupByKey>("date");
+  const [groupBy, setGroupBy]         = useState<GroupByKey>(() => {
+    try {
+      const saved = localStorage.getItem("report-group-by");
+      if (saved) return saved as GroupByKey;
+    } catch {}
+    return "date";
+  });
   const [hasRun, setHasRun]           = useState(false);
   const [visibleCols, setVisibleCols] = useState<Set<DetailColKey>>(() => {
     try {
@@ -460,6 +466,10 @@ export default function ReportsPage() {
   useEffect(() => {
     localStorage.setItem("report-col-order", JSON.stringify(colOrder));
   }, [colOrder]);
+
+  useEffect(() => {
+    localStorage.setItem("report-group-by", groupBy);
+  }, [groupBy]);
 
   const visibleColsList = colOrder
     .map((k) => DETAIL_COLUMNS.find((c) => c.key === k)!)
