@@ -20,7 +20,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer,
 } from "recharts";
 import html2canvas from "html2canvas";
-import { Printer, Download, FileText, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown, Upload, Image } from "lucide-react";
+import { Printer, Download, FileText, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown, Upload, Image, Loader2 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -456,6 +456,7 @@ export default function ReportsPage() {
     return ALL_DETAIL_KEYS;
   });
   const [dragCol,     setDragCol]     = useState<DetailColKey | null>(null);
+  const [pngLoading,  setPngLoading]  = useState(false);
 
   function toggleCol(key: DetailColKey) {
     setVisibleCols((prev) => {
@@ -729,12 +730,17 @@ export default function ReportsPage() {
   async function exportChartsAsPNG() {
     const el = document.getElementById("charts-print-area");
     if (!el) return;
-    const canvas = await html2canvas(el, { backgroundColor: "#ffffff", scale: 2, useCORS: true });
-    const url = canvas.toDataURL("image/png");
-    const a = Object.assign(document.createElement("a"), { href: url, download: "yarn-balance-charts.png" });
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    setPngLoading(true);
+    try {
+      const canvas = await html2canvas(el, { backgroundColor: "#ffffff", scale: 2, useCORS: true });
+      const url = canvas.toDataURL("image/png");
+      const a = Object.assign(document.createElement("a"), { href: url, download: "yarn-balance-charts.png" });
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } finally {
+      setPngLoading(false);
+    }
   }
 
   // Master data for filter dropdowns
@@ -1092,10 +1098,14 @@ export default function ReportsPage() {
                         variant="outline"
                         size="sm"
                         onClick={exportChartsAsPNG}
+                        disabled={pngLoading}
                         className="gap-1.5"
                       >
-                        <Image className="h-3.5 w-3.5" />
-                        Export PNG
+                        {pngLoading
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <Image className="h-3.5 w-3.5" />
+                        }
+                        {pngLoading ? "Exporting…" : "Export PNG"}
                       </Button>
                       <Button
                         variant="outline"
