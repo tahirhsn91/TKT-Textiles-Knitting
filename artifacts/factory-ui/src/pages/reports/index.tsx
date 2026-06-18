@@ -432,7 +432,13 @@ export default function ReportsPage() {
     } catch {}
     return new Set(ALL_DETAIL_KEYS);
   });
-  const [activeTab, setActiveTab]     = useState("summary");
+  const [activeTab, setActiveTab]     = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem("yarn-balance-active-tab");
+      if (saved === "summary" || saved === "detail" || saved === "charts") return saved;
+    } catch {}
+    return "summary";
+  });
   const [sortSummary, setSortSummary] = useState<{ key: SummarySortKey; dir: SortDir }>({ key: "label", dir: "asc" });
   const [sortDetail,  setSortDetail]  = useState<{ key: DetailColKey | null; dir: SortDir }>({ key: null, dir: "asc" });
   const [colOrder,    setColOrder]    = useState<DetailColKey[]>(() => {
@@ -1071,7 +1077,7 @@ export default function ReportsPage() {
             )}
 
             {rows.length > 0 && (
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); try { localStorage.setItem("yarn-balance-active-tab", v); } catch {} }}>
                 <div className="flex items-center justify-between gap-2 flex-wrap print:hidden">
                   <TabsList>
                     <TabsTrigger value="summary">Summary</TabsTrigger>

@@ -462,7 +462,13 @@ export default function YarnToFabricPage() {
     } catch {}
     return new Set(ALL_DETAIL_KEYS);
   });
-  const [activeTab, setActiveTab]     = useState("summary");
+  const [activeTab, setActiveTab]     = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem("yarn-to-fabric-active-tab");
+      if (saved === "summary" || saved === "detail" || saved === "charts" || saved === "party-balance") return saved;
+    } catch {}
+    return "summary";
+  });
   const [sortSummary,      setSortSummary]      = useState<{ key: SummarySortKey; dir: SortDir }>({ key: "label", dir: "asc" });
   const [sortDetail,       setSortDetail]       = useState<{ key: DetailColKey | null; dir: SortDir }>({ key: null, dir: "asc" });
   const [sortPartyBalance, setSortPartyBalance] = useState<{ key: PartyBalanceSortKey; dir: SortDir }>({ key: "party", dir: "asc" });
@@ -1188,7 +1194,7 @@ export default function YarnToFabricPage() {
             {!isError && rows.length === 0 && !isFetching && <p className="text-sm text-muted-foreground">No data found for the selected filters.</p>}
 
             {rows.length > 0 && (
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); try { localStorage.setItem("yarn-to-fabric-active-tab", v); } catch {} }}>
                 <div className="flex items-center justify-between gap-2 flex-wrap print:hidden">
                   <TabsList>
                     <TabsTrigger value="summary">Summary</TabsTrigger>
