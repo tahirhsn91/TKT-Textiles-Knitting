@@ -845,7 +845,7 @@ export default function TransactionForm() {
             </Card>
 
             <div className="flex justify-end gap-4 pt-4 border-t">
-              <Button type="button" variant="outline" onClick={() => setLocation("/")}>
+              <Button type="button" variant="outline" onClick={() => setLocation("/transactions")}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isPending}>
