@@ -326,6 +326,11 @@ export default function MastersPage() {
               fields={[
                 { key: "name", label: "Name", placeholder: "e.g. Circular Knitting Machine 1" },
                 { key: "machineNumber", label: "Machine Number", placeholder: "e.g. M-001" },
+                { key: "makingRate", label: "Making Rate", placeholder: "3.75", type: "number", step: "0.01", defaultValue: "3.75" },
+                { key: "needleChangeDate", label: "Needle Change Date", type: "date", defaultValue: new Date().toISOString().slice(0, 10) },
+                { key: "needleBrand", label: "Needle Brand", placeholder: "e.g. Sigma", defaultValue: "Sigma" },
+                { key: "sinkerChangeDate", label: "Sinker Change Date", type: "date", defaultValue: new Date().toISOString().slice(0, 10) },
+                { key: "sinkerBrand", label: "Sinker Brand", placeholder: "e.g. Kohala", defaultValue: "Kohala" },
               ]}
               rows={machines as never}
               isLoading={machinesLoading}

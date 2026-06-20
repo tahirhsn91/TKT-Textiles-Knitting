@@ -38,6 +38,11 @@ export const machineMasterTable = pgTable("machine_master", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   machineNumber: text("machine_number").notNull().unique(),
+  makingRate: numeric("making_rate", { precision: 10, scale: 2 }).default("3.75"),
+  needleChangeDate: text("needle_change_date"),
+  needleBrand: text("needle_brand").default("Sigma"),
+  sinkerChangeDate: text("sinker_change_date"),
+  sinkerBrand: text("sinker_brand").default("Kohala"),
 });
 export const insertMachineMasterSchema = createInsertSchema(machineMasterTable).omit({ id: true });
 export type InsertMachineMaster = z.infer<typeof insertMachineMasterSchema>;

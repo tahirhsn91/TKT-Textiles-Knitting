@@ -189,10 +189,18 @@ router.get("/masters/machine", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/machine", async (req, res): Promise<void> => {
-  const { name, machineNumber } = req.body;
+  const { name, machineNumber, makingRate, needleChangeDate, needleBrand, sinkerChangeDate, sinkerBrand } = req.body;
   if (!name || !machineNumber) { res.status(400).json({ error: "name and machineNumber are required" }); return; }
   try {
-    const [row] = await db.insert(machineMasterTable).values({ name, machineNumber }).returning();
+    const [row] = await db.insert(machineMasterTable).values({
+      name,
+      machineNumber,
+      makingRate: makingRate != null && makingRate !== "" ? String(parseFloat(makingRate)) : "3.75",
+      needleChangeDate: needleChangeDate || null,
+      needleBrand: needleBrand || "Sigma",
+      sinkerChangeDate: sinkerChangeDate || null,
+      sinkerBrand: sinkerBrand || "Kohala",
+    }).returning();
     res.status(201).json(row);
   } catch (err) {
     if (isUniqueViolation(err)) { res.status(409).json({ error: "Machine number already exists" }); return; }
@@ -203,10 +211,18 @@ router.post("/masters/machine", async (req, res): Promise<void> => {
 router.put("/masters/machine/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, machineNumber } = req.body;
+  const { name, machineNumber, makingRate, needleChangeDate, needleBrand, sinkerChangeDate, sinkerBrand } = req.body;
   if (!name || !machineNumber) { res.status(400).json({ error: "name and machineNumber are required" }); return; }
   try {
-    const [row] = await db.update(machineMasterTable).set({ name, machineNumber }).where(eq(machineMasterTable.id, id)).returning();
+    const [row] = await db.update(machineMasterTable).set({
+      name,
+      machineNumber,
+      makingRate: makingRate != null && makingRate !== "" ? String(parseFloat(makingRate)) : "3.75",
+      needleChangeDate: needleChangeDate || null,
+      needleBrand: needleBrand || "Sigma",
+      sinkerChangeDate: sinkerChangeDate || null,
+      sinkerBrand: sinkerBrand || "Kohala",
+    }).where(eq(machineMasterTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
     res.json(row);
   } catch (err) {

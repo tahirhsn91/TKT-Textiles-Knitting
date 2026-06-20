@@ -41,6 +41,7 @@ export type Field = {
   step?: string;
   options?: FieldOption[];
   displayKey?: string;
+  defaultValue?: string;
 };
 
 type Row = { id: number; [key: string]: string | number | null | undefined };
@@ -129,7 +130,7 @@ export function MasterTable({
   const [showAddRow, setShowAddRow] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const emptyAdd = () => Object.fromEntries(fields.map((f) => [f.key, ""]));
+  const emptyAdd = () => Object.fromEntries(fields.map((f) => [f.key, f.defaultValue ?? ""]));
 
   const startEdit = (row: Row) => {
     setEditingId(row.id as number);
