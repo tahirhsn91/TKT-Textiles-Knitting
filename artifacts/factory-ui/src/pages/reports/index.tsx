@@ -20,7 +20,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer,
 } from "recharts";
 import html2canvas from "html2canvas";
-import { Printer, Download, FileText, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown, Upload, Image, Loader2 } from "lucide-react";
+import { Printer, Download, FileText, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown, Upload, Image, Loader2, ClipboardCopy } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +56,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ImportDialog } from "@/components/import-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -457,6 +458,8 @@ export default function ReportsPage() {
   });
   const [dragCol,     setDragCol]     = useState<DetailColKey | null>(null);
   const [pngLoading,  setPngLoading]  = useState(false);
+  const [copyLoading, setCopyLoading] = useState(false);
+  const { toast } = useToast();
 
   function toggleCol(key: DetailColKey) {
     setVisibleCols((prev) => {
@@ -740,6 +743,24 @@ export default function ReportsPage() {
       a.remove();
     } finally {
       setPngLoading(false);
+    }
+  }
+
+  async function copyChartsToClipboard() {
+    const el = document.getElementById("charts-print-area");
+    if (!el) return;
+    setCopyLoading(true);
+    try {
+      const canvas = await html2canvas(el, { backgroundColor: "#ffffff", scale: 2, useCORS: true });
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Failed to create blob"))), "image/png")
+      );
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      toast({ title: "Copied!", description: "Charts copied to clipboard." });
+    } catch {
+      toast({ title: "Copy failed", description: "Your browser may not support clipboard image writing.", variant: "destructive" });
+    } finally {
+      setCopyLoading(false);
     }
   }
 
@@ -1094,6 +1115,19 @@ export default function ReportsPage() {
                   {/* Print / Export / Import toolbar */}
                   {activeTab === "charts" ? (
                     <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={copyChartsToClipboard}
+                        disabled={copyLoading}
+                        className="gap-1.5"
+                      >
+                        {copyLoading
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <ClipboardCopy className="h-3.5 w-3.5" />
+                        }
+                        {copyLoading ? "Copying…" : "Copy Image"}
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
