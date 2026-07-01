@@ -245,8 +245,7 @@ function getGroupLabel(row: ReportRow, key: GroupByKey): string {
 }
 
 type DetailRenderItem =
-  | { kind: "data"; r: ReportRow; idx: number; bal: number }
-  | { kind: "subtotal"; label: string; qty: number; netWt: number; wastageWt: number };
+  | { kind: "data"; r: ReportRow; idx: number; bal: number };
 
 type GroupedRow = {
   label: string;
@@ -562,44 +561,34 @@ export default function ReportsPage() {
     );
     const bodyRows: (string | number)[][] = [];
     for (const item of detailRenderRows) {
-      if (item.kind === "subtotal") {
-        bodyRows.push(visibleColsList.map((c, ci) =>
-          ci === 0             ? `Subtotal: ${item.label}`
-          : c.key === "quantity"       ? fmt(item.qty)
-          : c.key === "netWt"          ? fmt(item.netWt)
-          : c.key === "wastageWt"      ? fmt(item.wastageWt)
-          : ""
-        ));
-      } else {
-        const { r, idx } = item;
-        const wWt = wastageWt(r);
-        bodyRows.push(visibleColsList.map((c) => {
-          switch (c.key) {
-            case "date":                  return r.date;
-            case "docNumber":             return r.docNumber;
-            case "reference":             return r.reference ?? "";
-            case "sl":                    return r.sl ?? "";
-            case "gsm":                   return r.gsm ?? "";
-            case "transactionTypeName":   return r.transactionTypeName ?? "";
-            case "jobName":               return r.jobName ?? "";
-            case "partyName":             return r.partyName ?? "";
-            case "locationName":          return r.locationName ?? "";
-            case "fabricTypeName":        return r.fabricTypeName ?? "";
-            case "yarnTypeName":          return r.yarnTypeName ?? "";
-            case "yarnCountName":         return r.yarnCountName ?? "";
-            case "yarnBrandName":         return r.yarnBrandName ?? "";
-            case "uomName":               return r.uomName ?? "";
-            case "machineName":           return r.machineName ?? "";
-            case "machineOperatorName":   return r.machineOperatorName ?? "";
-            case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "";
-            case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "";
-            case "wastagePercent":        return wWt !== 0 ? (r.partyWastePercent ?? "") : "";
-            case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "";
-            case "runningBalance":        return fmt(runningBalances[idx]);
-            default:                      return "";
-          }
-        }));
-      }
+      const { r, bal } = item;
+      const wWt = wastageWt(r);
+      bodyRows.push(visibleColsList.map((c) => {
+        switch (c.key) {
+          case "date":                  return r.date;
+          case "docNumber":             return r.docNumber;
+          case "reference":             return r.reference ?? "";
+          case "sl":                    return r.sl ?? "";
+          case "gsm":                   return r.gsm ?? "";
+          case "transactionTypeName":   return r.transactionTypeName ?? "";
+          case "jobName":               return r.jobName ?? "";
+          case "partyName":             return r.partyName ?? "";
+          case "locationName":          return r.locationName ?? "";
+          case "fabricTypeName":        return r.fabricTypeName ?? "";
+          case "yarnTypeName":          return r.yarnTypeName ?? "";
+          case "yarnCountName":         return r.yarnCountName ?? "";
+          case "yarnBrandName":         return r.yarnBrandName ?? "";
+          case "uomName":               return r.uomName ?? "";
+          case "machineName":           return r.machineName ?? "";
+          case "machineOperatorName":   return r.machineOperatorName ?? "";
+          case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "";
+          case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "";
+          case "wastagePercent":        return wWt !== 0 ? (r.partyWastePercent ?? "") : "";
+          case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "";
+          case "runningBalance":        return fmt(bal);
+          default:                      return "";
+        }
+      }));
     }
     const grandRow = visibleColsList.map((c, ci) =>
       ci === 0               ? "Grand Total"
@@ -656,44 +645,34 @@ export default function ReportsPage() {
     );
     const bodyRows: string[][] = [];
     for (const item of detailRenderRows) {
-      if (item.kind === "subtotal") {
-        bodyRows.push(visibleColsList.map((c, ci) =>
-          ci === 0                     ? `Subtotal: ${item.label}`
-          : c.key === "quantity"       ? fmt(item.qty)
-          : c.key === "netWt"          ? fmt(item.netWt)
-          : c.key === "wastageWt"      ? fmt(item.wastageWt)
-          : "—"
-        ));
-      } else {
-        const { r, idx } = item;
-        const wWt = wastageWt(r);
-        bodyRows.push(visibleColsList.map((c) => {
-          switch (c.key) {
-            case "date":                  return r.date;
-            case "docNumber":             return r.docNumber;
-            case "reference":             return r.reference ?? "—";
-            case "sl":                    return r.sl ?? "—";
-            case "gsm":                   return String(r.gsm ?? "—");
-            case "transactionTypeName":   return r.transactionTypeName ?? "—";
-            case "jobName":               return r.jobName ?? "—";
-            case "partyName":             return r.partyName ?? "—";
-            case "locationName":          return r.locationName ?? "—";
-            case "fabricTypeName":        return r.fabricTypeName ?? "—";
-            case "yarnTypeName":          return r.yarnTypeName ?? "—";
-            case "yarnCountName":         return r.yarnCountName ?? "—";
-            case "yarnBrandName":         return r.yarnBrandName ?? "—";
-            case "uomName":               return r.uomName ?? "—";
-            case "machineName":           return r.machineName ?? "—";
-            case "machineOperatorName":   return r.machineOperatorName ?? "—";
-            case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "—";
-            case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "—";
-            case "wastagePercent":        return wWt !== 0 ? (r.partyWastePercent ?? "—") : "—";
-            case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "—";
-            case "runningBalance":        return fmt(runningBalances[idx]);
-            default:                      return "";
-          }
-        }));
-      }
+      const { r, bal } = item;
+      const wWt = wastageWt(r);
+      bodyRows.push(visibleColsList.map((c) => {
+        switch (c.key) {
+          case "date":                  return r.date;
+          case "docNumber":             return r.docNumber;
+          case "reference":             return r.reference ?? "—";
+          case "sl":                    return r.sl ?? "—";
+          case "gsm":                   return String(r.gsm ?? "—");
+          case "transactionTypeName":   return r.transactionTypeName ?? "—";
+          case "jobName":               return r.jobName ?? "—";
+          case "partyName":             return r.partyName ?? "—";
+          case "locationName":          return r.locationName ?? "—";
+          case "fabricTypeName":        return r.fabricTypeName ?? "—";
+          case "yarnTypeName":          return r.yarnTypeName ?? "—";
+          case "yarnCountName":         return r.yarnCountName ?? "—";
+          case "yarnBrandName":         return r.yarnBrandName ?? "—";
+          case "uomName":               return r.uomName ?? "—";
+          case "machineName":           return r.machineName ?? "—";
+          case "machineOperatorName":   return r.machineOperatorName ?? "—";
+          case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "—";
+          case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "—";
+          case "wastagePercent":        return wWt !== 0 ? (r.partyWastePercent ?? "—") : "—";
+          case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "—";
+          case "runningBalance":        return fmt(bal);
+          default:                      return "";
+        }
+      }));
     }
     const grandRow = visibleColsList.map((c, ci) =>
       ci === 0                ? "Grand Total"
@@ -709,9 +688,9 @@ export default function ReportsPage() {
       headStyles: { fillColor: [37, 99, 235] },
       didParseCell: (data) => {
         const label = data.row.raw[0]?.toString() ?? "";
-        if (data.section === "body" && (label.startsWith("Subtotal:") || label === "Grand Total")) {
+        if (data.section === "body" && label === "Grand Total") {
           data.cell.styles.fontStyle = "bold";
-          data.cell.styles.fillColor = label === "Grand Total" ? [220, 230, 255] : [240, 240, 240];
+          data.cell.styles.fillColor = [220, 230, 255];
         }
       },
     });
@@ -937,28 +916,14 @@ export default function ReportsPage() {
     });
   }, [rows, runningBalances, sortDetail]);
 
-  /** Sorted detail rows interleaved with a subtotal row after each group. */
+  /** Sorted detail rows with running balance recomputed in display order. */
   const detailRenderRows = useMemo((): DetailRenderItem[] => {
-    const result: DetailRenderItem[] = [];
-    let curKey: string | null = null;
-    let gQty = 0, gNetWt = 0, gWastageWt = 0, gLabel = "";
-    const flush = () => {
-      if (curKey !== null) {
-        result.push({ kind: "subtotal", label: gLabel, qty: gQty, netWt: gNetWt, wastageWt: gWastageWt });
-        gQty = 0; gNetWt = 0; gWastageWt = 0;
-      }
-    };
-    for (const item of sortedDetailRows) {
-      const k = getGroupLabel(item.r, groupBy);
-      if (k !== curKey) { flush(); curKey = k; gLabel = k; }
-      gQty       += signedQty(item.r);
-      gNetWt     += signedNetWt(item.r);
-      gWastageWt += wastageWt(item.r);
-      result.push({ kind: "data", r: item.r, idx: item.idx, bal: item.bal });
-    }
-    flush();
-    return result;
-  }, [sortedDetailRows, groupBy]);
+    let runBal = openingBalance;
+    return sortedDetailRows.map((item) => {
+      runBal += balanceNetWt(item.r) + wastageWt(item.r);
+      return { kind: "data", r: item.r, idx: item.idx, bal: runBal };
+    });
+  }, [sortedDetailRows, openingBalance]);
 
   // Years available in data for the year dropdown
   const currentYear = new Date().getFullYear();
@@ -1366,20 +1331,7 @@ export default function ReportsPage() {
                           })}
                         </TableRow>
 
-                        {detailRenderRows.map((item, ri) => {
-                          if (item.kind === "subtotal") {
-                            return (
-                              <TableRow key={`sub-${ri}`} className="bg-muted/60 font-semibold border-t">
-                                {visibleColsList.map((c, ci) => {
-                                  if (ci === 0)                return <TableCell key={c.key} className="whitespace-nowrap">Subtotal: {item.label}</TableCell>;
-                                  if (c.key === "quantity")    return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(item.qty)}</TableCell>;
-                                  if (c.key === "netWt")       return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(item.netWt)}</TableCell>;
-                                  if (c.key === "wastageWt")   return <TableCell key={c.key} className="text-right whitespace-nowrap">{item.wastageWt !== 0 ? fmt(item.wastageWt) : "—"}</TableCell>;
-                                  return <TableCell key={c.key} />;
-                                })}
-                              </TableRow>
-                            );
-                          }
+                        {detailRenderRows.map((item) => {
                           const { r, bal } = item;
                           const neg = getMultiplier(r.transactionTypeAction) < 0;
                           const wWt = wastageWt(r);
