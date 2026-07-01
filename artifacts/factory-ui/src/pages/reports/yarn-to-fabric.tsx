@@ -373,8 +373,7 @@ function groupRows(rows: ReportRow[], key: GroupByKey): Y2FGroupedRow[] {
 // ─── Detail render item ───────────────────────────────────────────────────────
 
 type DetailRenderItem =
-  | { kind: "data"; r: ReportRow; idx: number; fabricBal: number }
-  | { kind: "subtotal"; label: string; qty: number; fabricProduction: number; fabricDelivery: number; wastageWt: number; fabricDeliveryReturn: number };
+  | { kind: "data"; r: ReportRow; idx: number; fabricBal: number };
 
 // ─── Shared sub-components ────────────────────────────────────────────────────
 
@@ -731,38 +730,14 @@ export default function YarnToFabricPage() {
     });
   }, [rows, runningFabricBalances, sortDetail]);
 
-  // Detail rows interleaved with subtotals
+  // Detail rows with running fabric balance recomputed in display order
   const detailRenderRows = useMemo((): DetailRenderItem[] => {
-    const result: DetailRenderItem[] = [];
-    let curKey: string | null = null;
-    let gLabel = "";
-    let gQty = 0, gFP = 0, gFD = 0, gWWt = 0, gFDR = 0;
-
-    const flush = () => {
-      if (curKey !== null) {
-        result.push({
-          kind: "subtotal", label: gLabel, qty: gQty,
-          fabricProduction: gFP, fabricDelivery: gFD,
-          wastageWt: gWWt, fabricDeliveryReturn: gFDR,
-        });
-        gQty = 0; gFP = 0; gFD = 0; gWWt = 0; gFDR = 0;
-      }
-    };
-
-    for (const item of sortedDetailRows) {
-      const k = getGroupLabel(item.r, groupBy);
-      if (k !== curKey) { flush(); curKey = k; gLabel = k; }
-      gQty += signedQty(item.r);
-      const name = item.r.transactionTypeName;
-      if (name === "Fabric Production")      gFP  += signedNetWt(item.r);
-      if (name === "Fabric Delivery")        gFD  += signedNetWt(item.r);
-      if (name === "Fabric Delivery Return") gFDR += signedNetWt(item.r);
-      gWWt += wastageWt(item.r);
-      result.push({ kind: "data", r: item.r, idx: item.idx, fabricBal: item.fabricBal });
-    }
-    flush();
-    return result;
-  }, [sortedDetailRows, groupBy]);
+    let runBal = openingFabricBalance;
+    return sortedDetailRows.map((item) => {
+      runBal += fabricBalanceDelta(item.r);
+      return { kind: "data", r: item.r, idx: item.idx, fabricBal: runBal };
+    });
+  }, [sortedDetailRows, openingFabricBalance]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -900,47 +875,35 @@ export default function YarnToFabricPage() {
     );
     const bodyRows: (string | number)[][] = [];
     for (const item of detailRenderRows) {
-      if (item.kind === "subtotal") {
-        bodyRows.push(visibleColsList.map((c, ci) =>
-          ci === 0                           ? `Subtotal: ${item.label}`
-          : c.key === "quantity"             ? fmt(item.qty)
-          : c.key === "fabricProduction"     ? (item.fabricProduction !== 0 ? fmt(item.fabricProduction) : "")
-          : c.key === "fabricDelivery"       ? (item.fabricDelivery   !== 0 ? fmt(item.fabricDelivery)   : "")
-          : c.key === "wastageWt"            ? (item.wastageWt        !== 0 ? fmt(item.wastageWt)        : "")
-          : c.key === "fabricDeliveryReturn" ? (item.fabricDeliveryReturn !== 0 ? fmt(item.fabricDeliveryReturn) : "")
-          : ""
-        ));
-      } else {
-        const { r, idx } = item;
-        const wWt = wastageWt(r);
-        bodyRows.push(visibleColsList.map((c) => {
-          switch (c.key) {
-            case "date":                  return r.date;
-            case "docNumber":             return r.docNumber;
-            case "reference":             return r.reference ?? "";
-            case "sl":                    return r.sl ?? "";
-            case "gsm":                   return r.gsm ?? "";
-            case "transactionTypeName":   return r.transactionTypeName ?? "";
-            case "jobName":               return r.jobName ?? "";
-            case "partyName":             return r.partyName ?? "";
-            case "locationName":          return r.locationName ?? "";
-            case "fabricTypeName":        return r.fabricTypeName ?? "";
-            case "yarnTypeName":          return r.yarnTypeName ?? "";
-            case "yarnCountName":         return r.yarnCountName ?? "";
-            case "yarnBrandName":         return r.yarnBrandName ?? "";
-            case "uomName":               return r.uomName ?? "";
-            case "machineName":           return r.machineName ?? "";
-            case "machineOperatorName":   return r.machineOperatorName ?? "";
-            case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "";
-            case "fabricProduction":      { const v = signedNetWtIfType(r, "Fabric Production");      return v != null ? fmt(v) : ""; }
-            case "fabricDelivery":        { const v = signedNetWtIfType(r, "Fabric Delivery");        return v != null ? fmt(v) : ""; }
-            case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "";
-            case "fabricDeliveryReturn":  { const v = signedNetWtIfType(r, "Fabric Delivery Return"); return v != null ? fmt(v) : ""; }
-            case "runningFabricBalance":  return fmt(runningFabricBalances[idx]);
-            default:                      return "";
-          }
-        }));
-      }
+      const { r, fabricBal } = item;
+      const wWt = wastageWt(r);
+      bodyRows.push(visibleColsList.map((c) => {
+        switch (c.key) {
+          case "date":                  return r.date;
+          case "docNumber":             return r.docNumber;
+          case "reference":             return r.reference ?? "";
+          case "sl":                    return r.sl ?? "";
+          case "gsm":                   return r.gsm ?? "";
+          case "transactionTypeName":   return r.transactionTypeName ?? "";
+          case "jobName":               return r.jobName ?? "";
+          case "partyName":             return r.partyName ?? "";
+          case "locationName":          return r.locationName ?? "";
+          case "fabricTypeName":        return r.fabricTypeName ?? "";
+          case "yarnTypeName":          return r.yarnTypeName ?? "";
+          case "yarnCountName":         return r.yarnCountName ?? "";
+          case "yarnBrandName":         return r.yarnBrandName ?? "";
+          case "uomName":               return r.uomName ?? "";
+          case "machineName":           return r.machineName ?? "";
+          case "machineOperatorName":   return r.machineOperatorName ?? "";
+          case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "";
+          case "fabricProduction":      { const v = signedNetWtIfType(r, "Fabric Production");      return v != null ? fmt(v) : ""; }
+          case "fabricDelivery":        { const v = signedNetWtIfType(r, "Fabric Delivery");        return v != null ? fmt(v) : ""; }
+          case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "";
+          case "fabricDeliveryReturn":  { const v = signedNetWtIfType(r, "Fabric Delivery Return"); return v != null ? fmt(v) : ""; }
+          case "runningFabricBalance":  return fmt(fabricBal);
+          default:                      return "";
+        }
+      }));
     }
     const grandRow = visibleColsList.map((c, ci) =>
       ci === 0                           ? "Grand Total"
@@ -1031,47 +994,35 @@ export default function YarnToFabricPage() {
     );
     const bodyRows: string[][] = [];
     for (const item of detailRenderRows) {
-      if (item.kind === "subtotal") {
-        bodyRows.push(visibleColsList.map((c, ci) =>
-          ci === 0                           ? `Subtotal: ${item.label}`
-          : c.key === "quantity"             ? fmt(item.qty)
-          : c.key === "fabricProduction"     ? (item.fabricProduction !== 0 ? fmt(item.fabricProduction) : "—")
-          : c.key === "fabricDelivery"       ? (item.fabricDelivery   !== 0 ? fmt(item.fabricDelivery)   : "—")
-          : c.key === "wastageWt"            ? (item.wastageWt        !== 0 ? fmt(item.wastageWt)        : "—")
-          : c.key === "fabricDeliveryReturn" ? (item.fabricDeliveryReturn !== 0 ? fmt(item.fabricDeliveryReturn) : "—")
-          : "—"
-        ));
-      } else {
-        const { r, idx } = item;
-        const wWt = wastageWt(r);
-        bodyRows.push(visibleColsList.map((c) => {
-          switch (c.key) {
-            case "date":                  return r.date;
-            case "docNumber":             return r.docNumber;
-            case "reference":             return r.reference ?? "—";
-            case "sl":                    return r.sl ?? "—";
-            case "gsm":                   return String(r.gsm ?? "—");
-            case "transactionTypeName":   return r.transactionTypeName ?? "—";
-            case "jobName":               return r.jobName ?? "—";
-            case "partyName":             return r.partyName ?? "—";
-            case "locationName":          return r.locationName ?? "—";
-            case "fabricTypeName":        return r.fabricTypeName ?? "—";
-            case "yarnTypeName":          return r.yarnTypeName ?? "—";
-            case "yarnCountName":         return r.yarnCountName ?? "—";
-            case "yarnBrandName":         return r.yarnBrandName ?? "—";
-            case "uomName":               return r.uomName ?? "—";
-            case "machineName":           return r.machineName ?? "—";
-            case "machineOperatorName":   return r.machineOperatorName ?? "—";
-            case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "—";
-            case "fabricProduction":      { const v = signedNetWtIfType(r, "Fabric Production");      return v != null ? fmt(v) : "—"; }
-            case "fabricDelivery":        { const v = signedNetWtIfType(r, "Fabric Delivery");        return v != null ? fmt(v) : "—"; }
-            case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "—";
-            case "fabricDeliveryReturn":  { const v = signedNetWtIfType(r, "Fabric Delivery Return"); return v != null ? fmt(v) : "—"; }
-            case "runningFabricBalance":  return fmt(runningFabricBalances[idx]);
-            default:                      return "";
-          }
-        }));
-      }
+      const { r, fabricBal } = item;
+      const wWt = wastageWt(r);
+      bodyRows.push(visibleColsList.map((c) => {
+        switch (c.key) {
+          case "date":                  return r.date;
+          case "docNumber":             return r.docNumber;
+          case "reference":             return r.reference ?? "—";
+          case "sl":                    return r.sl ?? "—";
+          case "gsm":                   return String(r.gsm ?? "—");
+          case "transactionTypeName":   return r.transactionTypeName ?? "—";
+          case "jobName":               return r.jobName ?? "—";
+          case "partyName":             return r.partyName ?? "—";
+          case "locationName":          return r.locationName ?? "—";
+          case "fabricTypeName":        return r.fabricTypeName ?? "—";
+          case "yarnTypeName":          return r.yarnTypeName ?? "—";
+          case "yarnCountName":         return r.yarnCountName ?? "—";
+          case "yarnBrandName":         return r.yarnBrandName ?? "—";
+          case "uomName":               return r.uomName ?? "—";
+          case "machineName":           return r.machineName ?? "—";
+          case "machineOperatorName":   return r.machineOperatorName ?? "—";
+          case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "—";
+          case "fabricProduction":      { const v = signedNetWtIfType(r, "Fabric Production");      return v != null ? fmt(v) : "—"; }
+          case "fabricDelivery":        { const v = signedNetWtIfType(r, "Fabric Delivery");        return v != null ? fmt(v) : "—"; }
+          case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "—";
+          case "fabricDeliveryReturn":  { const v = signedNetWtIfType(r, "Fabric Delivery Return"); return v != null ? fmt(v) : "—"; }
+          case "runningFabricBalance":  return fmt(fabricBal);
+          default:                      return "";
+        }
+      }));
     }
     const grandRow = visibleColsList.map((c, ci) =>
       ci === 0                           ? "Grand Total"
@@ -1089,9 +1040,9 @@ export default function YarnToFabricPage() {
       headStyles: { fillColor: [37, 99, 235] },
       didParseCell: (data) => {
         const label = data.row.raw[0]?.toString() ?? "";
-        if (data.section === "body" && (label.startsWith("Subtotal:") || label === "Grand Total")) {
+        if (data.section === "body" && label === "Grand Total") {
           data.cell.styles.fontStyle = "bold";
-          data.cell.styles.fillColor = label === "Grand Total" ? [220, 230, 255] : [240, 240, 240];
+          data.cell.styles.fillColor = [220, 230, 255];
         }
       },
     });
@@ -1405,24 +1356,8 @@ export default function YarnToFabricPage() {
                           })}
                         </TableRow>
 
-                        {detailRenderRows.map((item, ri) => {
-                          if (item.kind === "subtotal") {
-                            return (
-                              <TableRow key={`sub-${ri}`} className="bg-muted/60 font-semibold border-t">
-                                {visibleColsList.map((c, ci) => {
-                                  if (ci === 0)                           return <TableCell key={c.key} className="whitespace-nowrap">Subtotal: {item.label}</TableCell>;
-                                  if (c.key === "quantity")               return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(item.qty)}</TableCell>;
-                                  if (c.key === "fabricProduction")       return <TableCell key={c.key} className="text-right whitespace-nowrap">{item.fabricProduction !== 0 ? fmt(item.fabricProduction) : "—"}</TableCell>;
-                                  if (c.key === "fabricDelivery")         return <TableCell key={c.key} className={`text-right whitespace-nowrap${item.fabricDelivery < 0 ? " text-red-600" : ""}`}>{item.fabricDelivery !== 0 ? fmt(item.fabricDelivery) : "—"}</TableCell>;
-                                  if (c.key === "wastageWt")              return <TableCell key={c.key} className="text-right whitespace-nowrap text-amber-700">{item.wastageWt !== 0 ? fmt(item.wastageWt) : "—"}</TableCell>;
-                                  if (c.key === "fabricDeliveryReturn")   return <TableCell key={c.key} className={`text-right whitespace-nowrap${item.fabricDeliveryReturn > 0 ? " text-green-700" : ""}`}>{item.fabricDeliveryReturn !== 0 ? fmt(item.fabricDeliveryReturn) : "—"}</TableCell>;
-                                  return <TableCell key={c.key} />;
-                                })}
-                              </TableRow>
-                            );
-                          }
-
-                          const { r, idx, fabricBal } = item;
+                        {detailRenderRows.map((item) => {
+                          const { r, fabricBal } = item;
                           const wWt = wastageWt(r);
 
                           return (
