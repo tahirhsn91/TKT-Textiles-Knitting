@@ -21,8 +21,6 @@ export const ListJobMasterResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
   code: zod.string(),
-  partyId: zod.number().nullish(),
-  partyName: zod.string().nullish(),
 });
 export const ListJobMasterResponse = zod.array(ListJobMasterResponseItem);
 
@@ -143,6 +141,18 @@ export const ListTransactionTypeMasterResponse = zod.array(
 );
 
 /**
+ * @summary List department master entries
+ */
+export const ListDepartmentMasterResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+export const ListDepartmentMasterResponse = zod.array(
+  ListDepartmentMasterResponseItem,
+);
+
+/**
  * @summary List transaction type master entries (CRUD)
  */
 export const ListTransactionTypeMasterCrudResponseItem = zod.object({
@@ -194,8 +204,6 @@ export const ListJobMasterCrudResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
   code: zod.string(),
-  partyId: zod.number().nullish(),
-  partyName: zod.string().nullish(),
 });
 export const ListJobMasterCrudResponse = zod.array(
   ListJobMasterCrudResponseItem,
@@ -207,7 +215,6 @@ export const ListJobMasterCrudResponse = zod.array(
 export const CreateJobMasterBody = zod.object({
   name: zod.string(),
   code: zod.string(),
-  partyId: zod.number().nullish(),
 });
 
 /**
@@ -220,15 +227,12 @@ export const UpdateJobMasterParams = zod.object({
 export const UpdateJobMasterBody = zod.object({
   name: zod.string(),
   code: zod.string(),
-  partyId: zod.number().nullish(),
 });
 
 export const UpdateJobMasterResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
   code: zod.string(),
-  partyId: zod.number().nullish(),
-  partyName: zod.string().nullish(),
 });
 
 /**
@@ -599,12 +603,62 @@ export const DeleteFabricTypeMasterParams = zod.object({
 });
 
 /**
+ * @summary List department master entries (CRUD)
+ */
+export const ListDepartmentMasterCrudResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+export const ListDepartmentMasterCrudResponse = zod.array(
+  ListDepartmentMasterCrudResponseItem,
+);
+
+/**
+ * @summary Create department master entry
+ */
+export const CreateDepartmentMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Update department master entry
+ */
+export const UpdateDepartmentMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateDepartmentMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+export const UpdateDepartmentMasterResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Delete department master entry
+ */
+export const DeleteDepartmentMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary List machine operator master entries (CRUD)
  */
 export const ListMachineOperatorMasterCrudResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
   code: zod.string(),
+  departmentId: zod.number().nullish(),
+  baseSalary: zod.string().nullish(),
+  overtimeRateHr: zod.string().nullish(),
+  attAllowance: zod.string().nullish(),
+  othAllowance: zod.string().nullish(),
 });
 export const ListMachineOperatorMasterCrudResponse = zod.array(
   ListMachineOperatorMasterCrudResponseItem,
@@ -616,6 +670,11 @@ export const ListMachineOperatorMasterCrudResponse = zod.array(
 export const CreateMachineOperatorMasterBody = zod.object({
   name: zod.string(),
   code: zod.string(),
+  departmentId: zod.number().nullish(),
+  baseSalary: zod.string().nullish(),
+  overtimeRateHr: zod.string().nullish(),
+  attAllowance: zod.string().nullish(),
+  othAllowance: zod.string().nullish(),
 });
 
 /**
@@ -628,12 +687,22 @@ export const UpdateMachineOperatorMasterParams = zod.object({
 export const UpdateMachineOperatorMasterBody = zod.object({
   name: zod.string(),
   code: zod.string(),
+  departmentId: zod.number().nullish(),
+  baseSalary: zod.string().nullish(),
+  overtimeRateHr: zod.string().nullish(),
+  attAllowance: zod.string().nullish(),
+  othAllowance: zod.string().nullish(),
 });
 
 export const UpdateMachineOperatorMasterResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
   code: zod.string(),
+  departmentId: zod.number().nullish(),
+  baseSalary: zod.string().nullish(),
+  overtimeRateHr: zod.string().nullish(),
+  attAllowance: zod.string().nullish(),
+  othAllowance: zod.string().nullish(),
 });
 
 /**
@@ -657,8 +726,6 @@ export const ListTransactionsResponseItem = zod.object({
   fabricTypeId: zod.number().nullish(),
   sl: zod.string().nullish(),
   gsm: zod.number().nullish(),
-  reference: zod.string().nullish(),
-  yarnBrandIds: zod.array(zod.number()).optional(),
 });
 export const ListTransactionsResponse = zod.array(ListTransactionsResponseItem);
 
@@ -675,7 +742,6 @@ export const CreateTransactionBody = zod.object({
   fabricTypeId: zod.number().nullish(),
   sl: zod.string().nullish(),
   gsm: zod.number().nullish(),
-  reference: zod.string().nullish(),
   details: zod.array(
     zod.object({
       machineId: zod.number().nullish(),
@@ -708,7 +774,6 @@ export const GetTransactionResponse = zod.object({
   fabricTypeId: zod.number().nullish(),
   sl: zod.string().nullish(),
   gsm: zod.number().nullish(),
-  reference: zod.string().nullish(),
   details: zod.array(
     zod.object({
       id: zod.number(),
@@ -742,7 +807,6 @@ export const UpdateTransactionBody = zod.object({
   fabricTypeId: zod.number().nullish(),
   sl: zod.string().nullish(),
   gsm: zod.number().nullish(),
-  reference: zod.string().nullish(),
   details: zod.array(
     zod.object({
       machineId: zod.number().nullish(),
@@ -768,7 +832,6 @@ export const UpdateTransactionResponse = zod.object({
   fabricTypeId: zod.number().nullish(),
   sl: zod.string().nullish(),
   gsm: zod.number().nullish(),
-  reference: zod.string().nullish(),
   details: zod.array(
     zod.object({
       id: zod.number(),

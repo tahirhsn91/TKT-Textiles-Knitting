@@ -21,12 +21,14 @@ import type {
   ConflictResponse,
   CreateLookupBody,
   CreateMachineBody,
+  CreateMachineOperatorBody,
   CreateTransactionBody,
   CreateUomBody,
   CreateYarnCountBody,
   HealthStatus,
   LookupItem,
   MachineLookupItem,
+  MachineOperatorLookupItem,
   NotFoundResponse,
   TransactionSummary,
   TransactionWithDetails,
@@ -937,6 +939,81 @@ export function useListTransactionTypeMaster<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListTransactionTypeMasterQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List department master entries
+ */
+export const getListDepartmentMasterUrl = () => {
+  return `/api/lookups/department-master`;
+};
+
+export const listDepartmentMaster = async (
+  options?: RequestInit,
+): Promise<LookupItem[]> => {
+  return customFetch<LookupItem[]>(getListDepartmentMasterUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListDepartmentMasterQueryKey = () => {
+  return [`/api/lookups/department-master`] as const;
+};
+
+export const getListDepartmentMasterQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDepartmentMaster>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listDepartmentMaster>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListDepartmentMasterQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listDepartmentMaster>>
+  > = ({ signal }) => listDepartmentMaster({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDepartmentMaster>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListDepartmentMasterQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDepartmentMaster>>
+>;
+export type ListDepartmentMasterQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List department master entries
+ */
+
+export function useListDepartmentMaster<
+  TData = Awaited<ReturnType<typeof listDepartmentMaster>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listDepartmentMaster>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListDepartmentMasterQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -4316,6 +4393,343 @@ export const useDeleteFabricTypeMaster = <
 };
 
 /**
+ * @summary List department master entries (CRUD)
+ */
+export const getListDepartmentMasterCrudUrl = () => {
+  return `/api/masters/department`;
+};
+
+export const listDepartmentMasterCrud = async (
+  options?: RequestInit,
+): Promise<LookupItem[]> => {
+  return customFetch<LookupItem[]>(getListDepartmentMasterCrudUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListDepartmentMasterCrudQueryKey = () => {
+  return [`/api/masters/department`] as const;
+};
+
+export const getListDepartmentMasterCrudQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDepartmentMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listDepartmentMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListDepartmentMasterCrudQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listDepartmentMasterCrud>>
+  > = ({ signal }) => listDepartmentMasterCrud({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDepartmentMasterCrud>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListDepartmentMasterCrudQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDepartmentMasterCrud>>
+>;
+export type ListDepartmentMasterCrudQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List department master entries (CRUD)
+ */
+
+export function useListDepartmentMasterCrud<
+  TData = Awaited<ReturnType<typeof listDepartmentMasterCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listDepartmentMasterCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListDepartmentMasterCrudQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create department master entry
+ */
+export const getCreateDepartmentMasterUrl = () => {
+  return `/api/masters/department`;
+};
+
+export const createDepartmentMaster = async (
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getCreateDepartmentMasterUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getCreateDepartmentMasterMutationOptions = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createDepartmentMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createDepartmentMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["createDepartmentMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createDepartmentMaster>>,
+    { data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createDepartmentMaster(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateDepartmentMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createDepartmentMaster>>
+>;
+export type CreateDepartmentMasterMutationBody = BodyType<CreateLookupBody>;
+export type CreateDepartmentMasterMutationError = ErrorType<
+  BadRequestResponse | ConflictResponse
+>;
+
+/**
+ * @summary Create department master entry
+ */
+export const useCreateDepartmentMaster = <
+  TError = ErrorType<BadRequestResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createDepartmentMaster>>,
+    TError,
+    { data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createDepartmentMaster>>,
+  TError,
+  { data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getCreateDepartmentMasterMutationOptions(options));
+};
+
+/**
+ * @summary Update department master entry
+ */
+export const getUpdateDepartmentMasterUrl = (id: number) => {
+  return `/api/masters/department/${id}`;
+};
+
+export const updateDepartmentMaster = async (
+  id: number,
+  createLookupBody: CreateLookupBody,
+  options?: RequestInit,
+): Promise<LookupItem> => {
+  return customFetch<LookupItem>(getUpdateDepartmentMasterUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createLookupBody),
+  });
+};
+
+export const getUpdateDepartmentMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateDepartmentMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateDepartmentMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  const mutationKey = ["updateDepartmentMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateDepartmentMaster>>,
+    { id: number; data: BodyType<CreateLookupBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateDepartmentMaster(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateDepartmentMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateDepartmentMaster>>
+>;
+export type UpdateDepartmentMasterMutationBody = BodyType<CreateLookupBody>;
+export type UpdateDepartmentMasterMutationError = ErrorType<
+  NotFoundResponse | ConflictResponse
+>;
+
+/**
+ * @summary Update department master entry
+ */
+export const useUpdateDepartmentMaster = <
+  TError = ErrorType<NotFoundResponse | ConflictResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateDepartmentMaster>>,
+    TError,
+    { id: number; data: BodyType<CreateLookupBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateDepartmentMaster>>,
+  TError,
+  { id: number; data: BodyType<CreateLookupBody> },
+  TContext
+> => {
+  return useMutation(getUpdateDepartmentMasterMutationOptions(options));
+};
+
+/**
+ * @summary Delete department master entry
+ */
+export const getDeleteDepartmentMasterUrl = (id: number) => {
+  return `/api/masters/department/${id}`;
+};
+
+export const deleteDepartmentMaster = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteDepartmentMasterUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteDepartmentMasterMutationOptions = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteDepartmentMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteDepartmentMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteDepartmentMaster"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteDepartmentMaster>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteDepartmentMaster(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteDepartmentMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteDepartmentMaster>>
+>;
+
+export type DeleteDepartmentMasterMutationError = ErrorType<NotFoundResponse>;
+
+/**
+ * @summary Delete department master entry
+ */
+export const useDeleteDepartmentMaster = <
+  TError = ErrorType<NotFoundResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteDepartmentMaster>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteDepartmentMaster>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteDepartmentMasterMutationOptions(options));
+};
+
+/**
  * @summary List machine operator master entries (CRUD)
  */
 export const getListMachineOperatorMasterCrudUrl = () => {
@@ -4324,11 +4738,14 @@ export const getListMachineOperatorMasterCrudUrl = () => {
 
 export const listMachineOperatorMasterCrud = async (
   options?: RequestInit,
-): Promise<LookupItem[]> => {
-  return customFetch<LookupItem[]>(getListMachineOperatorMasterCrudUrl(), {
-    ...options,
-    method: "GET",
-  });
+): Promise<MachineOperatorLookupItem[]> => {
+  return customFetch<MachineOperatorLookupItem[]>(
+    getListMachineOperatorMasterCrudUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
 };
 
 export const getListMachineOperatorMasterCrudQueryKey = () => {
@@ -4400,15 +4817,18 @@ export const getCreateMachineOperatorMasterUrl = () => {
 };
 
 export const createMachineOperatorMaster = async (
-  createLookupBody: CreateLookupBody,
+  createMachineOperatorBody: CreateMachineOperatorBody,
   options?: RequestInit,
-): Promise<LookupItem> => {
-  return customFetch<LookupItem>(getCreateMachineOperatorMasterUrl(), {
-    ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(createLookupBody),
-  });
+): Promise<MachineOperatorLookupItem> => {
+  return customFetch<MachineOperatorLookupItem>(
+    getCreateMachineOperatorMasterUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(createMachineOperatorBody),
+    },
+  );
 };
 
 export const getCreateMachineOperatorMasterMutationOptions = <
@@ -4418,14 +4838,14 @@ export const getCreateMachineOperatorMasterMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof createMachineOperatorMaster>>,
     TError,
-    { data: BodyType<CreateLookupBody> },
+    { data: BodyType<CreateMachineOperatorBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof createMachineOperatorMaster>>,
   TError,
-  { data: BodyType<CreateLookupBody> },
+  { data: BodyType<CreateMachineOperatorBody> },
   TContext
 > => {
   const mutationKey = ["createMachineOperatorMaster"];
@@ -4439,7 +4859,7 @@ export const getCreateMachineOperatorMasterMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof createMachineOperatorMaster>>,
-    { data: BodyType<CreateLookupBody> }
+    { data: BodyType<CreateMachineOperatorBody> }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -4453,7 +4873,7 @@ export type CreateMachineOperatorMasterMutationResult = NonNullable<
   Awaited<ReturnType<typeof createMachineOperatorMaster>>
 >;
 export type CreateMachineOperatorMasterMutationBody =
-  BodyType<CreateLookupBody>;
+  BodyType<CreateMachineOperatorBody>;
 export type CreateMachineOperatorMasterMutationError = ErrorType<
   BadRequestResponse | ConflictResponse
 >;
@@ -4468,14 +4888,14 @@ export const useCreateMachineOperatorMaster = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof createMachineOperatorMaster>>,
     TError,
-    { data: BodyType<CreateLookupBody> },
+    { data: BodyType<CreateMachineOperatorBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof createMachineOperatorMaster>>,
   TError,
-  { data: BodyType<CreateLookupBody> },
+  { data: BodyType<CreateMachineOperatorBody> },
   TContext
 > => {
   return useMutation(getCreateMachineOperatorMasterMutationOptions(options));
@@ -4490,15 +4910,18 @@ export const getUpdateMachineOperatorMasterUrl = (id: number) => {
 
 export const updateMachineOperatorMaster = async (
   id: number,
-  createLookupBody: CreateLookupBody,
+  createMachineOperatorBody: CreateMachineOperatorBody,
   options?: RequestInit,
-): Promise<LookupItem> => {
-  return customFetch<LookupItem>(getUpdateMachineOperatorMasterUrl(id), {
-    ...options,
-    method: "PUT",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(createLookupBody),
-  });
+): Promise<MachineOperatorLookupItem> => {
+  return customFetch<MachineOperatorLookupItem>(
+    getUpdateMachineOperatorMasterUrl(id),
+    {
+      ...options,
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(createMachineOperatorBody),
+    },
+  );
 };
 
 export const getUpdateMachineOperatorMasterMutationOptions = <
@@ -4508,14 +4931,14 @@ export const getUpdateMachineOperatorMasterMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateMachineOperatorMaster>>,
     TError,
-    { id: number; data: BodyType<CreateLookupBody> },
+    { id: number; data: BodyType<CreateMachineOperatorBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof updateMachineOperatorMaster>>,
   TError,
-  { id: number; data: BodyType<CreateLookupBody> },
+  { id: number; data: BodyType<CreateMachineOperatorBody> },
   TContext
 > => {
   const mutationKey = ["updateMachineOperatorMaster"];
@@ -4529,7 +4952,7 @@ export const getUpdateMachineOperatorMasterMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof updateMachineOperatorMaster>>,
-    { id: number; data: BodyType<CreateLookupBody> }
+    { id: number; data: BodyType<CreateMachineOperatorBody> }
   > = (props) => {
     const { id, data } = props ?? {};
 
@@ -4543,7 +4966,7 @@ export type UpdateMachineOperatorMasterMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateMachineOperatorMaster>>
 >;
 export type UpdateMachineOperatorMasterMutationBody =
-  BodyType<CreateLookupBody>;
+  BodyType<CreateMachineOperatorBody>;
 export type UpdateMachineOperatorMasterMutationError = ErrorType<
   NotFoundResponse | ConflictResponse
 >;
@@ -4558,14 +4981,14 @@ export const useUpdateMachineOperatorMaster = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateMachineOperatorMaster>>,
     TError,
-    { id: number; data: BodyType<CreateLookupBody> },
+    { id: number; data: BodyType<CreateMachineOperatorBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof updateMachineOperatorMaster>>,
   TError,
-  { id: number; data: BodyType<CreateLookupBody> },
+  { id: number; data: BodyType<CreateMachineOperatorBody> },
   TContext
 > => {
   return useMutation(getUpdateMachineOperatorMasterMutationOptions(options));

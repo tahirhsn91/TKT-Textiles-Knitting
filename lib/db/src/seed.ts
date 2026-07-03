@@ -12,6 +12,7 @@ import {
   uomMasterTable,
   fabricTypeMasterTable,
   machineOperatorMasterTable,
+  departmentMasterTable,
   transactionHeaderTable,
   transactionDetailTable,
 } from "./schema";
@@ -125,6 +126,17 @@ async function seed() {
     ])
     .onConflictDoNothing()
     .returning();
+
+  await db
+    .insert(departmentMasterTable)
+    .values([
+      { name: "Administration", code: "ADMIN" },
+      { name: "Knitting Production", code: "KNIT" },
+      { name: "Security", code: "SEC" },
+      { name: "Loading", code: "LOAD" },
+      { name: "Quality Check", code: "QC" },
+    ])
+    .onConflictDoNothing();
 
   await db
     .insert(machineOperatorMasterTable)

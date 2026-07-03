@@ -47,6 +47,10 @@ import {
   useCreateMachineOperatorMaster,
   useUpdateMachineOperatorMaster,
   useDeleteMachineOperatorMaster,
+  useListDepartmentMasterCrud,
+  useCreateDepartmentMaster,
+  useUpdateDepartmentMaster,
+  useDeleteDepartmentMaster,
   getListJobMasterCrudQueryKey,
   getListPartyMasterCrudQueryKey,
   getListMachineMasterCrudQueryKey,
@@ -57,6 +61,7 @@ import {
   getListUomMasterCrudQueryKey,
   getListFabricTypeMasterCrudQueryKey,
   getListMachineOperatorMasterCrudQueryKey,
+  getListDepartmentMasterCrudQueryKey,
   getListMachineMasterQueryKey,
   getListJobMasterQueryKey,
   getListPartyMasterQueryKey,
@@ -67,6 +72,7 @@ import {
   getListUomMasterQueryKey,
   getListFabricTypeMasterQueryKey,
   getListMachineOperatorMasterQueryKey,
+  getListDepartmentMasterQueryKey,
 } from "@workspace/api-client-react";
 import { X } from "lucide-react";
 import { Layout } from "@/components/layout";
@@ -154,6 +160,12 @@ export default function MastersPage() {
   const updateFabricType = useUpdateFabricTypeMaster();
   const deleteFabricType = useDeleteFabricTypeMaster();
 
+  // ── Department ───────────────────────────────────────────────────────────
+  const { data: departments, isLoading: departmentsLoading } = useListDepartmentMasterCrud();
+  const createDepartment = useCreateDepartmentMaster();
+  const updateDepartment = useUpdateDepartmentMaster();
+  const deleteDepartment = useDeleteDepartmentMaster();
+
   // ── Machine Operator ─────────────────────────────────────────────────────
   const { data: operators, isLoading: operatorsLoading } = useListMachineOperatorMasterCrud();
   const createOperator = useCreateMachineOperatorMaster();
@@ -180,6 +192,7 @@ export default function MastersPage() {
             <TabsTrigger value="yarn-brand">Yarn Brand</TabsTrigger>
             <TabsTrigger value="uom">UOM</TabsTrigger>
             <TabsTrigger value="fabric-type">Fabric Type</TabsTrigger>
+            <TabsTrigger value="department">Departments</TabsTrigger>
             <TabsTrigger value="operator">Operators</TabsTrigger>
           </TabsList>
 
@@ -542,6 +555,37 @@ export default function MastersPage() {
             />
           </TabsContent>
 
+          <TabsContent value="department" className="mt-4">
+            <MasterTable
+              title="Departments"
+              description="Departments within the factory (e.g. Administration, Knitting Production, Security)."
+              fields={[
+                { key: "name", label: "Name", placeholder: "e.g. Knitting Production" },
+                { key: "code", label: "Code", placeholder: "e.g. KNIT" },
+              ]}
+              rows={departments as never}
+              isLoading={departmentsLoading}
+              onAdd={(data) => new Promise((res, rej) =>
+                createDepartment.mutate({ data: data as never }, {
+                  onSuccess: () => { invalidateBoth(getListDepartmentMasterCrudQueryKey(), getListDepartmentMasterQueryKey()); res(); },
+                  onError: (e) => rej(e),
+                })
+              )}
+              onUpdate={(id, data) => new Promise((res, rej) =>
+                updateDepartment.mutate({ id, data: data as never }, {
+                  onSuccess: () => { invalidateBoth(getListDepartmentMasterCrudQueryKey(), getListDepartmentMasterQueryKey()); res(); },
+                  onError: (e) => rej(e),
+                })
+              )}
+              onDelete={(id) => new Promise((res, rej) =>
+                deleteDepartment.mutate({ id }, {
+                  onSuccess: () => { invalidateBoth(getListDepartmentMasterCrudQueryKey(), getListDepartmentMasterQueryKey()); res(); },
+                  onError: (e) => rej(e),
+                })
+              )}
+            />
+          </TabsContent>
+
           <TabsContent value="operator" className="mt-4">
             <MasterTable
               title="Machine Operators"
@@ -549,17 +593,32 @@ export default function MastersPage() {
               fields={[
                 { key: "name", label: "Name", placeholder: "e.g. Operator Alpha" },
                 { key: "code", label: "Code", placeholder: "e.g. OPA" },
+                {
+                  key: "departmentId",
+                  label: "Department",
+                  type: "select",
+                  displayKey: "departmentName",
+                  placeholder: "Select department",
+                  options: (departments ?? []).map((d) => ({ value: String(d.id), label: d.name })),
+                },
+                { key: "baseSalary", label: "Base Salary", placeholder: "e.g. 15000.00", type: "number", step: "0.01" },
+                { key: "overtimeRateHr", label: "Overtime Rate/Hr", placeholder: "e.g. 50.00", type: "number", step: "0.01" },
+                { key: "attAllowance", label: "Att. Allowance", placeholder: "e.g. 500.00", type: "number", step: "0.01" },
+                { key: "othAllowance", label: "Oth. Allowance", placeholder: "e.g. 200.00", type: "number", step: "0.01" },
               ]}
-              rows={operators as never}
+              rows={(operators ?? []).map((o) => ({
+                ...o,
+                departmentName: (departments ?? []).find((d) => d.id === (o as { departmentId?: number | null }).departmentId)?.name ?? null,
+              })) as never}
               isLoading={operatorsLoading}
               onAdd={(data) => new Promise((res, rej) =>
-                createOperator.mutate({ data: data as never }, {
+                createOperator.mutate({ data: { ...data, departmentId: data.departmentId ? Number(data.departmentId) : null } as never }, {
                   onSuccess: () => { invalidateBoth(getListMachineOperatorMasterCrudQueryKey(), getListMachineOperatorMasterQueryKey()); res(); },
                   onError: (e) => rej(e),
                 })
               )}
               onUpdate={(id, data) => new Promise((res, rej) =>
-                updateOperator.mutate({ id, data: data as never }, {
+                updateOperator.mutate({ id, data: { ...data, departmentId: data.departmentId ? Number(data.departmentId) : null } as never }, {
                   onSuccess: () => { invalidateBoth(getListMachineOperatorMasterCrudQueryKey(), getListMachineOperatorMasterQueryKey()); res(); },
                   onError: (e) => rej(e),
                 })

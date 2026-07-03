@@ -33,6 +33,37 @@ export interface UomLookupItem {
   abbreviation: string;
 }
 
+export interface MachineOperatorLookupItem {
+  id: number;
+  name: string;
+  code: string;
+  /** @nullable */
+  departmentId?: number | null;
+  /** @nullable */
+  baseSalary?: string | null;
+  /** @nullable */
+  overtimeRateHr?: string | null;
+  /** @nullable */
+  attAllowance?: string | null;
+  /** @nullable */
+  othAllowance?: string | null;
+}
+
+export interface CreateMachineOperatorBody {
+  name: string;
+  code: string;
+  /** @nullable */
+  departmentId?: number | null;
+  /** @nullable */
+  baseSalary?: string | null;
+  /** @nullable */
+  overtimeRateHr?: string | null;
+  /** @nullable */
+  attAllowance?: string | null;
+  /** @nullable */
+  othAllowance?: string | null;
+}
+
 export interface CreateLookupBody {
   name: string;
   code: string;

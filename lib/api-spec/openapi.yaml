@@ -182,6 +182,21 @@ paths:
                 items:
                   $ref: "#/components/schemas/LookupItem"
 
+  /lookups/department-master:
+    get:
+      operationId: listDepartmentMaster
+      tags: [lookups]
+      summary: List department master entries
+      responses:
+        "200":
+          description: List of department master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LookupItem"
+
   # ─── MASTER CRUD ENDPOINTS ────────────────────────────────────────────────
 
   # Transaction Type Master
@@ -914,15 +929,15 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  # Machine Operator Master
-  /masters/machine-operator:
+  # Department Master
+  /masters/department:
     get:
-      operationId: listMachineOperatorMasterCrud
+      operationId: listDepartmentMasterCrud
       tags: [masters]
-      summary: List machine operator master entries (CRUD)
+      summary: List department master entries (CRUD)
       responses:
         "200":
-          description: List of machine operator master entries
+          description: List of department master entries
           content:
             application/json:
               schema:
@@ -930,9 +945,9 @@ paths:
                 items:
                   $ref: "#/components/schemas/LookupItem"
     post:
-      operationId: createMachineOperatorMaster
+      operationId: createDepartmentMaster
       tags: [masters]
-      summary: Create machine operator master entry
+      summary: Create department master entry
       requestBody:
         required: true
         content:
@@ -951,11 +966,11 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
 
-  /masters/machine-operator/{id}:
+  /masters/department/{id}:
     put:
-      operationId: updateMachineOperatorMaster
+      operationId: updateDepartmentMaster
       tags: [masters]
-      summary: Update machine operator master entry
+      summary: Update department master entry
       parameters:
         - $ref: "#/components/parameters/IdParam"
       requestBody:
@@ -971,6 +986,79 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LookupItem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: deleteDepartmentMaster
+      tags: [masters]
+      summary: Delete department master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # Machine Operator Master
+  /masters/machine-operator:
+    get:
+      operationId: listMachineOperatorMasterCrud
+      tags: [masters]
+      summary: List machine operator master entries (CRUD)
+      responses:
+        "200":
+          description: List of machine operator master entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MachineOperatorLookupItem"
+    post:
+      operationId: createMachineOperatorMaster
+      tags: [masters]
+      summary: Create machine operator master entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMachineOperatorBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MachineOperatorLookupItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /masters/machine-operator/{id}:
+    put:
+      operationId: updateMachineOperatorMaster
+      tags: [masters]
+      summary: Update machine operator master entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMachineOperatorBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MachineOperatorLookupItem"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1163,6 +1251,61 @@ components:
         - id
         - name
         - abbreviation
+
+    MachineOperatorLookupItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+        departmentId:
+          type: integer
+          nullable: true
+        baseSalary:
+          type: string
+          nullable: true
+        overtimeRateHr:
+          type: string
+          nullable: true
+        attAllowance:
+          type: string
+          nullable: true
+        othAllowance:
+          type: string
+          nullable: true
+      required:
+        - id
+        - name
+        - code
+
+    CreateMachineOperatorBody:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        departmentId:
+          type: integer
+          nullable: true
+        baseSalary:
+          type: string
+          nullable: true
+        overtimeRateHr:
+          type: string
+          nullable: true
+        attAllowance:
+          type: string
+          nullable: true
+        othAllowance:
+          type: string
+          nullable: true
+      required:
+        - name
+        - code
 
     CreateLookupBody:
       type: object

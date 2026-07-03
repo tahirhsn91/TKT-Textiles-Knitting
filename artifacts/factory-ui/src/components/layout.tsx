@@ -11,9 +11,13 @@ import {
 
 const navItems = [
   { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
-  { href: "/transactions", label: "Transactions", icon: FileText },
   { href: "/masters",      label: "Master Data",  icon: Database },
   { href: "/operators",    label: "Operators",    icon: Users },
+];
+
+const transactionItems = [
+  { href: "/transactions",           label: "Yarn-Fabric Transactions" },
+  { href: "/transactions/monthly-salary-entry", label: "Monthly Salary Entry" },
 ];
 
 const reportItems = [
@@ -23,6 +27,7 @@ const reportItems = [
 
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
+  const transactionsActive = location.startsWith("/transactions");
   const reportsActive = location.startsWith("/reports");
 
   return (
@@ -50,6 +55,37 @@ export function Layout({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors outline-none",
+                transactionsActive
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              )}>
+                <FileText className="h-4 w-4" />
+                Transactions
+                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-64">
+              {transactionItems.map((item) => (
+                <DropdownMenuItem key={item.href} asChild>
+                  <Link href={item.href}>
+                    <span className={cn(
+                      "w-full cursor-pointer text-sm",
+                      (item.href === "/transactions" ? location === item.href : location.startsWith(item.href))
+                        ? "font-semibold text-primary"
+                        : ""
+                    )}>
+                      {item.label}
+                    </span>
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

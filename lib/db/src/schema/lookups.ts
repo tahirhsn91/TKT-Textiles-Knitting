@@ -103,10 +103,24 @@ export const insertFabricTypeMasterSchema = createInsertSchema(fabricTypeMasterT
 export type InsertFabricTypeMaster = z.infer<typeof insertFabricTypeMasterSchema>;
 export type FabricTypeMaster = typeof fabricTypeMasterTable.$inferSelect;
 
+export const departmentMasterTable = pgTable("department_master", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+});
+export const insertDepartmentMasterSchema = createInsertSchema(departmentMasterTable).omit({ id: true });
+export type InsertDepartmentMaster = z.infer<typeof insertDepartmentMasterSchema>;
+export type DepartmentMaster = typeof departmentMasterTable.$inferSelect;
+
 export const machineOperatorMasterTable = pgTable("machine_operator_master", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
+  departmentId: integer("department_id"),
+  baseSalary: numeric("base_salary", { precision: 10, scale: 2 }),
+  overtimeRateHr: numeric("overtime_rate_hr", { precision: 10, scale: 2 }),
+  attAllowance: numeric("att_allowance", { precision: 10, scale: 2 }),
+  othAllowance: numeric("oth_allowance", { precision: 10, scale: 2 }),
 });
 export const insertMachineOperatorMasterSchema = createInsertSchema(machineOperatorMasterTable).omit({ id: true });
 export type InsertMachineOperatorMaster = z.infer<typeof insertMachineOperatorMasterSchema>;
