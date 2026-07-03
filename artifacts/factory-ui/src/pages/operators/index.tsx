@@ -194,7 +194,7 @@ function SalarySettingsTab() {
             <TableRow>
               <TableHead>Code</TableHead>
               <TableHead>Name</TableHead>
-              <TableHead className="text-right">Base Daily Wage (₹)</TableHead>
+              <TableHead className="text-right">Base Daily Wage</TableHead>
               <TableHead className="w-24 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -222,7 +222,7 @@ function SalarySettingsTab() {
                     />
                   ) : (
                     <span className={op.baseDailyWage ? "font-mono" : "text-muted-foreground"}>
-                      {op.baseDailyWage ? `₹ ${fmtMoney(toNum(op.baseDailyWage))}` : "—"}
+                      {op.baseDailyWage ? fmtMoney(toNum(op.baseDailyWage)) : "—"}
                     </span>
                   )}
                 </TableCell>
@@ -387,9 +387,9 @@ function SalaryRecordsTab() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Day</TableHead>
-                    <TableHead className="text-right">Base Wage (₹)</TableHead>
-                    <TableHead className="text-right">Commission / Production (₹)</TableHead>
-                    <TableHead className="text-right">Final Amount (₹)</TableHead>
+                    <TableHead className="text-right">Base Wage</TableHead>
+                    <TableHead className="text-right">Commission / Production</TableHead>
+                    <TableHead className="text-right">Final Amount</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -531,7 +531,7 @@ function AdvancesTab() {
               <Input type="date" className="w-40" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
             </div>
             <div className="flex flex-col gap-1">
-              <Label>Amount (₹)</Label>
+              <Label>Amount</Label>
               <Input type="number" min="0" step="0.01" className="w-32" placeholder="0.00"
                 value={form.amount} onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))} />
             </div>
@@ -578,7 +578,7 @@ function AdvancesTab() {
               <TableRow>
                 <TableHead>Date</TableHead>
                 <TableHead>Operator</TableHead>
-                <TableHead className="text-right">Amount (₹)</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Notes</TableHead>
                 <TableHead className="w-16"></TableHead>
               </TableRow>
@@ -611,7 +611,7 @@ function AdvancesTab() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete Advance</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Delete ₹{fmtMoney(toNum(a.amount))} advance for {a.operatorName} on {formatDate(a.date)}? This cannot be undone.
+                            Delete {fmtMoney(toNum(a.amount))} advance for {a.operatorName} on {formatDate(a.date)}? This cannot be undone.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -669,7 +669,7 @@ function PayrollSummaryTab() {
 
     autoTable(doc, {
       startY: 26,
-      head: [["Operator", "Days Worked", "Total Salary (₹)", "Total Advances (₹)", "Net Payable (₹)"]],
+      head: [["Operator", "Days Worked", "Total Salary", "Total Advances", "Net Payable"]],
       body: summary.map((s) => [
         s.operatorName,
         s.totalDaysWorked,
@@ -724,7 +724,7 @@ function PayrollSummaryTab() {
       }
 
       doc.setFontSize(9);
-      doc.text(`Net Payable: ₹${fmtMoney(s.netPayable)}`, 14, yOffset);
+      doc.text(`Net Payable: ${fmtMoney(s.netPayable)}`, 14, yOffset);
       yOffset += 10;
     }
 
@@ -805,9 +805,9 @@ function PayrollSummaryTab() {
               <TableRow>
                 <TableHead>Operator</TableHead>
                 <TableHead className="text-right">Days Worked</TableHead>
-                <TableHead className="text-right">Total Salary (₹)</TableHead>
-                <TableHead className="text-right">Total Advances (₹)</TableHead>
-                <TableHead className="text-right">Net Payable (₹)</TableHead>
+                <TableHead className="text-right">Total Salary</TableHead>
+                <TableHead className="text-right">Total Advances</TableHead>
+                <TableHead className="text-right">Net Payable</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

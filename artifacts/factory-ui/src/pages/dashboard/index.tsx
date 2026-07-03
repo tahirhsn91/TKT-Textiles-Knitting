@@ -156,7 +156,7 @@ export default function DashboardPage() {
             />
             <KpiCard
               title="Operator Payroll Due"
-              value={`₹${fmt(data.kpis.payrollDue, 0)}`}
+              value={fmt(data.kpis.payrollDue, 0)}
               sub={`net payable this period`}
               icon={Wallet}
               color="bg-blue-500"
@@ -357,11 +357,11 @@ export default function DashboardPage() {
                       margin={{ left: 8, right: 24, top: 4, bottom: 4 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                      <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${fmt(v, 0)}`} />
+                      <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v, 0)} />
                       <YAxis dataKey="operatorName" type="category" tick={{ fontSize: 11 }} width={110} />
                       <Tooltip
                         contentStyle={CustomTooltipStyle.contentStyle}
-                        formatter={(v: number, name: string) => [`₹${fmtMoney(v)}`, name]}
+                        formatter={(v: number, name: string) => [fmtMoney(v), name]}
                       />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                       <Bar dataKey="baseWages" stackId="a" fill="#6366f1" name="Base Wages" barSize={16} />
