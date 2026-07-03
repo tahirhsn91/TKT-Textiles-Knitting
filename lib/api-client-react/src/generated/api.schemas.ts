@@ -64,6 +64,23 @@ export interface CreateMachineOperatorBody {
   othAllowance?: string | null;
 }
 
+export interface JobLookupItem {
+  id: number;
+  name: string;
+  code: string;
+  /** @nullable */
+  partyId?: number | null;
+  /** @nullable */
+  partyName?: string | null;
+}
+
+export interface CreateJobBody {
+  name: string;
+  code: string;
+  /** @nullable */
+  partyId?: number | null;
+}
+
 export interface CreateLookupBody {
   name: string;
   code: string;
@@ -138,6 +155,9 @@ export interface TransactionSummary {
   sl?: string | null;
   /** @nullable */
   gsm?: number | null;
+  /** @nullable */
+  reference?: string | null;
+  yarnBrandIds?: number[];
 }
 
 export interface TransactionWithDetails {
@@ -157,6 +177,8 @@ export interface TransactionWithDetails {
   sl?: string | null;
   /** @nullable */
   gsm?: number | null;
+  /** @nullable */
+  reference?: string | null;
   details: TransactionDetailItem[];
 }
 
@@ -195,5 +217,7 @@ export interface CreateTransactionBody {
   sl?: string | null;
   /** @nullable */
   gsm?: number | null;
+  /** @nullable */
+  reference?: string | null;
   details: CreateTransactionDetailBody[];
 }

@@ -30,7 +30,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/LookupItem"
+                  $ref: "#/components/schemas/JobLookupItem"
 
   /lookups/party-master:
     get:
@@ -286,7 +286,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/LookupItem"
+                  $ref: "#/components/schemas/JobLookupItem"
     post:
       operationId: createJobMaster
       tags: [masters]
@@ -296,14 +296,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateLookupBody"
+              $ref: "#/components/schemas/CreateJobBody"
       responses:
         "201":
           description: Created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LookupItem"
+                $ref: "#/components/schemas/JobLookupItem"
         "400":
           $ref: "#/components/responses/BadRequest"
         "409":
@@ -321,14 +321,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateLookupBody"
+              $ref: "#/components/schemas/CreateJobBody"
       responses:
         "200":
           description: Updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LookupItem"
+                $ref: "#/components/schemas/JobLookupItem"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -1307,6 +1307,40 @@ components:
         - name
         - code
 
+    JobLookupItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+        partyId:
+          type: integer
+          nullable: true
+        partyName:
+          type: string
+          nullable: true
+      required:
+        - id
+        - name
+        - code
+
+    CreateJobBody:
+      type: object
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+        partyId:
+          type: integer
+          nullable: true
+      required:
+        - name
+        - code
+
     CreateLookupBody:
       type: object
       properties:
@@ -1447,6 +1481,13 @@ components:
         gsm:
           type: integer
           nullable: true
+        reference:
+          type: string
+          nullable: true
+        yarnBrandIds:
+          type: array
+          items:
+            type: integer
       required:
         - id
         - transactionTypeId
@@ -1481,6 +1522,9 @@ components:
           nullable: true
         gsm:
           type: integer
+          nullable: true
+        reference:
+          type: string
           nullable: true
         details:
           type: array
@@ -1547,6 +1591,9 @@ components:
           nullable: true
         gsm:
           type: integer
+          nullable: true
+        reference:
+          type: string
           nullable: true
         details:
           type: array

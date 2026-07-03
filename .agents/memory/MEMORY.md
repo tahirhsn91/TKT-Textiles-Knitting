@@ -1,0 +1,1 @@
+- [OpenAPI spec/route drift](openapi-spec-route-drift.md) — API routes can silently return extra DB fields that Zod response validation strips because the schema in openapi.yaml is stale; only surfaces when codegen is rerun.

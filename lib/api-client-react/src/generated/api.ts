@@ -19,6 +19,7 @@ import type {
 import type {
   BadRequestResponse,
   ConflictResponse,
+  CreateJobBody,
   CreateLookupBody,
   CreateMachineBody,
   CreateMachineOperatorBody,
@@ -26,6 +27,7 @@ import type {
   CreateUomBody,
   CreateYarnCountBody,
   HealthStatus,
+  JobLookupItem,
   LookupItem,
   MachineLookupItem,
   MachineOperatorLookupItem,
@@ -129,8 +131,8 @@ export const getListJobMasterUrl = () => {
 
 export const listJobMaster = async (
   options?: RequestInit,
-): Promise<LookupItem[]> => {
-  return customFetch<LookupItem[]>(getListJobMasterUrl(), {
+): Promise<JobLookupItem[]> => {
+  return customFetch<JobLookupItem[]>(getListJobMasterUrl(), {
     ...options,
     method: "GET",
   });
@@ -1372,8 +1374,8 @@ export const getListJobMasterCrudUrl = () => {
 
 export const listJobMasterCrud = async (
   options?: RequestInit,
-): Promise<LookupItem[]> => {
-  return customFetch<LookupItem[]>(getListJobMasterCrudUrl(), {
+): Promise<JobLookupItem[]> => {
+  return customFetch<JobLookupItem[]>(getListJobMasterCrudUrl(), {
     ...options,
     method: "GET",
   });
@@ -1446,14 +1448,14 @@ export const getCreateJobMasterUrl = () => {
 };
 
 export const createJobMaster = async (
-  createLookupBody: CreateLookupBody,
+  createJobBody: CreateJobBody,
   options?: RequestInit,
-): Promise<LookupItem> => {
-  return customFetch<LookupItem>(getCreateJobMasterUrl(), {
+): Promise<JobLookupItem> => {
+  return customFetch<JobLookupItem>(getCreateJobMasterUrl(), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(createLookupBody),
+    body: JSON.stringify(createJobBody),
   });
 };
 
@@ -1464,14 +1466,14 @@ export const getCreateJobMasterMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof createJobMaster>>,
     TError,
-    { data: BodyType<CreateLookupBody> },
+    { data: BodyType<CreateJobBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof createJobMaster>>,
   TError,
-  { data: BodyType<CreateLookupBody> },
+  { data: BodyType<CreateJobBody> },
   TContext
 > => {
   const mutationKey = ["createJobMaster"];
@@ -1485,7 +1487,7 @@ export const getCreateJobMasterMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof createJobMaster>>,
-    { data: BodyType<CreateLookupBody> }
+    { data: BodyType<CreateJobBody> }
   > = (props) => {
     const { data } = props ?? {};
 
@@ -1498,7 +1500,7 @@ export const getCreateJobMasterMutationOptions = <
 export type CreateJobMasterMutationResult = NonNullable<
   Awaited<ReturnType<typeof createJobMaster>>
 >;
-export type CreateJobMasterMutationBody = BodyType<CreateLookupBody>;
+export type CreateJobMasterMutationBody = BodyType<CreateJobBody>;
 export type CreateJobMasterMutationError = ErrorType<
   BadRequestResponse | ConflictResponse
 >;
@@ -1513,14 +1515,14 @@ export const useCreateJobMaster = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof createJobMaster>>,
     TError,
-    { data: BodyType<CreateLookupBody> },
+    { data: BodyType<CreateJobBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof createJobMaster>>,
   TError,
-  { data: BodyType<CreateLookupBody> },
+  { data: BodyType<CreateJobBody> },
   TContext
 > => {
   return useMutation(getCreateJobMasterMutationOptions(options));
@@ -1535,14 +1537,14 @@ export const getUpdateJobMasterUrl = (id: number) => {
 
 export const updateJobMaster = async (
   id: number,
-  createLookupBody: CreateLookupBody,
+  createJobBody: CreateJobBody,
   options?: RequestInit,
-): Promise<LookupItem> => {
-  return customFetch<LookupItem>(getUpdateJobMasterUrl(id), {
+): Promise<JobLookupItem> => {
+  return customFetch<JobLookupItem>(getUpdateJobMasterUrl(id), {
     ...options,
     method: "PUT",
     headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(createLookupBody),
+    body: JSON.stringify(createJobBody),
   });
 };
 
@@ -1553,14 +1555,14 @@ export const getUpdateJobMasterMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateJobMaster>>,
     TError,
-    { id: number; data: BodyType<CreateLookupBody> },
+    { id: number; data: BodyType<CreateJobBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof updateJobMaster>>,
   TError,
-  { id: number; data: BodyType<CreateLookupBody> },
+  { id: number; data: BodyType<CreateJobBody> },
   TContext
 > => {
   const mutationKey = ["updateJobMaster"];
@@ -1574,7 +1576,7 @@ export const getUpdateJobMasterMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof updateJobMaster>>,
-    { id: number; data: BodyType<CreateLookupBody> }
+    { id: number; data: BodyType<CreateJobBody> }
   > = (props) => {
     const { id, data } = props ?? {};
 
@@ -1587,7 +1589,7 @@ export const getUpdateJobMasterMutationOptions = <
 export type UpdateJobMasterMutationResult = NonNullable<
   Awaited<ReturnType<typeof updateJobMaster>>
 >;
-export type UpdateJobMasterMutationBody = BodyType<CreateLookupBody>;
+export type UpdateJobMasterMutationBody = BodyType<CreateJobBody>;
 export type UpdateJobMasterMutationError = ErrorType<
   NotFoundResponse | ConflictResponse
 >;
@@ -1602,14 +1604,14 @@ export const useUpdateJobMaster = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updateJobMaster>>,
     TError,
-    { id: number; data: BodyType<CreateLookupBody> },
+    { id: number; data: BodyType<CreateJobBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof updateJobMaster>>,
   TError,
-  { id: number; data: BodyType<CreateLookupBody> },
+  { id: number; data: BodyType<CreateJobBody> },
   TContext
 > => {
   return useMutation(getUpdateJobMasterMutationOptions(options));

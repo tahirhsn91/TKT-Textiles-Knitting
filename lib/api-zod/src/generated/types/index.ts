@@ -8,6 +8,7 @@
 
 export * from "./badRequestResponse";
 export * from "./conflictResponse";
+export * from "./createJobBody";
 export * from "./createLookupBody";
 export * from "./createMachineBody";
 export * from "./createMachineOperatorBody";
@@ -17,6 +18,7 @@ export * from "./createUomBody";
 export * from "./createYarnCountBody";
 export * from "./errorResponse";
 export * from "./healthStatus";
+export * from "./jobLookupItem";
 export * from "./lookupItem";
 export * from "./machineLookupItem";
 export * from "./machineOperatorLookupItem";

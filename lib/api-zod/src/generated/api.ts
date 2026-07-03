@@ -21,6 +21,8 @@ export const ListJobMasterResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
   code: zod.string(),
+  partyId: zod.number().nullish(),
+  partyName: zod.string().nullish(),
 });
 export const ListJobMasterResponse = zod.array(ListJobMasterResponseItem);
 
@@ -204,6 +206,8 @@ export const ListJobMasterCrudResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
   code: zod.string(),
+  partyId: zod.number().nullish(),
+  partyName: zod.string().nullish(),
 });
 export const ListJobMasterCrudResponse = zod.array(
   ListJobMasterCrudResponseItem,
@@ -215,6 +219,7 @@ export const ListJobMasterCrudResponse = zod.array(
 export const CreateJobMasterBody = zod.object({
   name: zod.string(),
   code: zod.string(),
+  partyId: zod.number().nullish(),
 });
 
 /**
@@ -227,12 +232,15 @@ export const UpdateJobMasterParams = zod.object({
 export const UpdateJobMasterBody = zod.object({
   name: zod.string(),
   code: zod.string(),
+  partyId: zod.number().nullish(),
 });
 
 export const UpdateJobMasterResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
   code: zod.string(),
+  partyId: zod.number().nullish(),
+  partyName: zod.string().nullish(),
 });
 
 /**
@@ -726,6 +734,8 @@ export const ListTransactionsResponseItem = zod.object({
   fabricTypeId: zod.number().nullish(),
   sl: zod.string().nullish(),
   gsm: zod.number().nullish(),
+  reference: zod.string().nullish(),
+  yarnBrandIds: zod.array(zod.number()).optional(),
 });
 export const ListTransactionsResponse = zod.array(ListTransactionsResponseItem);
 
@@ -742,6 +752,7 @@ export const CreateTransactionBody = zod.object({
   fabricTypeId: zod.number().nullish(),
   sl: zod.string().nullish(),
   gsm: zod.number().nullish(),
+  reference: zod.string().nullish(),
   details: zod.array(
     zod.object({
       machineId: zod.number().nullish(),
@@ -774,6 +785,7 @@ export const GetTransactionResponse = zod.object({
   fabricTypeId: zod.number().nullish(),
   sl: zod.string().nullish(),
   gsm: zod.number().nullish(),
+  reference: zod.string().nullish(),
   details: zod.array(
     zod.object({
       id: zod.number(),
@@ -807,6 +819,7 @@ export const UpdateTransactionBody = zod.object({
   fabricTypeId: zod.number().nullish(),
   sl: zod.string().nullish(),
   gsm: zod.number().nullish(),
+  reference: zod.string().nullish(),
   details: zod.array(
     zod.object({
       machineId: zod.number().nullish(),
@@ -832,6 +845,7 @@ export const UpdateTransactionResponse = zod.object({
   fabricTypeId: zod.number().nullish(),
   sl: zod.string().nullish(),
   gsm: zod.number().nullish(),
+  reference: zod.string().nullish(),
   details: zod.array(
     zod.object({
       id: zod.number(),
