@@ -20,4 +20,5 @@ export interface MachineOperatorLookupItem {
   attAllowance?: string | null;
   /** @nullable */
   othAllowance?: string | null;
+  active: boolean;
 }

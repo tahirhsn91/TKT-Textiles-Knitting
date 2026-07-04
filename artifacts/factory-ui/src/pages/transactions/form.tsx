@@ -767,11 +767,13 @@ export default function TransactionForm() {
                                   </FormControl>
                                   <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
-                                    {machineOperatorMaster?.map(op => (
-                                      <SelectItem key={op.id} value={op.id.toString()}>
-                                        {op.name}
-                                      </SelectItem>
-                                    ))}
+                                    {machineOperatorMaster
+                                      ?.filter(op => (op as { active?: boolean }).active !== false || op.id === field.value)
+                                      .map(op => (
+                                        <SelectItem key={op.id} value={op.id.toString()}>
+                                          {op.name}
+                                        </SelectItem>
+                                      ))}
                                   </SelectContent>
                                 </Select>
                               </FormItem>

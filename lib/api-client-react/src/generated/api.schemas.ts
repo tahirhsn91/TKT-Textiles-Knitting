@@ -47,6 +47,7 @@ export interface MachineOperatorLookupItem {
   attAllowance?: string | null;
   /** @nullable */
   othAllowance?: string | null;
+  active: boolean;
 }
 
 export interface CreateMachineOperatorBody {
@@ -62,6 +63,7 @@ export interface CreateMachineOperatorBody {
   attAllowance?: string | null;
   /** @nullable */
   othAllowance?: string | null;
+  active?: boolean;
 }
 
 export interface JobLookupItem {

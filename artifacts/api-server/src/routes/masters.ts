@@ -552,7 +552,7 @@ router.get("/masters/machine-operator", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/machine-operator", async (req, res): Promise<void> => {
-  const { name, code, departmentId, baseSalary, overtimeRateHr, attAllowance, othAllowance } = req.body;
+  const { name, code, departmentId, baseSalary, overtimeRateHr, attAllowance, othAllowance, active } = req.body;
   if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
   try {
     const [row] = await db.insert(machineOperatorMasterTable).values({
@@ -563,6 +563,7 @@ router.post("/masters/machine-operator", async (req, res): Promise<void> => {
       overtimeRateHr: numOrNull(overtimeRateHr),
       attAllowance: numOrNull(attAllowance),
       othAllowance: numOrNull(othAllowance),
+      active: active ?? true,
     }).returning();
     res.status(201).json(row);
   } catch (err) {
@@ -574,7 +575,7 @@ router.post("/masters/machine-operator", async (req, res): Promise<void> => {
 router.put("/masters/machine-operator/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, code, departmentId, baseSalary, overtimeRateHr, attAllowance, othAllowance } = req.body;
+  const { name, code, departmentId, baseSalary, overtimeRateHr, attAllowance, othAllowance, active } = req.body;
   if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
   try {
     const [row] = await db.update(machineOperatorMasterTable).set({
@@ -585,6 +586,7 @@ router.put("/masters/machine-operator/:id", async (req, res): Promise<void> => {
       overtimeRateHr: numOrNull(overtimeRateHr),
       attAllowance: numOrNull(attAllowance),
       othAllowance: numOrNull(othAllowance),
+      active: active ?? true,
     }).where(eq(machineOperatorMasterTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
     res.json(row);

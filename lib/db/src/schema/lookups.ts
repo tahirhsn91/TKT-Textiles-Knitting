@@ -1,4 +1,4 @@
-import { pgTable, text, serial, unique, numeric, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, unique, numeric, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -121,6 +121,7 @@ export const machineOperatorMasterTable = pgTable("machine_operator_master", {
   overtimeRateHr: numeric("overtime_rate_hr", { precision: 10, scale: 2 }),
   attAllowance: numeric("att_allowance", { precision: 10, scale: 2 }),
   othAllowance: numeric("oth_allowance", { precision: 10, scale: 2 }),
+  active: boolean("active").notNull().default(true),
 });
 export const insertMachineOperatorMasterSchema = createInsertSchema(machineOperatorMasterTable).omit({ id: true });
 export type InsertMachineOperatorMaster = z.infer<typeof insertMachineOperatorMasterSchema>;

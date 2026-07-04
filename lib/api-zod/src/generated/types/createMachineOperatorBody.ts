@@ -19,4 +19,5 @@ export interface CreateMachineOperatorBody {
   attAllowance?: string | null;
   /** @nullable */
   othAllowance?: string | null;
+  active?: boolean;
 }

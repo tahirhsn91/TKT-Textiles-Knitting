@@ -806,11 +806,14 @@ export const getListMachineOperatorMasterUrl = () => {
 
 export const listMachineOperatorMaster = async (
   options?: RequestInit,
-): Promise<LookupItem[]> => {
-  return customFetch<LookupItem[]>(getListMachineOperatorMasterUrl(), {
-    ...options,
-    method: "GET",
-  });
+): Promise<MachineOperatorLookupItem[]> => {
+  return customFetch<MachineOperatorLookupItem[]>(
+    getListMachineOperatorMasterUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
 };
 
 export const getListMachineOperatorMasterQueryKey = () => {

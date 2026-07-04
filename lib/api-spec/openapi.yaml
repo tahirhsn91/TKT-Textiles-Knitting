@@ -165,7 +165,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/LookupItem"
+                  $ref: "#/components/schemas/MachineOperatorLookupItem"
 
   /lookups/transaction-type-master:
     get:
@@ -1276,10 +1276,14 @@ components:
         othAllowance:
           type: string
           nullable: true
+        active:
+          type: boolean
+          default: true
       required:
         - id
         - name
         - code
+        - active
 
     CreateMachineOperatorBody:
       type: object
@@ -1303,6 +1307,9 @@ components:
         othAllowance:
           type: string
           nullable: true
+        active:
+          type: boolean
+          default: true
       required:
         - name
         - code

@@ -87,6 +87,17 @@ function FieldInput({
       </Select>
     );
   }
+  if (field.type === "checkbox") {
+    return (
+      <input
+        type="checkbox"
+        className="h-4 w-4 accent-primary"
+        checked={value === "true"}
+        onChange={(e) => onChange(String(e.target.checked))}
+        autoFocus={autoFocus}
+      />
+    );
+  }
   return (
     <Input
       className="h-8 text-sm"
@@ -109,6 +120,9 @@ function displayValue(field: Field, row: Row): string {
   if (field.type === "select" && field.options) {
     const match = field.options.find((o) => o.value === String(row[field.key] ?? ""));
     return match ? match.label : (raw != null ? String(raw) : "—");
+  }
+  if (field.type === "checkbox") {
+    return String(row[field.key]) === "true" ? "Yes" : "No";
   }
   return raw != null ? String(raw) : "";
 }

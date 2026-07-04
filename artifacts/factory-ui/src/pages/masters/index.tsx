@@ -605,20 +605,22 @@ export default function MastersPage() {
                 { key: "overtimeRateHr", label: "Overtime Rate/Hr", placeholder: "e.g. 50.00", type: "number", step: "0.01" },
                 { key: "attAllowance", label: "Att. Allowance", placeholder: "e.g. 500.00", type: "number", step: "0.01" },
                 { key: "othAllowance", label: "Oth. Allowance", placeholder: "e.g. 200.00", type: "number", step: "0.01" },
+                { key: "active", label: "Active", type: "checkbox", defaultValue: "true" },
               ]}
               rows={(operators ?? []).map((o) => ({
                 ...o,
                 departmentName: (departments ?? []).find((d) => d.id === (o as { departmentId?: number | null }).departmentId)?.name ?? null,
+                active: String((o as { active?: boolean }).active ?? true),
               })) as never}
               isLoading={operatorsLoading}
               onAdd={(data) => new Promise((res, rej) =>
-                createOperator.mutate({ data: { ...data, departmentId: data.departmentId ? Number(data.departmentId) : null } as never }, {
+                createOperator.mutate({ data: { ...data, departmentId: data.departmentId ? Number(data.departmentId) : null, active: data.active !== "false" } as never }, {
                   onSuccess: () => { invalidateBoth(getListMachineOperatorMasterCrudQueryKey(), getListMachineOperatorMasterQueryKey()); res(); },
                   onError: (e) => rej(e),
                 })
               )}
               onUpdate={(id, data) => new Promise((res, rej) =>
-                updateOperator.mutate({ id, data: { ...data, departmentId: data.departmentId ? Number(data.departmentId) : null } as never }, {
+                updateOperator.mutate({ id, data: { ...data, departmentId: data.departmentId ? Number(data.departmentId) : null, active: data.active !== "false" } as never }, {
                   onSuccess: () => { invalidateBoth(getListMachineOperatorMasterCrudQueryKey(), getListMachineOperatorMasterQueryKey()); res(); },
                   onError: (e) => rej(e),
                 })
