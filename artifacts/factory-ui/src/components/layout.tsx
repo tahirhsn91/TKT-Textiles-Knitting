@@ -17,7 +17,7 @@ const navItems = [
 
 const transactionItems = [
   { href: "/transactions",           label: "Yarn-Fabric Transactions" },
-  { href: "/transactions/monthly-salary-entry", label: "Monthly Salary Entry" },
+  { href: "/transactions/monthly-salary-entry", label: "Payroll Maintenance" },
 ];
 
 const reportItems = [

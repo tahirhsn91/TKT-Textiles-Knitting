@@ -5,7 +5,7 @@ export default function MonthlySalaryEntryPage() {
     <Layout>
       <div className="flex flex-col gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Monthly Salary Entry</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Payroll Maintenance</h2>
           <p className="text-muted-foreground text-sm mt-0.5">
             This screen is not yet implemented.
           </p>
