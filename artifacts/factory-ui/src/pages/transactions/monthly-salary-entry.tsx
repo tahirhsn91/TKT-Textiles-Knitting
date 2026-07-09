@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Trash2, Download } from "lucide-react";
+import { Trash2, Download, PlusCircle, Pencil, Lock, Unlock } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -74,6 +76,32 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function fmtTimestamp(ts: string | null | undefined): string {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function downloadBlob(content: string, filename: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function toCSV(headers: string[], rows: (string | number | null)[][]): string {
+  const escape = (v: string | number | null) => {
+    const s = v === null || v === undefined ? "" : String(v);
+    return s.includes(",") || s.includes('"') || s.includes("\n")
+      ? `"${s.replace(/"/g, '""')}"`
+      : s;
+  };
+  return [headers, ...rows].map((r) => r.map(escape).join(",")).join("\n");
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface OperatorLookup {
@@ -113,6 +141,39 @@ interface PayrollSummaryItem {
   advances: Advance[];
 }
 
+interface SalaryHeader {
+  id: number;
+  month: number;
+  year: number;
+  departmentIds: number[];
+  departmentNames: string[];
+  posted: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+interface SalaryDetailRow {
+  id: number;
+  headerId: number;
+  operatorId: number;
+  operatorName: string;
+  basicSalary: string;
+  otRateHr: string;
+  attAllowance: string;
+  othAllowance: string;
+  presentDays: string;
+  absentDays: string;
+  holidays: string;
+  totalAttendance: string;
+  totalSalary: string;
+  otHours: string;
+  otAmount: string;
+  advanceDeduction: string;
+  loanDeduction: string;
+  otherDeduction: string;
+  payableSalary: string;
+}
+
 // ─── API fetch helper ─────────────────────────────────────────────────────────
 
 async function apiFetch(path: string, opts?: RequestInit) {
@@ -126,6 +187,206 @@ async function apiFetch(path: string, opts?: RequestInit) {
   }
   if (res.status === 204) return null;
   return res.json();
+}
+
+// ─── Salary Entry Tab ─────────────────────────────────────────────────────────
+
+function SalaryEntryTab() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [, navigate] = useLocation();
+
+  const { data: headers = [], isLoading } = useQuery<SalaryHeader[]>({
+    queryKey: ["salary-headers"],
+    queryFn: () => apiFetch("/api/salary-entries"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiFetch(`/api/salary-entries/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["salary-headers"] });
+      toast({ title: "Record deleted." });
+    },
+    onError: (e: Error) => toast({ variant: "destructive", title: "Error", description: e.message }),
+  });
+
+  const postMutation = useMutation({
+    mutationFn: ({ id, action }: { id: number; action: "post" | "unpost" }) =>
+      apiFetch(`/api/salary-entries/${id}/${action}`, { method: "POST" }),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["salary-headers"] });
+      toast({ title: vars.action === "post" ? "Record posted." : "Record un-posted." });
+    },
+    onError: (e: Error) => toast({ variant: "destructive", title: "Error", description: e.message }),
+  });
+
+  async function handleExportCSV() {
+    if (headers.length === 0) {
+      toast({ variant: "destructive", title: "No data", description: "No salary entries to export." });
+      return;
+    }
+    // Fetch all details for all headers
+    const allDetails: Array<{ header: SalaryHeader; details: SalaryDetailRow[] }> = [];
+    for (const h of headers) {
+      try {
+        const full = await apiFetch(`/api/salary-entries/${h.id}`);
+        allDetails.push({ header: h, details: full.details ?? [] });
+      } catch {
+        // skip
+      }
+    }
+
+    const csvHeaders = [
+      "Month", "Year", "Departments", "Status",
+      "Employee", "Basic Salary", "OT Rate/Hr", "Att. Allowance", "Oth. Allowance",
+      "Present Days", "Absent Days", "Holidays", "Total Attendance",
+      "Total Salary", "OT Hours", "OT Amount",
+      "Advance Deduction", "Loan Deduction", "Other Deduction", "Payable Salary",
+    ];
+
+    const rows: (string | number | null)[][] = [];
+    for (const { header, details } of allDetails) {
+      const monthName = MONTHS[header.month - 1];
+      const deptNames = (header.departmentNames ?? []).join("; ");
+      const status = header.posted ? "Posted" : "Draft";
+      for (const d of details) {
+        rows.push([
+          monthName, header.year, deptNames, status,
+          d.operatorName, d.basicSalary, d.otRateHr, d.attAllowance, d.othAllowance,
+          d.presentDays, d.absentDays, d.holidays, d.totalAttendance,
+          d.totalSalary, d.otHours, d.otAmount,
+          d.advanceDeduction, d.loanDeduction, d.otherDeduction, d.payableSalary,
+        ]);
+      }
+    }
+
+    downloadBlob(toCSV(csvHeaders, rows), "salary-entries.csv", "text/csv;charset=utf-8;");
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">Monthly salary records — add, edit, post, and export.</p>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExportCSV}>
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+          <Button size="sm" className="gap-1.5" onClick={() => navigate("/transactions/monthly-salary-entry/new")}>
+            <PlusCircle className="h-4 w-4" />
+            Add New Salary
+          </Button>
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Month / Year</TableHead>
+                <TableHead>Department(s)</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-40 text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading && Array.from({ length: 3 }).map((_, i) => (
+                <TableRow key={i}>
+                  {[1,2,3,4,5].map((c) => <TableCell key={c}><Skeleton className="h-5 w-full" /></TableCell>)}
+                </TableRow>
+              ))}
+              {!isLoading && headers.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
+                    No salary entries yet. Click "Add New Salary" to get started.
+                  </TableCell>
+                </TableRow>
+              )}
+              {!isLoading && headers.map((h) => (
+                <TableRow key={h.id}>
+                  <TableCell className="font-medium">
+                    {MONTHS[h.month - 1]} {h.year}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {(h.departmentNames ?? []).join(", ") || "—"}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {fmtTimestamp(h.createdAt)}
+                  </TableCell>
+                  <TableCell>
+                    {h.posted
+                      ? <Badge className="bg-green-100 text-green-800 border-green-200">Posted</Badge>
+                      : <Badge variant="outline">Draft</Badge>}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-1">
+                      {!h.posted && (
+                        <>
+                          <Button
+                            size="icon" variant="ghost" className="h-8 w-8"
+                            title="Edit"
+                            onClick={() => navigate(`/transactions/monthly-salary-entry/${h.id}/edit`)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon" variant="ghost" className="h-8 w-8 text-green-700"
+                            title="Post"
+                            onClick={() => postMutation.mutate({ id: h.id, action: "post" })}
+                            disabled={postMutation.isPending}
+                          >
+                            <Lock className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                      {h.posted && (
+                        <Button
+                          size="icon" variant="ghost" className="h-8 w-8 text-amber-600"
+                          title="Un-Post"
+                          onClick={() => postMutation.mutate({ id: h.id, action: "unpost" })}
+                          disabled={postMutation.isPending}
+                        >
+                          <Unlock className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {!h.posted && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" title="Delete">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Salary Entry</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Delete the {MONTHS[h.month - 1]} {h.year} entry? This removes all employee detail rows and cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteMutation.mutate(h.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
 // ─── Advances Tab ─────────────────────────────────────────────────────────────
@@ -533,13 +794,17 @@ export default function PayrollMaintenancePage() {
       <div className="flex flex-col gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Payroll Maintenance</h1>
-          <p className="text-muted-foreground mt-1">Manage operator advances and payroll summary.</p>
+          <p className="text-muted-foreground mt-1">Monthly salary entries, advances, and payroll summary.</p>
         </div>
-        <Tabs defaultValue="advances">
+        <Tabs defaultValue="salary-entry">
           <TabsList>
+            <TabsTrigger value="salary-entry">Salary Entry</TabsTrigger>
             <TabsTrigger value="advances">Advances</TabsTrigger>
             <TabsTrigger value="payroll-summary">Payroll Summary</TabsTrigger>
           </TabsList>
+          <TabsContent value="salary-entry" className="mt-4">
+            <SalaryEntryTab />
+          </TabsContent>
           <TabsContent value="advances" className="mt-4">
             <AdvancesTab />
           </TabsContent>

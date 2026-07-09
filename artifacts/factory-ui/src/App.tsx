@@ -6,6 +6,7 @@ import NotFound from "@/pages/not-found";
 import TransactionList from "@/pages/transactions";
 import TransactionForm from "@/pages/transactions/form";
 import MonthlySalaryEntryPage from "@/pages/transactions/monthly-salary-entry";
+import PayrollEntryPage from "@/pages/transactions/payroll-entry";
 import MastersPage from "@/pages/masters";
 import YarnBalancePage from "@/pages/reports/index";
 import YarnToFabricPage from "@/pages/reports/yarn-to-fabric";
@@ -21,6 +22,8 @@ function Router() {
       <Route path="/transactions" component={TransactionList} />
       <Route path="/transactions/new" component={TransactionForm} />
       <Route path="/transactions/:id/edit" component={TransactionForm} />
+      <Route path="/transactions/monthly-salary-entry/new" component={PayrollEntryPage} />
+      <Route path="/transactions/monthly-salary-entry/:id/edit" component={PayrollEntryPage} />
       <Route path="/transactions/monthly-salary-entry" component={MonthlySalaryEntryPage} />
       <Route path="/masters" component={MastersPage} />
       <Route path="/reports" component={() => <Redirect to="/reports/yarn-balance" />} />

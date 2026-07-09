@@ -163,3 +163,42 @@ export const operatorAdvancesTable = pgTable("operator_advances", {
 export const insertOperatorAdvancesSchema = createInsertSchema(operatorAdvancesTable).omit({ id: true, createdAt: true });
 export type InsertOperatorAdvance = z.infer<typeof insertOperatorAdvancesSchema>;
 export type OperatorAdvance = typeof operatorAdvancesTable.$inferSelect;
+
+// ─── Salary Header ─────────────────────────────────────────────────────────
+export const salaryHeaderTable = pgTable("salary_header", {
+  id: serial("id").primaryKey(),
+  month: integer("month").notNull(),
+  year: integer("year").notNull(),
+  departmentIds: integer("department_ids").array().notNull().default([]),
+  posted: boolean("posted").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type SalaryHeader = typeof salaryHeaderTable.$inferSelect;
+
+// ─── Salary Detail ─────────────────────────────────────────────────────────
+export const salaryDetailTable = pgTable("salary_detail", {
+  id: serial("id").primaryKey(),
+  headerId: integer("header_id").notNull().references(() => salaryHeaderTable.id, { onDelete: "cascade" }),
+  operatorId: integer("operator_id").notNull().references(() => machineOperatorMasterTable.id),
+  departmentId: integer("department_id"),
+  operatorName: text("operator_name").notNull(),
+  basicSalary: numeric("basic_salary", { precision: 10, scale: 2 }).notNull().default("0"),
+  otRateHr: numeric("ot_rate_hr", { precision: 10, scale: 2 }).notNull().default("0"),
+  attAllowance: numeric("att_allowance", { precision: 10, scale: 2 }).notNull().default("0"),
+  othAllowance: numeric("oth_allowance", { precision: 10, scale: 2 }).notNull().default("0"),
+  presentDays: numeric("present_days", { precision: 5, scale: 1 }).notNull().default("0"),
+  absentDays: numeric("absent_days", { precision: 5, scale: 1 }).notNull().default("0"),
+  holidays: numeric("holidays", { precision: 5, scale: 1 }).notNull().default("0"),
+  totalAttendance: numeric("total_attendance", { precision: 5, scale: 1 }).notNull().default("0"),
+  totalSalary: numeric("total_salary", { precision: 10, scale: 2 }).notNull().default("0"),
+  otHours: numeric("ot_hours", { precision: 5, scale: 2 }).notNull().default("0"),
+  otAmount: numeric("ot_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  advanceDeduction: numeric("advance_deduction", { precision: 10, scale: 2 }).notNull().default("0"),
+  loanDeduction: numeric("loan_deduction", { precision: 10, scale: 2 }).notNull().default("0"),
+  otherDeduction: numeric("other_deduction", { precision: 10, scale: 2 }).notNull().default("0"),
+  payableSalary: numeric("payable_salary", { precision: 10, scale: 2 }).notNull().default("0"),
+}, (t) => [
+  unique("salary_detail_header_operator_unique").on(t.headerId, t.operatorId),
+]);
+export type SalaryDetail = typeof salaryDetailTable.$inferSelect;
