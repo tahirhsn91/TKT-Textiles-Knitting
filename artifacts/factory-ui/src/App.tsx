@@ -9,6 +9,7 @@ import MonthlySalaryEntryPage from "@/pages/transactions/monthly-salary-entry";
 import MastersPage from "@/pages/masters";
 import YarnBalancePage from "@/pages/reports/index";
 import YarnToFabricPage from "@/pages/reports/yarn-to-fabric";
+import OperatorsPage from "@/pages/operators";
 import DashboardPage from "@/pages/dashboard";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/reports" component={() => <Redirect to="/reports/yarn-balance" />} />
       <Route path="/reports/yarn-balance" component={YarnBalancePage} />
       <Route path="/reports/yarn-to-fabric" component={YarnToFabricPage} />
+      <Route path="/operators" component={OperatorsPage} />
       <Route component={NotFound} />
     </Switch>
   );

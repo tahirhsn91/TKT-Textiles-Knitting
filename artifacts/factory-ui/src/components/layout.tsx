@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Factory, FileText, Database, BarChart2, LayoutDashboard, ChevronDown } from "lucide-react";
+import { Factory, FileText, Database, BarChart2, Users, LayoutDashboard, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -12,6 +12,7 @@ import {
 const navItems = [
   { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
   { href: "/masters",      label: "Master Data",  icon: Database },
+  { href: "/operators",    label: "Operators",    icon: Users },
 ];
 
 const transactionItems = [
