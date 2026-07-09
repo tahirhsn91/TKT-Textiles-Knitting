@@ -104,6 +104,12 @@ function toCSV(headers: string[], rows: (string | number | null)[][]): string {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+interface Department {
+  id: number;
+  name: string;
+  code: string;
+}
+
 interface OperatorLookup {
   id: number;
   name: string;
@@ -199,14 +205,23 @@ function SalaryEntryTab() {
   // Filter state
   const [filterMonth, setFilterMonth] = useState("__all__");
   const [filterYear, setFilterYear] = useState("__all__");
+  const [filterDept, setFilterDept] = useState("__all__");
+
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ["department-lookup"],
+    queryFn: () => apiFetch("/api/lookups/department-master"),
+  });
 
   // Build query string based on filters
   const queryParams = new URLSearchParams();
   if (filterMonth !== "__all__") queryParams.set("month", filterMonth);
   if (filterYear !== "__all__") queryParams.set("year", filterYear);
+  if (filterDept !== "__all__") queryParams.set("departmentId", filterDept);
+
+  const hasFilter = filterMonth !== "__all__" || filterYear !== "__all__" || filterDept !== "__all__";
 
   const { data: headers = [], isLoading } = useQuery<SalaryHeader[]>({
-    queryKey: ["salary-headers", filterMonth, filterYear],
+    queryKey: ["salary-headers", filterMonth, filterYear, filterDept],
     queryFn: () => apiFetch(`/api/salary-entries?${queryParams.toString()}`),
   });
 
@@ -271,7 +286,10 @@ function SalaryEntryTab() {
 
     const yearPart = filterYear !== "__all__" ? filterYear : "all";
     const monPart = filterMonth !== "__all__" ? MONTHS[parseInt(filterMonth) - 1].toLowerCase() : "all";
-    downloadBlob(toCSV(csvHeaders, rows), `salary-entries-${yearPart}-${monPart}.csv`, "text/csv;charset=utf-8;");
+    const deptName = filterDept !== "__all__"
+      ? (departments.find((d) => String(d.id) === filterDept)?.name ?? "dept").toLowerCase().replace(/\s+/g, "-")
+      : "all-depts";
+    downloadBlob(toCSV(csvHeaders, rows), `salary-entries-${yearPart}-${monPart}-${deptName}.csv`, "text/csv;charset=utf-8;");
   }
 
   return (
@@ -307,10 +325,24 @@ function SalaryEntryTab() {
               </SelectContent>
             </Select>
           </div>
-          {(filterMonth !== "__all__" || filterYear !== "__all__") && (
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs">Department</Label>
+            <Select value={filterDept} onValueChange={setFilterDept}>
+              <SelectTrigger className="w-44 h-8 text-sm">
+                <SelectValue placeholder="All departments" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Departments</SelectItem>
+                {departments.map((d) => (
+                  <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {hasFilter && (
             <Button
               variant="ghost" size="sm" className="h-8 text-xs"
-              onClick={() => { setFilterMonth("__all__"); setFilterYear("__all__"); }}
+              onClick={() => { setFilterMonth("__all__"); setFilterYear("__all__"); setFilterDept("__all__"); }}
             >
               Clear
             </Button>
@@ -337,7 +369,7 @@ function SalaryEntryTab() {
                 <TableHead>Department(s)</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-40 text-right">Actions</TableHead>
+                <TableHead className="w-52 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -349,7 +381,7 @@ function SalaryEntryTab() {
               {!isLoading && headers.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
-                    {filterMonth !== "__all__" || filterYear !== "__all__"
+                    {hasFilter
                       ? "No salary entries match the selected filters."
                       : "No salary entries yet. Click \"Add New Salary\" to get started."}
                   </TableCell>
@@ -382,27 +414,62 @@ function SalaryEntryTab() {
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button
-                            size="icon" variant="ghost" className="h-8 w-8 text-green-700"
-                            title="Post"
-                            onClick={() => postMutation.mutate({ id: h.id, action: "post" })}
-                            disabled={postMutation.isPending}
-                          >
-                            <Lock className="h-4 w-4" />
-                          </Button>
+                          {/* Post — requires confirmation */}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                size="icon" variant="ghost" className="h-8 w-8 text-green-700"
+                                title="Post" disabled={postMutation.isPending}
+                              >
+                                <Lock className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Post Salary Entry</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Post the {MONTHS[h.month - 1]} {h.year} entry? Once posted it will be locked for editing.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => postMutation.mutate({ id: h.id, action: "post" })}>
+                                  Post
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </>
                       )}
                       {h.posted && (
-                        <Button
-                          size="icon" variant="ghost" className="h-8 w-8 text-amber-600"
-                          title="Un-Post"
-                          onClick={() => postMutation.mutate({ id: h.id, action: "unpost" })}
-                          disabled={postMutation.isPending}
-                        >
-                          <Unlock className="h-4 w-4" />
-                        </Button>
+                        /* Un-Post — requires confirmation */
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              size="icon" variant="ghost" className="h-8 w-8 text-amber-600"
+                              title="Un-Post" disabled={postMutation.isPending}
+                            >
+                              <Unlock className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Un-Post Salary Entry</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Un-post the {MONTHS[h.month - 1]} {h.year} entry? This will revert it to Draft so it can be edited again.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => postMutation.mutate({ id: h.id, action: "unpost" })}>
+                                Un-Post
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       )}
                       {!h.posted && (
+                        /* Delete — requires confirmation */
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" title="Delete">

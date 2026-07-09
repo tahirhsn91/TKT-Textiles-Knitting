@@ -1158,6 +1158,140 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /salary-entries:
+    get:
+      operationId: listSalaryEntries
+      tags: [payroll]
+      summary: List salary entry headers
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: integer
+        - name: year
+          in: query
+          schema:
+            type: integer
+        - name: departmentId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of salary headers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SalaryHeader"
+    post:
+      operationId: createSalaryEntry
+      tags: [payroll]
+      summary: Create a new salary entry header with detail rows
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSalaryEntryBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalaryHeader"
+        "409":
+          description: Duplicate operator in same month/year
+
+  /salary-entries/{id}:
+    get:
+      operationId: getSalaryEntry
+      tags: [payroll]
+      summary: Get a salary entry header with its detail rows
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Salary entry with details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalaryHeaderWithDetails"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: updateSalaryEntry
+      tags: [payroll]
+      summary: Update a salary entry (blocked if posted)
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSalaryEntryBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalaryHeader"
+        "403":
+          description: Record is posted and cannot be edited
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteSalaryEntry
+      tags: [payroll]
+      summary: Delete a salary entry (blocked if posted)
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Record is posted and cannot be deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /salary-entries/{id}/post:
+    post:
+      operationId: postSalaryEntry
+      tags: [payroll]
+      summary: Post (lock) a salary entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Posted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalaryHeader"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /salary-entries/{id}/unpost:
+    post:
+      operationId: unpostSalaryEntry
+      tags: [payroll]
+      summary: Un-post (unlock) a salary entry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Un-posted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalaryHeader"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
 components:
   parameters:
     IdParam:
@@ -1611,3 +1745,138 @@ components:
         - date
         - docNumber
         - details
+
+    SalaryHeader:
+      type: object
+      properties:
+        id:
+          type: integer
+        month:
+          type: integer
+        year:
+          type: integer
+        departmentIds:
+          type: array
+          items:
+            type: integer
+        departmentNames:
+          type: array
+          items:
+            type: string
+        posted:
+          type: boolean
+        createdAt:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          nullable: true
+      required: [id, month, year, departmentIds, departmentNames, posted]
+
+    SalaryDetailRow:
+      type: object
+      properties:
+        id:
+          type: integer
+        headerId:
+          type: integer
+        operatorId:
+          type: integer
+        operatorName:
+          type: string
+        basicSalary:
+          type: string
+        otRateHr:
+          type: string
+        attAllowance:
+          type: string
+        othAllowance:
+          type: string
+        presentDays:
+          type: string
+        absentDays:
+          type: string
+        holidays:
+          type: string
+        totalAttendance:
+          type: string
+        totalSalary:
+          type: string
+        otHours:
+          type: string
+        otAmount:
+          type: string
+        advanceDeduction:
+          type: string
+        loanDeduction:
+          type: string
+        otherDeduction:
+          type: string
+        payableSalary:
+          type: string
+      required: [id, headerId, operatorId, operatorName]
+
+    SalaryHeaderWithDetails:
+      allOf:
+        - $ref: "#/components/schemas/SalaryHeader"
+        - type: object
+          properties:
+            details:
+              type: array
+              items:
+                $ref: "#/components/schemas/SalaryDetailRow"
+          required: [details]
+
+    SalaryDetailInput:
+      type: object
+      properties:
+        operatorId:
+          type: integer
+        basicSalary:
+          type: number
+        otRateHr:
+          type: number
+        attAllowance:
+          type: number
+        othAllowance:
+          type: number
+        presentDays:
+          type: number
+        absentDays:
+          type: number
+        holidays:
+          type: number
+        totalAttendance:
+          type: number
+        totalSalary:
+          type: number
+        otHours:
+          type: number
+        otAmount:
+          type: number
+        advanceDeduction:
+          type: number
+        loanDeduction:
+          type: number
+        otherDeduction:
+          type: number
+        payableSalary:
+          type: number
+      required: [operatorId]
+
+    CreateSalaryEntryBody:
+      type: object
+      properties:
+        month:
+          type: integer
+        year:
+          type: integer
+        departmentIds:
+          type: array
+          items:
+            type: integer
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/SalaryDetailInput"
+      required: [month, year, departmentIds, details]
