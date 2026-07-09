@@ -6,7 +6,13 @@ import path from "path";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
-    alias: { "@": path.resolve(__dirname, "src") },
+    alias: {
+      "@": path.resolve(__dirname, "src"),
+      "@workspace/api-client-react": path.resolve(
+        __dirname,
+        "src/vendor/api-client-react",
+      ),
+    },
     dedupe: ["react", "react-dom"],
   },
   server: {
