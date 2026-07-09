@@ -22,8 +22,10 @@ function toNum(val: unknown): number {
 
 // ─── List headers ─────────────────────────────────────────────────────────────
 
-router.get("/salary-entries", async (_req, res): Promise<void> => {
-  const headers = await db
+router.get("/salary-entries", async (req, res): Promise<void> => {
+  const { month, year, departmentId } = req.query as Record<string, string | undefined>;
+
+  const allHeaders = await db
     .select()
     .from(salaryHeaderTable)
     .orderBy(salaryHeaderTable.year, salaryHeaderTable.month);
@@ -31,7 +33,15 @@ router.get("/salary-entries", async (_req, res): Promise<void> => {
   const depts = await db.select().from(departmentMasterTable);
   const deptMap = Object.fromEntries(depts.map((d) => [d.id, d.name]));
 
-  const result = headers.map((h) => ({
+  let filtered = allHeaders;
+  if (month) filtered = filtered.filter((h) => h.month === parseInt(month));
+  if (year) filtered = filtered.filter((h) => h.year === parseInt(year));
+  if (departmentId) {
+    const did = parseInt(departmentId);
+    filtered = filtered.filter((h) => (h.departmentIds ?? []).includes(did));
+  }
+
+  const result = filtered.map((h) => ({
     ...h,
     departmentNames: (h.departmentIds ?? []).map((id) => deptMap[id] ?? String(id)),
   }));
@@ -104,15 +114,14 @@ router.post("/salary-entries", async (req, res): Promise<void> => {
 
   const operatorIds = details.map((d) => d.operatorId);
 
-  // Duplicate check: same (month, year, operatorId) across any header
+  // Enforce DB-level uniqueness: check if any (operatorId, month, year) already exists
   const existingDetails = await db
-    .select({ operatorId: salaryDetailTable.operatorId, headerId: salaryDetailTable.headerId })
+    .select({ operatorId: salaryDetailTable.operatorId })
     .from(salaryDetailTable)
-    .innerJoin(salaryHeaderTable, eq(salaryDetailTable.headerId, salaryHeaderTable.id))
     .where(
       and(
-        eq(salaryHeaderTable.month, month),
-        eq(salaryHeaderTable.year, year),
+        eq(salaryDetailTable.month, month),
+        eq(salaryDetailTable.year, year),
         inArray(salaryDetailTable.operatorId, operatorIds)
       )
     );
@@ -135,6 +144,8 @@ router.post("/salary-entries", async (req, res): Promise<void> => {
   const detailRows = details.map((d) => ({
     headerId: header.id,
     operatorId: d.operatorId,
+    month,
+    year,
     departmentId: d.departmentId ?? null,
     operatorName: d.operatorName,
     basicSalary: String(toNum(d.basicSalary)),
@@ -201,15 +212,14 @@ router.put("/salary-entries/:id", async (req, res): Promise<void> => {
 
   const operatorIds = details.map((d) => d.operatorId);
 
-  // Duplicate check: same (month, year, operatorId) on a DIFFERENT header
+  // Duplicate check: same (operatorId, month, year) on a DIFFERENT header's details
   const existingDetails = await db
     .select({ operatorId: salaryDetailTable.operatorId, headerId: salaryDetailTable.headerId })
     .from(salaryDetailTable)
-    .innerJoin(salaryHeaderTable, eq(salaryDetailTable.headerId, salaryHeaderTable.id))
     .where(
       and(
-        eq(salaryHeaderTable.month, month),
-        eq(salaryHeaderTable.year, year),
+        eq(salaryDetailTable.month, month),
+        eq(salaryDetailTable.year, year),
         inArray(salaryDetailTable.operatorId, operatorIds)
       )
     );
@@ -237,6 +247,8 @@ router.put("/salary-entries/:id", async (req, res): Promise<void> => {
   const detailRows = details.map((d) => ({
     headerId: id,
     operatorId: d.operatorId,
+    month,
+    year,
     departmentId: d.departmentId ?? null,
     operatorName: d.operatorName,
     basicSalary: String(toNum(d.basicSalary)),

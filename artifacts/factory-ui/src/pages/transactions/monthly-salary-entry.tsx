@@ -196,9 +196,18 @@ function SalaryEntryTab() {
   const qc = useQueryClient();
   const [, navigate] = useLocation();
 
+  // Filter state
+  const [filterMonth, setFilterMonth] = useState("__all__");
+  const [filterYear, setFilterYear] = useState("__all__");
+
+  // Build query string based on filters
+  const queryParams = new URLSearchParams();
+  if (filterMonth !== "__all__") queryParams.set("month", filterMonth);
+  if (filterYear !== "__all__") queryParams.set("year", filterYear);
+
   const { data: headers = [], isLoading } = useQuery<SalaryHeader[]>({
-    queryKey: ["salary-headers"],
-    queryFn: () => apiFetch("/api/salary-entries"),
+    queryKey: ["salary-headers", filterMonth, filterYear],
+    queryFn: () => apiFetch(`/api/salary-entries?${queryParams.toString()}`),
   });
 
   const deleteMutation = useMutation({
@@ -222,17 +231,17 @@ function SalaryEntryTab() {
 
   async function handleExportCSV() {
     if (headers.length === 0) {
-      toast({ variant: "destructive", title: "No data", description: "No salary entries to export." });
+      toast({ variant: "destructive", title: "No data", description: "No salary entries match the current filter." });
       return;
     }
-    // Fetch all details for all headers
+    // Fetch details only for the currently-filtered headers
     const allDetails: Array<{ header: SalaryHeader; details: SalaryDetailRow[] }> = [];
     for (const h of headers) {
       try {
         const full = await apiFetch(`/api/salary-entries/${h.id}`);
         allDetails.push({ header: h, details: full.details ?? [] });
       } catch {
-        // skip
+        // skip on error
       }
     }
 
@@ -260,13 +269,53 @@ function SalaryEntryTab() {
       }
     }
 
-    downloadBlob(toCSV(csvHeaders, rows), "salary-entries.csv", "text/csv;charset=utf-8;");
+    const yearPart = filterYear !== "__all__" ? filterYear : "all";
+    const monPart = filterMonth !== "__all__" ? MONTHS[parseInt(filterMonth) - 1].toLowerCase() : "all";
+    downloadBlob(toCSV(csvHeaders, rows), `salary-entries-${yearPart}-${monPart}.csv`, "text/csv;charset=utf-8;");
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Monthly salary records — add, edit, post, and export.</p>
+      {/* Filters + actions */}
+      <div className="flex flex-wrap items-end gap-3 justify-between">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs">Month</Label>
+            <Select value={filterMonth} onValueChange={setFilterMonth}>
+              <SelectTrigger className="w-36 h-8 text-sm">
+                <SelectValue placeholder="All months" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Months</SelectItem>
+                {MONTHS.map((m, i) => (
+                  <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs">Year</Label>
+            <Select value={filterYear} onValueChange={setFilterYear}>
+              <SelectTrigger className="w-28 h-8 text-sm">
+                <SelectValue placeholder="All years" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Years</SelectItem>
+                {YEARS.map((y) => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {(filterMonth !== "__all__" || filterYear !== "__all__") && (
+            <Button
+              variant="ghost" size="sm" className="h-8 text-xs"
+              onClick={() => { setFilterMonth("__all__"); setFilterYear("__all__"); }}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExportCSV}>
             <Download className="h-4 w-4" />
@@ -300,7 +349,9 @@ function SalaryEntryTab() {
               {!isLoading && headers.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
-                    No salary entries yet. Click "Add New Salary" to get started.
+                    {filterMonth !== "__all__" || filterYear !== "__all__"
+                      ? "No salary entries match the selected filters."
+                      : "No salary entries yet. Click \"Add New Salary\" to get started."}
                   </TableCell>
                 </TableRow>
               )}

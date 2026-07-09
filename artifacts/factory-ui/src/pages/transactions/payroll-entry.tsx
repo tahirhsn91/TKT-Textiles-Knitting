@@ -79,7 +79,6 @@ interface Operator {
   othAllowance: string | null;
 }
 
-// Row stores all input fields; formula fields are stored but recomputed on change
 interface DetailRow {
   operatorId: number;
   departmentId: number | null;
@@ -101,28 +100,34 @@ interface DetailRow {
   payableSalary: string;
 }
 
-function recompute(row: DetailRow, totalDays: number): DetailRow {
-  const basic = toNum(row.basicSalary);
-  const otRate = toNum(row.otRateHr);
-  const att = toNum(row.totalAttendance);
-  const otH = toNum(row.otHours);
-  const totalSalary = totalDays > 0 ? (basic / totalDays) * att : 0;
-  const otAmount = otH * otRate;
+// Fields that, when changed, trigger auto-recalculation of totalSalary
+const SALARY_SOURCE_FIELDS = new Set<keyof DetailRow>(["basicSalary", "totalAttendance"]);
+// Fields that, when changed, trigger auto-recalculation of otAmount
+const OT_SOURCE_FIELDS = new Set<keyof DetailRow>(["otHours", "otRateHr"]);
+
+function recomputePayable(row: DetailRow): DetailRow {
   const payable =
-    totalSalary + otAmount -
+    toNum(row.totalSalary) +
+    toNum(row.otAmount) -
     toNum(row.advanceDeduction) -
     toNum(row.loanDeduction) -
     toNum(row.otherDeduction);
-  return {
+  return { ...row, payableSalary: payable.toFixed(2) };
+}
+
+function recomputeAll(row: DetailRow, totalDays: number): DetailRow {
+  const totalSalary =
+    totalDays > 0 ? (toNum(row.basicSalary) / totalDays) * toNum(row.totalAttendance) : 0;
+  const otAmount = toNum(row.otHours) * toNum(row.otRateHr);
+  return recomputePayable({
     ...row,
     totalSalary: totalSalary.toFixed(2),
     otAmount: otAmount.toFixed(2),
-    payableSalary: payable.toFixed(2),
-  };
+  });
 }
 
-function rowFromOperator(op: Operator): DetailRow {
-  return {
+function rowFromOperator(op: Operator, totalDays: number): DetailRow {
+  const base: DetailRow = {
     operatorId: op.id,
     departmentId: op.departmentId,
     operatorName: op.name,
@@ -142,6 +147,7 @@ function rowFromOperator(op: Operator): DetailRow {
     otherDeduction: "0.00",
     payableSalary: "0.00",
   };
+  return recomputeAll(base, totalDays);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -163,7 +169,6 @@ export default function PayrollEntryPage() {
 
   const totalDays = daysInMonthFn(parseInt(month) || 1, parseInt(year) || CURRENT_YEAR);
 
-  // ── Queries ──
   const { data: departments = [] } = useQuery<Department[]>({
     queryKey: ["dept-lookup"],
     queryFn: () => apiFetch("/api/lookups/department-master"),
@@ -183,7 +188,7 @@ export default function PayrollEntryPage() {
     enabled: isEdit,
   });
 
-  // ── Populate form once for edit mode ──
+  // Populate form once when loading an existing entry
   useEffect(() => {
     if (!isEdit || !existingEntry || initialized) return;
     setMonth(String(existingEntry.month));
@@ -193,56 +198,69 @@ export default function PayrollEntryPage() {
     setInitialized(true);
   }, [isEdit, existingEntry, initialized]);
 
-  // ── For new mode: populate rows when dept selection or operators change ──
-  const prevDeptKey = useMemo(
+  // For new mode: rebuild rows when dept selection or operator list changes
+  const deptKey = useMemo(
     () => selectedDeptIds.slice().sort().join(","),
     [selectedDeptIds]
   );
-  const [lastDeptKey, setLastDeptKey] = useState(prevDeptKey);
-  const [lastOperatorCount, setLastOperatorCount] = useState(0);
+  const [builtForKey, setBuiltForKey] = useState<string | null>(null);
+  const [builtForOpCount, setBuiltForOpCount] = useState(-1);
 
   useEffect(() => {
     if (isEdit) return;
-    const deptKey = selectedDeptIds.slice().sort().join(",");
-    if (deptKey === lastDeptKey && allOperators.length === lastOperatorCount) return;
-
-    setLastDeptKey(deptKey);
-    setLastOperatorCount(allOperators.length);
-
-    if (selectedDeptIds.length === 0) {
-      setRows([]);
-      return;
-    }
+    if (deptKey === builtForKey && allOperators.length === builtForOpCount) return;
+    setBuiltForKey(deptKey);
+    setBuiltForOpCount(allOperators.length);
+    if (selectedDeptIds.length === 0) { setRows([]); return; }
+    const td = daysInMonthFn(parseInt(month) || 1, parseInt(year) || CURRENT_YEAR);
     const filtered = allOperators.filter(
       (op) => op.active && op.departmentId !== null && selectedDeptIds.includes(op.departmentId!)
     );
-    setRows(filtered.map((op) => recompute(rowFromOperator(op), totalDays)));
-  });
+    setRows(filtered.map((op) => rowFromOperator(op, td)));
+  }, [isEdit, deptKey, allOperators.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Update a single row field and recompute formulas ──
-  const updateRow = useCallback((idx: number, field: keyof DetailRow, value: string) => {
-    setRows((prev) => {
-      const next = [...prev];
-      const td = daysInMonthFn(parseInt(month) || 1, parseInt(year) || CURRENT_YEAR);
-      next[idx] = recompute({ ...next[idx], [field]: value }, td);
-      return next;
-    });
-  }, [month, year]);
+  // ── Row update with field-aware formula logic ──
+  const updateRow = useCallback(
+    (idx: number, field: keyof DetailRow, value: string) => {
+      setRows((prev) => {
+        const next = [...prev];
+        const td = daysInMonthFn(parseInt(month) || 1, parseInt(year) || CURRENT_YEAR);
+        const updated = { ...next[idx], [field]: value };
 
-  // ── When month/year change, recompute formula cells in existing rows ──
-  const handleMonthChange = useCallback((m: string) => {
-    setMonth(m);
-    const td = daysInMonthFn(parseInt(m) || 1, parseInt(year) || CURRENT_YEAR);
-    setRows((prev) => prev.map((r) => recompute(r, td)));
-  }, [year]);
+        if (SALARY_SOURCE_FIELDS.has(field) || OT_SOURCE_FIELDS.has(field)) {
+          // Source field changed → recompute both derived salary/OT fields and payable
+          next[idx] = recomputeAll(updated, td);
+        } else {
+          // User is directly editing totalSalary, otAmount, or a deduction →
+          // honour their override, only recompute payableSalary
+          next[idx] = recomputePayable(updated);
+        }
+        return next;
+      });
+    },
+    [month, year]
+  );
 
-  const handleYearChange = useCallback((y: string) => {
-    setYear(y);
-    const td = daysInMonthFn(parseInt(month) || 1, parseInt(y) || CURRENT_YEAR);
-    setRows((prev) => prev.map((r) => recompute(r, td)));
-  }, [month]);
+  // When month changes: update state and recompute formula fields
+  const handleMonthChange = useCallback(
+    (m: string) => {
+      setMonth(m);
+      const td = daysInMonthFn(parseInt(m) || 1, parseInt(year) || CURRENT_YEAR);
+      setRows((prev) => prev.map((r) => recomputeAll(r, td)));
+    },
+    [year]
+  );
 
-  // ── Save ──
+  // When year changes: update state and recompute formula fields
+  const handleYearChange = useCallback(
+    (y: string) => {
+      setYear(y);
+      const td = daysInMonthFn(parseInt(month) || 1, parseInt(y) || CURRENT_YEAR);
+      setRows((prev) => prev.map((r) => recomputeAll(r, td)));
+    },
+    [month]
+  );
+
   const saveMutation = useMutation({
     mutationFn: (body: object) =>
       isEdit
@@ -266,7 +284,7 @@ export default function PayrollEntryPage() {
       return;
     }
     if (rows.length === 0) {
-      toast({ variant: "destructive", title: "Validation", description: "No employees for the selected department(s)." });
+      toast({ variant: "destructive", title: "Validation", description: "No employees for selected department(s)." });
       return;
     }
     saveMutation.mutate({
@@ -299,12 +317,8 @@ export default function PayrollEntryPage() {
   return (
     <Layout>
       <div className="flex flex-col gap-4">
-        {/* Page title */}
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost" size="icon"
-            onClick={() => navigate("/transactions/monthly-salary-entry")}
-          >
+          <Button variant="ghost" size="icon" onClick={() => navigate("/transactions/monthly-salary-entry")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -404,9 +418,12 @@ export default function PayrollEntryPage() {
             <CardHeader>
               <CardTitle>Employee Detail</CardTitle>
               <p className="text-xs text-muted-foreground">
-                Total Salary = (Basic ÷ {totalDays} days) × Attendance &nbsp;|&nbsp;
+                Auto-formula: Total Salary = (Basic ÷ {totalDays}) × Attendance &nbsp;|&nbsp;
                 OT Amount = OT Hours × OT Rate &nbsp;|&nbsp;
-                Payable = (Total Salary + OT) − Deductions
+                Payable = (Total Salary + OT) − Deductions.
+                <span className="ml-1 italic">
+                  Total Salary, OT Amount, and deduction fields are directly editable to override.
+                </span>
               </p>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
@@ -422,9 +439,9 @@ export default function PayrollEntryPage() {
                     <TableHead className="text-right min-w-[75px]">Absent</TableHead>
                     <TableHead className="text-right min-w-[70px]">Holidays</TableHead>
                     <TableHead className="text-right min-w-[80px]">Total Att.</TableHead>
-                    <TableHead className="text-right min-w-[100px]">Total Salary</TableHead>
+                    <TableHead className="text-right min-w-[100px]">Total Salary ✎</TableHead>
                     <TableHead className="text-right min-w-[70px]">OT Hrs</TableHead>
-                    <TableHead className="text-right min-w-[90px]">OT Amount</TableHead>
+                    <TableHead className="text-right min-w-[90px]">OT Amount ✎</TableHead>
                     <TableHead className="text-right min-w-[90px]">Adv. Deduction</TableHead>
                     <TableHead className="text-right min-w-[90px]">Loan Deduction</TableHead>
                     <TableHead className="text-right min-w-[90px]">Other Deduction</TableHead>
@@ -443,7 +460,7 @@ export default function PayrollEntryPage() {
                         <TableCell className="py-1"><Input disabled className={ro} value={row.otRateHr} /></TableCell>
                         <TableCell className="py-1"><Input disabled className={ro} value={row.attAllowance} /></TableCell>
                         <TableCell className="py-1"><Input disabled className={ro} value={row.othAllowance} /></TableCell>
-                        {/* User-editable attendance */}
+                        {/* Attendance inputs — trigger salary formula */}
                         <TableCell className="py-1">
                           <Input type="number" min="0" step="0.5" className={inp}
                             value={row.presentDays} disabled={isPosted}
@@ -459,24 +476,27 @@ export default function PayrollEntryPage() {
                             value={row.holidays} disabled={isPosted}
                             onChange={(e) => updateRow(i, "holidays", e.target.value)} />
                         </TableCell>
+                        {/* totalAttendance — triggers totalSalary recalculation */}
                         <TableCell className="py-1">
                           <Input type="number" min="0" step="0.5" className={inp}
                             value={row.totalAttendance} disabled={isPosted}
                             onChange={(e) => updateRow(i, "totalAttendance", e.target.value)} />
                         </TableCell>
-                        {/* Formula-computed but still editable overrides */}
+                        {/* totalSalary — auto-computed but directly editable */}
                         <TableCell className="py-1">
-                          <Input type="number" min="0" step="0.01" className={inp}
+                          <Input type="number" min="0" step="0.01" className={`${inp} bg-amber-50`}
                             value={row.totalSalary} disabled={isPosted}
                             onChange={(e) => updateRow(i, "totalSalary", e.target.value)} />
                         </TableCell>
+                        {/* otHours — triggers otAmount recalculation */}
                         <TableCell className="py-1">
                           <Input type="number" min="0" step="0.5" className={inp}
                             value={row.otHours} disabled={isPosted}
                             onChange={(e) => updateRow(i, "otHours", e.target.value)} />
                         </TableCell>
+                        {/* otAmount — auto-computed but directly editable */}
                         <TableCell className="py-1">
-                          <Input type="number" min="0" step="0.01" className={inp}
+                          <Input type="number" min="0" step="0.01" className={`${inp} bg-amber-50`}
                             value={row.otAmount} disabled={isPosted}
                             onChange={(e) => updateRow(i, "otAmount", e.target.value)} />
                         </TableCell>
@@ -496,7 +516,7 @@ export default function PayrollEntryPage() {
                             value={row.otherDeduction} disabled={isPosted}
                             onChange={(e) => updateRow(i, "otherDeduction", e.target.value)} />
                         </TableCell>
-                        {/* Payable — computed read-only display */}
+                        {/* Payable — live computed, read-only display */}
                         <TableCell
                           className={`py-1 pr-2 text-right font-mono text-sm font-semibold ${
                             toNum(row.payableSalary) < 0 ? "text-red-600" : "text-green-700"
@@ -519,7 +539,6 @@ export default function PayrollEntryPage() {
           </p>
         )}
 
-        {/* Actions */}
         <div className="flex gap-3 justify-end pb-4">
           <Button variant="outline" onClick={() => navigate("/transactions/monthly-salary-entry")}>
             Cancel

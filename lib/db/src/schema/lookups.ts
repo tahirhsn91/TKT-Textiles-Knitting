@@ -181,6 +181,8 @@ export const salaryDetailTable = pgTable("salary_detail", {
   id: serial("id").primaryKey(),
   headerId: integer("header_id").notNull().references(() => salaryHeaderTable.id, { onDelete: "cascade" }),
   operatorId: integer("operator_id").notNull().references(() => machineOperatorMasterTable.id),
+  month: integer("month"),
+  year: integer("year"),
   departmentId: integer("department_id"),
   operatorName: text("operator_name").notNull(),
   basicSalary: numeric("basic_salary", { precision: 10, scale: 2 }).notNull().default("0"),
@@ -200,5 +202,6 @@ export const salaryDetailTable = pgTable("salary_detail", {
   payableSalary: numeric("payable_salary", { precision: 10, scale: 2 }).notNull().default("0"),
 }, (t) => [
   unique("salary_detail_header_operator_unique").on(t.headerId, t.operatorId),
+  unique("salary_detail_op_month_year_unique").on(t.operatorId, t.month, t.year),
 ]);
 export type SalaryDetail = typeof salaryDetailTable.$inferSelect;
