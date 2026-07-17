@@ -5,6 +5,7 @@ import mastersRouter from "./masters.js";
 import transactionsRouter from "./transactions.js";
 import reportsRouter from "./reports.js";
 import operatorsRouter from "./operators.js";
+import salaryEntriesRouter from "./salary-entries.js";
 import dashboardRouter from "./dashboard.js";
 
 const router: IRouter = Router();
@@ -15,6 +16,7 @@ router.use(mastersRouter);
 router.use(transactionsRouter);
 router.use(reportsRouter);
 router.use(operatorsRouter);
+router.use(salaryEntriesRouter);
 router.use(dashboardRouter);
 
 export default router;

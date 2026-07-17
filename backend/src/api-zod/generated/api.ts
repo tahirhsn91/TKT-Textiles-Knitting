@@ -121,10 +121,18 @@ export const ListFabricTypeMasterResponse = zod.array(
 /**
  * @summary List machine operator master entries
  */
+export const listMachineOperatorMasterResponseActiveDefault = true;
+
 export const ListMachineOperatorMasterResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
   code: zod.string(),
+  departmentId: zod.number().nullish(),
+  baseSalary: zod.string().nullish(),
+  overtimeRateHr: zod.string().nullish(),
+  attAllowance: zod.string().nullish(),
+  othAllowance: zod.string().nullish(),
+  active: zod.boolean().default(listMachineOperatorMasterResponseActiveDefault),
 });
 export const ListMachineOperatorMasterResponse = zod.array(
   ListMachineOperatorMasterResponseItem,
@@ -140,6 +148,18 @@ export const ListTransactionTypeMasterResponseItem = zod.object({
 });
 export const ListTransactionTypeMasterResponse = zod.array(
   ListTransactionTypeMasterResponseItem,
+);
+
+/**
+ * @summary List department master entries
+ */
+export const ListDepartmentMasterResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+export const ListDepartmentMasterResponse = zod.array(
+  ListDepartmentMasterResponseItem,
 );
 
 /**
@@ -599,12 +619,67 @@ export const DeleteFabricTypeMasterParams = zod.object({
 });
 
 /**
+ * @summary List department master entries (CRUD)
+ */
+export const ListDepartmentMasterCrudResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+export const ListDepartmentMasterCrudResponse = zod.array(
+  ListDepartmentMasterCrudResponseItem,
+);
+
+/**
+ * @summary Create department master entry
+ */
+export const CreateDepartmentMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Update department master entry
+ */
+export const UpdateDepartmentMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateDepartmentMasterBody = zod.object({
+  name: zod.string(),
+  code: zod.string(),
+});
+
+export const UpdateDepartmentMasterResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  code: zod.string(),
+});
+
+/**
+ * @summary Delete department master entry
+ */
+export const DeleteDepartmentMasterParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary List machine operator master entries (CRUD)
  */
+export const listMachineOperatorMasterCrudResponseActiveDefault = true;
+
 export const ListMachineOperatorMasterCrudResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
   code: zod.string(),
+  departmentId: zod.number().nullish(),
+  baseSalary: zod.string().nullish(),
+  overtimeRateHr: zod.string().nullish(),
+  attAllowance: zod.string().nullish(),
+  othAllowance: zod.string().nullish(),
+  active: zod
+    .boolean()
+    .default(listMachineOperatorMasterCrudResponseActiveDefault),
 });
 export const ListMachineOperatorMasterCrudResponse = zod.array(
   ListMachineOperatorMasterCrudResponseItem,
@@ -613,9 +688,17 @@ export const ListMachineOperatorMasterCrudResponse = zod.array(
 /**
  * @summary Create machine operator master entry
  */
+export const createMachineOperatorMasterBodyActiveDefault = true;
+
 export const CreateMachineOperatorMasterBody = zod.object({
   name: zod.string(),
   code: zod.string(),
+  departmentId: zod.number().nullish(),
+  baseSalary: zod.string().nullish(),
+  overtimeRateHr: zod.string().nullish(),
+  attAllowance: zod.string().nullish(),
+  othAllowance: zod.string().nullish(),
+  active: zod.boolean().default(createMachineOperatorMasterBodyActiveDefault),
 });
 
 /**
@@ -625,15 +708,33 @@ export const UpdateMachineOperatorMasterParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const updateMachineOperatorMasterBodyActiveDefault = true;
+
 export const UpdateMachineOperatorMasterBody = zod.object({
   name: zod.string(),
   code: zod.string(),
+  departmentId: zod.number().nullish(),
+  baseSalary: zod.string().nullish(),
+  overtimeRateHr: zod.string().nullish(),
+  attAllowance: zod.string().nullish(),
+  othAllowance: zod.string().nullish(),
+  active: zod.boolean().default(updateMachineOperatorMasterBodyActiveDefault),
 });
+
+export const updateMachineOperatorMasterResponseActiveDefault = true;
 
 export const UpdateMachineOperatorMasterResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
   code: zod.string(),
+  departmentId: zod.number().nullish(),
+  baseSalary: zod.string().nullish(),
+  overtimeRateHr: zod.string().nullish(),
+  attAllowance: zod.string().nullish(),
+  othAllowance: zod.string().nullish(),
+  active: zod
+    .boolean()
+    .default(updateMachineOperatorMasterResponseActiveDefault),
 });
 
 /**

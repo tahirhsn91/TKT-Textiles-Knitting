@@ -5,7 +5,7 @@
  * Fabric Knitting Factory Management System API
  * OpenAPI spec version: 0.1.0
  */
-import type { TransactionDetailItem } from "./transactionDetailItem";
+import type { TransactionDetailItem } from "./transactionDetailItem.js";
 
 export interface TransactionWithDetails {
   id: number;

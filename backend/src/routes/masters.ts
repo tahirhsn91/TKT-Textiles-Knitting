@@ -13,6 +13,7 @@ import {
   uomMasterTable,
   fabricTypeMasterTable,
   machineOperatorMasterTable,
+  departmentMasterTable,
 } from "../db/index.js";
 
 const router: IRouter = Router();
@@ -189,10 +190,18 @@ router.get("/masters/machine", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/machine", async (req, res): Promise<void> => {
-  const { name, machineNumber } = req.body;
+  const { name, machineNumber, makingRate, needleChangeDate, needleBrand, sinkerChangeDate, sinkerBrand } = req.body;
   if (!name || !machineNumber) { res.status(400).json({ error: "name and machineNumber are required" }); return; }
   try {
-    const [row] = await db.insert(machineMasterTable).values({ name, machineNumber }).returning();
+    const [row] = await db.insert(machineMasterTable).values({
+      name,
+      machineNumber,
+      makingRate: makingRate != null && makingRate !== "" ? String(parseFloat(makingRate)) : "3.75",
+      needleChangeDate: needleChangeDate || null,
+      needleBrand: needleBrand || "Sigma",
+      sinkerChangeDate: sinkerChangeDate || null,
+      sinkerBrand: sinkerBrand || "Kohala",
+    }).returning();
     res.status(201).json(row);
   } catch (err) {
     if (isUniqueViolation(err)) { res.status(409).json({ error: "Machine number already exists" }); return; }
@@ -203,10 +212,18 @@ router.post("/masters/machine", async (req, res): Promise<void> => {
 router.put("/masters/machine/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, machineNumber } = req.body;
+  const { name, machineNumber, makingRate, needleChangeDate, needleBrand, sinkerChangeDate, sinkerBrand } = req.body;
   if (!name || !machineNumber) { res.status(400).json({ error: "name and machineNumber are required" }); return; }
   try {
-    const [row] = await db.update(machineMasterTable).set({ name, machineNumber }).where(eq(machineMasterTable.id, id)).returning();
+    const [row] = await db.update(machineMasterTable).set({
+      name,
+      machineNumber,
+      makingRate: makingRate != null && makingRate !== "" ? String(parseFloat(makingRate)) : "3.75",
+      needleChangeDate: needleChangeDate || null,
+      needleBrand: needleBrand || "Sigma",
+      sinkerChangeDate: sinkerChangeDate || null,
+      sinkerBrand: sinkerBrand || "Kohala",
+    }).where(eq(machineMasterTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
     res.json(row);
   } catch (err) {
@@ -481,7 +498,53 @@ router.delete("/masters/fabric-type/:id", async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
+// ─── Department Master ────────────────────────────────────────────────────────
+
+router.get("/masters/department", async (_req, res): Promise<void> => {
+  const rows = await db.select().from(departmentMasterTable).orderBy(departmentMasterTable.name);
+  res.json(rows);
+});
+
+router.post("/masters/department", async (req, res): Promise<void> => {
+  const { name, code } = req.body;
+  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  try {
+    const [row] = await db.insert(departmentMasterTable).values({ name, code }).returning();
+    res.status(201).json(row);
+  } catch (err) {
+    if (isUniqueViolation(err)) { res.status(409).json({ error: "Code already exists" }); return; }
+    throw err;
+  }
+});
+
+router.put("/masters/department/:id", async (req, res): Promise<void> => {
+  const id = idParam(req);
+  if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
+  const { name, code } = req.body;
+  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  try {
+    const [row] = await db.update(departmentMasterTable).set({ name, code }).where(eq(departmentMasterTable.id, id)).returning();
+    if (!row) { res.status(404).json({ error: "Not found" }); return; }
+    res.json(row);
+  } catch (err) {
+    if (isUniqueViolation(err)) { res.status(409).json({ error: "Code already exists" }); return; }
+    throw err;
+  }
+});
+
+router.delete("/masters/department/:id", async (req, res): Promise<void> => {
+  const id = idParam(req);
+  if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
+  const [row] = await db.delete(departmentMasterTable).where(eq(departmentMasterTable.id, id)).returning();
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  res.sendStatus(204);
+});
+
 // ─── Machine Operator Master ──────────────────────────────────────────────────
+
+function numOrNull(v: unknown): string | null {
+  return v != null && v !== "" ? String(v) : null;
+}
 
 router.get("/masters/machine-operator", async (_req, res): Promise<void> => {
   const rows = await db.select().from(machineOperatorMasterTable).orderBy(machineOperatorMasterTable.name);
@@ -489,10 +552,19 @@ router.get("/masters/machine-operator", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/machine-operator", async (req, res): Promise<void> => {
-  const { name, code } = req.body;
+  const { name, code, departmentId, baseSalary, overtimeRateHr, attAllowance, othAllowance, active } = req.body;
   if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
   try {
-    const [row] = await db.insert(machineOperatorMasterTable).values({ name, code }).returning();
+    const [row] = await db.insert(machineOperatorMasterTable).values({
+      name,
+      code,
+      departmentId: departmentId ?? null,
+      baseSalary: numOrNull(baseSalary),
+      overtimeRateHr: numOrNull(overtimeRateHr),
+      attAllowance: numOrNull(attAllowance),
+      othAllowance: numOrNull(othAllowance),
+      active: active ?? true,
+    }).returning();
     res.status(201).json(row);
   } catch (err) {
     if (isUniqueViolation(err)) { res.status(409).json({ error: "Code already exists" }); return; }
@@ -503,10 +575,19 @@ router.post("/masters/machine-operator", async (req, res): Promise<void> => {
 router.put("/masters/machine-operator/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, code } = req.body;
+  const { name, code, departmentId, baseSalary, overtimeRateHr, attAllowance, othAllowance, active } = req.body;
   if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
   try {
-    const [row] = await db.update(machineOperatorMasterTable).set({ name, code }).where(eq(machineOperatorMasterTable.id, id)).returning();
+    const [row] = await db.update(machineOperatorMasterTable).set({
+      name,
+      code,
+      departmentId: departmentId ?? null,
+      baseSalary: numOrNull(baseSalary),
+      overtimeRateHr: numOrNull(overtimeRateHr),
+      attAllowance: numOrNull(attAllowance),
+      othAllowance: numOrNull(othAllowance),
+      active: active ?? true,
+    }).where(eq(machineOperatorMasterTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
     res.json(row);
   } catch (err) {

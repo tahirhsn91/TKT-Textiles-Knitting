@@ -5,7 +5,7 @@
  * Fabric Knitting Factory Management System API
  * OpenAPI spec version: 0.1.0
  */
-import type { CreateTransactionDetailBody } from "./createTransactionDetailBody";
+import type { CreateTransactionDetailBody } from "./createTransactionDetailBody.js";
 
 export interface CreateTransactionBody {
   transactionTypeId: number;

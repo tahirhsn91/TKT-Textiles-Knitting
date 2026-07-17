@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
@@ -19,7 +19,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell, ResponsiveContainer,
 } from "recharts";
-import { Printer, Download, FileText, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import html2canvas from "html2canvas";
+import { Printer, Download, FileText, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown, Upload, Image, Loader2, ClipboardCopy } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +55,8 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ImportDialog } from "@/components/import-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -136,6 +139,24 @@ function defaultFilters(): Filters {
     yarnTypeId: [], yarnCountId: [], yarnBrandId: [], uomId: [],
     machineId: [], machineOperatorId: [],
   };
+}
+
+function loadSavedFilters(storageKey: string): Filters {
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed === "object") {
+        const defaults = defaultFilters();
+        const result: Filters = { ...defaults };
+        for (const k of Object.keys(defaults) as (keyof Filters)[]) {
+          if (k in parsed) (result as unknown as Record<string, unknown>)[k] = parsed[k];
+        }
+        return result;
+      }
+    }
+  } catch {}
+  return defaultFilters();
 }
 
 const EMPTY_FILTERS: Filters = {
@@ -224,14 +245,14 @@ function getGroupLabel(row: ReportRow, key: GroupByKey): string {
 }
 
 type DetailRenderItem =
-  | { kind: "data"; r: ReportRow; idx: number; bal: number }
-  | { kind: "subtotal"; label: string; qty: number; netWt: number; wastageWt: number };
+  | { kind: "data"; r: ReportRow; idx: number; bal: number };
 
 type GroupedRow = {
   label: string;
   count: number;
   qty: number;
   netWt: number;
+  wastageWt: number;
   balNetWt: number;
   balNetWtMinusWastage: number;
   docNums: string[];
@@ -240,18 +261,19 @@ type GroupedRow = {
 
 function groupRows(rows: ReportRow[], key: GroupByKey): GroupedRow[] {
   const map = new Map<string, {
-    qty: number; netWt: number; balNetWt: number; balNetWtMinusWastage: number;
+    qty: number; netWt: number; wastageWt: number; balNetWt: number; balNetWtMinusWastage: number;
     count: number; docNumSet: Set<string>; refSet: Set<string>;
   }>();
   for (const row of rows) {
     const rawKey = key === "month" ? getMonthLabel(row.date) : (row[key] ?? "—");
     const k = String(rawKey);
     const existing = map.get(k) ?? {
-      qty: 0, netWt: 0, balNetWt: 0, balNetWtMinusWastage: 0, count: 0,
+      qty: 0, netWt: 0, wastageWt: 0, balNetWt: 0, balNetWtMinusWastage: 0, count: 0,
       docNumSet: new Set<string>(), refSet: new Set<string>(),
     };
     existing.qty                  += signedQty(row);
     existing.netWt                += signedNetWt(row);
+    existing.wastageWt            += wastageWt(row);
     existing.balNetWt             += balanceNetWt(row);
     existing.balNetWtMinusWastage += balanceNetWt(row) + wastageWt(row);
     existing.count                += 1;
@@ -261,7 +283,7 @@ function groupRows(rows: ReportRow[], key: GroupByKey): GroupedRow[] {
   }
   return Array.from(map.entries())
     .map(([label, v]) => ({
-      label, count: v.count, qty: v.qty, netWt: v.netWt,
+      label, count: v.count, qty: v.qty, netWt: v.netWt, wastageWt: v.wastageWt,
       balNetWt: v.balNetWt, balNetWtMinusWastage: v.balNetWtMinusWastage,
       docNums: [...v.docNumSet], refs: [...v.refSet],
     }))
@@ -388,9 +410,17 @@ const ALL_DETAIL_KEYS = DETAIL_COLUMNS.map((c) => c.key);
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
-  const [filters, setFilters]         = useState<Filters>(defaultFilters);
+  const queryClient = useQueryClient();
+  const [importOpen, setImportOpen]   = useState(false);
+  const [filters, setFilters]         = useState<Filters>(() => loadSavedFilters("report-filters"));
   const [applied, setApplied]         = useState<Filters>(EMPTY_FILTERS);
-  const [groupBy, setGroupBy]         = useState<GroupByKey>("date");
+  const [groupBy, setGroupBy]         = useState<GroupByKey>(() => {
+    try {
+      const saved = localStorage.getItem("report-group-by");
+      if (saved) return saved as GroupByKey;
+    } catch {}
+    return "date";
+  });
   const [hasRun, setHasRun]           = useState(false);
   const [visibleCols, setVisibleCols] = useState<Set<DetailColKey>>(() => {
     try {
@@ -402,7 +432,13 @@ export default function ReportsPage() {
     } catch {}
     return new Set(ALL_DETAIL_KEYS);
   });
-  const [activeTab, setActiveTab]     = useState("summary");
+  const [activeTab, setActiveTab]     = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem("yarn-balance-active-tab");
+      if (saved === "summary" || saved === "detail" || saved === "charts") return saved;
+    } catch {}
+    return "summary";
+  });
   const [sortSummary, setSortSummary] = useState<{ key: SummarySortKey; dir: SortDir }>({ key: "label", dir: "asc" });
   const [sortDetail,  setSortDetail]  = useState<{ key: DetailColKey | null; dir: SortDir }>({ key: null, dir: "asc" });
   const [colOrder,    setColOrder]    = useState<DetailColKey[]>(() => {
@@ -420,6 +456,9 @@ export default function ReportsPage() {
     return ALL_DETAIL_KEYS;
   });
   const [dragCol,     setDragCol]     = useState<DetailColKey | null>(null);
+  const [pngLoading,  setPngLoading]  = useState(false);
+  const [copyLoading, setCopyLoading] = useState(false);
+  const { toast } = useToast();
 
   function toggleCol(key: DetailColKey) {
     setVisibleCols((prev) => {
@@ -457,6 +496,10 @@ export default function ReportsPage() {
   useEffect(() => {
     localStorage.setItem("report-col-order", JSON.stringify(colOrder));
   }, [colOrder]);
+
+  useEffect(() => {
+    localStorage.setItem("report-group-by", groupBy);
+  }, [groupBy]);
 
   const visibleColsList = colOrder
     .map((k) => DETAIL_COLUMNS.find((c) => c.key === k)!)
@@ -498,15 +541,15 @@ export default function ReportsPage() {
 
   function exportSummaryCSV() {
     const groupLabel = GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? groupBy;
-    const headers    = [groupLabel, "Doc Number(s)", "Reference(s)", "Rows", "Total Qty", "Total Net Wt", "Running Total"];
+    const headers    = [groupLabel, "Doc Number(s)", "Reference(s)", "Rows", "Total Qty", "Total Net Wt", "Total Wastage Wt", "Running Total"];
     let bal = openingBalance;
     const data: (string | number)[][] = [
-      ["Opening Balance", "", "", "", "", "", fmt(openingBalance)],
+      ["Opening Balance", "", "", "", "", "", "", fmt(openingBalance)],
       ...sortedGrouped.map((r) => {
         bal += r.balNetWtMinusWastage;
-        return [r.label, r.docNums.join(", "), r.refs.join(", "), r.count, fmt(r.qty), fmt(r.netWt), fmt(bal)];
+        return [r.label, r.docNums.join(", "), r.refs.join(", "), r.count, fmt(r.qty), fmt(r.netWt), r.wastageWt !== 0 ? fmt(r.wastageWt) : "", fmt(bal)];
       }),
-      ["Total", "", "", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
+      ["Total", "", "", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(totalWastageWt), fmt(openingBalance + totalNetWt)],
     ];
     downloadBlob(csvHeading() + toCSV(headers, data), "report-summary.csv", "text/csv;charset=utf-8;");
   }
@@ -518,44 +561,34 @@ export default function ReportsPage() {
     );
     const bodyRows: (string | number)[][] = [];
     for (const item of detailRenderRows) {
-      if (item.kind === "subtotal") {
-        bodyRows.push(visibleColsList.map((c, ci) =>
-          ci === 0             ? `Subtotal: ${item.label}`
-          : c.key === "quantity"       ? fmt(item.qty)
-          : c.key === "netWt"          ? fmt(item.netWt)
-          : c.key === "wastageWt"      ? fmt(item.wastageWt)
-          : ""
-        ));
-      } else {
-        const { r, idx } = item;
-        const wWt = wastageWt(r);
-        bodyRows.push(visibleColsList.map((c) => {
-          switch (c.key) {
-            case "date":                  return r.date;
-            case "docNumber":             return r.docNumber;
-            case "reference":             return r.reference ?? "";
-            case "sl":                    return r.sl ?? "";
-            case "gsm":                   return r.gsm ?? "";
-            case "transactionTypeName":   return r.transactionTypeName ?? "";
-            case "jobName":               return r.jobName ?? "";
-            case "partyName":             return r.partyName ?? "";
-            case "locationName":          return r.locationName ?? "";
-            case "fabricTypeName":        return r.fabricTypeName ?? "";
-            case "yarnTypeName":          return r.yarnTypeName ?? "";
-            case "yarnCountName":         return r.yarnCountName ?? "";
-            case "yarnBrandName":         return r.yarnBrandName ?? "";
-            case "uomName":               return r.uomName ?? "";
-            case "machineName":           return r.machineName ?? "";
-            case "machineOperatorName":   return r.machineOperatorName ?? "";
-            case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "";
-            case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "";
-            case "wastagePercent":        return wWt !== 0 ? (r.partyWastePercent ?? "") : "";
-            case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "";
-            case "runningBalance":        return fmt(runningBalances[idx]);
-            default:                      return "";
-          }
-        }));
-      }
+      const { r, bal } = item;
+      const wWt = wastageWt(r);
+      bodyRows.push(visibleColsList.map((c) => {
+        switch (c.key) {
+          case "date":                  return r.date;
+          case "docNumber":             return r.docNumber;
+          case "reference":             return r.reference ?? "";
+          case "sl":                    return r.sl ?? "";
+          case "gsm":                   return r.gsm ?? "";
+          case "transactionTypeName":   return r.transactionTypeName ?? "";
+          case "jobName":               return r.jobName ?? "";
+          case "partyName":             return r.partyName ?? "";
+          case "locationName":          return r.locationName ?? "";
+          case "fabricTypeName":        return r.fabricTypeName ?? "";
+          case "yarnTypeName":          return r.yarnTypeName ?? "";
+          case "yarnCountName":         return r.yarnCountName ?? "";
+          case "yarnBrandName":         return r.yarnBrandName ?? "";
+          case "uomName":               return r.uomName ?? "";
+          case "machineName":           return r.machineName ?? "";
+          case "machineOperatorName":   return r.machineOperatorName ?? "";
+          case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "";
+          case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "";
+          case "wastagePercent":        return wWt !== 0 ? (r.partyWastePercent ?? "") : "";
+          case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "";
+          case "runningBalance":        return fmt(bal);
+          default:                      return "";
+        }
+      }));
     }
     const grandRow = visibleColsList.map((c, ci) =>
       ci === 0               ? "Grand Total"
@@ -580,14 +613,14 @@ export default function ReportsPage() {
     let bal = openingBalance;
     autoTable(doc, {
       startY: 36,
-      head: [[groupLabel, "Doc Number(s)", "Reference(s)", "Rows", "Total Qty", "Total Net Wt", "Running Total"]],
+      head: [[groupLabel, "Doc Number(s)", "Reference(s)", "Rows", "Total Qty", "Total Net Wt", "Total Wastage Wt", "Running Total"]],
       body: [
-        ["Opening Balance", "", "", "", "", "", fmt(openingBalance)],
+        ["Opening Balance", "", "", "", "", "", "", fmt(openingBalance)],
         ...sortedGrouped.map((r) => {
           bal += r.balNetWtMinusWastage;
-          return [r.label, r.docNums.join(", "), r.refs.join(", "), r.count, fmt(r.qty), fmt(r.netWt), fmt(bal)];
+          return [r.label, r.docNums.join(", "), r.refs.join(", "), r.count, fmt(r.qty), fmt(r.netWt), r.wastageWt !== 0 ? fmt(r.wastageWt) : "", fmt(bal)];
         }),
-        ["Total", "", "", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(openingBalance + totalNetWt)],
+        ["Total", "", "", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(totalWastageWt), fmt(openingBalance + totalNetWt)],
       ],
       styles: { fontSize: 9 },
       headStyles: { fillColor: [37, 99, 235] },
@@ -612,44 +645,34 @@ export default function ReportsPage() {
     );
     const bodyRows: string[][] = [];
     for (const item of detailRenderRows) {
-      if (item.kind === "subtotal") {
-        bodyRows.push(visibleColsList.map((c, ci) =>
-          ci === 0                     ? `Subtotal: ${item.label}`
-          : c.key === "quantity"       ? fmt(item.qty)
-          : c.key === "netWt"          ? fmt(item.netWt)
-          : c.key === "wastageWt"      ? fmt(item.wastageWt)
-          : "—"
-        ));
-      } else {
-        const { r, idx } = item;
-        const wWt = wastageWt(r);
-        bodyRows.push(visibleColsList.map((c) => {
-          switch (c.key) {
-            case "date":                  return r.date;
-            case "docNumber":             return r.docNumber;
-            case "reference":             return r.reference ?? "—";
-            case "sl":                    return r.sl ?? "—";
-            case "gsm":                   return String(r.gsm ?? "—");
-            case "transactionTypeName":   return r.transactionTypeName ?? "—";
-            case "jobName":               return r.jobName ?? "—";
-            case "partyName":             return r.partyName ?? "—";
-            case "locationName":          return r.locationName ?? "—";
-            case "fabricTypeName":        return r.fabricTypeName ?? "—";
-            case "yarnTypeName":          return r.yarnTypeName ?? "—";
-            case "yarnCountName":         return r.yarnCountName ?? "—";
-            case "yarnBrandName":         return r.yarnBrandName ?? "—";
-            case "uomName":               return r.uomName ?? "—";
-            case "machineName":           return r.machineName ?? "—";
-            case "machineOperatorName":   return r.machineOperatorName ?? "—";
-            case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "—";
-            case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "—";
-            case "wastagePercent":        return wWt !== 0 ? (r.partyWastePercent ?? "—") : "—";
-            case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "—";
-            case "runningBalance":        return fmt(runningBalances[idx]);
-            default:                      return "";
-          }
-        }));
-      }
+      const { r, bal } = item;
+      const wWt = wastageWt(r);
+      bodyRows.push(visibleColsList.map((c) => {
+        switch (c.key) {
+          case "date":                  return r.date;
+          case "docNumber":             return r.docNumber;
+          case "reference":             return r.reference ?? "—";
+          case "sl":                    return r.sl ?? "—";
+          case "gsm":                   return String(r.gsm ?? "—");
+          case "transactionTypeName":   return r.transactionTypeName ?? "—";
+          case "jobName":               return r.jobName ?? "—";
+          case "partyName":             return r.partyName ?? "—";
+          case "locationName":          return r.locationName ?? "—";
+          case "fabricTypeName":        return r.fabricTypeName ?? "—";
+          case "yarnTypeName":          return r.yarnTypeName ?? "—";
+          case "yarnCountName":         return r.yarnCountName ?? "—";
+          case "yarnBrandName":         return r.yarnBrandName ?? "—";
+          case "uomName":               return r.uomName ?? "—";
+          case "machineName":           return r.machineName ?? "—";
+          case "machineOperatorName":   return r.machineOperatorName ?? "—";
+          case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "—";
+          case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "—";
+          case "wastagePercent":        return wWt !== 0 ? (r.partyWastePercent ?? "—") : "—";
+          case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "—";
+          case "runningBalance":        return fmt(bal);
+          default:                      return "";
+        }
+      }));
     }
     const grandRow = visibleColsList.map((c, ci) =>
       ci === 0                ? "Grand Total"
@@ -665,9 +688,9 @@ export default function ReportsPage() {
       headStyles: { fillColor: [37, 99, 235] },
       didParseCell: (data) => {
         const label = data.row.raw[0]?.toString() ?? "";
-        if (data.section === "body" && (label.startsWith("Subtotal:") || label === "Grand Total")) {
+        if (data.section === "body" && label === "Grand Total") {
           data.cell.styles.fontStyle = "bold";
-          data.cell.styles.fillColor = label === "Grand Total" ? [220, 230, 255] : [240, 240, 240];
+          data.cell.styles.fillColor = [220, 230, 255];
         }
       },
     });
@@ -675,6 +698,50 @@ export default function ReportsPage() {
   }
 
   function handlePrint() { window.print(); }
+
+  function printCharts() {
+    document.body.classList.add("charts-print");
+    const cleanup = () => {
+      document.body.classList.remove("charts-print");
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
+    window.print();
+  }
+
+  async function exportChartsAsPNG() {
+    const el = document.getElementById("charts-print-area");
+    if (!el) return;
+    setPngLoading(true);
+    try {
+      const canvas = await html2canvas(el, { backgroundColor: "#ffffff", scale: 2, useCORS: true });
+      const url = canvas.toDataURL("image/png");
+      const a = Object.assign(document.createElement("a"), { href: url, download: "yarn-balance-charts.png" });
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } finally {
+      setPngLoading(false);
+    }
+  }
+
+  async function copyChartsToClipboard() {
+    const el = document.getElementById("charts-print-area");
+    if (!el) return;
+    setCopyLoading(true);
+    try {
+      const canvas = await html2canvas(el, { backgroundColor: "#ffffff", scale: 2, useCORS: true });
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Failed to create blob"))), "image/png")
+      );
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      toast({ title: "Copied!", description: "Charts copied to clipboard." });
+    } catch {
+      toast({ title: "Copy failed", description: "Your browser may not support clipboard image writing.", variant: "destructive" });
+    } finally {
+      setCopyLoading(false);
+    }
+  }
 
   // Master data for filter dropdowns
   const { data: transactionTypes }    = useListTransactionTypeMaster();
@@ -691,7 +758,7 @@ export default function ReportsPage() {
 
   const qs = useMemo(() => buildQueryString(applied), [applied]);
 
-  const { data: rows = [], isFetching, isError } = useQuery<ReportRow[]>({
+  const { data: rawRows = [], isFetching, isError } = useQuery<ReportRow[]>({
     queryKey: ["reports/data", qs],
     queryFn: async () => {
       const res = await fetch(`/api/reports/data${qs ? `?${qs}` : ""}`);
@@ -700,6 +767,16 @@ export default function ReportsPage() {
     },
     enabled: hasRun,
   });
+
+  // When "All" transaction types are selected, exclude Fabric Production rows
+  // (they belong to the Yarn to Fabric report, not the Yarn Balance report).
+  const rows = useMemo(
+    () =>
+      applied.transactionTypeId.length === 0
+        ? rawRows.filter((r) => r.transactionTypeName !== "Fabric Production")
+        : rawRows,
+    [rawRows, applied.transactionTypeId]
+  );
 
   // ── Opening Balance query ─────────────────────────────────────────────────
   // Same filters as applied, but date range = everything BEFORE the dateFrom.
@@ -711,7 +788,7 @@ export default function ReportsPage() {
     return buildQueryString({ ...applied, dateFrom: "", dateTo });
   }, [applied]);
 
-  const { data: openingRows = [] } = useQuery<ReportRow[]>({
+  const { data: rawOpeningRows = [] } = useQuery<ReportRow[]>({
     queryKey: ["reports/opening-balance", openingQs],
     queryFn: async () => {
       const res = await fetch(`/api/reports/data${openingQs ? `?${openingQs}` : ""}`);
@@ -720,6 +797,15 @@ export default function ReportsPage() {
     },
     enabled: hasRun && openingQs !== null,
   });
+
+  // Same exclusion for opening-balance rows
+  const openingRows = useMemo(
+    () =>
+      applied.transactionTypeId.length === 0
+        ? rawOpeningRows.filter((r) => r.transactionTypeName !== "Fabric Production")
+        : rawOpeningRows,
+    [rawOpeningRows, applied.transactionTypeId]
+  );
 
   const openingBalance = useMemo(
     () => openingRows.reduce((s, r) => s + balanceNetWt(r) + wastageWt(r), 0),
@@ -731,6 +817,7 @@ export default function ReportsPage() {
   }
 
   function runReport() {
+    try { localStorage.setItem("report-filters", JSON.stringify(filters)); } catch {}
     setApplied(filters);
     setHasRun(true);
   }
@@ -829,28 +916,14 @@ export default function ReportsPage() {
     });
   }, [rows, runningBalances, sortDetail]);
 
-  /** Sorted detail rows interleaved with a subtotal row after each group. */
+  /** Sorted detail rows with running balance recomputed in display order. */
   const detailRenderRows = useMemo((): DetailRenderItem[] => {
-    const result: DetailRenderItem[] = [];
-    let curKey: string | null = null;
-    let gQty = 0, gNetWt = 0, gWastageWt = 0, gLabel = "";
-    const flush = () => {
-      if (curKey !== null) {
-        result.push({ kind: "subtotal", label: gLabel, qty: gQty, netWt: gNetWt, wastageWt: gWastageWt });
-        gQty = 0; gNetWt = 0; gWastageWt = 0;
-      }
-    };
-    for (const item of sortedDetailRows) {
-      const k = getGroupLabel(item.r, groupBy);
-      if (k !== curKey) { flush(); curKey = k; gLabel = k; }
-      gQty       += signedQty(item.r);
-      gNetWt     += signedNetWt(item.r);
-      gWastageWt += wastageWt(item.r);
-      result.push({ kind: "data", r: item.r, idx: item.idx, bal: item.bal });
-    }
-    flush();
-    return result;
-  }, [sortedDetailRows, groupBy]);
+    let runBal = openingBalance;
+    return sortedDetailRows.map((item) => {
+      runBal += balanceNetWt(item.r) + wastageWt(item.r);
+      return { kind: "data", r: item.r, idx: item.idx, bal: runBal };
+    });
+  }, [sortedDetailRows, openingBalance]);
 
   // Years available in data for the year dropdown
   const currentYear = new Date().getFullYear();
@@ -873,7 +946,7 @@ export default function ReportsPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Yarn Balance Report</h1>
             <p className="text-sm text-muted-foreground">Apply filters and run the report to see detailed and summary data with charts.</p>
           </div>
         </div>
@@ -885,7 +958,7 @@ export default function ReportsPage() {
         </div>
 
         {/* ── Filter Panel ─────────────────────────────────── */}
-        <Card>
+        <Card className="print:hidden">
           <CardHeader className="pb-3 pt-4 px-4">
             <CardTitle className="text-base">Filters</CardTitle>
           </CardHeader>
@@ -954,6 +1027,10 @@ export default function ReportsPage() {
                 {isFetching ? "Loading..." : "Run Report"}
               </Button>
               <Button variant="outline" size="sm" onClick={resetFilters}>Reset</Button>
+              <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="gap-1.5 ml-auto">
+                <Upload className="h-3.5 w-3.5" />
+                Import CSV
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -992,17 +1069,65 @@ export default function ReportsPage() {
             )}
 
             {rows.length > 0 && (
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <div className="flex items-center justify-between gap-2 flex-wrap">
+              <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); try { localStorage.setItem("yarn-balance-active-tab", v); } catch {} }}>
+                <div className="flex items-center justify-between gap-2 flex-wrap print:hidden">
                   <TabsList>
                     <TabsTrigger value="summary">Summary</TabsTrigger>
                     <TabsTrigger value="detail">Detailed</TabsTrigger>
                     <TabsTrigger value="charts">Charts</TabsTrigger>
                   </TabsList>
 
-                  {/* Print / Export toolbar */}
-                  {activeTab !== "charts" && (
+                  {/* Print / Export / Import toolbar */}
+                  {activeTab === "charts" ? (
                     <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={copyChartsToClipboard}
+                        disabled={copyLoading}
+                        className="gap-1.5"
+                      >
+                        {copyLoading
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <ClipboardCopy className="h-3.5 w-3.5" />
+                        }
+                        {copyLoading ? "Copying…" : "Copy Image"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={exportChartsAsPNG}
+                        disabled={pngLoading}
+                        className="gap-1.5"
+                      >
+                        {pngLoading
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <Image className="h-3.5 w-3.5" />
+                        }
+                        {pngLoading ? "Exporting…" : "Export PNG"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={printCharts}
+                        className="gap-1.5"
+                      >
+                        <Printer className="h-3.5 w-3.5" />
+                        Print Charts
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setImportOpen(true)}
+                        className="gap-1.5"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        Import
+                      </Button>
+
                       <Button
                         variant="outline"
                         size="sm"
@@ -1043,7 +1168,7 @@ export default function ReportsPage() {
 
                 {/* ── Summary Tab ─────────────────────────── */}
                 <TabsContent value="summary" className="space-y-3 mt-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 print:hidden">
                     <Label className="text-sm shrink-0">Group By:</Label>
                     <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupByKey)}>
                       <SelectTrigger className="h-8 w-52 text-sm">
@@ -1057,7 +1182,7 @@ export default function ReportsPage() {
                     </Select>
                   </div>
 
-                  <div className="rounded-md border overflow-auto max-h-[500px]">
+                  <div className="rounded-md border overflow-auto max-h-[500px] print:max-h-none print:overflow-visible">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1072,6 +1197,7 @@ export default function ReportsPage() {
                           <SortHead label="Rows"          sortKey="count" sort={sortSummary} onSort={handleSortSummary} right />
                           <SortHead label="Total Qty"     sortKey="qty"   sort={sortSummary} onSort={handleSortSummary} right />
                           <SortHead label="Total Net Wt"  sortKey="netWt" sort={sortSummary} onSort={handleSortSummary} right />
+                          <TableHead className="text-right whitespace-nowrap">Total Wastage Wt</TableHead>
                           <TableHead className="text-right whitespace-nowrap">Running Total</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1079,6 +1205,7 @@ export default function ReportsPage() {
                         {/* Opening Balance row */}
                         <TableRow className="bg-muted/40 italic text-muted-foreground">
                           <TableCell className="whitespace-nowrap">Opening Balance</TableCell>
+                          <TableCell />
                           <TableCell />
                           <TableCell />
                           <TableCell />
@@ -1100,6 +1227,9 @@ export default function ReportsPage() {
                             <TableCell className="text-right">{r.count}</TableCell>
                             <TableCell className="text-right">{fmt(r.qty)}</TableCell>
                             <TableCell className="text-right">{fmt(r.netWt)}</TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {r.wastageWt !== 0 ? fmt(r.wastageWt) : "—"}
+                            </TableCell>
                             <TableCell className={`text-right whitespace-nowrap font-semibold ${summaryRunningTotals[i] < 0 ? "text-red-600" : "text-blue-700"}`}>
                               {fmt(summaryRunningTotals[i])}
                             </TableCell>
@@ -1112,6 +1242,7 @@ export default function ReportsPage() {
                           <TableCell className="text-right">{rows.length}</TableCell>
                           <TableCell className="text-right">{fmt(totalQty)}</TableCell>
                           <TableCell className="text-right">{fmt(totalNetWt)}</TableCell>
+                          <TableCell className="text-right">{fmt(totalWastageWt)}</TableCell>
                           <TableCell className={`text-right whitespace-nowrap ${(openingBalance + totalNetWt) < 0 ? "text-red-600" : "text-blue-700"}`}>
                             {fmt(openingBalance + totalNetWt)}
                           </TableCell>
@@ -1125,7 +1256,7 @@ export default function ReportsPage() {
                 <TabsContent value="detail" className="mt-3 space-y-3">
 
                   {/* Column visibility picker */}
-                  <Card className="border-dashed">
+                  <Card className="border-dashed print:hidden">
                     <CardContent className="px-4 py-3">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Show / Hide Columns</span>
@@ -1200,20 +1331,7 @@ export default function ReportsPage() {
                           })}
                         </TableRow>
 
-                        {detailRenderRows.map((item, ri) => {
-                          if (item.kind === "subtotal") {
-                            return (
-                              <TableRow key={`sub-${ri}`} className="bg-muted/60 font-semibold border-t">
-                                {visibleColsList.map((c, ci) => {
-                                  if (ci === 0)                return <TableCell key={c.key} className="whitespace-nowrap">Subtotal: {item.label}</TableCell>;
-                                  if (c.key === "quantity")    return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(item.qty)}</TableCell>;
-                                  if (c.key === "netWt")       return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(item.netWt)}</TableCell>;
-                                  if (c.key === "wastageWt")   return <TableCell key={c.key} className="text-right whitespace-nowrap">{item.wastageWt !== 0 ? fmt(item.wastageWt) : "—"}</TableCell>;
-                                  return <TableCell key={c.key} />;
-                                })}
-                              </TableRow>
-                            );
-                          }
+                        {detailRenderRows.map((item) => {
                           const { r, bal } = item;
                           const neg = getMultiplier(r.transactionTypeAction) < 0;
                           const wWt = wastageWt(r);
@@ -1307,20 +1425,31 @@ export default function ReportsPage() {
 
                 {/* ── Charts Tab ──────────────────────────── */}
                 <TabsContent value="charts" className="mt-3 space-y-6">
-                  <ChartSection rows={rows} />
+                  <ChartSection rows={rows} dateRange={
+                    applied.dateFrom && applied.dateTo ? `From ${applied.dateFrom}  Till ${applied.dateTo}`
+                    : applied.dateFrom ? `From ${applied.dateFrom}`
+                    : applied.dateTo   ? `Till ${applied.dateTo}`
+                    : "All Dates"
+                  } />
                 </TabsContent>
               </Tabs>
             )}
           </>
         )}
       </div>
+
+      <ImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["reports/data"] })}
+      />
     </Layout>
   );
 }
 
 // ─── Charts Section ──────────────────────────────────────────────────────────
 
-function ChartSection({ rows }: { rows: ReportRow[] }) {
+function ChartSection({ rows, dateRange }: { rows: ReportRow[]; dateRange: string }) {
   const byMonth = useMemo(() => {
     const map = new Map<string, { qty: number; netWt: number }>();
     for (const r of rows) {
@@ -1385,7 +1514,13 @@ function ChartSection({ rows }: { rows: ReportRow[] }) {
   }, [rows]);
 
   return (
-    <div className="space-y-6">
+    <div id="charts-print-area" className="space-y-6">
+      {/* Print-only header */}
+      <div className="hidden print:block mb-4">
+        <h1 className="text-xl font-bold">TKT Textiles (Knitting) — Yarn Balance Report</h1>
+        <p className="text-sm text-gray-600 mt-0.5">{dateRange}</p>
+      </div>
+
       {/* Net Wt by Month */}
       {byMonth.length > 0 && (
         <Card>

@@ -8,9 +8,6 @@ import {
   partyMasterTable,
   machineMasterTable,
   machineOperatorMasterTable,
-  operatorSalarySettingsTable,
-  operatorSalaryRecordsTable,
-  operatorAdvancesTable,
 } from "../db/index.js";
 
 const router: IRouter = Router();
@@ -148,71 +145,13 @@ router.get("/dashboard/summary", async (_req, res): Promise<void> => {
     .orderBy(sql`SUM(${transactionDetailTable.netWt}) DESC`)
     .limit(10);
 
-  // ── Payroll breakdown (latest salary period) ────────────────────────────
-  // Determine the most recent month/year that has any salary records
-  const [latestRecord] = await db
-    .select({ date: operatorSalaryRecordsTable.date })
-    .from(operatorSalaryRecordsTable)
-    .orderBy(sql`${operatorSalaryRecordsTable.date} DESC`)
-    .limit(1);
-
-  let payrollFrom = cmFrom;
-  let payrollTo = cmTo;
-  let payrollPeriodLabel = `${now.toLocaleString("default", { month: "long" })} ${currentYear}`;
-
-  if (latestRecord) {
-    const latestDate = new Date(latestRecord.date);
-    const pYear = latestDate.getFullYear();
-    const pMonth = latestDate.getMonth() + 1;
-    payrollFrom = `${pYear}-${String(pMonth).padStart(2, "0")}-01`;
-    const pLastDay = new Date(pYear, pMonth, 0).getDate();
-    payrollTo = `${pYear}-${String(pMonth).padStart(2, "0")}-${String(pLastDay).padStart(2, "0")}`;
-    const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-    payrollPeriodLabel = `${MONTH_NAMES[pMonth - 1]} ${pYear}`;
-  }
-
-  const operators = await db
-    .select({ id: machineOperatorMasterTable.id, name: machineOperatorMasterTable.name })
-    .from(machineOperatorMasterTable)
-    .orderBy(machineOperatorMasterTable.name);
-
-  const salaryRecords = await db
-    .select()
-    .from(operatorSalaryRecordsTable)
-    .where(and(gte(operatorSalaryRecordsTable.date, payrollFrom), lte(operatorSalaryRecordsTable.date, payrollTo)));
-
-  const advances = await db
-    .select()
-    .from(operatorAdvancesTable)
-    .where(and(gte(operatorAdvancesTable.date, payrollFrom), lte(operatorAdvancesTable.date, payrollTo)));
-
-  const payrollBreakdown = operators
-    .map((op) => {
-      const opRecords = salaryRecords.filter((r) => r.operatorId === op.id);
-      const opAdvances = advances.filter((a) => a.operatorId === op.id);
-      const baseWages = opRecords.reduce((s, r) => s + toNum(r.baseWage), 0);
-      const commissions = opRecords.reduce((s, r) => {
-        const finalSalary = toNum(r.finalSalary);
-        const base = toNum(r.baseWage);
-        return s + Math.max(0, finalSalary - base);
-      }, 0);
-      const totalAdvances = opAdvances.reduce((s, a) => s + toNum(a.amount), 0);
-      const netPayable = opRecords.reduce((s, r) => s + toNum(r.finalSalary), 0) - totalAdvances;
-      return { operatorName: op.name, baseWages, commissions, advances: totalAdvances, netPayable };
-    })
-    .filter((op) => op.baseWages > 0 || op.commissions > 0 || op.advances > 0);
-
-  const totalPayrollDue = payrollBreakdown.reduce((s, op) => s + op.netPayable, 0);
-
   res.json({
     kpis: {
       totalTransactions: toNum(txnCountRow?.totalTransactions),
       totalNetWeight: toNum(netWtRow?.totalNetWeight),
       activeMachines: toNum(activeMachinesRow?.activeMachines),
-      payrollDue: totalPayrollDue,
       periodLabel: `${now.toLocaleString("default", { month: "long" })} ${currentYear}`,
     },
-    payrollPeriodLabel,
     monthlyTrend: monthlyTrend.map((r) => ({
       label: `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][toNum(r.month) - 1]} ${String(toNum(r.year)).slice(2)}`,
       netWeight: toNum(r.totalNetWeight),
@@ -239,7 +178,6 @@ router.get("/dashboard/summary", async (_req, res): Promise<void> => {
       name: r.operatorName ?? "Unknown",
       netWeight: toNum(r.totalNetWeight),
     })),
-    payrollBreakdown,
   });
 });
 

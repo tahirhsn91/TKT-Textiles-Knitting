@@ -1,4 +1,4 @@
-import { pgTable, text, serial, unique, numeric, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, unique, numeric, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -38,6 +38,11 @@ export const machineMasterTable = pgTable("machine_master", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   machineNumber: text("machine_number").notNull().unique(),
+  makingRate: numeric("making_rate", { precision: 10, scale: 2 }).default("3.75"),
+  needleChangeDate: text("needle_change_date"),
+  needleBrand: text("needle_brand").default("Sigma"),
+  sinkerChangeDate: text("sinker_change_date"),
+  sinkerBrand: text("sinker_brand").default("Kohala"),
 });
 export const insertMachineMasterSchema = createInsertSchema(machineMasterTable).omit({ id: true });
 export type InsertMachineMaster = z.infer<typeof insertMachineMasterSchema>;
@@ -98,10 +103,25 @@ export const insertFabricTypeMasterSchema = createInsertSchema(fabricTypeMasterT
 export type InsertFabricTypeMaster = z.infer<typeof insertFabricTypeMasterSchema>;
 export type FabricTypeMaster = typeof fabricTypeMasterTable.$inferSelect;
 
+export const departmentMasterTable = pgTable("department_master", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+});
+export const insertDepartmentMasterSchema = createInsertSchema(departmentMasterTable).omit({ id: true });
+export type InsertDepartmentMaster = z.infer<typeof insertDepartmentMasterSchema>;
+export type DepartmentMaster = typeof departmentMasterTable.$inferSelect;
+
 export const machineOperatorMasterTable = pgTable("machine_operator_master", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
+  departmentId: integer("department_id"),
+  baseSalary: numeric("base_salary", { precision: 10, scale: 2 }),
+  overtimeRateHr: numeric("overtime_rate_hr", { precision: 10, scale: 2 }),
+  attAllowance: numeric("att_allowance", { precision: 10, scale: 2 }),
+  othAllowance: numeric("oth_allowance", { precision: 10, scale: 2 }),
+  active: boolean("active").notNull().default(true),
 });
 export const insertMachineOperatorMasterSchema = createInsertSchema(machineOperatorMasterTable).omit({ id: true });
 export type InsertMachineOperatorMaster = z.infer<typeof insertMachineOperatorMasterSchema>;
@@ -143,3 +163,45 @@ export const operatorAdvancesTable = pgTable("operator_advances", {
 export const insertOperatorAdvancesSchema = createInsertSchema(operatorAdvancesTable).omit({ id: true, createdAt: true });
 export type InsertOperatorAdvance = z.infer<typeof insertOperatorAdvancesSchema>;
 export type OperatorAdvance = typeof operatorAdvancesTable.$inferSelect;
+
+// ─── Salary Header ─────────────────────────────────────────────────────────
+export const salaryHeaderTable = pgTable("salary_header", {
+  id: serial("id").primaryKey(),
+  month: integer("month").notNull(),
+  year: integer("year").notNull(),
+  departmentIds: integer("department_ids").array().notNull().default([]),
+  posted: boolean("posted").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type SalaryHeader = typeof salaryHeaderTable.$inferSelect;
+
+// ─── Salary Detail ─────────────────────────────────────────────────────────
+export const salaryDetailTable = pgTable("salary_detail", {
+  id: serial("id").primaryKey(),
+  headerId: integer("header_id").notNull().references(() => salaryHeaderTable.id, { onDelete: "cascade" }),
+  operatorId: integer("operator_id").notNull().references(() => machineOperatorMasterTable.id),
+  month: integer("month"),
+  year: integer("year"),
+  departmentId: integer("department_id"),
+  operatorName: text("operator_name").notNull(),
+  basicSalary: numeric("basic_salary", { precision: 10, scale: 2 }).notNull().default("0"),
+  otRateHr: numeric("ot_rate_hr", { precision: 10, scale: 2 }).notNull().default("0"),
+  attAllowance: numeric("att_allowance", { precision: 10, scale: 2 }).notNull().default("0"),
+  othAllowance: numeric("oth_allowance", { precision: 10, scale: 2 }).notNull().default("0"),
+  presentDays: numeric("present_days", { precision: 5, scale: 1 }).notNull().default("0"),
+  absentDays: numeric("absent_days", { precision: 5, scale: 1 }).notNull().default("0"),
+  holidays: numeric("holidays", { precision: 5, scale: 1 }).notNull().default("0"),
+  totalAttendance: numeric("total_attendance", { precision: 5, scale: 1 }).notNull().default("0"),
+  totalSalary: numeric("total_salary", { precision: 10, scale: 2 }).notNull().default("0"),
+  otHours: numeric("ot_hours", { precision: 5, scale: 2 }).notNull().default("0"),
+  otAmount: numeric("ot_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  advanceDeduction: numeric("advance_deduction", { precision: 10, scale: 2 }).notNull().default("0"),
+  loanDeduction: numeric("loan_deduction", { precision: 10, scale: 2 }).notNull().default("0"),
+  otherDeduction: numeric("other_deduction", { precision: 10, scale: 2 }).notNull().default("0"),
+  payableSalary: numeric("payable_salary", { precision: 10, scale: 2 }).notNull().default("0"),
+}, (t) => [
+  unique("salary_detail_header_operator_unique").on(t.headerId, t.operatorId),
+  unique("salary_detail_op_month_year_unique").on(t.operatorId, t.month, t.year),
+]);
+export type SalaryDetail = typeof salaryDetailTable.$inferSelect;

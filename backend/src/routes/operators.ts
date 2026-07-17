@@ -3,7 +3,6 @@ import { eq, and, gte, lte } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   machineOperatorMasterTable,
-  operatorSalarySettingsTable,
   operatorSalaryRecordsTable,
   operatorAdvancesTable,
 } from "../db/index.js";
@@ -19,122 +18,6 @@ function toNum(val: unknown): number {
   const n = parseFloat(String(val ?? ""));
   return isNaN(n) ? 0 : n;
 }
-
-// ─── Salary Settings ─────────────────────────────────────────────────────────
-
-router.get("/operators/salary-settings", async (_req, res): Promise<void> => {
-  const rows = await db
-    .select({
-      operatorId: machineOperatorMasterTable.id,
-      operatorName: machineOperatorMasterTable.name,
-      operatorCode: machineOperatorMasterTable.code,
-      baseDailyWage: operatorSalarySettingsTable.baseDailyWage,
-    })
-    .from(machineOperatorMasterTable)
-    .leftJoin(
-      operatorSalarySettingsTable,
-      eq(machineOperatorMasterTable.id, operatorSalarySettingsTable.operatorId)
-    )
-    .orderBy(machineOperatorMasterTable.name);
-  res.json(rows);
-});
-
-router.post("/operators/salary-settings", async (req, res): Promise<void> => {
-  const { operatorId, baseDailyWage } = req.body;
-  if (!operatorId) { res.status(400).json({ error: "operatorId is required" }); return; }
-  const wage = toNum(baseDailyWage);
-  if (wage < 0) { res.status(400).json({ error: "baseDailyWage must be >= 0" }); return; }
-  await db
-    .insert(operatorSalarySettingsTable)
-    .values({ operatorId: Number(operatorId), baseDailyWage: String(wage) })
-    .onConflictDoUpdate({
-      target: operatorSalarySettingsTable.operatorId,
-      set: { baseDailyWage: String(wage) },
-    });
-  const [row] = await db
-    .select({
-      operatorId: machineOperatorMasterTable.id,
-      operatorName: machineOperatorMasterTable.name,
-      operatorCode: machineOperatorMasterTable.code,
-      baseDailyWage: operatorSalarySettingsTable.baseDailyWage,
-    })
-    .from(machineOperatorMasterTable)
-    .leftJoin(operatorSalarySettingsTable, eq(machineOperatorMasterTable.id, operatorSalarySettingsTable.operatorId))
-    .where(eq(machineOperatorMasterTable.id, Number(operatorId)));
-  res.json(row);
-});
-
-// ─── Salary Records ──────────────────────────────────────────────────────────
-
-router.get("/operators/salary-records", async (req, res): Promise<void> => {
-  const { operatorId, month, year } = req.query as Record<string, string>;
-  if (!operatorId || !month || !year) {
-    res.status(400).json({ error: "operatorId, month, and year are required" });
-    return;
-  }
-  const m = parseInt(month);
-  const y = parseInt(year);
-  const dateFrom = `${y}-${String(m).padStart(2, "0")}-01`;
-  const lastDay = new Date(y, m, 0).getDate();
-  const dateTo = `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-  const rows = await db
-    .select()
-    .from(operatorSalaryRecordsTable)
-    .where(
-      and(
-        eq(operatorSalaryRecordsTable.operatorId, Number(operatorId)),
-        gte(operatorSalaryRecordsTable.date, dateFrom),
-        lte(operatorSalaryRecordsTable.date, dateTo)
-      )
-    )
-    .orderBy(operatorSalaryRecordsTable.date);
-  res.json(rows);
-});
-
-router.post("/operators/salary-records/bulk", async (req, res): Promise<void> => {
-  const entries: { operatorId: number; date: string; commission: number }[] = req.body;
-  if (!Array.isArray(entries) || entries.length === 0) {
-    res.status(400).json({ error: "Body must be a non-empty array" });
-    return;
-  }
-  for (const e of entries) {
-    if (toNum(e.commission) < 0) {
-      res.status(400).json({ error: "commission must be >= 0" });
-      return;
-    }
-  }
-  const results = [];
-  for (const entry of entries) {
-    const opId = Number(entry.operatorId);
-    const commission = toNum(entry.commission);
-    const [settings] = await db
-      .select({ baseDailyWage: operatorSalarySettingsTable.baseDailyWage })
-      .from(operatorSalarySettingsTable)
-      .where(eq(operatorSalarySettingsTable.operatorId, opId));
-    const baseWage = toNum(settings?.baseDailyWage);
-    const finalSalary = Math.max(baseWage, commission);
-    const [row] = await db
-      .insert(operatorSalaryRecordsTable)
-      .values({
-        operatorId: opId,
-        date: entry.date,
-        baseWage: String(baseWage),
-        commission: String(commission),
-        finalSalary: String(finalSalary),
-      })
-      .onConflictDoUpdate({
-        target: [operatorSalaryRecordsTable.operatorId, operatorSalaryRecordsTable.date],
-        set: {
-          baseWage: String(baseWage),
-          commission: String(commission),
-          finalSalary: String(finalSalary),
-        },
-      })
-      .returning();
-    results.push(row);
-  }
-  res.json(results);
-});
 
 // ─── Advances ────────────────────────────────────────────────────────────────
 

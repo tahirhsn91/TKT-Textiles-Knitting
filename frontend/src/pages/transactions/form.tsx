@@ -272,7 +272,7 @@ export default function TransactionForm() {
             toast({ title: "Transaction updated successfully" });
             queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() });
             queryClient.invalidateQueries({ queryKey: getGetTransactionQueryKey(id!) });
-            setLocation("/");
+            setLocation("/transactions");
           },
           onError: () => {
             toast({ title: "Failed to update transaction", variant: "destructive" });
@@ -286,7 +286,7 @@ export default function TransactionForm() {
           onSuccess: () => {
             toast({ title: "Transaction created successfully" });
             queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() });
-            setLocation("/");
+            setLocation("/transactions");
           },
           onError: () => {
             toast({ title: "Failed to create transaction", variant: "destructive" });
@@ -322,7 +322,7 @@ export default function TransactionForm() {
     <Layout>
       <div className="flex flex-col gap-6 pb-20">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" onClick={() => setLocation("/")}>
+          <Button variant="outline" size="icon" onClick={() => setLocation("/transactions")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -767,11 +767,13 @@ export default function TransactionForm() {
                                   </FormControl>
                                   <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
-                                    {machineOperatorMaster?.map(op => (
-                                      <SelectItem key={op.id} value={op.id.toString()}>
-                                        {op.name}
-                                      </SelectItem>
-                                    ))}
+                                    {machineOperatorMaster
+                                      ?.filter(op => (op as { active?: boolean }).active !== false || op.id === field.value)
+                                      .map(op => (
+                                        <SelectItem key={op.id} value={op.id.toString()}>
+                                          {op.name}
+                                        </SelectItem>
+                                      ))}
                                   </SelectContent>
                                 </Select>
                               </FormItem>
@@ -845,7 +847,7 @@ export default function TransactionForm() {
             </Card>
 
             <div className="flex justify-end gap-4 pt-4 border-t">
-              <Button type="button" variant="outline" onClick={() => setLocation("/")}>
+              <Button type="button" variant="outline" onClick={() => setLocation("/transactions")}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isPending}>

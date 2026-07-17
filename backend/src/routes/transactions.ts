@@ -1,7 +1,21 @@
 import { Router, type IRouter } from "express";
-import { eq, sql, desc } from "drizzle-orm";
+import { eq, sql, desc, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { transactionHeaderTable, transactionDetailTable } from "../db/index.js";
+import {
+  transactionHeaderTable,
+  transactionDetailTable,
+  transactionTypeMasterTable,
+  jobMasterTable,
+  partyMasterTable,
+  locationMasterTable,
+  fabricTypeMasterTable,
+  yarnTypeMasterTable,
+  yarnCountMasterTable,
+  yarnBrandMasterTable,
+  uomMasterTable,
+  machineMasterTable,
+  machineOperatorMasterTable,
+} from "../db/index.js";
 import {
   ListTransactionsResponse,
   GetTransactionResponse,
@@ -33,6 +47,249 @@ function normalizeDetail<T extends DetailInput>(d: T): T {
     netWt: normalizeNumericString(d.netWt),
   };
 }
+
+// ─── CSV Import helpers ────────────────────────────────────────────────────────
+
+interface ImportCsvRow {
+  date?: string;
+  docNumber?: string;
+  reference?: string;
+  sl?: string;
+  gsm?: string;
+  transTypeName?: string;
+  jobName?: string;
+  partyName?: string;
+  locationName?: string;
+  fabricTypeName?: string;
+  yarnTypeName?: string;
+  yarnCountName?: string;
+  yarnBrandName?: string;
+  uomName?: string;
+  machineName?: string;
+  operatorName?: string;
+  quantity?: string;
+  netWt?: string;
+}
+
+export interface ImportError {
+  docNumber: string;
+  row: number | null;
+  field: string;
+  value: string;
+  reason: string;
+}
+
+/** Returns the ID for a non-empty name, or null if name is blank.
+ *  If name is non-empty but not found, returns structured error info. */
+function resolveLookup(
+  map: Map<string, number>,
+  name: string | undefined,
+  fieldLabel: string,
+): { id: number | null; field: string | null; value: string | null } {
+  if (!name || !name.trim()) return { id: null, field: null, value: null };
+  const id = map.get(name.toLowerCase().trim());
+  if (id == null) return { id: null, field: fieldLabel, value: name.trim() };
+  return { id, field: null, value: null };
+}
+
+function parseImportNumeric(s: string | undefined): string | null {
+  if (!s || !s.trim()) return null;
+  const clean = s.replace(/,/g, "");
+  const n = parseFloat(clean);
+  if (isNaN(n)) return null;
+  return String(Math.abs(n));
+}
+
+async function buildMasterMaps() {
+  const [transTypes, jobs, parties, locations, fabricTypes, yarnTypes, yarnCounts, yarnBrands, uoms, machines, operators] =
+    await Promise.all([
+      db.select({ id: transactionTypeMasterTable.id, name: transactionTypeMasterTable.name }).from(transactionTypeMasterTable),
+      db.select({ id: jobMasterTable.id, name: jobMasterTable.name }).from(jobMasterTable),
+      db.select({ id: partyMasterTable.id, name: partyMasterTable.name }).from(partyMasterTable),
+      db.select({ id: locationMasterTable.id, name: locationMasterTable.name }).from(locationMasterTable),
+      db.select({ id: fabricTypeMasterTable.id, name: fabricTypeMasterTable.name }).from(fabricTypeMasterTable),
+      db.select({ id: yarnTypeMasterTable.id, name: yarnTypeMasterTable.name }).from(yarnTypeMasterTable),
+      db.select({ id: yarnCountMasterTable.id, name: yarnCountMasterTable.name }).from(yarnCountMasterTable),
+      db.select({ id: yarnBrandMasterTable.id, name: yarnBrandMasterTable.name }).from(yarnBrandMasterTable),
+      db.select({ id: uomMasterTable.id, name: uomMasterTable.name }).from(uomMasterTable),
+      db.select({ id: machineMasterTable.id, name: machineMasterTable.name }).from(machineMasterTable),
+      db.select({ id: machineOperatorMasterTable.id, name: machineOperatorMasterTable.name }).from(machineOperatorMasterTable),
+    ]);
+
+  const toMap = (rows: { id: number; name: string }[]) =>
+    new Map(rows.map((r) => [r.name.toLowerCase().trim(), r.id]));
+
+  return {
+    transTypes:  toMap(transTypes),
+    jobs:        toMap(jobs),
+    parties:     toMap(parties),
+    locations:   toMap(locations),
+    fabricTypes: toMap(fabricTypes),
+    yarnTypes:   toMap(yarnTypes),
+    yarnCounts:  toMap(yarnCounts),
+    yarnBrands:  toMap(yarnBrands),
+    uoms:        toMap(uoms),
+    machines:    toMap(machines),
+    operators:   toMap(operators),
+  };
+}
+
+async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
+  const maps = await buildMasterMaps();
+
+  const totalRows = rows.length;
+
+  // Group by docNumber — each group becomes one header + N details
+  const groups = new Map<string, { first: ImportCsvRow; rows: ImportCsvRow[] }>();
+  for (const row of rows) {
+    const key = (row.docNumber ?? "").trim();
+    if (!key) continue;
+    if (!groups.has(key)) groups.set(key, { first: row, rows: [] });
+    groups.get(key)!.rows.push(row);
+  }
+
+  const docNumbers = [...groups.keys()];
+
+  // Duplicate check
+  let existingSet = new Set<string>();
+  if (docNumbers.length > 0) {
+    const existing = await db
+      .select({ docNumber: transactionHeaderTable.docNumber })
+      .from(transactionHeaderTable)
+      .where(inArray(transactionHeaderTable.docNumber, docNumbers));
+    existingSet = new Set(existing.map((r) => r.docNumber));
+  }
+
+  let toImport   = 0;
+  let imported   = 0;
+  let duplicates = 0;
+  const errors: ImportError[] = [];
+
+  for (const [docNum, group] of groups) {
+    if (existingSet.has(docNum)) { duplicates++; continue; }
+
+    const first = group.first;
+
+    if (!first.date || !first.date.trim()) {
+      errors.push({ docNumber: docNum, row: null, field: "Date", value: "", reason: "Missing date" });
+      continue;
+    }
+
+    // Resolve all header lookups — non-empty names that can't be matched are errors
+    const transTypeId = maps.transTypes.get((first.transTypeName ?? "").toLowerCase().trim());
+    if (!transTypeId) {
+      errors.push({
+        docNumber: docNum,
+        row: null,
+        field: "Trans Type",
+        value: first.transTypeName?.trim() ?? "",
+        reason: "Not found in master list",
+      });
+      continue;
+    }
+
+    const jobR         = resolveLookup(maps.jobs,        first.jobName,        "Job");
+    const partyR       = resolveLookup(maps.parties,     first.partyName,      "Party");
+    const locationR    = resolveLookup(maps.locations,   first.locationName,   "Location");
+    const fabricTypeR  = resolveLookup(maps.fabricTypes, first.fabricTypeName, "Fabric Type");
+
+    // Resolve detail lookups per-row — collect all resolution errors across all detail rows
+    const detailResults = group.rows.map((r, ri) => {
+      const yarnTypeR  = resolveLookup(maps.yarnTypes,  r.yarnTypeName,  "Yarn Type");
+      const yarnCountR = resolveLookup(maps.yarnCounts, r.yarnCountName, "Yarn Count");
+      const yarnBrandR = resolveLookup(maps.yarnBrands, r.yarnBrandName, "Yarn Brand");
+      const uomR       = resolveLookup(maps.uoms,       r.uomName,       "UOM");
+      const machineR   = resolveLookup(maps.machines,   r.machineName,   "Machine");
+      const operatorR  = resolveLookup(maps.operators,  r.operatorName,  "Operator");
+      const rowErrors: ImportError[] = [yarnTypeR, yarnCountR, yarnBrandR, uomR, machineR, operatorR]
+        .filter((x) => x.field !== null)
+        .map((x) => ({
+          docNumber: docNum,
+          row: ri + 1,
+          field: x.field as string,
+          value: x.value as string,
+          reason: "Not found in master list",
+        }));
+      return { yarnTypeR, yarnCountR, yarnBrandR, uomR, machineR, operatorR, rowErrors };
+    });
+
+    const headerErrors: ImportError[] = [
+      { r: jobR,        field: "Job" },
+      { r: partyR,      field: "Party" },
+      { r: locationR,   field: "Location" },
+      { r: fabricTypeR, field: "Fabric Type" },
+    ]
+      .filter(({ r }) => r.field !== null)
+      .map(({ r }) => ({
+        docNumber: docNum,
+        row: null,
+        field: r.field as string,
+        value: r.value as string,
+        reason: "Not found in master list",
+      }));
+
+    const allErrors = [...headerErrors, ...detailResults.flatMap((d) => d.rowErrors)];
+
+    if (allErrors.length > 0) {
+      errors.push(...allErrors);
+      continue;
+    }
+
+    toImport++;
+
+    if (doInsert) {
+      try {
+        await db.transaction(async (tx) => {
+          const gsmVal = first.gsm ? parseInt(first.gsm, 10) : null;
+          const [header] = await tx
+            .insert(transactionHeaderTable)
+            .values({
+              transactionTypeId: transTypeId,
+              date:              first.date!.trim(),
+              docNumber:         docNum,
+              reference:         first.reference?.trim() || null,
+              sl:                first.sl?.trim() || null,
+              gsm:               gsmVal && !isNaN(gsmVal) ? gsmVal : null,
+              jobId:             jobR.id,
+              partyId:           partyR.id,
+              locationId:        locationR.id,
+              fabricTypeId:      fabricTypeR.id,
+            })
+            .returning();
+
+          if (group.rows.length > 0) {
+            await tx.insert(transactionDetailTable).values(
+              detailResults.map((d, i) => ({
+                headerId:          header.id,
+                yarnTypeId:        d.yarnTypeR.id,
+                yarnCountId:       d.yarnCountR.id,
+                yarnBrandId:       d.yarnBrandR.id,
+                uomId:             d.uomR.id,
+                machineId:         d.machineR.id,
+                machineOperatorId: d.operatorR.id,
+                quantity:          parseImportNumeric(group.rows[i].quantity),
+                netWt:             parseImportNumeric(group.rows[i].netWt),
+              }))
+            );
+          }
+        });
+        imported++;
+      } catch (err) {
+        errors.push({
+          docNumber: docNum,
+          row: null,
+          field: "",
+          value: "",
+          reason: `Insert failed: ${err instanceof Error ? err.message : String(err)}`,
+        });
+      }
+    }
+  }
+
+  return { totalRows, toImport, imported, duplicates, errors, previewRows: rows.slice(0, 10) };
+}
+
+// ─── Routes ───────────────────────────────────────────────────────────────────
 
 router.get("/transactions", async (_req, res): Promise<void> => {
   const rows = await db
@@ -102,6 +359,41 @@ router.get("/transactions/suggestions", async (_req, res): Promise<void> => {
 
   res.json({ nextDocNumber: String(maxNumeric + 1), lastReference });
 });
+
+// ─── CSV Import endpoints (must be before /:id) ───────────────────────────────
+
+router.post("/transactions/import/preview", async (req, res): Promise<void> => {
+  const { rows } = req.body as { rows?: unknown };
+  if (!Array.isArray(rows)) {
+    res.status(400).json({ error: "rows must be an array" });
+    return;
+  }
+  const result = await processImport(rows as ImportCsvRow[], false);
+  res.json({
+    totalRows:   result.totalRows,
+    toImport:    result.toImport,
+    duplicates:  result.duplicates,
+    errors:      result.errors,
+    previewRows: result.previewRows,
+  });
+});
+
+router.post("/transactions/import", async (req, res): Promise<void> => {
+  const { rows } = req.body as { rows?: unknown };
+  if (!Array.isArray(rows)) {
+    res.status(400).json({ error: "rows must be an array" });
+    return;
+  }
+  const result = await processImport(rows as ImportCsvRow[], true);
+  res.json({
+    totalRows: result.totalRows,
+    imported:  result.imported,
+    skipped:   result.duplicates,
+    errors:    result.errors,
+  });
+});
+
+// ─── Single-transaction CRUD ──────────────────────────────────────────────────
 
 router.get("/transactions/:id", async (req, res): Promise<void> => {
   const params = GetTransactionParams.safeParse(req.params);

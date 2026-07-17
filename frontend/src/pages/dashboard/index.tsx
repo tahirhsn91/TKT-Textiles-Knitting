@@ -7,7 +7,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import {
-  Activity, Weight, Cpu, Wallet,
+  Activity, Weight, Cpu,
 } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,26 +27,19 @@ function fmt(n: number, decimals = 1) {
   return n.toFixed(decimals);
 }
 
-function fmtMoney(n: number) {
-  return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
 interface DashboardData {
   kpis: {
     totalTransactions: number;
     totalNetWeight: number;
     activeMachines: number;
-    payrollDue: number;
     periodLabel: string;
   };
-  payrollPeriodLabel: string;
   monthlyTrend: { label: string; netWeight: number; quantity: number }[];
   dailyProduction: { date: string; quantity: number; netWeight: number }[];
   fabricBreakdown: { name: string; value: number }[];
   topParties: { name: string; count: number }[];
   machineUtilization: { name: string; lines: number }[];
   operatorOutput: { name: string; netWeight: number }[];
-  payrollBreakdown: { operatorName: string; baseWages: number; commissions: number; advances: number; netPayable: number }[];
 }
 
 function KpiCard({
@@ -124,15 +117,15 @@ export default function DashboardPage() {
 
         {/* KPI Cards */}
         {isLoading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => (
               <Card key={i}><CardContent className="p-5"><Skeleton className="h-20 w-full" /></CardContent></Card>
             ))}
           </div>
         ) : isError ? (
           <p className="text-destructive text-sm">Failed to load dashboard data.</p>
         ) : data ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <KpiCard
               title="Total Transactions"
               value={data.kpis.totalTransactions.toLocaleString()}
@@ -153,13 +146,6 @@ export default function DashboardPage() {
               sub="machines with activity this month"
               icon={Cpu}
               color="bg-emerald-500"
-            />
-            <KpiCard
-              title="Operator Payroll Due"
-              value={`₹${fmt(data.kpis.payrollDue, 0)}`}
-              sub={`net payable this period`}
-              icon={Wallet}
-              color="bg-blue-500"
             />
           </div>
         ) : null}
@@ -317,61 +303,31 @@ export default function DashboardPage() {
               </ChartCard>
             </div>
 
-            {/* Row 4: Operator Output + Payroll Breakdown */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <ChartCard title="Top Operators by Net Weight — This Month">
-                {data.operatorOutput.length === 0 ? (
-                  <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
-                    No data for this period
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={Math.max(180, data.operatorOutput.length * 28 + 30)}>
-                    <BarChart
-                      data={data.operatorOutput}
-                      layout="vertical"
-                      margin={{ left: 8, right: 24, top: 4, bottom: 4 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                      <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
-                      <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={110} />
-                      <Tooltip
-                        contentStyle={CustomTooltipStyle.contentStyle}
-                        formatter={(v: number) => [`${v.toFixed(2)} kg`, "Net Weight"]}
-                      />
-                      <Bar dataKey="netWeight" fill="#8b5cf6" name="Net Weight (kg)" radius={[0, 3, 3, 0]} barSize={16} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </ChartCard>
-
-              <ChartCard title={`Operator Payroll Breakdown — ${data.payrollPeriodLabel}`}>
-                {data.payrollBreakdown.length === 0 ? (
-                  <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
-                    No salary records for this period
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={Math.max(180, data.payrollBreakdown.length * 32 + 40)}>
-                    <BarChart
-                      data={data.payrollBreakdown}
-                      layout="vertical"
-                      margin={{ left: 8, right: 24, top: 4, bottom: 4 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                      <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${fmt(v, 0)}`} />
-                      <YAxis dataKey="operatorName" type="category" tick={{ fontSize: 11 }} width={110} />
-                      <Tooltip
-                        contentStyle={CustomTooltipStyle.contentStyle}
-                        formatter={(v: number, name: string) => [`₹${fmtMoney(v)}`, name]}
-                      />
-                      <Legend wrapperStyle={{ fontSize: 11 }} />
-                      <Bar dataKey="baseWages" stackId="a" fill="#6366f1" name="Base Wages" barSize={16} />
-                      <Bar dataKey="commissions" stackId="a" fill="#f59e0b" name="Commissions" barSize={16} />
-                      <Bar dataKey="advances" stackId="a" fill="#ef4444" name="Advances" radius={[0, 3, 3, 0]} barSize={16} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </ChartCard>
-            </div>
+            {/* Row 4: Operator Output */}
+            <ChartCard title="Top Operators by Net Weight — This Month">
+              {data.operatorOutput.length === 0 ? (
+                <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
+                  No data for this period
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={Math.max(180, data.operatorOutput.length * 28 + 30)}>
+                  <BarChart
+                    data={data.operatorOutput}
+                    layout="vertical"
+                    margin={{ left: 8, right: 24, top: 4, bottom: 4 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
+                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={110} />
+                    <Tooltip
+                      contentStyle={CustomTooltipStyle.contentStyle}
+                      formatter={(v: number) => [`${v.toFixed(2)} kg`, "Net Weight"]}
+                    />
+                    <Bar dataKey="netWeight" fill="#8b5cf6" name="Net Weight (kg)" radius={[0, 3, 3, 0]} barSize={16} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </ChartCard>
           </>
         ) : null}
       </div>

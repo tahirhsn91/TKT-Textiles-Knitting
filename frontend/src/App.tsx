@@ -5,9 +5,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import TransactionList from "@/pages/transactions";
 import TransactionForm from "@/pages/transactions/form";
+import MonthlySalaryEntryPage from "@/pages/transactions/monthly-salary-entry";
+import PayrollEntryPage from "@/pages/transactions/payroll-entry";
 import MastersPage from "@/pages/masters";
-import ReportsPage from "@/pages/reports";
-import OperatorsPage from "@/pages/operators";
+import YarnBalancePage from "@/pages/reports/index";
+import YarnToFabricPage from "@/pages/reports/yarn-to-fabric";
 import DashboardPage from "@/pages/dashboard";
 
 const queryClient = new QueryClient();
@@ -20,9 +22,13 @@ function Router() {
       <Route path="/transactions" component={TransactionList} />
       <Route path="/transactions/new" component={TransactionForm} />
       <Route path="/transactions/:id/edit" component={TransactionForm} />
+      <Route path="/transactions/monthly-salary-entry/new" component={PayrollEntryPage} />
+      <Route path="/transactions/monthly-salary-entry/:id/edit" component={PayrollEntryPage} />
+      <Route path="/transactions/monthly-salary-entry" component={MonthlySalaryEntryPage} />
       <Route path="/masters" component={MastersPage} />
-      <Route path="/reports" component={ReportsPage} />
-      <Route path="/operators" component={OperatorsPage} />
+      <Route path="/reports" component={() => <Redirect to="/reports/yarn-balance" />} />
+      <Route path="/reports/yarn-balance" component={YarnBalancePage} />
+      <Route path="/reports/yarn-to-fabric" component={YarnToFabricPage} />
       <Route component={NotFound} />
     </Switch>
   );

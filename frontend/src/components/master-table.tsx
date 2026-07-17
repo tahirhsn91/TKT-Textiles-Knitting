@@ -41,6 +41,7 @@ export type Field = {
   step?: string;
   options?: FieldOption[];
   displayKey?: string;
+  defaultValue?: string;
 };
 
 type Row = { id: number; [key: string]: string | number | null | undefined };
@@ -86,6 +87,17 @@ function FieldInput({
       </Select>
     );
   }
+  if (field.type === "checkbox") {
+    return (
+      <input
+        type="checkbox"
+        className="h-4 w-4 accent-primary"
+        checked={value === "true"}
+        onChange={(e) => onChange(String(e.target.checked))}
+        autoFocus={autoFocus}
+      />
+    );
+  }
   return (
     <Input
       className="h-8 text-sm"
@@ -109,6 +121,9 @@ function displayValue(field: Field, row: Row): string {
     const match = field.options.find((o) => o.value === String(row[field.key] ?? ""));
     return match ? match.label : (raw != null ? String(raw) : "—");
   }
+  if (field.type === "checkbox") {
+    return String(row[field.key]) === "true" ? "Yes" : "No";
+  }
   return raw != null ? String(raw) : "";
 }
 
@@ -129,7 +144,7 @@ export function MasterTable({
   const [showAddRow, setShowAddRow] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const emptyAdd = () => Object.fromEntries(fields.map((f) => [f.key, ""]));
+  const emptyAdd = () => Object.fromEntries(fields.map((f) => [f.key, f.defaultValue ?? ""]));
 
   const startEdit = (row: Row) => {
     setEditingId(row.id as number);
