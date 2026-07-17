@@ -6,6 +6,11 @@ import { logger } from "./lib/logger.js";
 
 const app: Express = express();
 
+const allowedOrigins = (process.env["ALLOWED_ORIGINS"] ?? "http://localhost:3000")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(
   pinoHttp({
     logger,
@@ -25,7 +30,18 @@ app.use(
     },
   }),
 );
-app.use(cors());
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Same-origin requests (server-to-server, curl, the nginx/Vercel proxy) send no Origin header.
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`Origin ${origin} is not allowed`));
+    },
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

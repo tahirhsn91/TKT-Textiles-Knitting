@@ -1,5 +1,6 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Response } from "express";
 import { eq } from "drizzle-orm";
+import { z } from "zod/v4";
 import { db } from "../db/index.js";
 import {
   transactionTypeMasterTable,
@@ -14,6 +15,18 @@ import {
   fabricTypeMasterTable,
   machineOperatorMasterTable,
   departmentMasterTable,
+  insertTransactionTypeMasterSchema,
+  insertJobMasterSchema,
+  insertPartyMasterSchema,
+  insertMachineMasterSchema,
+  insertLocationMasterSchema,
+  insertYarnTypeMasterSchema,
+  insertYarnCountMasterSchema,
+  insertYarnBrandMasterSchema,
+  insertUomMasterSchema,
+  insertFabricTypeMasterSchema,
+  insertDepartmentMasterSchema,
+  insertMachineOperatorMasterSchema,
 } from "../db/index.js";
 
 const router: IRouter = Router();
@@ -34,6 +47,34 @@ function isUniqueViolation(err: unknown): boolean {
   );
 }
 
+/**
+ * Validates the given fields of `body` against the table's generated insert
+ * schema (type-correct, not just truthy) and rejects blank strings the same
+ * way the old `if (!name) ...` checks did. Writes the 400 response itself;
+ * callers just bail out on a null return.
+ */
+function requireFields<Shape extends z.ZodRawShape, K extends keyof Shape & string>(
+  schema: z.ZodObject<Shape>,
+  keys: K[],
+  body: unknown,
+  res: Response,
+): { [P in K]: z.infer<Shape[P]> } | null {
+  const shape = Object.fromEntries(keys.map((k) => [k, schema.shape[k]])) as Pick<Shape, K>;
+  const parsed = z.object(shape).safeParse(body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return null;
+  }
+  for (const k of keys) {
+    const v = (parsed.data as Record<string, unknown>)[k];
+    if (typeof v === "string" && v.trim() === "") {
+      res.status(400).json({ error: `${k} is required` });
+      return null;
+    }
+  }
+  return parsed.data as { [P in K]: z.infer<Shape[P]> };
+}
+
 // ─── Transaction Type Master ─────────────────────────────────────────────────
 
 router.get("/masters/transaction-type", async (_req, res): Promise<void> => {
@@ -42,8 +83,10 @@ router.get("/masters/transaction-type", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/transaction-type", async (req, res): Promise<void> => {
-  const { name, code, action } = req.body;
-  if (!name || !code) { res.status(400).json({ message: "name and code are required" }); return; }
+  const parsed = requireFields(insertTransactionTypeMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
+  const { action } = req.body;
   try {
     const [row] = await db.insert(transactionTypeMasterTable).values({ name, code, action: action || null }).returning();
     res.status(201).json(row);
@@ -55,9 +98,11 @@ router.post("/masters/transaction-type", async (req, res): Promise<void> => {
 
 router.put("/masters/transaction-type/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
-  if (!id) { res.status(400).json({ message: "Invalid id" }); return; }
-  const { name, code, action } = req.body;
-  if (!name || !code) { res.status(400).json({ message: "name and code are required" }); return; }
+  if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
+  const parsed = requireFields(insertTransactionTypeMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
+  const { action } = req.body;
   try {
     const [row] = await db.update(transactionTypeMasterTable).set({ name, code, action: action || null }).where(eq(transactionTypeMasterTable.id, id)).returning();
     if (!row) { res.status(404).json({ message: "Not found" }); return; }
@@ -94,8 +139,10 @@ router.get("/masters/job", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/job", async (req, res): Promise<void> => {
-  const { name, code, partyId } = req.body;
-  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const parsed = requireFields(insertJobMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
+  const { partyId } = req.body;
   try {
     const [inserted] = await db.insert(jobMasterTable).values({ name, code, partyId: partyId ?? null }).returning();
     const [row] = await db
@@ -113,8 +160,10 @@ router.post("/masters/job", async (req, res): Promise<void> => {
 router.put("/masters/job/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, code, partyId } = req.body;
-  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const parsed = requireFields(insertJobMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
+  const { partyId } = req.body;
   try {
     await db.update(jobMasterTable).set({ name, code, partyId: partyId ?? null }).where(eq(jobMasterTable.id, id));
     const [row] = await db
@@ -146,8 +195,10 @@ router.get("/masters/party", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/party", async (req, res): Promise<void> => {
-  const { name, code, wastePercent } = req.body;
-  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const parsed = requireFields(insertPartyMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
+  const { wastePercent } = req.body;
   const waste = wastePercent !== undefined && wastePercent !== "" ? String(parseFloat(wastePercent)) : "1.00";
   try {
     const [row] = await db.insert(partyMasterTable).values({ name, code, wastePercent: waste }).returning();
@@ -161,8 +212,10 @@ router.post("/masters/party", async (req, res): Promise<void> => {
 router.put("/masters/party/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, code, wastePercent } = req.body;
-  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const parsed = requireFields(insertPartyMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
+  const { wastePercent } = req.body;
   const waste = wastePercent !== undefined && wastePercent !== "" ? String(parseFloat(wastePercent)) : "1.00";
   try {
     const [row] = await db.update(partyMasterTable).set({ name, code, wastePercent: waste }).where(eq(partyMasterTable.id, id)).returning();
@@ -190,8 +243,10 @@ router.get("/masters/machine", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/machine", async (req, res): Promise<void> => {
-  const { name, machineNumber, makingRate, needleChangeDate, needleBrand, sinkerChangeDate, sinkerBrand } = req.body;
-  if (!name || !machineNumber) { res.status(400).json({ error: "name and machineNumber are required" }); return; }
+  const parsed = requireFields(insertMachineMasterSchema, ["name", "machineNumber"], req.body, res);
+  if (!parsed) return;
+  const { name, machineNumber } = parsed;
+  const { makingRate, needleChangeDate, needleBrand, sinkerChangeDate, sinkerBrand } = req.body;
   try {
     const [row] = await db.insert(machineMasterTable).values({
       name,
@@ -212,8 +267,10 @@ router.post("/masters/machine", async (req, res): Promise<void> => {
 router.put("/masters/machine/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, machineNumber, makingRate, needleChangeDate, needleBrand, sinkerChangeDate, sinkerBrand } = req.body;
-  if (!name || !machineNumber) { res.status(400).json({ error: "name and machineNumber are required" }); return; }
+  const parsed = requireFields(insertMachineMasterSchema, ["name", "machineNumber"], req.body, res);
+  if (!parsed) return;
+  const { name, machineNumber } = parsed;
+  const { makingRate, needleChangeDate, needleBrand, sinkerChangeDate, sinkerBrand } = req.body;
   try {
     const [row] = await db.update(machineMasterTable).set({
       name,
@@ -248,8 +305,9 @@ router.get("/masters/location", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/location", async (req, res): Promise<void> => {
-  const { name, code } = req.body;
-  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const parsed = requireFields(insertLocationMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
   try {
     const [row] = await db.insert(locationMasterTable).values({ name, code }).returning();
     res.status(201).json(row);
@@ -262,8 +320,9 @@ router.post("/masters/location", async (req, res): Promise<void> => {
 router.put("/masters/location/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, code } = req.body;
-  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const parsed = requireFields(insertLocationMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
   try {
     const [row] = await db.update(locationMasterTable).set({ name, code }).where(eq(locationMasterTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
@@ -290,8 +349,10 @@ router.get("/masters/yarn-type", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/yarn-type", async (req, res): Promise<void> => {
-  const { name, code, makeRate } = req.body;
-  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const parsed = requireFields(insertYarnTypeMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
+  const { makeRate } = req.body;
   try {
     const [row] = await db.insert(yarnTypeMasterTable).values({
       name, code,
@@ -307,8 +368,10 @@ router.post("/masters/yarn-type", async (req, res): Promise<void> => {
 router.put("/masters/yarn-type/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, code, makeRate } = req.body;
-  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const parsed = requireFields(insertYarnTypeMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
+  const { makeRate } = req.body;
   try {
     const [row] = await db.update(yarnTypeMasterTable).set({
       name, code,
@@ -338,8 +401,9 @@ router.get("/masters/yarn-count", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/yarn-count", async (req, res): Promise<void> => {
-  const { name, count } = req.body;
-  if (!name || !count) { res.status(400).json({ error: "name and count are required" }); return; }
+  const parsed = requireFields(insertYarnCountMasterSchema, ["name", "count"], req.body, res);
+  if (!parsed) return;
+  const { name, count } = parsed;
   try {
     const [row] = await db.insert(yarnCountMasterTable).values({ name, count }).returning();
     res.status(201).json(row);
@@ -352,8 +416,9 @@ router.post("/masters/yarn-count", async (req, res): Promise<void> => {
 router.put("/masters/yarn-count/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, count } = req.body;
-  if (!name || !count) { res.status(400).json({ error: "name and count are required" }); return; }
+  const parsed = requireFields(insertYarnCountMasterSchema, ["name", "count"], req.body, res);
+  if (!parsed) return;
+  const { name, count } = parsed;
   try {
     const [row] = await db.update(yarnCountMasterTable).set({ name, count }).where(eq(yarnCountMasterTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
@@ -380,8 +445,9 @@ router.get("/masters/yarn-brand", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/yarn-brand", async (req, res): Promise<void> => {
-  const { name, code } = req.body;
-  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const parsed = requireFields(insertYarnBrandMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
   try {
     const [row] = await db.insert(yarnBrandMasterTable).values({ name, code }).returning();
     res.status(201).json(row);
@@ -394,8 +460,9 @@ router.post("/masters/yarn-brand", async (req, res): Promise<void> => {
 router.put("/masters/yarn-brand/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, code } = req.body;
-  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const parsed = requireFields(insertYarnBrandMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
   try {
     const [row] = await db.update(yarnBrandMasterTable).set({ name, code }).where(eq(yarnBrandMasterTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
@@ -422,8 +489,9 @@ router.get("/masters/uom", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/uom", async (req, res): Promise<void> => {
-  const { name, abbreviation } = req.body;
-  if (!name || !abbreviation) { res.status(400).json({ error: "name and abbreviation are required" }); return; }
+  const parsed = requireFields(insertUomMasterSchema, ["name", "abbreviation"], req.body, res);
+  if (!parsed) return;
+  const { name, abbreviation } = parsed;
   try {
     const [row] = await db.insert(uomMasterTable).values({ name, abbreviation }).returning();
     res.status(201).json(row);
@@ -436,8 +504,9 @@ router.post("/masters/uom", async (req, res): Promise<void> => {
 router.put("/masters/uom/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, abbreviation } = req.body;
-  if (!name || !abbreviation) { res.status(400).json({ error: "name and abbreviation are required" }); return; }
+  const parsed = requireFields(insertUomMasterSchema, ["name", "abbreviation"], req.body, res);
+  if (!parsed) return;
+  const { name, abbreviation } = parsed;
   try {
     const [row] = await db.update(uomMasterTable).set({ name, abbreviation }).where(eq(uomMasterTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
@@ -464,8 +533,9 @@ router.get("/masters/fabric-type", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/fabric-type", async (req, res): Promise<void> => {
-  const { name, code } = req.body;
-  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const parsed = requireFields(insertFabricTypeMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
   try {
     const [row] = await db.insert(fabricTypeMasterTable).values({ name, code }).returning();
     res.status(201).json(row);
@@ -478,8 +548,9 @@ router.post("/masters/fabric-type", async (req, res): Promise<void> => {
 router.put("/masters/fabric-type/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, code } = req.body;
-  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const parsed = requireFields(insertFabricTypeMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
   try {
     const [row] = await db.update(fabricTypeMasterTable).set({ name, code }).where(eq(fabricTypeMasterTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
@@ -506,8 +577,9 @@ router.get("/masters/department", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/department", async (req, res): Promise<void> => {
-  const { name, code } = req.body;
-  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const parsed = requireFields(insertDepartmentMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
   try {
     const [row] = await db.insert(departmentMasterTable).values({ name, code }).returning();
     res.status(201).json(row);
@@ -520,8 +592,9 @@ router.post("/masters/department", async (req, res): Promise<void> => {
 router.put("/masters/department/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, code } = req.body;
-  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const parsed = requireFields(insertDepartmentMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
   try {
     const [row] = await db.update(departmentMasterTable).set({ name, code }).where(eq(departmentMasterTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
@@ -552,8 +625,10 @@ router.get("/masters/machine-operator", async (_req, res): Promise<void> => {
 });
 
 router.post("/masters/machine-operator", async (req, res): Promise<void> => {
-  const { name, code, departmentId, baseSalary, overtimeRateHr, attAllowance, othAllowance, active } = req.body;
-  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const parsed = requireFields(insertMachineOperatorMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
+  const { departmentId, baseSalary, overtimeRateHr, attAllowance, othAllowance, active } = req.body;
   try {
     const [row] = await db.insert(machineOperatorMasterTable).values({
       name,
@@ -575,8 +650,10 @@ router.post("/masters/machine-operator", async (req, res): Promise<void> => {
 router.put("/masters/machine-operator/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, code, departmentId, baseSalary, overtimeRateHr, attAllowance, othAllowance, active } = req.body;
-  if (!name || !code) { res.status(400).json({ error: "name and code are required" }); return; }
+  const parsed = requireFields(insertMachineOperatorMasterSchema, ["name", "code"], req.body, res);
+  if (!parsed) return;
+  const { name, code } = parsed;
+  const { departmentId, baseSalary, overtimeRateHr, attAllowance, othAllowance, active } = req.body;
   try {
     const [row] = await db.update(machineOperatorMasterTable).set({
       name,
