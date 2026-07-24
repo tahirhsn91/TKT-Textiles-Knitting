@@ -459,7 +459,7 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
           {/* Preview summary */}
           {preview && step !== "idle" && (
             <div className="space-y-3">
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="rounded-md border p-3 text-center">
                   <FileText className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
                   <p className="text-xl font-semibold">{preview.totalRows}</p>

@@ -17,7 +17,10 @@ function toNum(val: unknown): number {
   return isNaN(n) ? 0 : n;
 }
 
-router.get("/dashboard/summary", async (_req, res): Promise<void> => {
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+// ── Shared date windows (constants, not data — safe to recompute per call) ───
+function getWindow() {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
@@ -38,8 +41,16 @@ router.get("/dashboard/summary", async (_req, res): Promise<void> => {
   const dailyFrom = `${thirtyDaysAgo.getFullYear()}-${String(thirtyDaysAgo.getMonth() + 1).padStart(2, "0")}-${String(thirtyDaysAgo.getDate()).padStart(2, "0")}`;
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-  // ── KPIs: current month ─────────────────────────────────────────────────
-  // Count distinct transaction headers (not detail lines)
+  const periodLabel = `${now.toLocaleString("default", { month: "long" })} ${currentYear}`;
+
+  return { cmFrom, cmTo, trendFrom, dailyFrom, todayStr, periodLabel };
+}
+
+// ── Widget data functions ───────────────────────────────────────────────────
+
+async function getKpis() {
+  const { cmFrom, cmTo, periodLabel } = getWindow();
+
   const [txnCountRow] = await db
     .select({ totalTransactions: count(transactionHeaderTable.id) })
     .from(transactionHeaderTable)
@@ -51,15 +62,23 @@ router.get("/dashboard/summary", async (_req, res): Promise<void> => {
     .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
     .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo)));
 
-  // Active machines: distinct machines with at least one detail in current month
   const [activeMachinesRow] = await db
     .select({ activeMachines: sql<number>`COUNT(DISTINCT ${transactionDetailTable.machineId})` })
     .from(transactionDetailTable)
     .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
     .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo)));
 
-  // ── Monthly production trend (last 12 months) ───────────────────────────
-  const monthlyTrend = await db
+  return {
+    totalTransactions: toNum(txnCountRow?.totalTransactions),
+    totalNetWeight: toNum(netWtRow?.totalNetWeight),
+    activeMachines: toNum(activeMachinesRow?.activeMachines),
+    periodLabel,
+  };
+}
+
+async function getMonthlyTrend() {
+  const { trendFrom, cmTo } = getWindow();
+  const rows = await db
     .select({
       year: sql<number>`EXTRACT(YEAR FROM ${transactionHeaderTable.date})`,
       month: sql<number>`EXTRACT(MONTH FROM ${transactionHeaderTable.date})`,
@@ -78,8 +97,16 @@ router.get("/dashboard/summary", async (_req, res): Promise<void> => {
       sql`EXTRACT(MONTH FROM ${transactionHeaderTable.date})`,
     );
 
-  // ── Daily production (last 30 days) ─────────────────────────────────────
-  const dailyProduction = await db
+  return rows.map((r) => ({
+    label: `${MONTHS_SHORT[toNum(r.month) - 1]} ${String(toNum(r.year)).slice(2)}`,
+    netWeight: toNum(r.totalNetWeight),
+    quantity: toNum(r.totalQuantity),
+  }));
+}
+
+async function getDailyProduction() {
+  const { dailyFrom, todayStr } = getWindow();
+  const rows = await db
     .select({
       date: transactionHeaderTable.date,
       totalQuantity: sum(transactionDetailTable.quantity),
@@ -91,8 +118,16 @@ router.get("/dashboard/summary", async (_req, res): Promise<void> => {
     .groupBy(transactionHeaderTable.date)
     .orderBy(transactionHeaderTable.date);
 
-  // ── Fabric type breakdown (current month) ───────────────────────────────
-  const fabricBreakdown = await db
+  return rows.map((r) => ({
+    date: r.date,
+    quantity: toNum(r.totalQuantity),
+    netWeight: toNum(r.totalNetWeight),
+  }));
+}
+
+async function getFabricBreakdown() {
+  const { cmFrom, cmTo } = getWindow();
+  const rows = await db
     .select({
       fabricType: fabricTypeMasterTable.name,
       totalNetWeight: sum(transactionDetailTable.netWt),
@@ -104,8 +139,12 @@ router.get("/dashboard/summary", async (_req, res): Promise<void> => {
     .groupBy(fabricTypeMasterTable.name)
     .orderBy(sql`SUM(${transactionDetailTable.netWt}) DESC`);
 
-  // ── Top parties by transaction count (current month) ────────────────────
-  const topParties = await db
+  return rows.map((r) => ({ name: r.fabricType ?? "Unknown", value: toNum(r.totalNetWeight) }));
+}
+
+async function getTopParties() {
+  const { cmFrom, cmTo } = getWindow();
+  const rows = await db
     .select({
       partyName: partyMasterTable.name,
       transactionCount: count(transactionHeaderTable.id),
@@ -117,8 +156,12 @@ router.get("/dashboard/summary", async (_req, res): Promise<void> => {
     .orderBy(sql`COUNT(${transactionHeaderTable.id}) DESC`)
     .limit(10);
 
-  // ── Machine utilization (current month) ─────────────────────────────────
-  const machineUtilization = await db
+  return rows.map((r) => ({ name: r.partyName ?? "Unknown", count: toNum(r.transactionCount) }));
+}
+
+async function getMachineUtilization() {
+  const { cmFrom, cmTo } = getWindow();
+  const rows = await db
     .select({
       machineName: machineMasterTable.name,
       transactionLines: count(transactionDetailTable.id),
@@ -131,8 +174,12 @@ router.get("/dashboard/summary", async (_req, res): Promise<void> => {
     .orderBy(sql`COUNT(${transactionDetailTable.id}) DESC`)
     .limit(15);
 
-  // ── Top operators by net weight (current month) ──────────────────────────
-  const operatorOutput = await db
+  return rows.map((r) => ({ name: r.machineName ?? "Unknown", lines: toNum(r.transactionLines) }));
+}
+
+async function getOperatorOutput() {
+  const { cmFrom, cmTo } = getWindow();
+  const rows = await db
     .select({
       operatorName: machineOperatorMasterTable.name,
       totalNetWeight: sum(transactionDetailTable.netWt),
@@ -145,40 +192,32 @@ router.get("/dashboard/summary", async (_req, res): Promise<void> => {
     .orderBy(sql`SUM(${transactionDetailTable.netWt}) DESC`)
     .limit(10);
 
-  res.json({
-    kpis: {
-      totalTransactions: toNum(txnCountRow?.totalTransactions),
-      totalNetWeight: toNum(netWtRow?.totalNetWeight),
-      activeMachines: toNum(activeMachinesRow?.activeMachines),
-      periodLabel: `${now.toLocaleString("default", { month: "long" })} ${currentYear}`,
-    },
-    monthlyTrend: monthlyTrend.map((r) => ({
-      label: `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][toNum(r.month) - 1]} ${String(toNum(r.year)).slice(2)}`,
-      netWeight: toNum(r.totalNetWeight),
-      quantity: toNum(r.totalQuantity),
-    })),
-    dailyProduction: dailyProduction.map((r) => ({
-      date: r.date,
-      quantity: toNum(r.totalQuantity),
-      netWeight: toNum(r.totalNetWeight),
-    })),
-    fabricBreakdown: fabricBreakdown.map((r) => ({
-      name: r.fabricType ?? "Unknown",
-      value: toNum(r.totalNetWeight),
-    })),
-    topParties: topParties.map((r) => ({
-      name: r.partyName ?? "Unknown",
-      count: toNum(r.transactionCount),
-    })),
-    machineUtilization: machineUtilization.map((r) => ({
-      name: r.machineName ?? "Unknown",
-      lines: toNum(r.transactionLines),
-    })),
-    operatorOutput: operatorOutput.map((r) => ({
-      name: r.operatorName ?? "Unknown",
-      netWeight: toNum(r.totalNetWeight),
-    })),
-  });
+  return rows.map((r) => ({ name: r.operatorName ?? "Unknown", netWeight: toNum(r.totalNetWeight) }));
+}
+
+// ── Per-widget endpoints ────────────────────────────────────────────────────
+router.get("/dashboard/kpis",                async (_req, res) => { res.json(await getKpis()); });
+router.get("/dashboard/monthly-trend",       async (_req, res) => { res.json(await getMonthlyTrend()); });
+router.get("/dashboard/daily-production",    async (_req, res) => { res.json(await getDailyProduction()); });
+router.get("/dashboard/fabric-breakdown",    async (_req, res) => { res.json(await getFabricBreakdown()); });
+router.get("/dashboard/top-parties",         async (_req, res) => { res.json(await getTopParties()); });
+router.get("/dashboard/machine-utilization", async (_req, res) => { res.json(await getMachineUtilization()); });
+router.get("/dashboard/operator-output",     async (_req, res) => { res.json(await getOperatorOutput()); });
+
+// ── Aggregated summary (kept for backward compatibility) ────────────────────
+router.get("/dashboard/summary", async (_req, res): Promise<void> => {
+  const [kpis, monthlyTrend, dailyProduction, fabricBreakdown, topParties, machineUtilization, operatorOutput] =
+    await Promise.all([
+      getKpis(),
+      getMonthlyTrend(),
+      getDailyProduction(),
+      getFabricBreakdown(),
+      getTopParties(),
+      getMachineUtilization(),
+      getOperatorOutput(),
+    ]);
+
+  res.json({ kpis, monthlyTrend, dailyProduction, fabricBreakdown, topParties, machineUtilization, operatorOutput });
 });
 
 export default router;

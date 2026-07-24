@@ -87,91 +87,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export default function MastersPage() {
+// ─── Shared invalidation helper ────────────────────────────────────────────
+function useInvalidateBoth() {
   const qc = useQueryClient();
-
-  const invalidateBoth = (crudKey: readonly unknown[], lookupKey: readonly unknown[]) => {
+  return (crudKey: readonly unknown[], lookupKey: readonly unknown[]) => {
     qc.invalidateQueries({ queryKey: [...crudKey] });
     qc.invalidateQueries({ queryKey: [...lookupKey] });
     void qc.refetchQueries({ queryKey: [...lookupKey], type: "all" });
   };
+}
 
-  // ── Transaction Type ─────────────────────────────────────────────────────
-  const { data: txTypes, isLoading: txTypesLoading } = useListTransactionTypeMasterCrud();
-  const createTxType = useCreateTransactionTypeMaster();
-  const updateTxType = useUpdateTransactionTypeMaster();
-  const deleteTxType = useDeleteTransactionTypeMaster();
-
-  // ── Job ──────────────────────────────────────────────────────────────────
-  const { data: jobs, isLoading: jobsLoading } = useListJobMasterCrud();
-  const createJob = useCreateJobMaster();
-  const updateJob = useUpdateJobMaster();
-  const deleteJob = useDeleteJobMaster();
-  const [jobPartyFilter, setJobPartyFilter] = useState<string>("");
-  const filteredJobs = jobPartyFilter
-    ? (jobs ?? []).filter((j) => String((j as { partyId?: number | null }).partyId ?? "") === jobPartyFilter)
-    : (jobs ?? []);
-
-  // ── Party ────────────────────────────────────────────────────────────────
-  const { data: parties, isLoading: partiesLoading } = useListPartyMasterCrud();
-  const createParty = useCreatePartyMaster();
-  const updateParty = useUpdatePartyMaster();
-  const deleteParty = useDeletePartyMaster();
-
-  // ── Machine ──────────────────────────────────────────────────────────────
-  const { data: machines, isLoading: machinesLoading } = useListMachineMasterCrud();
-  const createMachine = useCreateMachineMaster();
-  const updateMachine = useUpdateMachineMaster();
-  const deleteMachine = useDeleteMachineMaster();
-
-  // ── Location ─────────────────────────────────────────────────────────────
-  const { data: locations, isLoading: locationsLoading } = useListLocationMasterCrud();
-  const createLocation = useCreateLocationMaster();
-  const updateLocation = useUpdateLocationMaster();
-  const deleteLocation = useDeleteLocationMaster();
-
-  // ── Yarn Type ────────────────────────────────────────────────────────────
-  const { data: yarnTypes, isLoading: yarnTypesLoading } = useListYarnTypeMasterCrud();
-  const createYarnType = useCreateYarnTypeMaster();
-  const updateYarnType = useUpdateYarnTypeMaster();
-  const deleteYarnType = useDeleteYarnTypeMaster();
-
-  // ── Yarn Count ───────────────────────────────────────────────────────────
-  const { data: yarnCounts, isLoading: yarnCountsLoading } = useListYarnCountMasterCrud();
-  const createYarnCount = useCreateYarnCountMaster();
-  const updateYarnCount = useUpdateYarnCountMaster();
-  const deleteYarnCount = useDeleteYarnCountMaster();
-
-  // ── Yarn Brand ───────────────────────────────────────────────────────────
-  const { data: yarnBrands, isLoading: yarnBrandsLoading } = useListYarnBrandMasterCrud();
-  const createYarnBrand = useCreateYarnBrandMaster();
-  const updateYarnBrand = useUpdateYarnBrandMaster();
-  const deleteYarnBrand = useDeleteYarnBrandMaster();
-
-  // ── UOM ──────────────────────────────────────────────────────────────────
-  const { data: uoms, isLoading: uomsLoading } = useListUomMasterCrud();
-  const createUom = useCreateUomMaster();
-  const updateUom = useUpdateUomMaster();
-  const deleteUom = useDeleteUomMaster();
-
-  // ── Fabric Type ──────────────────────────────────────────────────────────
-  const { data: fabricTypes, isLoading: fabricTypesLoading } = useListFabricTypeMasterCrud();
-  const createFabricType = useCreateFabricTypeMaster();
-  const updateFabricType = useUpdateFabricTypeMaster();
-  const deleteFabricType = useDeleteFabricTypeMaster();
-
-  // ── Department ───────────────────────────────────────────────────────────
-  const { data: departments, isLoading: departmentsLoading } = useListDepartmentMasterCrud();
-  const createDepartment = useCreateDepartmentMaster();
-  const updateDepartment = useUpdateDepartmentMaster();
-  const deleteDepartment = useDeleteDepartmentMaster();
-
-  // ── Machine Operator ─────────────────────────────────────────────────────
-  const { data: operators, isLoading: operatorsLoading } = useListMachineOperatorMasterCrud();
-  const createOperator = useCreateMachineOperatorMaster();
-  const updateOperator = useUpdateMachineOperatorMaster();
-  const deleteOperator = useDeleteMachineOperatorMaster();
-
+// ─── Page ──────────────────────────────────────────────────────────────────
+// Each tab's data is fetched inside its own child component. Because Radix
+// unmounts inactive TabsContent, a tab's list/CRUD queries only fire once the
+// user actually navigates to that tab — not all at once on page load.
+export default function MastersPage() {
   return (
     <Layout>
       <div className="flex flex-col gap-4">
@@ -196,445 +126,383 @@ export default function MastersPage() {
             <TabsTrigger value="operator">Operators</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="transaction-type" className="mt-4">
-            <MasterTable
-              title="Transaction Types"
-              description="Types of transactions (e.g. Receipt, Issue, Transfer). Used as a mandatory field on every transaction."
-              fields={[
-                { key: "name", label: "Name", placeholder: "e.g. Receipt" },
-                { key: "code", label: "Code", placeholder: "e.g. REC" },
-                { key: "action", label: "Action", placeholder: "e.g. IN" },
-              ]}
-              rows={txTypes as never}
-              isLoading={txTypesLoading}
-              onAdd={(data) => new Promise((res, rej) =>
-                createTxType.mutate({ data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListTransactionTypeMasterCrudQueryKey(), getListTransactionTypeMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onUpdate={(id, data) => new Promise((res, rej) =>
-                updateTxType.mutate({ id, data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListTransactionTypeMasterCrudQueryKey(), getListTransactionTypeMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onDelete={(id) => new Promise((res, rej) =>
-                deleteTxType.mutate({ id }, {
-                  onSuccess: () => { invalidateBoth(getListTransactionTypeMasterCrudQueryKey(), getListTransactionTypeMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-            />
-          </TabsContent>
-
-          <TabsContent value="job" className="mt-4">
-            {/* Party filter */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground font-medium">Filter by Party</span>
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={jobPartyFilter || "__all__"}
-                    onValueChange={(v) => setJobPartyFilter(v === "__all__" ? "" : v)}
-                  >
-                    <SelectTrigger className="h-9 w-64">
-                      <SelectValue placeholder="All Parties" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__all__">All Parties</SelectItem>
-                      {(parties ?? []).map((p) => (
-                        <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {jobPartyFilter && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 text-muted-foreground hover:text-foreground"
-                      onClick={() => setJobPartyFilter("")}
-                      title="Clear filter"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-            <MasterTable
-              title="Job Types"
-              description="Job types linked to a party. The combination of Party + Code must be unique."
-              fields={[
-                {
-                  key: "partyId",
-                  label: "Party",
-                  type: "select",
-                  displayKey: "partyName",
-                  placeholder: "Select party",
-                  options: (parties ?? []).map((p) => ({ value: String(p.id), label: p.name })),
-                },
-                { key: "name", label: "Job Type", placeholder: "e.g. Knitting Order" },
-                { key: "code", label: "Code", placeholder: "e.g. KO" },
-              ]}
-              rows={filteredJobs as never}
-              isLoading={jobsLoading}
-              onAdd={(data) => new Promise((res, rej) =>
-                createJob.mutate({ data: { ...data, partyId: data.partyId ? Number(data.partyId) : null } as never }, {
-                  onSuccess: () => { invalidateBoth(getListJobMasterCrudQueryKey(), getListJobMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onUpdate={(id, data) => new Promise((res, rej) =>
-                updateJob.mutate({ id, data: { ...data, partyId: data.partyId ? Number(data.partyId) : null } as never }, {
-                  onSuccess: () => { invalidateBoth(getListJobMasterCrudQueryKey(), getListJobMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onDelete={(id) => new Promise((res, rej) =>
-                deleteJob.mutate({ id }, {
-                  onSuccess: () => { invalidateBoth(getListJobMasterCrudQueryKey(), getListJobMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-            />
-          </TabsContent>
-
-          <TabsContent value="party" className="mt-4">
-            <MasterTable
-              title="Parties"
-              description="Business parties (customers, suppliers, contractors)."
-              fields={[
-                { key: "name", label: "Name", placeholder: "e.g. Sunrise Textiles" },
-                { key: "code", label: "Code", placeholder: "e.g. SUN" },
-                { key: "wastePercent", label: "Waste%", placeholder: "1.00", type: "number", step: "any" },
-              ]}
-              rows={parties as never}
-              isLoading={partiesLoading}
-              onAdd={(data) => new Promise((res, rej) =>
-                createParty.mutate({ data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListPartyMasterCrudQueryKey(), getListPartyMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onUpdate={(id, data) => new Promise((res, rej) =>
-                updateParty.mutate({ id, data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListPartyMasterCrudQueryKey(), getListPartyMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onDelete={(id) => new Promise((res, rej) =>
-                deleteParty.mutate({ id }, {
-                  onSuccess: () => { invalidateBoth(getListPartyMasterCrudQueryKey(), getListPartyMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-            />
-          </TabsContent>
-
-          <TabsContent value="machine" className="mt-4">
-            <MasterTable
-              title="Machines"
-              description="Knitting machines on the production floor."
-              fields={[
-                { key: "name", label: "Name", placeholder: "e.g. Circular Knitting Machine 1" },
-                { key: "machineNumber", label: "Machine Number", placeholder: "e.g. M-001" },
-                { key: "makingRate", label: "Making Rate", placeholder: "3.75", type: "number", step: "0.01", defaultValue: "3.75" },
-                { key: "needleChangeDate", label: "Needle Change Date", type: "date", defaultValue: new Date().toISOString().slice(0, 10) },
-                { key: "needleBrand", label: "Needle Brand", placeholder: "e.g. Sigma", defaultValue: "Sigma" },
-                { key: "sinkerChangeDate", label: "Sinker Change Date", type: "date", defaultValue: new Date().toISOString().slice(0, 10) },
-                { key: "sinkerBrand", label: "Sinker Brand", placeholder: "e.g. Kohala", defaultValue: "Kohala" },
-              ]}
-              rows={machines as never}
-              isLoading={machinesLoading}
-              onAdd={(data) => new Promise((res, rej) =>
-                createMachine.mutate({ data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListMachineMasterCrudQueryKey(), getListMachineMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onUpdate={(id, data) => new Promise((res, rej) =>
-                updateMachine.mutate({ id, data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListMachineMasterCrudQueryKey(), getListMachineMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onDelete={(id) => new Promise((res, rej) =>
-                deleteMachine.mutate({ id }, {
-                  onSuccess: () => { invalidateBoth(getListMachineMasterCrudQueryKey(), getListMachineMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-            />
-          </TabsContent>
-
-          <TabsContent value="location" className="mt-4">
-            <MasterTable
-              title="Locations"
-              description="Physical locations within the factory."
-              fields={[
-                { key: "name", label: "Name", placeholder: "e.g. Production Floor A" },
-                { key: "code", label: "Code", placeholder: "e.g. PFA" },
-              ]}
-              rows={locations as never}
-              isLoading={locationsLoading}
-              onAdd={(data) => new Promise((res, rej) =>
-                createLocation.mutate({ data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListLocationMasterCrudQueryKey(), getListLocationMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onUpdate={(id, data) => new Promise((res, rej) =>
-                updateLocation.mutate({ id, data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListLocationMasterCrudQueryKey(), getListLocationMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onDelete={(id) => new Promise((res, rej) =>
-                deleteLocation.mutate({ id }, {
-                  onSuccess: () => { invalidateBoth(getListLocationMasterCrudQueryKey(), getListLocationMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-            />
-          </TabsContent>
-
-          <TabsContent value="yarn-type" className="mt-4">
-            <MasterTable
-              title="Yarn Types"
-              description="Types of yarn used in production (e.g. Cotton, Polyester)."
-              fields={[
-                { key: "name", label: "Name", placeholder: "e.g. Cotton" },
-                { key: "makeRate", label: "Make Rate", placeholder: "e.g. 12.50", type: "number", step: "any" },
-                { key: "code", label: "Code", placeholder: "e.g. COT" },
-              ]}
-              rows={yarnTypes as never}
-              isLoading={yarnTypesLoading}
-              onAdd={(data) => new Promise((res, rej) =>
-                createYarnType.mutate({ data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListYarnTypeMasterCrudQueryKey(), getListYarnTypeMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onUpdate={(id, data) => new Promise((res, rej) =>
-                updateYarnType.mutate({ id, data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListYarnTypeMasterCrudQueryKey(), getListYarnTypeMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onDelete={(id) => new Promise((res, rej) =>
-                deleteYarnType.mutate({ id }, {
-                  onSuccess: () => { invalidateBoth(getListYarnTypeMasterCrudQueryKey(), getListYarnTypeMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-            />
-          </TabsContent>
-
-          <TabsContent value="yarn-count" className="mt-4">
-            <MasterTable
-              title="Yarn Counts"
-              description="Yarn count values (thickness/fineness)."
-              fields={[
-                { key: "name", label: "Name", placeholder: "e.g. 30s (30)" },
-                { key: "count", label: "Count", placeholder: "e.g. 30" },
-              ]}
-              rows={yarnCounts as never}
-              isLoading={yarnCountsLoading}
-              onAdd={(data) => new Promise((res, rej) =>
-                createYarnCount.mutate({ data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListYarnCountMasterCrudQueryKey(), getListYarnCountMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onUpdate={(id, data) => new Promise((res, rej) =>
-                updateYarnCount.mutate({ id, data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListYarnCountMasterCrudQueryKey(), getListYarnCountMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onDelete={(id) => new Promise((res, rej) =>
-                deleteYarnCount.mutate({ id }, {
-                  onSuccess: () => { invalidateBoth(getListYarnCountMasterCrudQueryKey(), getListYarnCountMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-            />
-          </TabsContent>
-
-          <TabsContent value="yarn-brand" className="mt-4">
-            <MasterTable
-              title="Yarn Brands"
-              description="Yarn manufacturer/brand names."
-              fields={[
-                { key: "name", label: "Name", placeholder: "e.g. Vardhman" },
-                { key: "code", label: "Code", placeholder: "e.g. VAR" },
-              ]}
-              rows={yarnBrands as never}
-              isLoading={yarnBrandsLoading}
-              onAdd={(data) => new Promise((res, rej) =>
-                createYarnBrand.mutate({ data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListYarnBrandMasterCrudQueryKey(), getListYarnBrandMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onUpdate={(id, data) => new Promise((res, rej) =>
-                updateYarnBrand.mutate({ id, data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListYarnBrandMasterCrudQueryKey(), getListYarnBrandMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onDelete={(id) => new Promise((res, rej) =>
-                deleteYarnBrand.mutate({ id }, {
-                  onSuccess: () => { invalidateBoth(getListYarnBrandMasterCrudQueryKey(), getListYarnBrandMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-            />
-          </TabsContent>
-
-          <TabsContent value="uom" className="mt-4">
-            <MasterTable
-              title="Units of Measure"
-              description="Units used for measuring quantities and weights."
-              fields={[
-                { key: "name", label: "Name", placeholder: "e.g. Kilogram" },
-                { key: "abbreviation", label: "Abbreviation", placeholder: "e.g. KG" },
-              ]}
-              rows={uoms as never}
-              isLoading={uomsLoading}
-              onAdd={(data) => new Promise((res, rej) =>
-                createUom.mutate({ data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListUomMasterCrudQueryKey(), getListUomMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onUpdate={(id, data) => new Promise((res, rej) =>
-                updateUom.mutate({ id, data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListUomMasterCrudQueryKey(), getListUomMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onDelete={(id) => new Promise((res, rej) =>
-                deleteUom.mutate({ id }, {
-                  onSuccess: () => { invalidateBoth(getListUomMasterCrudQueryKey(), getListUomMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-            />
-          </TabsContent>
-
-          <TabsContent value="fabric-type" className="mt-4">
-            <MasterTable
-              title="Fabric Types"
-              description="Types of fabric produced (e.g. Single Jersey, Rib)."
-              fields={[
-                { key: "name", label: "Name", placeholder: "e.g. Single Jersey" },
-                { key: "code", label: "Code", placeholder: "e.g. SJ" },
-              ]}
-              rows={fabricTypes as never}
-              isLoading={fabricTypesLoading}
-              onAdd={(data) => new Promise((res, rej) =>
-                createFabricType.mutate({ data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListFabricTypeMasterCrudQueryKey(), getListFabricTypeMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onUpdate={(id, data) => new Promise((res, rej) =>
-                updateFabricType.mutate({ id, data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListFabricTypeMasterCrudQueryKey(), getListFabricTypeMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onDelete={(id) => new Promise((res, rej) =>
-                deleteFabricType.mutate({ id }, {
-                  onSuccess: () => { invalidateBoth(getListFabricTypeMasterCrudQueryKey(), getListFabricTypeMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-            />
-          </TabsContent>
-
-          <TabsContent value="department" className="mt-4">
-            <MasterTable
-              title="Departments"
-              description="Departments within the factory (e.g. Administration, Knitting Production, Security)."
-              fields={[
-                { key: "name", label: "Name", placeholder: "e.g. Knitting Production" },
-                { key: "code", label: "Code", placeholder: "e.g. KNIT" },
-              ]}
-              rows={departments as never}
-              isLoading={departmentsLoading}
-              onAdd={(data) => new Promise((res, rej) =>
-                createDepartment.mutate({ data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListDepartmentMasterCrudQueryKey(), getListDepartmentMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onUpdate={(id, data) => new Promise((res, rej) =>
-                updateDepartment.mutate({ id, data: data as never }, {
-                  onSuccess: () => { invalidateBoth(getListDepartmentMasterCrudQueryKey(), getListDepartmentMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onDelete={(id) => new Promise((res, rej) =>
-                deleteDepartment.mutate({ id }, {
-                  onSuccess: () => { invalidateBoth(getListDepartmentMasterCrudQueryKey(), getListDepartmentMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-            />
-          </TabsContent>
-
-          <TabsContent value="operator" className="mt-4">
-            <MasterTable
-              title="Machine Operators"
-              description="Operators assigned to machines during production runs."
-              fields={[
-                { key: "name", label: "Name", placeholder: "e.g. Operator Alpha" },
-                { key: "code", label: "Code", placeholder: "e.g. OPA" },
-                {
-                  key: "departmentId",
-                  label: "Department",
-                  type: "select",
-                  displayKey: "departmentName",
-                  placeholder: "Select department",
-                  options: (departments ?? []).map((d) => ({ value: String(d.id), label: d.name })),
-                },
-                { key: "baseSalary", label: "Base Salary", placeholder: "e.g. 15000.00", type: "number", step: "0.01" },
-                { key: "overtimeRateHr", label: "Overtime Rate/Hr", placeholder: "e.g. 50.00", type: "number", step: "0.01" },
-                { key: "attAllowance", label: "Att. Allowance", placeholder: "e.g. 500.00", type: "number", step: "0.01" },
-                { key: "othAllowance", label: "Oth. Allowance", placeholder: "e.g. 200.00", type: "number", step: "0.01" },
-                { key: "active", label: "Active", type: "checkbox", defaultValue: "true" },
-              ]}
-              rows={(operators ?? []).map((o) => ({
-                ...o,
-                departmentName: (departments ?? []).find((d) => d.id === (o as { departmentId?: number | null }).departmentId)?.name ?? null,
-                active: String((o as { active?: boolean }).active ?? true),
-              })) as never}
-              isLoading={operatorsLoading}
-              onAdd={(data) => new Promise((res, rej) =>
-                createOperator.mutate({ data: { ...data, departmentId: data.departmentId ? Number(data.departmentId) : null, active: data.active !== "false" } as never }, {
-                  onSuccess: () => { invalidateBoth(getListMachineOperatorMasterCrudQueryKey(), getListMachineOperatorMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onUpdate={(id, data) => new Promise((res, rej) =>
-                updateOperator.mutate({ id, data: { ...data, departmentId: data.departmentId ? Number(data.departmentId) : null, active: data.active !== "false" } as never }, {
-                  onSuccess: () => { invalidateBoth(getListMachineOperatorMasterCrudQueryKey(), getListMachineOperatorMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-              onDelete={(id) => new Promise((res, rej) =>
-                deleteOperator.mutate({ id }, {
-                  onSuccess: () => { invalidateBoth(getListMachineOperatorMasterCrudQueryKey(), getListMachineOperatorMasterQueryKey()); res(); },
-                  onError: (e) => rej(e),
-                })
-              )}
-            />
-          </TabsContent>
+          <TabsContent value="transaction-type" className="mt-4"><TransactionTypeTab /></TabsContent>
+          <TabsContent value="job" className="mt-4"><JobTab /></TabsContent>
+          <TabsContent value="party" className="mt-4"><PartyTab /></TabsContent>
+          <TabsContent value="machine" className="mt-4"><MachineTab /></TabsContent>
+          <TabsContent value="location" className="mt-4"><LocationTab /></TabsContent>
+          <TabsContent value="yarn-type" className="mt-4"><YarnTypeTab /></TabsContent>
+          <TabsContent value="yarn-count" className="mt-4"><YarnCountTab /></TabsContent>
+          <TabsContent value="yarn-brand" className="mt-4"><YarnBrandTab /></TabsContent>
+          <TabsContent value="uom" className="mt-4"><UomTab /></TabsContent>
+          <TabsContent value="fabric-type" className="mt-4"><FabricTypeTab /></TabsContent>
+          <TabsContent value="department" className="mt-4"><DepartmentTab /></TabsContent>
+          <TabsContent value="operator" className="mt-4"><OperatorTab /></TabsContent>
         </Tabs>
       </div>
     </Layout>
+  );
+}
+
+// ─── Transaction Type ───────────────────────────────────────────────────────
+function TransactionTypeTab() {
+  const invalidateBoth = useInvalidateBoth();
+  const { data, isLoading } = useListTransactionTypeMasterCrud();
+  const create = useCreateTransactionTypeMaster();
+  const update = useUpdateTransactionTypeMaster();
+  const remove = useDeleteTransactionTypeMaster();
+  const done = () => invalidateBoth(getListTransactionTypeMasterCrudQueryKey(), getListTransactionTypeMasterQueryKey());
+
+  return (
+    <MasterTable
+      title="Transaction Types"
+      description="Types of transactions (e.g. Receipt, Issue, Transfer). Used as a mandatory field on every transaction."
+      fields={[
+        { key: "name", label: "Name", placeholder: "e.g. Receipt" },
+        { key: "code", label: "Code", placeholder: "e.g. REC" },
+        { key: "action", label: "Action", placeholder: "e.g. IN" },
+      ]}
+      rows={data as never}
+      isLoading={isLoading}
+      onAdd={(d) => new Promise((res, rej) => create.mutate({ data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onUpdate={(id, d) => new Promise((res, rej) => update.mutate({ id, data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+    />
+  );
+}
+
+// ─── Job (depends on Party for filter + select options) ─────────────────────
+function JobTab() {
+  const invalidateBoth = useInvalidateBoth();
+  const { data: jobs, isLoading } = useListJobMasterCrud();
+  const { data: parties } = useListPartyMasterCrud();
+  const create = useCreateJobMaster();
+  const update = useUpdateJobMaster();
+  const remove = useDeleteJobMaster();
+  const done = () => invalidateBoth(getListJobMasterCrudQueryKey(), getListJobMasterQueryKey());
+
+  const [jobPartyFilter, setJobPartyFilter] = useState<string>("");
+  const filteredJobs = jobPartyFilter
+    ? (jobs ?? []).filter((j) => String((j as { partyId?: number | null }).partyId ?? "") === jobPartyFilter)
+    : (jobs ?? []);
+
+  return (
+    <>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground font-medium">Filter by Party</span>
+          <div className="flex items-center gap-2">
+            <Select value={jobPartyFilter || "__all__"} onValueChange={(v) => setJobPartyFilter(v === "__all__" ? "" : v)}>
+              <SelectTrigger className="h-9 w-64">
+                <SelectValue placeholder="All Parties" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Parties</SelectItem>
+                {(parties ?? []).map((p) => (
+                  <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {jobPartyFilter && (
+              <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground" onClick={() => setJobPartyFilter("")} title="Clear filter">
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+      <MasterTable
+        title="Job Types"
+        description="Job types linked to a party. The combination of Party + Code must be unique."
+        fields={[
+          { key: "partyId", label: "Party", type: "select", displayKey: "partyName", placeholder: "Select party", options: (parties ?? []).map((p) => ({ value: String(p.id), label: p.name })) },
+          { key: "name", label: "Job Type", placeholder: "e.g. Knitting Order" },
+          { key: "code", label: "Code", placeholder: "e.g. KO" },
+        ]}
+        rows={filteredJobs as never}
+        isLoading={isLoading}
+        onAdd={(d) => new Promise((res, rej) => create.mutate({ data: { ...d, partyId: d.partyId ? Number(d.partyId) : null } as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+        onUpdate={(id, d) => new Promise((res, rej) => update.mutate({ id, data: { ...d, partyId: d.partyId ? Number(d.partyId) : null } as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+        onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      />
+    </>
+  );
+}
+
+// ─── Party ──────────────────────────────────────────────────────────────────
+function PartyTab() {
+  const invalidateBoth = useInvalidateBoth();
+  const { data, isLoading } = useListPartyMasterCrud();
+  const create = useCreatePartyMaster();
+  const update = useUpdatePartyMaster();
+  const remove = useDeletePartyMaster();
+  const done = () => invalidateBoth(getListPartyMasterCrudQueryKey(), getListPartyMasterQueryKey());
+
+  return (
+    <MasterTable
+      title="Parties"
+      description="Business parties (customers, suppliers, contractors)."
+      fields={[
+        { key: "name", label: "Name", placeholder: "e.g. Sunrise Textiles" },
+        { key: "code", label: "Code", placeholder: "e.g. SUN" },
+        { key: "wastePercent", label: "Waste%", placeholder: "1.00", type: "number", step: "any" },
+      ]}
+      rows={data as never}
+      isLoading={isLoading}
+      onAdd={(d) => new Promise((res, rej) => create.mutate({ data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onUpdate={(id, d) => new Promise((res, rej) => update.mutate({ id, data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+    />
+  );
+}
+
+// ─── Machine ────────────────────────────────────────────────────────────────
+function MachineTab() {
+  const invalidateBoth = useInvalidateBoth();
+  const { data, isLoading } = useListMachineMasterCrud();
+  const create = useCreateMachineMaster();
+  const update = useUpdateMachineMaster();
+  const remove = useDeleteMachineMaster();
+  const done = () => invalidateBoth(getListMachineMasterCrudQueryKey(), getListMachineMasterQueryKey());
+
+  return (
+    <MasterTable
+      title="Machines"
+      description="Knitting machines on the production floor."
+      fields={[
+        { key: "name", label: "Name", placeholder: "e.g. Circular Knitting Machine 1" },
+        { key: "machineNumber", label: "Machine Number", placeholder: "e.g. M-001" },
+        { key: "makingRate", label: "Making Rate", placeholder: "3.75", type: "number", step: "0.01", defaultValue: "3.75" },
+        { key: "needleChangeDate", label: "Needle Change Date", type: "date", defaultValue: new Date().toISOString().slice(0, 10) },
+        { key: "needleBrand", label: "Needle Brand", placeholder: "e.g. Sigma", defaultValue: "Sigma" },
+        { key: "sinkerChangeDate", label: "Sinker Change Date", type: "date", defaultValue: new Date().toISOString().slice(0, 10) },
+        { key: "sinkerBrand", label: "Sinker Brand", placeholder: "e.g. Kohala", defaultValue: "Kohala" },
+      ]}
+      rows={data as never}
+      isLoading={isLoading}
+      onAdd={(d) => new Promise((res, rej) => create.mutate({ data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onUpdate={(id, d) => new Promise((res, rej) => update.mutate({ id, data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+    />
+  );
+}
+
+// ─── Location ───────────────────────────────────────────────────────────────
+function LocationTab() {
+  const invalidateBoth = useInvalidateBoth();
+  const { data, isLoading } = useListLocationMasterCrud();
+  const create = useCreateLocationMaster();
+  const update = useUpdateLocationMaster();
+  const remove = useDeleteLocationMaster();
+  const done = () => invalidateBoth(getListLocationMasterCrudQueryKey(), getListLocationMasterQueryKey());
+
+  return (
+    <MasterTable
+      title="Locations"
+      description="Physical locations within the factory."
+      fields={[
+        { key: "name", label: "Name", placeholder: "e.g. Production Floor A" },
+        { key: "code", label: "Code", placeholder: "e.g. PFA" },
+      ]}
+      rows={data as never}
+      isLoading={isLoading}
+      onAdd={(d) => new Promise((res, rej) => create.mutate({ data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onUpdate={(id, d) => new Promise((res, rej) => update.mutate({ id, data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+    />
+  );
+}
+
+// ─── Yarn Type ──────────────────────────────────────────────────────────────
+function YarnTypeTab() {
+  const invalidateBoth = useInvalidateBoth();
+  const { data, isLoading } = useListYarnTypeMasterCrud();
+  const create = useCreateYarnTypeMaster();
+  const update = useUpdateYarnTypeMaster();
+  const remove = useDeleteYarnTypeMaster();
+  const done = () => invalidateBoth(getListYarnTypeMasterCrudQueryKey(), getListYarnTypeMasterQueryKey());
+
+  return (
+    <MasterTable
+      title="Yarn Types"
+      description="Types of yarn used in production (e.g. Cotton, Polyester)."
+      fields={[
+        { key: "name", label: "Name", placeholder: "e.g. Cotton" },
+        { key: "makeRate", label: "Make Rate", placeholder: "e.g. 12.50", type: "number", step: "any" },
+        { key: "code", label: "Code", placeholder: "e.g. COT" },
+      ]}
+      rows={data as never}
+      isLoading={isLoading}
+      onAdd={(d) => new Promise((res, rej) => create.mutate({ data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onUpdate={(id, d) => new Promise((res, rej) => update.mutate({ id, data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+    />
+  );
+}
+
+// ─── Yarn Count ─────────────────────────────────────────────────────────────
+function YarnCountTab() {
+  const invalidateBoth = useInvalidateBoth();
+  const { data, isLoading } = useListYarnCountMasterCrud();
+  const create = useCreateYarnCountMaster();
+  const update = useUpdateYarnCountMaster();
+  const remove = useDeleteYarnCountMaster();
+  const done = () => invalidateBoth(getListYarnCountMasterCrudQueryKey(), getListYarnCountMasterQueryKey());
+
+  return (
+    <MasterTable
+      title="Yarn Counts"
+      description="Yarn count values (thickness/fineness)."
+      fields={[
+        { key: "name", label: "Name", placeholder: "e.g. 30s (30)" },
+        { key: "count", label: "Count", placeholder: "e.g. 30" },
+      ]}
+      rows={data as never}
+      isLoading={isLoading}
+      onAdd={(d) => new Promise((res, rej) => create.mutate({ data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onUpdate={(id, d) => new Promise((res, rej) => update.mutate({ id, data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+    />
+  );
+}
+
+// ─── Yarn Brand ─────────────────────────────────────────────────────────────
+function YarnBrandTab() {
+  const invalidateBoth = useInvalidateBoth();
+  const { data, isLoading } = useListYarnBrandMasterCrud();
+  const create = useCreateYarnBrandMaster();
+  const update = useUpdateYarnBrandMaster();
+  const remove = useDeleteYarnBrandMaster();
+  const done = () => invalidateBoth(getListYarnBrandMasterCrudQueryKey(), getListYarnBrandMasterQueryKey());
+
+  return (
+    <MasterTable
+      title="Yarn Brands"
+      description="Yarn manufacturer/brand names."
+      fields={[
+        { key: "name", label: "Name", placeholder: "e.g. Vardhman" },
+        { key: "code", label: "Code", placeholder: "e.g. VAR" },
+      ]}
+      rows={data as never}
+      isLoading={isLoading}
+      onAdd={(d) => new Promise((res, rej) => create.mutate({ data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onUpdate={(id, d) => new Promise((res, rej) => update.mutate({ id, data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+    />
+  );
+}
+
+// ─── UOM ────────────────────────────────────────────────────────────────────
+function UomTab() {
+  const invalidateBoth = useInvalidateBoth();
+  const { data, isLoading } = useListUomMasterCrud();
+  const create = useCreateUomMaster();
+  const update = useUpdateUomMaster();
+  const remove = useDeleteUomMaster();
+  const done = () => invalidateBoth(getListUomMasterCrudQueryKey(), getListUomMasterQueryKey());
+
+  return (
+    <MasterTable
+      title="Units of Measure"
+      description="Units used for measuring quantities and weights."
+      fields={[
+        { key: "name", label: "Name", placeholder: "e.g. Kilogram" },
+        { key: "abbreviation", label: "Abbreviation", placeholder: "e.g. KG" },
+      ]}
+      rows={data as never}
+      isLoading={isLoading}
+      onAdd={(d) => new Promise((res, rej) => create.mutate({ data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onUpdate={(id, d) => new Promise((res, rej) => update.mutate({ id, data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+    />
+  );
+}
+
+// ─── Fabric Type ────────────────────────────────────────────────────────────
+function FabricTypeTab() {
+  const invalidateBoth = useInvalidateBoth();
+  const { data, isLoading } = useListFabricTypeMasterCrud();
+  const create = useCreateFabricTypeMaster();
+  const update = useUpdateFabricTypeMaster();
+  const remove = useDeleteFabricTypeMaster();
+  const done = () => invalidateBoth(getListFabricTypeMasterCrudQueryKey(), getListFabricTypeMasterQueryKey());
+
+  return (
+    <MasterTable
+      title="Fabric Types"
+      description="Types of fabric produced (e.g. Single Jersey, Rib)."
+      fields={[
+        { key: "name", label: "Name", placeholder: "e.g. Single Jersey" },
+        { key: "code", label: "Code", placeholder: "e.g. SJ" },
+      ]}
+      rows={data as never}
+      isLoading={isLoading}
+      onAdd={(d) => new Promise((res, rej) => create.mutate({ data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onUpdate={(id, d) => new Promise((res, rej) => update.mutate({ id, data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+    />
+  );
+}
+
+// ─── Department ─────────────────────────────────────────────────────────────
+function DepartmentTab() {
+  const invalidateBoth = useInvalidateBoth();
+  const { data, isLoading } = useListDepartmentMasterCrud();
+  const create = useCreateDepartmentMaster();
+  const update = useUpdateDepartmentMaster();
+  const remove = useDeleteDepartmentMaster();
+  const done = () => invalidateBoth(getListDepartmentMasterCrudQueryKey(), getListDepartmentMasterQueryKey());
+
+  return (
+    <MasterTable
+      title="Departments"
+      description="Departments within the factory (e.g. Administration, Knitting Production, Security)."
+      fields={[
+        { key: "name", label: "Name", placeholder: "e.g. Knitting Production" },
+        { key: "code", label: "Code", placeholder: "e.g. KNIT" },
+      ]}
+      rows={data as never}
+      isLoading={isLoading}
+      onAdd={(d) => new Promise((res, rej) => create.mutate({ data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onUpdate={(id, d) => new Promise((res, rej) => update.mutate({ id, data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+    />
+  );
+}
+
+// ─── Machine Operator (depends on Department for select options) ────────────
+function OperatorTab() {
+  const invalidateBoth = useInvalidateBoth();
+  const { data: operators, isLoading } = useListMachineOperatorMasterCrud();
+  const { data: departments } = useListDepartmentMasterCrud();
+  const create = useCreateMachineOperatorMaster();
+  const update = useUpdateMachineOperatorMaster();
+  const remove = useDeleteMachineOperatorMaster();
+  const done = () => invalidateBoth(getListMachineOperatorMasterCrudQueryKey(), getListMachineOperatorMasterQueryKey());
+
+  return (
+    <MasterTable
+      title="Machine Operators"
+      description="Operators assigned to machines during production runs."
+      fields={[
+        { key: "name", label: "Name", placeholder: "e.g. Operator Alpha" },
+        { key: "code", label: "Code", placeholder: "e.g. OPA" },
+        { key: "departmentId", label: "Department", type: "select", displayKey: "departmentName", placeholder: "Select department", options: (departments ?? []).map((d) => ({ value: String(d.id), label: d.name })) },
+        { key: "baseSalary", label: "Base Salary", placeholder: "e.g. 15000.00", type: "number", step: "0.01" },
+        { key: "overtimeRateHr", label: "Overtime Rate/Hr", placeholder: "e.g. 50.00", type: "number", step: "0.01" },
+        { key: "attAllowance", label: "Att. Allowance", placeholder: "e.g. 500.00", type: "number", step: "0.01" },
+        { key: "othAllowance", label: "Oth. Allowance", placeholder: "e.g. 200.00", type: "number", step: "0.01" },
+        { key: "active", label: "Active", type: "checkbox", defaultValue: "true" },
+      ]}
+      rows={(operators ?? []).map((o) => ({
+        ...o,
+        departmentName: (departments ?? []).find((d) => d.id === (o as { departmentId?: number | null }).departmentId)?.name ?? null,
+        active: String((o as { active?: boolean }).active ?? true),
+      })) as never}
+      isLoading={isLoading}
+      onAdd={(d) => new Promise((res, rej) => create.mutate({ data: { ...d, departmentId: d.departmentId ? Number(d.departmentId) : null, active: d.active !== "false" } as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onUpdate={(id, d) => new Promise((res, rej) => update.mutate({ id, data: { ...d, departmentId: d.departmentId ? Number(d.departmentId) : null, active: d.active !== "false" } as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+      onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+    />
   );
 }
