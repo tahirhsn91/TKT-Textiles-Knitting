@@ -2,12 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>Fabric Factory Management</title>
+    <!-- maximum-scale removed: it blocks pinch-zoom on the shop-floor tablet. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TKT Textiles — Knitting Operations</title>
+    <meta name="theme-color" content="#1E211B" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- No webfont CDN. System stacks only: the office should not wait on a
+         third-party font host, and the app must render offline. -->
   </head>
   <body>
     <div id="root"></div>

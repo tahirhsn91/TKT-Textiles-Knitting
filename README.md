@@ -22,9 +22,14 @@ cd TKT-Textiles-Knitting
 docker compose up --build
 ```
 
-- **Frontend** → http://localhost:3000
-- **Backend API** → http://localhost:8080/api
-- **PostgreSQL** → localhost:5432 (user: `postgres`, password: `password`, db: `heliumdb`)
+- **Frontend** → http://localhost:3001
+- **Backend API** → http://localhost:8081/api
+- **PostgreSQL** → localhost:5433 (user: `postgres`, password: `password`, db: `heliumdb`)
+
+Host ports are chosen to avoid clashing with other local stacks. Override any of
+them in `.env` with `FRONTEND_PORT`, `BACKEND_PORT` or `POSTGRES_PORT`; the ports
+inside the containers never change, so the frontend always reaches the backend
+over the internal Docker network regardless.
 
 The database is automatically seeded with the current production data on first startup.
 

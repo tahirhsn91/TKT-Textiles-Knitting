@@ -45,6 +45,11 @@
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
 
+  /* Signal — the TKT brand colour. Rationed on purpose: selvedge, focus, one
+     primary action per screen. See the palette note below. */
+  --color-signal: hsl(var(--signal));
+  --color-signal-foreground: hsl(var(--signal-foreground));
+
   --color-sidebar: hsl(var(--sidebar));
   --color-sidebar-foreground: hsl(var(--sidebar-foreground));
   --color-sidebar-border: hsl(var(--sidebar-border));
@@ -74,56 +79,89 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  /* Industrial Slate & Blue Palette */
-  --background: 210 20% 98%;
-  --foreground: 222 47% 11%;
-  
-  --border: 214 32% 91%;
-  --input: 214 32% 91%;
-  --ring: 222 47% 11%;
+  /* ─────────────────────────────────────────────────────────────────────────
+   * TKT — "Mass Balance"
+   *
+   * The palette comes off the knitting floor, not off a chart of blues:
+   *   Greige   #F2F3EE  unbleached knitted cloth — the page
+   *   Bleach   #FFFFFF  finished goods — the cards
+   *   Graphite #1E211B  ink, a green-black rather than a blue-slate
+   *   Machine  #6B7166  faded machine paint — secondary text and chrome
+   *   Signal   #FF3C00  TKT brand. Rationed: selvedge, focus ring, one
+   *                     primary action per screen. Never a card fill.
+   *   Vat      #26456E  indigo. The workhorse data colour, so charts never
+   *                     have to borrow the brand colour.
+   *   Madder   #A32E3C  loss, shortage, destruction. Deep and pink-leaning
+   *                     so it can never be mistaken for Signal.
+   * ───────────────────────────────────────────────────────────────────────── */
+
+  --signal: 14 100% 50%;
+  /* Graphite, not white: white on Signal measures 3.56:1 and fails AA for body
+     text, Graphite measures 4.52:1 and passes — and dark-on-hi-vis is the more
+     honest industrial reference anyway. */
+  --signal-foreground: 89 10% 12%;
+
+  --background: 72 16% 95%;
+  --foreground: 89 10% 12%;
+
+  --border: 80 12% 87%;
+  --input: 80 12% 84%;
+  --ring: 14 100% 50%;          /* focus is always Signal — the one place it earns its keep */
 
   --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  --card-border: 214 32% 91%;
+  --card-foreground: 89 10% 12%;
+  --card-border: 80 12% 88%;
 
-  --sidebar: 210 20% 98%;
-  --sidebar-foreground: 222 47% 11%;
-  --sidebar-border: 214 32% 91%;
-  --sidebar-primary: 222 47% 11%;
-  --sidebar-primary-foreground: 210 40% 98%;
-  --sidebar-accent: 210 40% 96%;
-  --sidebar-accent-foreground: 222 47% 11%;
-  --sidebar-ring: 222 47% 11%;
+  /* The sidebar is a bezel, not a panel: dark ground so the light work area
+     reads unmistakably as the work area. */
+  --sidebar: 89 12% 13%;
+  --sidebar-foreground: 75 10% 78%;
+  --sidebar-border: 89 9% 21%;
+  --sidebar-primary: 14 100% 50%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 89 10% 19%;
+  --sidebar-accent-foreground: 60 14% 96%;
+  --sidebar-ring: 14 100% 50%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
-  --popover-border: 214 32% 91%;
+  --popover-foreground: 89 10% 12%;
+  --popover-border: 80 12% 88%;
 
-  --primary: 222 47% 11%;
-  --primary-foreground: 210 40% 98%;
+  /* Primary stays Graphite. There are hundreds of buttons in this app and
+     Signal at that surface area is punishing over a six-hour shift. */
+  --primary: 89 10% 14%;
+  --primary-foreground: 72 16% 96%;
 
-  --secondary: 210 40% 96%;
-  --secondary-foreground: 222 47% 11%;
+  --secondary: 78 14% 92%;
+  --secondary-foreground: 89 10% 16%;
 
-  --muted: 210 40% 96%;
-  --muted-foreground: 215.4 16.3% 46.9%;
+  --muted: 78 14% 92%;
+  --muted-foreground: 92 8% 40%;
 
-  --accent: 210 40% 96%;
-  --accent-foreground: 222 47% 11%;
+  --accent: 78 16% 90%;
+  --accent-foreground: 89 10% 14%;
 
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive: 353 56% 41%;
+  --destructive-foreground: 0 0% 100%;
 
-  --chart-1: 221.2 83.2% 53.3%;
-  --chart-2: 212 95% 68%;
-  --chart-3: 216 92% 60%;
-  --chart-4: 210 98% 78%;
-  --chart-5: 212 97% 87%;
+  /* Chart ramp reads as dye lots, not a hue rotation. Signal sits last so it
+     only appears when a series count actually demands it. */
+  --chart-1: 214 49% 32%;   /* vat indigo   */
+  --chart-2: 96 22% 40%;    /* machine green*/
+  --chart-3: 38 74% 45%;    /* ochre        */
+  --chart-4: 353 46% 46%;   /* madder       */
+  --chart-5: 14 100% 50%;   /* signal       */
 
-  --app-font-sans: 'Inter', sans-serif;
-  --app-font-serif: Georgia, serif;
-  --app-font-mono: 'JetBrains Mono', monospace;
-  --radius: 0.3rem; /* Crisper borders */
+  /* System stacks only — no CDN, works on a factory floor with no internet.
+     Personality comes from weight, tracking and the mono numeral spine. */
+  --app-font-sans: ui-sans-serif, system-ui, "Segoe UI Variable Text", "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --app-font-serif: Georgia, "Times New Roman", serif;
+  --app-font-mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", "SF Mono",
+    Menlo, Consolas, "Liberation Mono", monospace;
+  /* Down from 0.3rem. Crisp enough to read as machined — but not 0, which is
+     its own cliché. Derived scale lands at sm 1px / md 3px / lg 5px. */
+  --radius: 0.3125rem;
 
   --shadow-2xs: 0px 1px 2px 0px rgba(0, 0, 0, 0.05);
   --shadow-xs: 0px 1px 2px 0px rgba(0, 0, 0, 0.05);
@@ -153,50 +191,53 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  --background: 222 47% 11%;
-  --foreground: 210 40% 98%;
-  
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 212.7 26.8% 83.9%;
+  --signal: 14 100% 55%;
+  --signal-foreground: 89 12% 8%;
 
-  --card: 222 47% 11%;
-  --card-foreground: 210 40% 98%;
-  --card-border: 217.2 32.6% 17.5%;
+  --background: 89 12% 10%;
+  --foreground: 72 14% 92%;
 
-  --sidebar: 222 47% 11%;
-  --sidebar-foreground: 210 40% 98%;
-  --sidebar-border: 217.2 32.6% 17.5%;
-  --sidebar-primary: 210 40% 98%;
-  --sidebar-primary-foreground: 222 47% 11%;
-  --sidebar-accent: 217.2 32.6% 17.5%;
-  --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-ring: 212.7 26.8% 83.9%;
+  --border: 89 9% 20%;
+  --input: 89 9% 24%;
+  --ring: 14 100% 55%;
 
-  --popover: 222 47% 11%;
-  --popover-foreground: 210 40% 98%;
-  --popover-border: 217.2 32.6% 17.5%;
+  --card: 89 11% 13%;
+  --card-foreground: 72 14% 92%;
+  --card-border: 89 9% 20%;
 
-  --primary: 210 40% 98%;
-  --primary-foreground: 222 47% 11%;
+  --sidebar: 89 13% 8%;
+  --sidebar-foreground: 75 10% 76%;
+  --sidebar-border: 89 9% 18%;
+  --sidebar-primary: 14 100% 55%;
+  --sidebar-primary-foreground: 89 12% 8%;
+  --sidebar-accent: 89 10% 16%;
+  --sidebar-accent-foreground: 60 14% 95%;
+  --sidebar-ring: 14 100% 55%;
 
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
+  --popover: 89 11% 13%;
+  --popover-foreground: 72 14% 92%;
+  --popover-border: 89 9% 20%;
 
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
+  --primary: 72 14% 92%;
+  --primary-foreground: 89 12% 10%;
 
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
+  --secondary: 89 9% 18%;
+  --secondary-foreground: 72 14% 92%;
 
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
+  --muted: 89 9% 18%;
+  --muted-foreground: 84 8% 62%;
 
-  --chart-1: 212 95% 68%;
-  --chart-2: 216 92% 60%;
-  --chart-3: 210 98% 78%;
-  --chart-4: 212 97% 87%;
-  --chart-5: 221.2 83.2% 53.3%;
+  --accent: 89 9% 20%;
+  --accent-foreground: 72 14% 92%;
+
+  --destructive: 353 52% 48%;
+  --destructive-foreground: 0 0% 100%;
+
+  --chart-1: 214 56% 58%;   /* vat indigo, lifted for dark ground */
+  --chart-2: 96 26% 55%;    /* machine green */
+  --chart-3: 38 78% 58%;    /* ochre         */
+  --chart-4: 353 55% 58%;   /* madder        */
+  --chart-5: 14 100% 58%;   /* signal        */
 }
 
 @layer base {
@@ -206,6 +247,101 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    font-synthesis-weight: none;
+  }
+
+  /* Headings are the prose voice: tight, sentence case, no decoration. */
+  h1, h2, h3, h4 {
+    letter-spacing: -0.018em;
+  }
+
+  /* The instrument voice.
+   *
+   * Every figure in this app is a weight, a rate, a count or a date, and the
+   * whole product exists to make a kilogram traceable from cone to roll. So
+   * numerals get lining, tabular, slashed-zero treatment everywhere they
+   * appear in tabular or entry context — columns of kg align on the decimal,
+   * and a transposed digit changes the shape of the column. */
+  th, td, input, textarea, select {
+    font-variant-numeric: tabular-nums slashed-zero;
+  }
+
+  /* Focus is Signal, always, and never invisible. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--signal));
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Numerals rendered in the mono stack. Apply to any standalone figure —
+     KPI values, totals, balances — not to running prose. */
+  .num {
+    font-family: var(--app-font-mono);
+    font-variant-numeric: tabular-nums slashed-zero;
+    letter-spacing: -0.02em;
+  }
+
+  /* Stamped label. Column heads, card eyebrows, section markers. */
+  .eyebrow {
+    font-size: 0.6875rem;
+    line-height: 1.1;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* ── Signature: the selvedge ────────────────────────────────────────────
+   * The finished, non-fraying edge of a knitted panel. A 3px Signal band on
+   * the leading edge marks what is active or what leads a card. It is the
+   * only place the brand colour appears in the chrome, and it is the one
+   * thing this interface should be remembered by. */
+  .selvedge {
+    position: relative;
+  }
+  .selvedge::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: hsl(var(--signal));
+  }
+  /* Horizontal variant — a short tick above a figure. Standalone: does not
+     need .selvedge alongside it. */
+  .selvedge-top {
+    position: relative;
+  }
+  .selvedge-top::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+    width: 2rem;
+    height: 3px;
+    background: hsl(var(--signal));
+  }
+
+  /* The single most important action on a screen. Deliberately not the
+     default button variant — scarcity is the point. */
+  .btn-signal {
+    background: hsl(var(--signal));
+    color: hsl(var(--signal-foreground));
+    border-color: hsl(var(--signal));
+  }
+  .btn-signal:hover {
+    background: hsl(var(--signal) / 0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

@@ -1,0 +1,9 @@
+# Same reason as the frontend: `COPY . .` must not overwrite the image's own
+# Linux node_modules with the host's Windows build. Also keeps the local .env
+# out of the image — the container gets its config from docker-compose.
+node_modules
+dist
+.env
+.env.*
+npm-debug.log*
+.DS_Store

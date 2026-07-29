@@ -6,19 +6,33 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer,
 } from "recharts";
-import {
-  Activity, Weight, Cpu,
-} from "lucide-react";
 import { Layout } from "@/components/layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-const COLORS = [
-  "#6366f1", "#f59e0b", "#10b981", "#3b82f6",
-  "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6",
-  "#f97316", "#84cc16",
+/**
+ * Recharts writes colours as SVG presentation attributes, where var() does not
+ * resolve — so these literals mirror the light-mode tokens in index.css.
+ * Keep them in step if the tokens move.
+ */
+const TOKEN = {
+  ink: "#1F221C",
+  machine: "#656E5E",
+  rule: "#DFE2DA",
+  card: "#FFFFFF",
+  signal: "#FF3C00",
+};
+
+/**
+ * Dye lots, not a hue rotation. Vat indigo carries the workhorse series so the
+ * charts never have to borrow the brand colour; Signal sits last and only turns
+ * up when a series count genuinely demands it.
+ */
+const DYE = [
+  "#2A4C7A", "#627C50", "#C8891E", "#AB3F4C", "#FF3C00",
+  "#4E729E", "#87A173", "#E0AC55", "#C97682", "#FF7A4D",
 ];
 
 function fmt(n: number, decimals = 1) {
@@ -53,45 +67,51 @@ function useWidget<T>(key: string): UseQueryResult<T> {
   });
 }
 
-const CustomTooltipStyle = {
-  contentStyle: {
-    background: "hsl(var(--card))",
-    border: "1px solid hsl(var(--border))",
-    borderRadius: 8,
-    fontSize: 12,
-  },
-};
+const tooltipStyle = {
+  background: TOKEN.card,
+  border: `1px solid ${TOKEN.rule}`,
+  borderRadius: 3,
+  fontSize: 12,
+  fontFamily: "var(--app-font-mono)",
+  padding: "6px 10px",
+} as const;
+
+const axisTick = { fontSize: 11, fill: TOKEN.machine, fontFamily: "var(--app-font-mono)" };
 
 // ── Presentational helpers ───────────────────────────────────────────────────
-function KpiCard({
-  title, value, sub, icon: Icon, color,
+
+/**
+ * One reading on the panel. No icon chip: in a mass-balance system the number
+ * is the subject, and a coloured square next to it only competes with it.
+ */
+function Reading({
+  label, value, unit, sub, lead = false,
 }: {
-  title: string;
+  label: string;
   value: string;
+  unit?: string;
   sub: string;
-  icon: React.ElementType;
-  color: string;
+  lead?: boolean;
 }) {
   return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <p className="text-sm text-muted-foreground font-medium">{title}</p>
-            <p className="text-2xl font-bold tracking-tight">{value}</p>
-            <p className="text-xs text-muted-foreground">{sub}</p>
-          </div>
-          <div className={`p-2 rounded-lg ${color}`}>
-            <Icon className="h-5 w-5 text-white" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <div className={`px-6 py-5 ${lead ? "selvedge-top" : ""}`}>
+      <p className="eyebrow">{label}</p>
+      <p className="mt-3 flex items-baseline gap-1.5">
+        <span className="num text-[2.125rem] font-medium leading-none text-foreground">
+          {value}
+        </span>
+        {unit && (
+          <span className="text-sm font-medium text-muted-foreground">{unit}</span>
+        )}
+      </p>
+      <p className="mt-2 text-xs text-muted-foreground">{sub}</p>
+    </div>
   );
 }
 
 function ChartCard({
   title,
+  scope,
   isLoading,
   isError,
   isEmpty,
@@ -99,6 +119,7 @@ function ChartCard({
   children,
 }: {
   title: string;
+  scope: string;
   isLoading: boolean;
   isError: boolean;
   isEmpty?: boolean;
@@ -106,22 +127,21 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card>
-      <CardHeader className="pb-2 pt-4 px-5">
-        <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="px-4 pb-4">
+    <Card className="overflow-hidden">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-3.5">
+        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+        <span className="eyebrow">{scope}</span>
+      </div>
+      <CardContent className="px-3 pt-4 pb-3">
         {isLoading ? (
           <Skeleton className="w-full" style={{ height }} />
         ) : isError ? (
-          <div className="flex items-center justify-center text-destructive text-sm" style={{ height }}>
-            Failed to load.
+          <div className="flex items-center justify-center px-2 text-sm text-destructive" style={{ height }}>
+            Couldn't load this chart. Reload the page to try again.
           </div>
         ) : isEmpty ? (
-          <div className="flex items-center justify-center text-muted-foreground text-sm" style={{ height }}>
-            No data for this period
+          <div className="flex items-center justify-center px-2 text-sm text-muted-foreground" style={{ height }}>
+            Nothing recorded for this period yet.
           </div>
         ) : (
           children
@@ -132,27 +152,51 @@ function ChartCard({
 }
 
 // ── KPI row widget ───────────────────────────────────────────────────────────
-function KpiRow() {
+function ReadingPanel() {
   const { data, isLoading, isError } = useWidget<Kpis>("kpis");
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[...Array(3)].map((_, i) => (
-          <Card key={i}><CardContent className="p-5"><Skeleton className="h-20 w-full" /></CardContent></Card>
-        ))}
-      </div>
+      <Card>
+        <div className="grid grid-cols-1 divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="px-6 py-5"><Skeleton className="h-[5.5rem] w-full" /></div>
+          ))}
+        </div>
+      </Card>
     );
   }
   if (isError || !data) {
-    return <p className="text-destructive text-sm">Failed to load KPIs.</p>;
+    return (
+      <Card>
+        <CardContent className="px-6 py-5 text-sm text-destructive">
+          Couldn't load the headline figures. Reload the page to try again.
+        </CardContent>
+      </Card>
+    );
   }
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <KpiCard title="Total Transactions" value={data.totalTransactions.toLocaleString()} sub="transaction headers this month" icon={Activity} color="bg-indigo-500" />
-      <KpiCard title="Total Net Weight" value={`${fmt(data.totalNetWeight)} kg`} sub="net weight produced this month" icon={Weight} color="bg-amber-500" />
-      <KpiCard title="Active Machines" value={String(data.activeMachines)} sub="machines with activity this month" icon={Cpu} color="bg-emerald-500" />
-    </div>
+    <Card className="overflow-hidden">
+      <div className="grid grid-cols-1 divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <Reading
+          lead
+          label="Net weight produced"
+          value={fmt(data.totalNetWeight, 1)}
+          unit="kg"
+          sub="Fabric off the machines this month"
+        />
+        <Reading
+          label="Transactions"
+          value={data.totalTransactions.toLocaleString()}
+          sub="Yarn-to-fabric headers recorded"
+        />
+        <Reading
+          label="Machines running"
+          value={String(data.activeMachines)}
+          sub="With recorded activity this month"
+        />
+      </div>
+    </Card>
   );
 }
 
@@ -160,20 +204,31 @@ function KpiRow() {
 function MonthlyTrendWidget() {
   const { data, isLoading, isError } = useWidget<TrendPoint[]>("monthly-trend");
   return (
-    <ChartCard title="Monthly Production Trend — Last 12 Months" isLoading={isLoading} isError={isError} isEmpty={data?.length === 0}>
-      <ResponsiveContainer width="100%" height={220}>
-        <AreaChart data={data} {...CustomTooltipStyle}>
+    <ChartCard
+      title="Production trend"
+      scope="Last 12 months"
+      isLoading={isLoading}
+      isError={isError}
+      isEmpty={data?.length === 0}
+      height={240}
+    >
+      <ResponsiveContainer width="100%" height={240}>
+        <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="gradNW" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+              <stop offset="0%" stopColor={DYE[0]} stopOpacity={0.22} />
+              <stop offset="100%" stopColor={DYE[0]} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-          <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
-          <Tooltip contentStyle={CustomTooltipStyle.contentStyle} formatter={(v: number) => [`${v.toFixed(2)} kg`, "Net Weight"]} />
-          <Area type="monotone" dataKey="netWeight" stroke="#6366f1" strokeWidth={2} fill="url(#gradNW)" name="Net Weight (kg)" />
+          <CartesianGrid stroke={TOKEN.rule} vertical={false} />
+          <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={{ stroke: TOKEN.rule }} />
+          <YAxis tick={axisTick} tickLine={false} axisLine={false} tickFormatter={(v) => fmt(v)} width={48} />
+          <Tooltip
+            contentStyle={tooltipStyle}
+            cursor={{ stroke: TOKEN.signal, strokeWidth: 1 }}
+            formatter={(v: number) => [`${v.toFixed(2)} kg`, "Net weight"]}
+          />
+          <Area type="monotone" dataKey="netWeight" stroke={DYE[0]} strokeWidth={2} fill="url(#gradNW)" name="Net weight (kg)" />
         </AreaChart>
       </ResponsiveContainer>
     </ChartCard>
@@ -184,22 +239,36 @@ function MonthlyTrendWidget() {
 function DailyProductionWidget() {
   const { data, isLoading, isError } = useWidget<DailyPoint[]>("daily-production");
   return (
-    <ChartCard title="Daily Production Volume — Last 30 Days" isLoading={isLoading} isError={isError} isEmpty={data?.length === 0}>
+    <ChartCard
+      title="Daily volume"
+      scope="Last 30 days"
+      isLoading={isLoading}
+      isError={isError}
+      isEmpty={data?.length === 0}
+    >
       <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={data} barSize={6}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-          <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v: string) => v.slice(5)} interval="preserveStartEnd" />
-          <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
+        <BarChart data={data} barSize={6} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid stroke={TOKEN.rule} vertical={false} />
+          <XAxis
+            dataKey="date"
+            tick={axisTick}
+            tickLine={false}
+            axisLine={{ stroke: TOKEN.rule }}
+            tickFormatter={(v: string) => v.slice(5)}
+            interval="preserveStartEnd"
+          />
+          <YAxis tick={axisTick} tickLine={false} axisLine={false} tickFormatter={(v) => fmt(v)} width={48} />
           <Tooltip
-            contentStyle={CustomTooltipStyle.contentStyle}
+            contentStyle={tooltipStyle}
+            cursor={{ fill: "rgba(31,34,28,0.05)" }}
             formatter={(v: number, name: string) => [
               name === "netWeight" ? `${v.toFixed(2)} kg` : v.toFixed(2),
-              name === "netWeight" ? "Net Weight" : "Quantity",
+              name === "netWeight" ? "Net weight" : "Quantity",
             ]}
           />
-          <Legend wrapperStyle={{ fontSize: 11 }} />
-          <Bar dataKey="quantity" fill="#f59e0b" name="Quantity" radius={[2, 2, 0, 0]} />
-          <Bar dataKey="netWeight" fill="#6366f1" name="Net Weight (kg)" radius={[2, 2, 0, 0]} />
+          <Legend wrapperStyle={{ fontSize: 11, color: TOKEN.machine }} />
+          <Bar dataKey="quantity" fill={DYE[2]} name="Quantity" radius={[1, 1, 0, 0]} />
+          <Bar dataKey="netWeight" fill={DYE[0]} name="Net weight (kg)" radius={[1, 1, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </ChartCard>
@@ -210,101 +279,141 @@ function DailyProductionWidget() {
 function FabricBreakdownWidget() {
   const { data, isLoading, isError } = useWidget<NameValue[]>("fabric-breakdown");
   return (
-    <ChartCard title="Production by Fabric Type — This Month" isLoading={isLoading} isError={isError} isEmpty={data?.length === 0}>
+    <ChartCard
+      title="Production by fabric type"
+      scope="This month"
+      isLoading={isLoading}
+      isError={isError}
+      isEmpty={data?.length === 0}
+    >
       <ResponsiveContainer width="100%" height={220}>
         <PieChart>
           <Pie
             data={data}
             cx="50%"
             cy="50%"
-            innerRadius={55}
-            outerRadius={85}
-            paddingAngle={2}
+            innerRadius={58}
+            outerRadius={84}
+            paddingAngle={1}
             dataKey="value"
             nameKey="name"
+            stroke={TOKEN.card}
+            strokeWidth={2}
             label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
             labelLine={false}
           >
             {(data ?? []).map((_, i) => (
-              <Cell key={i} fill={COLORS[i % COLORS.length]} />
+              <Cell key={i} fill={DYE[i % DYE.length]} />
             ))}
           </Pie>
-          <Tooltip contentStyle={CustomTooltipStyle.contentStyle} formatter={(v: number) => [`${v.toFixed(2)} kg`, "Net Weight"]} />
+          <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v.toFixed(2)} kg`, "Net weight"]} />
         </PieChart>
       </ResponsiveContainer>
     </ChartCard>
   );
 }
 
-// ── Top parties widget ───────────────────────────────────────────────────────
+// ── Ranked horizontal bar, shared by the three "top N" widgets ───────────────
+function RankedBars<T extends Record<string, unknown>>({
+  title, scope, data, isLoading, isError, dataKey, seriesName, color, formatter, numeric,
+}: {
+  title: string;
+  scope: string;
+  data: T[] | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  dataKey: string;
+  seriesName: string;
+  color: string;
+  formatter: (v: number) => [string, string];
+  numeric?: boolean;
+}) {
+  const height = Math.max(180, (data?.length ?? 6) * 28 + 30);
+  return (
+    <ChartCard
+      title={title}
+      scope={scope}
+      isLoading={isLoading}
+      isError={isError}
+      isEmpty={data?.length === 0}
+      height={height}
+    >
+      <ResponsiveContainer width="100%" height={Math.max(180, (data?.length ?? 0) * 28 + 30)}>
+        <BarChart data={data} layout="vertical" margin={{ left: 8, right: 28, top: 4, bottom: 4 }}>
+          <CartesianGrid stroke={TOKEN.rule} horizontal={false} />
+          <XAxis
+            type="number"
+            tick={axisTick}
+            tickLine={false}
+            axisLine={false}
+            allowDecimals={!numeric}
+            tickFormatter={numeric ? (v) => fmt(v) : undefined}
+          />
+          <YAxis
+            dataKey="name"
+            type="category"
+            tick={{ fontSize: 11, fill: TOKEN.ink }}
+            tickLine={false}
+            axisLine={{ stroke: TOKEN.rule }}
+            width={118}
+          />
+          <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(31,34,28,0.05)" }} formatter={formatter} />
+          <Bar dataKey={dataKey} fill={color} name={seriesName} radius={[0, 1, 1, 0]} barSize={14} />
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartCard>
+  );
+}
+
 function TopPartiesWidget() {
   const { data, isLoading, isError } = useWidget<NameCount[]>("top-parties");
   return (
-    <ChartCard
-      title="Top Parties by Transaction Count — This Month"
+    <RankedBars
+      title="Top parties"
+      scope="By transaction count, this month"
+      data={data}
       isLoading={isLoading}
       isError={isError}
-      isEmpty={data?.length === 0}
-      height={Math.max(180, (data?.length ?? 6) * 28 + 30)}
-    >
-      <ResponsiveContainer width="100%" height={Math.max(180, (data?.length ?? 0) * 28 + 30)}>
-        <BarChart data={data} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-          <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-          <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={110} />
-          <Tooltip contentStyle={CustomTooltipStyle.contentStyle} formatter={(v: number) => [v, "Transactions"]} />
-          <Bar dataKey="count" fill="#10b981" name="Transactions" radius={[0, 3, 3, 0]} barSize={16} />
-        </BarChart>
-      </ResponsiveContainer>
-    </ChartCard>
+      dataKey="count"
+      seriesName="Transactions"
+      color={DYE[1]}
+      formatter={(v: number) => [String(v), "Transactions"]}
+    />
   );
 }
 
-// ── Machine utilization widget ───────────────────────────────────────────────
 function MachineUtilizationWidget() {
   const { data, isLoading, isError } = useWidget<NameLines[]>("machine-utilization");
   return (
-    <ChartCard
-      title="Machine Utilization — This Month"
+    <RankedBars
+      title="Machine utilisation"
+      scope="By transaction lines, this month"
+      data={data}
       isLoading={isLoading}
       isError={isError}
-      isEmpty={data?.length === 0}
-      height={Math.max(180, (data?.length ?? 6) * 28 + 30)}
-    >
-      <ResponsiveContainer width="100%" height={Math.max(180, (data?.length ?? 0) * 28 + 30)}>
-        <BarChart data={data} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-          <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-          <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={110} />
-          <Tooltip contentStyle={CustomTooltipStyle.contentStyle} formatter={(v: number) => [v, "Transaction Lines"]} />
-          <Bar dataKey="lines" fill="#3b82f6" name="Lines" radius={[0, 3, 3, 0]} barSize={16} />
-        </BarChart>
-      </ResponsiveContainer>
-    </ChartCard>
+      dataKey="lines"
+      seriesName="Lines"
+      color={DYE[0]}
+      formatter={(v: number) => [String(v), "Transaction lines"]}
+    />
   );
 }
 
-// ── Operator output widget ───────────────────────────────────────────────────
 function OperatorOutputWidget() {
   const { data, isLoading, isError } = useWidget<NameNetWeight[]>("operator-output");
   return (
-    <ChartCard
-      title="Top Operators by Net Weight — This Month"
+    <RankedBars
+      title="Top operators"
+      scope="By net weight, this month"
+      data={data}
       isLoading={isLoading}
       isError={isError}
-      isEmpty={data?.length === 0}
-      height={Math.max(180, (data?.length ?? 6) * 28 + 30)}
-    >
-      <ResponsiveContainer width="100%" height={Math.max(180, (data?.length ?? 0) * 28 + 30)}>
-        <BarChart data={data} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-          <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} />
-          <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={110} />
-          <Tooltip contentStyle={CustomTooltipStyle.contentStyle} formatter={(v: number) => [`${v.toFixed(2)} kg`, "Net Weight"]} />
-          <Bar dataKey="netWeight" fill="#8b5cf6" name="Net Weight (kg)" radius={[0, 3, 3, 0]} barSize={16} />
-        </BarChart>
-      </ResponsiveContainer>
-    </ChartCard>
+      dataKey="netWeight"
+      seriesName="Net weight (kg)"
+      color={DYE[3]}
+      formatter={(v: number) => [`${v.toFixed(2)} kg`, "Net weight"]}
+      numeric
+    />
   );
 }
 
@@ -315,26 +424,27 @@ export default function DashboardPage() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          {kpis && (
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Overview for {kpis.periodLabel}
-            </p>
-          )}
-        </div>
+        <header className="border-b pb-5">
+          <p className="eyebrow">Knitting operations</p>
+          <h1 className="mt-2 text-[1.75rem] font-semibold leading-none text-foreground">
+            Dashboard
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {kpis ? <>Figures for <span className="num">{kpis.periodLabel}</span>.</> : "Loading figures…"}
+          </p>
+        </header>
 
         {/* Each widget fetches and loads independently */}
-        <KpiRow />
+        <ReadingPanel />
 
         <MonthlyTrendWidget />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <DailyProductionWidget />
           <FabricBreakdownWidget />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <TopPartiesWidget />
           <MachineUtilizationWidget />
         </div>

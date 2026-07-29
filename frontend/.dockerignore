@@ -1,0 +1,9 @@
+# The Dockerfile runs `npm install` and then `COPY . .`. Without this file the
+# host's node_modules — built for Windows — lands on top of the Linux install
+# and the build dies on a missing @rollup/rollup-linux-x64-gnu.
+node_modules
+dist
+.env
+.env.*
+npm-debug.log*
+.DS_Store

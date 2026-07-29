@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TKT Textiles — Visual identity</title>
+<style>
+:root{
+  --signal:#FF3C00;
+  --greige:#F2F3EE;
+  --bleach:#FFFFFF;
+  --graphite:#1F221C;
+  --machine:#656E5E;
+  --rule:#DFE2DA;
+  --vat:#2A4C7A;
+  --moss:#627C50;
+  --ochre:#C8891E;
+  --madder:#AB3F4C;
+  --bezel:#1E211B;
+  --bezel-2:#2C3029;
+  --radius:5px;
+  --sans: ui-sans-serif, system-ui, "Segoe UI Variable Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono: ui-monospace,"Cascadia Mono","Segoe UI Mono","SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--greige);color:var(--graphite);font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;font-synthesis-weight:none}
+h1,h2,h3{letter-spacing:-.018em;margin:0}
+:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums slashed-zero;letter-spacing:-.02em}
+.eyebrow{font-size:.6875rem;line-height:1.1;font-weight:600;text-transform:uppercase;
+  letter-spacing:.14em;color:var(--machine)}
+.selvedge{position:relative}
+.selvedge::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--signal)}
+.selvedge-top{position:relative}
+.selvedge-top::before{content:"";position:absolute;left:0;top:0;width:2rem;height:3px;background:var(--signal)}
+
+.wrap{max-width:1180px;margin:0 auto;padding:48px 24px 96px}
+.doc-head{border-bottom:1px solid var(--rule);padding-bottom:28px;margin-bottom:40px;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.stitch{width:26px;height:26px;flex:none;color:var(--signal)}
+.mark{display:flex;align-items:center;gap:12px}
+.mark .name{font-size:1.0625rem;font-weight:600;letter-spacing:.12em}
+.mark .sub{font-size:.625rem;font-weight:500;text-transform:uppercase;letter-spacing:.16em;color:var(--machine);margin-top:4px}
+
+section{margin-bottom:52px}
+.sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
+  border-bottom:1px solid var(--rule);padding-bottom:10px;margin-bottom:22px;flex-wrap:wrap}
+.sec-head h2{font-size:.9375rem;font-weight:600}
+.note{font-size:.8125rem;line-height:1.6;color:var(--machine);max-width:62ch;margin:0 0 20px}
+
+/* ── shell mock ─────────────────────────────── */
+.shell{display:grid;grid-template-columns:232px 1fr;border:1px solid var(--rule);
+  border-radius:var(--radius);overflow:hidden;background:var(--greige)}
+.bezel{background:var(--bezel);color:#C4C9BE;padding:0 0 20px}
+.bezel .top{height:64px;display:flex;align-items:center;padding:0 16px;border-bottom:1px solid #33382F}
+.bezel .name{font-size:.9375rem;font-weight:600;letter-spacing:.12em;color:#F2F3EE}
+.navsec{padding:18px 12px 6px;font-size:.625rem;font-weight:600;text-transform:uppercase;
+  letter-spacing:.16em;color:#8B9282}
+.navitem{display:flex;align-items:center;gap:11px;margin:0 8px;padding:9px 12px;border-radius:var(--radius);
+  font-size:.875rem;font-weight:500;color:#A9AFA2}
+.navitem.on{background:var(--bezel-2);color:#F2F3EE}
+.navitem .dot{width:16px;height:16px;border:1.5px solid currentColor;border-radius:2px;opacity:.75;flex:none}
+.navsub{margin:2px 8px 2px 31px;padding:7px 10px;font-size:.8125rem;color:#8D9485;border-left:1px solid #33382F}
+.navsub.on{color:#F2F3EE;font-weight:600;border-left:none;padding-left:11px}
+.work{padding:28px 26px;min-width:0}
+
+.card{background:var(--bleach);border:1px solid var(--rule);border-radius:var(--radius);overflow:hidden}
+.panel{display:grid;grid-template-columns:repeat(3,1fr)}
+.reading{padding:20px 22px;border-left:1px solid var(--rule)}
+.reading:first-child{border-left:none}
+.reading .val{font-size:2.125rem;font-weight:500;line-height:1;margin:12px 0 0}
+.reading .unit{font-size:.875rem;font-weight:500;color:var(--machine);margin-left:5px}
+.reading .sub{font-size:.75rem;color:var(--machine);margin:8px 0 0}
+.card-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
+  border-bottom:1px solid var(--rule);padding:13px 18px}
+.card-head h3{font-size:.875rem;font-weight:600}
+
+/* pure-css bar chart */
+.chart{padding:20px 18px;display:flex;align-items:flex-end;gap:5px;height:150px}
+.chart i{flex:1;background:var(--vat);border-radius:1px 1px 0 0;display:block}
+
+table{width:100%;border-collapse:collapse;font-size:.8125rem}
+th{text-align:left;padding:9px 18px;border-bottom:1px solid var(--rule);
+  font-size:.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--machine)}
+td{padding:10px 18px;border-bottom:1px solid var(--rule);font-variant-numeric:tabular-nums slashed-zero}
+tr:last-child td{border-bottom:none}
+.r{text-align:right;font-family:var(--mono);letter-spacing:-.02em}
+.short{color:var(--madder);font-weight:600}
+
+/* ── palette ────────────────────────────────── */
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(184px,1fr));gap:14px}
+.sw{border:1px solid var(--rule);border-radius:var(--radius);overflow:hidden;background:var(--bleach)}
+.sw .chip{height:78px}
+.sw .meta{padding:11px 13px}
+.sw .nm{font-size:.8125rem;font-weight:600}
+.sw .hex{font-family:var(--mono);font-size:.75rem;color:var(--machine);margin-top:3px;letter-spacing:-.02em}
+.sw .use{font-size:.6875rem;color:var(--machine);margin-top:7px;line-height:1.5}
+
+/* ── type specimen ──────────────────────────── */
+.spec{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.spec .card{padding:22px}
+.spec .lbl{margin-bottom:14px}
+.prose-a{font-size:1.75rem;font-weight:600;letter-spacing:-.018em;line-height:1.15}
+.prose-b{font-size:.875rem;color:var(--machine);line-height:1.65;margin-top:12px}
+.instr{font-family:var(--mono);font-variant-numeric:tabular-nums slashed-zero;letter-spacing:-.02em}
+.instr .big{display:block;font-size:1.75rem;font-weight:500}
+.ladder{margin-top:14px;font-size:.9375rem;line-height:1.9;text-align:right;width:11ch}
+
+.btns{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{font-family:inherit;font-size:.8125rem;font-weight:500;padding:8px 15px;border-radius:3px;
+  border:1px solid var(--graphite);background:var(--graphite);color:var(--greige);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--graphite);border-color:var(--rule)}
+.btn.signal{background:var(--signal);border-color:var(--signal);color:var(--graphite);font-weight:600}
+.inp{font-family:var(--mono);font-size:.8125rem;padding:8px 11px;border:1px solid #D5D9CE;
+  border-radius:3px;background:var(--bleach);width:150px;text-align:right;
+  font-variant-numeric:tabular-nums slashed-zero}
+
+@media (max-width:820px){.shell{grid-template-columns:1fr}.bezel{display:none}.panel{grid-template-columns:1fr}
+  .reading{border-left:none;border-top:1px solid var(--rule)}.reading:first-child{border-top:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="doc-head">
+    <div class="mark">
+      <svg class="stitch" viewBox="0 0 40 40" aria-hidden="true">
+        <path d="M7 11 Q 14 14 20 27 Q 26 14 33 11" fill="none" stroke="currentColor"
+              stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <div class="name">TKT</div>
+        <div class="sub">Textiles</div>
+      </div>
+    </div>
+    <div style="text-align:right">
+      <p class="eyebrow">Visual identity</p>
+      <h1 style="font-size:1.5rem;font-weight:600;margin-top:8px">Mass Balance</h1>
+    </div>
+  </div>
+
+  <p class="note" style="max-width:70ch;font-size:.875rem;color:var(--graphite)">
+    The whole product exists to make a kilogram traceable from cone to roll. So the interface is
+    built as an instrument rather than a dashboard: numbers are the subject, colour is rationed,
+    and every figure sits on a monospaced grid where a transposed digit changes the shape of the column.
+  </p>
+
+  <!-- ── SHELL ─────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <h2>The shell</h2>
+      <span class="eyebrow">Sidebar, reading panel, tables</span>
+    </div>
+    <p class="note">
+      The sidebar is a bezel, not a panel — dark ground, so the light work area reads unmistakably
+      as the work area. The 3&nbsp;px orange band on the active item is the selvedge: the finished,
+      non-fraying edge of a knitted piece. It is the only place the brand colour appears in the chrome.
+    </p>
+
+    <div class="shell">
+      <div class="bezel">
+        <div class="top">
+          <div style="display:flex;align-items:center;gap:11px">
+            <svg class="stitch" style="width:20px;height:20px" viewBox="0 0 40 40" aria-hidden="true">
+              <path d="M7 11 Q 14 14 20 27 Q 26 14 33 11" fill="none" stroke="currentColor"
+                    stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div><div class="name">TKT</div>
+              <div style="font-size:.5625rem;text-transform:uppercase;letter-spacing:.16em;color:#8B9282;margin-top:3px">Textiles</div></div>
+          </div>
+        </div>
+        <div class="navsec">Overview</div>
+        <div class="navitem on selvedge"><span class="dot"></span>Dashboard</div>
+        <div class="navitem"><span class="dot"></span>Master Data</div>
+        <div class="navsec">Daily Work</div>
+        <div class="navitem"><span class="dot"></span>Transactions</div>
+        <div class="navsub">Yarn-Fabric Transactions</div>
+        <div class="navsub">Payroll Maintenance</div>
+        <div class="navsec">Analysis</div>
+        <div class="navitem"><span class="dot"></span>Reports</div>
+        <div class="navsub selvedge on">Yarn Balance Report</div>
+        <div class="navsub">Yarn to Fabric Movement</div>
+      </div>
+
+      <div class="work">
+        <div style="border-bottom:1px solid var(--rule);padding-bottom:18px;margin-bottom:20px">
+          <p class="eyebrow">Knitting operations</p>
+          <h2 style="font-size:1.75rem;font-weight:600;margin-top:8px;line-height:1">Dashboard</h2>
+          <p style="font-size:.8125rem;color:var(--machine);margin:9px 0 0">
+            Figures for <span class="num">July 2026</span>.
+          </p>
+        </div>
+
+        <div class="card panel">
+          <div class="reading selvedge-top">
+            <p class="eyebrow">Net weight produced</p>
+            <p class="val num">18.4<span class="unit">kg&nbsp;×1000</span></p>
+            <p class="sub">Fabric off the machines this month</p>
+          </div>
+          <div class="reading">
+            <p class="eyebrow">Transactions</p>
+            <p class="val num">1,204</p>
+            <p class="sub">Yarn-to-fabric headers recorded</p>
+          </div>
+          <div class="reading">
+            <p class="eyebrow">Machines running</p>
+            <p class="val num">14</p>
+            <p class="sub">With recorded activity this month</p>
+          </div>
+        </div>
+
+        <div style="height:16px"></div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>Production trend</h3>
+            <span class="eyebrow">Last 12 months</span>
+          </div>
+          <div class="chart">
+            <i style="height:46%"></i><i style="height:58%"></i><i style="height:41%"></i>
+            <i style="height:66%"></i><i style="height:72%"></i><i style="height:55%"></i>
+            <i style="height:80%"></i><i style="height:69%"></i><i style="height:88%"></i>
+            <i style="height:74%"></i><i style="height:95%"></i>
+            <i style="height:62%;background:var(--signal)"></i>
+          </div>
+        </div>
+
+        <div style="height:16px"></div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>Yarn balance</h3>
+            <span class="eyebrow">Open lots</span>
+          </div>
+          <table>
+            <thead><tr>
+              <th>Lot</th><th>Yarn</th>
+              <th style="text-align:right">Issued</th>
+              <th style="text-align:right">Returned</th>
+              <th style="text-align:right">Balance</th>
+            </tr></thead>
+            <tbody>
+              <tr><td class="num">L-24081</td><td>30s Combed</td><td class="r">1,240.50</td><td class="r">1,208.75</td><td class="r">31.75</td></tr>
+              <tr><td class="num">L-24082</td><td>40s Carded</td><td class="r">906.00</td><td class="r">902.40</td><td class="r">3.60</td></tr>
+              <tr><td class="num">L-24083</td><td>26s Polyester</td><td class="r">2,015.25</td><td class="r">1,860.00</td><td class="r short">155.25</td></tr>
+              <tr><td class="num">L-24084</td><td>30s Lycra Blend</td><td class="r">478.80</td><td class="r">474.10</td><td class="r">4.70</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="height:18px"></div>
+        <div class="btns">
+          <button class="btn signal">Record transaction</button>
+          <button class="btn">Save draft</button>
+          <button class="btn ghost">Export PDF</button>
+          <input class="inp" value="1,240.50" aria-label="Weight in kilograms">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PALETTE ───────────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <h2>Palette</h2>
+      <span class="eyebrow">Seven values, one of them rationed</span>
+    </div>
+    <p class="note">
+      Signal is TKT's brand colour and the loudest thing available, so it is spent in exactly three
+      places: the selvedge, the focus ring, and one primary action per screen. Charts run on vat
+      indigo instead, which keeps the orange meaningful when it does appear.
+    </p>
+    <div class="swatches">
+      <div class="sw"><div class="chip" style="background:#FF3C00"></div>
+        <div class="meta"><div class="nm">Signal</div><div class="hex">#FF3C00</div>
+        <div class="use">Selvedge, focus ring, one primary action. Never a card fill.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#1E211B"></div>
+        <div class="meta"><div class="nm">Graphite</div><div class="hex">#1E211B</div>
+        <div class="use">Ink and sidebar bezel. A green-black, not a blue-slate.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#F2F3EE;box-shadow:inset 0 0 0 1px #DFE2DA"></div>
+        <div class="meta"><div class="nm">Greige</div><div class="hex">#F2F3EE</div>
+        <div class="use">Page ground. Unbleached cloth before dyeing.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#656E5E"></div>
+        <div class="meta"><div class="nm">Machine</div><div class="hex">#656E5E</div>
+        <div class="use">Secondary text, labels, axis ticks. Faded machine paint.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#2A4C7A"></div>
+        <div class="meta"><div class="nm">Vat</div><div class="hex">#2A4C7A</div>
+        <div class="use">Indigo. The workhorse data series across every chart.</div></div></div>
+      <div class="sw"><div class="chip" style="background:#AB3F4C"></div>
+        <div class="meta"><div class="nm">Madder</div><div class="hex">#AB3F4C</div>
+        <div class="use">Loss, shortage, destructive actions. Deep enough never to read as Signal.</div></div></div>
+      <div class="sw"><div class="chip" style="background:linear-gradient(90deg,#2A4C7A 0 25%,#627C50 25% 50%,#C8891E 50% 75%,#AB3F4C 75% 100%)"></div>
+        <div class="meta"><div class="nm">Dye lots</div><div class="hex">chart-1 … chart-4</div>
+        <div class="use">The series ramp. Distinguishable by lightness as well as hue.</div></div></div>
+    </div>
+  </section>
+
+  <!-- ── TYPE ──────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <h2>Two voices</h2>
+      <span class="eyebrow">System stacks only — no webfont CDN</span>
+    </div>
+    <p class="note">
+      Prose gets the system UI stack with tight tracking. Every quantity gets the mono stack with
+      tabular, slashed-zero figures. That second voice is the identity, and it does real work:
+      columns of kilograms align on the decimal and a mistyped digit is visible at a glance.
+    </p>
+    <div class="spec">
+      <div class="card">
+        <p class="eyebrow lbl">Prose voice — system sans</p>
+        <div class="prose-a">Yarn to fabric movement</div>
+        <p class="prose-b">Every issue, return and adjustment against an open lot, so a shortage
+          is attributable to a machine, a shift and an operator rather than to the month.</p>
+      </div>
+      <div class="card">
+        <p class="eyebrow lbl">Instrument voice — system mono</p>
+        <div class="instr">
+          <span class="big">1,204.50 kg</span>
+          <div class="ladder">
+            1,240.50<br>906.00<br>2,015.25<br>478.80<br>0.00
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p style="font-size:.75rem;color:var(--machine);border-top:1px solid var(--rule);padding-top:20px">
+    Static preview. Tokens live in <span class="num">frontend/src/index.css</span> — this file mirrors them.
+  </p>
+</div>
+</body>
+</html>
