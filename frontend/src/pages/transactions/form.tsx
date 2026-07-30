@@ -1,9 +1,10 @@
-import { useEffect, useRef, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useLocation, useParams } from "wouter";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Trash2, ArrowLeft } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Lock, Loader2 } from "lucide-react";
+import { useUnreconciledProduction } from "@/hooks/use-daily-production";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 
@@ -153,6 +154,71 @@ export default function TransactionForm() {
 
   const watchedDetails = useWatch({ control: form.control, name: "details" });
 
+  // ─── Fabric Production reconciliation ──────────────────────────────────────
+  // Matched on the master's `code`, not its name or id: names are user-editable
+  // in Master Data and ids differ per environment, so either would break the
+  // moment someone renames the type or the app is deployed elsewhere.
+  const watchedTypeId = form.watch("transactionTypeId");
+  const watchedDate = form.watch("date");
+
+  const isFabricProduction =
+    transactionTypeMaster?.find((t) => t.id === watchedTypeId)?.code === "Fabric_Production";
+
+  const productionDateIso = watchedDate ? format(watchedDate, "yyyy-MM-dd") : "";
+
+  const { data: unreconciled, isFetching: loadingProduction } = useUnreconciledProduction(
+    isFabricProduction && !isEditing ? productionDateIso : "",
+    isFabricProduction && !isEditing ? watchedPartyId : null,
+  );
+
+  // Ids claimed on save. Cleared whenever the date/party combination changes so
+  // a transaction can never carry ids from a combination the user moved away from.
+  const [reconcileIds, setReconcileIds] = useState<number[]>([]);
+
+  // Auto-fill runs once per date+party pair. Without this guard every
+  // background refetch would overwrite line items the user had already edited.
+  const filledFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isFabricProduction || isEditing) {
+      filledFor.current = null;
+      if (reconcileIds.length > 0) setReconcileIds([]);
+      return;
+    }
+
+    const key = `${productionDateIso}|${watchedPartyId ?? ""}`;
+    if (filledFor.current === key) return;
+    if (!unreconciled || loadingProduction) return;
+
+    filledFor.current = key;
+
+    if (unreconciled.rows.length === 0) {
+      setReconcileIds([]);
+      return;
+    }
+
+    // One detail line per production entry: roll count becomes quantity and
+    // total roll weight becomes net weight. Yarn type/count/brand and UoM are
+    // left blank — daily production doesn't record them, and guessing would put
+    // unverified values on a stock movement.
+    form.setValue(
+      "details",
+      unreconciled.rows.map((p) => ({
+        machineId: p.machineId,
+        machineOperatorId: p.operatorId,
+        yarnTypeId: null,
+        yarnCountId: null,
+        yarnBrandId: null,
+        uomId: null,
+        quantity: String(p.rollCount),
+        netWt: p.totalProduction,
+      })),
+      { shouldDirty: true },
+    );
+    setReconcileIds(unreconciled.rows.map((p) => p.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFabricProduction, isEditing, productionDateIso, watchedPartyId, unreconciled, loadingProduction]);
+
   const runTotals = useMemo(() => {
     const result: number[] = [];
     let running = 0;
@@ -280,16 +346,39 @@ export default function TransactionForm() {
         }
       );
     } else {
+      // reconcileProductionIds isn't part of CreateTransactionBody — that type
+      // is generated from the OpenAPI spec and must not be hand-edited, so the
+      // field is attached here and read separately on the server. Re-run the
+      // API codegen and this cast can go.
+      const createPayload = {
+        ...payload,
+        ...(reconcileIds.length > 0 ? { reconcileProductionIds: reconcileIds } : {}),
+      } as typeof payload;
+
       createTx.mutate(
-        { data: payload },
+        { data: createPayload },
         {
           onSuccess: () => {
-            toast({ title: "Transaction created successfully" });
+            toast({
+              title: "Transaction created",
+              description: reconcileIds.length > 0
+                ? `${reconcileIds.length} production ${reconcileIds.length === 1 ? "entry" : "entries"} reconciled and locked.`
+                : undefined,
+            });
             queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() });
+            queryClient.invalidateQueries({ queryKey: ["/api/daily-production"] });
             setLocation("/transactions");
           },
-          onError: () => {
-            toast({ title: "Failed to create transaction", variant: "destructive" });
+          onError: (err) => {
+            // A 409 means someone else reconciled this production first. That
+            // needs the real reason, not a generic failure toast.
+            const status = (err as { status?: number })?.status;
+            const detail = (err as { data?: { error?: string } })?.data?.error;
+            toast({
+              title: status === 409 ? "Production already reconciled" : "Failed to create transaction",
+              description: detail,
+              variant: "destructive",
+            });
           }
         }
       );
@@ -592,6 +681,36 @@ export default function TransactionForm() {
                     Add Row
                   </Button>
                 </div>
+                {/* Fabric Production reconciliation status. Stated plainly
+                    because saving here permanently freezes the production
+                    entries — the user should know that before pressing Save,
+                    not discover it on the production screen afterwards. */}
+                {isFabricProduction && !isEditing && (
+                  <div className="mt-2 rounded-md border border-yellow-300 bg-yellow-100 px-3 py-2 text-sm text-yellow-900 dark:border-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-200">
+                    {loadingProduction ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Loading daily production for this date and party…
+                      </span>
+                    ) : !watchedPartyId ? (
+                      "Choose a party to load that day's production."
+                    ) : reconcileIds.length > 0 ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Lock className="h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          Loaded <span className="num font-medium">{reconcileIds.length}</span>{" "}
+                          production {reconcileIds.length === 1 ? "entry" : "entries"} into the lines
+                          below. Saving locks {reconcileIds.length === 1 ? "it" : "them"} permanently
+                          — {reconcileIds.length === 1 ? "it" : "they"} can't be edited or deleted on
+                          the Daily Production screen afterwards.
+                        </span>
+                      </span>
+                    ) : (
+                      "No unreconciled production for this date and party. Anything recorded has already been booked into another transaction."
+                    )}
+                  </div>
+                )}
+
                 <div className="text-sm font-bold text-foreground mt-1">
                   Total_Net Wt.:&nbsp;
                   {(watchedDetails?.reduce((s, d) => s + (parseFloat(d?.netWt?.toString() ?? "0") || 0), 0) ?? 0).toFixed(3)}

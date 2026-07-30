@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
+import { useSort } from "@/hooks/use-sort";
+import { SortableHead } from "@/components/sortable-head";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,6 +31,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
 export type FieldOption = { value: string; label: string };
@@ -144,6 +147,15 @@ export function MasterTable({
   const [showAddRow, setShowAddRow] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Sort on the value the cell actually renders, not the raw field. A select
+  // column stores an id but shows a label, so sorting the raw value would
+  // order parties by primary key while the user reads names.
+  const accessors = useMemo(
+    () => Object.fromEntries(fields.map((f) => [f.key, (row: Row) => displayValue(f, row)])),
+    [fields],
+  );
+  const { sorted: sortedRows, sort, toggleSort } = useSort(rows, accessors);
+
   const emptyAdd = () => Object.fromEntries(fields.map((f) => [f.key, f.defaultValue ?? ""]));
 
   const startEdit = (row: Row) => {
@@ -192,28 +204,51 @@ export function MasterTable({
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-5">
+      {/* Stacks on a phone so neither the description nor the action gets
+          squeezed; the action goes full-width for a proper touch target. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
-          {description && <p className="text-muted-foreground text-sm mt-0.5">{description}</p>}
+          <h2 className="text-lg font-semibold leading-none text-foreground">{title}</h2>
+          {description && (
+            <p className="mt-2 max-w-prose text-sm text-muted-foreground">{description}</p>
+          )}
         </div>
         <Button
-          size="sm"
+          className="w-full shrink-0 sm:w-auto"
           onClick={() => { setShowAddRow(true); setAddValues(emptyAdd()); setEditingId(null); }}
           disabled={showAddRow}
         >
           <Plus className="mr-2 h-4 w-4" />
-          Add New
+          Add new
         </Button>
       </div>
 
-      <div className="rounded-md border bg-card overflow-x-auto">
+      {/* Card with a hairline section head, matching the production grid. The
+          record count sits where that grid puts its date — the one piece of
+          context worth carrying in a header. */}
+      <Card className="overflow-hidden">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-3.5">
+          <h3 className="text-sm font-semibold text-foreground">All {title.toLowerCase()}</h3>
+          {!isLoading && rows && (
+            <span className="eyebrow">
+              <span className="num">{rows.length}</span> record{rows.length === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               {fields.map((f) => (
-                <TableHead key={f.key}>{f.label}</TableHead>
+                <SortableHead
+                  key={f.key}
+                  label={f.label}
+                  sortKey={f.key}
+                  sort={sort}
+                  onSort={toggleSort}
+                />
               ))}
               <TableHead className="w-24 text-right">Actions</TableHead>
             </TableRow>
@@ -236,10 +271,13 @@ export function MasterTable({
                 ))}
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:text-green-700" onClick={handleAdd} disabled={saving}>
+                    {/* Solid Graphite primary, not green. Green is not in the
+                        Mass Balance palette, and Signal is reserved for the
+                        one primary action per screen (Add new). */}
+                    <Button size="icon" className="h-9 w-9 sm:h-8 sm:w-8" aria-label="Save new entry" onClick={handleAdd} disabled={saving}>
                       <Check className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setShowAddRow(false); setAddValues({}); }}>
+                    <Button size="icon" variant="ghost" className="h-9 w-9 sm:h-8 sm:w-8" aria-label="Discard new entry" onClick={() => { setShowAddRow(false); setAddValues({}); }}>
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
@@ -258,17 +296,22 @@ export function MasterTable({
             {/* Empty */}
             {!isLoading && !showAddRow && (!rows || rows.length === 0) && (
               <TableRow>
-                <TableCell colSpan={fields.length + 1} className="text-center py-10 text-muted-foreground">
-                  No entries yet. Click "Add New" to get started.
+                {/* An empty screen is an invitation, not a dead end — and it
+                    names the control by the label actually on the button. */}
+                <TableCell colSpan={fields.length + 1} className="py-10 text-center text-muted-foreground">
+                  No {title.toLowerCase()} recorded yet. Add the first one to get started.
                 </TableCell>
               </TableRow>
             )}
 
             {/* Data rows */}
-            {rows?.map((row) => (
+            {sortedRows.map((row) => (
               <TableRow key={row.id}>
                 {fields.map((f, i) => (
-                  <TableCell key={f.key}>
+                  // Figures get the tabular mono face so columns of numbers
+                  // line up digit-for-digit, as they already do on the
+                  // production and report grids.
+                  <TableCell key={f.key} className={f.type === "number" ? "num" : undefined}>
                     {editingId === row.id ? (
                       <FieldInput
                         field={f}
@@ -286,29 +329,32 @@ export function MasterTable({
                 <TableCell className="text-right">
                   {editingId === row.id ? (
                     <div className="flex justify-end gap-1">
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:text-green-700" onClick={handleSaveEdit} disabled={saving}>
+                      <Button size="icon" className="h-9 w-9 sm:h-8 sm:w-8" aria-label="Save changes" onClick={handleSaveEdit} disabled={saving}>
                         <Check className="h-4 w-4" />
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={cancelEdit}>
+                      <Button size="icon" variant="ghost" className="h-9 w-9 sm:h-8 sm:w-8" aria-label="Cancel editing" onClick={cancelEdit}>
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
                   ) : (
                     <div className="flex justify-end gap-1">
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => startEdit(row)}>
+                      <Button size="icon" variant="ghost" className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8" aria-label={`Edit ${displayValue(fields[0], row)}`} onClick={() => startEdit(row)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                          <Button size="icon" variant="ghost" className="h-9 w-9 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8" aria-label={`Delete ${displayValue(fields[0], row)}`}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Delete this entry?</AlertDialogTitle>
+                            {/* Names the record instead of asking about "this
+                                entry" — the user may have several rows open in
+                                their head. */}
+                            <AlertDialogTitle>Delete {displayValue(fields[0], row) || "this entry"}?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This will permanently remove this record. It cannot be deleted if it is currently used in a transaction.
+                              This permanently removes the record. It can't be deleted if a transaction already uses it.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -329,7 +375,9 @@ export function MasterTable({
             ))}
           </TableBody>
         </Table>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

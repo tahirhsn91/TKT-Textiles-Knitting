@@ -1,7 +1,9 @@
 import { Router, type IRouter } from "express";
-import { eq, sql, desc, inArray } from "drizzle-orm";
+import { eq, and, sql, desc, inArray } from "drizzle-orm";
+import { z } from "zod/v4";
 import { db } from "../db/index.js";
 import {
+  dailyProductionHeaderTable,
   transactionHeaderTable,
   transactionDetailTable,
   transactionTypeMasterTable,
@@ -28,6 +30,11 @@ import {
 } from "../api-zod/index.js";
 
 const router: IRouter = Router();
+
+/** Daily-production entries a Fabric Production transaction is claiming. */
+const reconcileIdsSchema = z.object({
+  reconcileProductionIds: z.array(z.number().int().positive()).optional(),
+});
 
 function normalizeNumericString(v: string | null | undefined): string | null {
   if (v == null || v === "") return null;
@@ -323,6 +330,18 @@ router.post("/transactions", async (req, res): Promise<void> => {
 
   const { details, ...headerData } = parsed.data;
 
+  // Parsed separately from CreateTransactionBody, which is generated from the
+  // OpenAPI spec and must not be hand-edited. Ids are optional: only the
+  // Fabric Production flow sends them.
+  const reconcile = reconcileIdsSchema.safeParse(req.body);
+  if (!reconcile.success) {
+    res.status(400).json({ error: "reconcileProductionIds must be an array of positive integers" });
+    return;
+  }
+  const reconcileIds = reconcile.data.reconcileProductionIds ?? [];
+
+  let conflict: { error: string } | null = null;
+
   const result = await db.transaction(async (tx) => {
     const [header] = await tx
       .insert(transactionHeaderTable)
@@ -337,8 +356,41 @@ router.post("/transactions", async (req, res): Promise<void> => {
         .returning();
     }
 
+    if (reconcileIds.length > 0) {
+      // `reconciled = false` in the WHERE is the concurrency guard. Two users
+      // booking the same production day at once would otherwise both succeed
+      // and the output would be counted twice. The update claims only rows
+      // still free; if any were taken in between, the count comes up short and
+      // the whole transaction — header, details and all — rolls back.
+      const claimed = await tx
+        .update(dailyProductionHeaderTable)
+        .set({
+          reconciled: true,
+          reconciledTransactionId: header.id,
+          reconciledAt: new Date(),
+        })
+        .where(and(
+          inArray(dailyProductionHeaderTable.id, reconcileIds),
+          eq(dailyProductionHeaderTable.reconciled, false),
+        ))
+        .returning({ id: dailyProductionHeaderTable.id });
+
+      if (claimed.length !== reconcileIds.length) {
+        conflict = {
+          error:
+            "Some of the selected production entries were reconciled by another transaction. Reload the production list and try again.",
+        };
+        tx.rollback();
+      }
+    }
+
     return { ...header, details: detailRows };
+  }).catch((err) => {
+    if (conflict) return null;
+    throw err;
   });
+
+  if (conflict) { res.status(409).json(conflict); return; }
 
   res.status(201).json(GetTransactionResponse.parse(result));
 });

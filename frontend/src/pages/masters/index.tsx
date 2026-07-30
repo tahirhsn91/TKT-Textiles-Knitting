@@ -104,14 +104,26 @@ function useInvalidateBoth() {
 export default function MastersPage() {
   return (
     <Layout>
-      <div className="flex flex-col gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Master Data</h1>
-          <p className="text-muted-foreground mt-1">Manage all lookup tables used across the system.</p>
-        </div>
+      <div className="flex flex-col gap-6">
+        {/* Page header matches dashboard and daily production: eyebrow, then a
+            1.75rem semibold title on a hairline rule. The previous
+            text-3xl font-bold was the shadcn default and one of four different
+            h1 treatments across the app. */}
+        <header className="border-b pb-5">
+          <p className="eyebrow">Reference data</p>
+          <h1 className="mt-2 text-[1.75rem] font-semibold leading-none text-foreground">
+            Master data
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            The lookup tables every transaction, production entry and payroll run draws from.
+          </p>
+        </header>
 
         <Tabs defaultValue="transaction-type">
-          <TabsList className="flex-wrap h-auto gap-1">
+          {/* -mx-* + px-* lets the tab strip bleed to the screen edge and scroll
+              horizontally on a phone, instead of wrapping twelve triggers into
+              a four-row block that pushes the table off the fold. */}
+          <TabsList className="-mx-4 flex h-auto w-auto max-w-none justify-start gap-1 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
             <TabsTrigger value="transaction-type">Transaction Type</TabsTrigger>
             <TabsTrigger value="job">Job Types</TabsTrigger>
             <TabsTrigger value="party">Parties</TabsTrigger>

@@ -17,6 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useSort } from "@/hooks/use-sort";
+import { SortableHead } from "@/components/sortable-head";
 import {
   Select,
   SelectContent,
@@ -154,6 +156,15 @@ function AdvancesTab() {
     queryFn: () => apiFetch(`/api/operators/advances?${advanceParams.toString()}`),
   });
 
+  const { sorted: sortedAdvances, sort, toggleSort } = useSort(advances, {
+    date: (a: Advance) => a.date,
+    operatorName: (a: Advance) => a.operatorName,
+    // amount arrives from the API as a string; sorting it as text puts
+    // 1000 before 900.
+    amount: (a: Advance) => toNum(a.amount),
+    notes: (a: Advance) => a.notes,
+  });
+
   const addMutation = useMutation({
     mutationFn: (data: object) => apiFetch("/api/operators/advances", { method: "POST", body: JSON.stringify(data) }),
     onSuccess: () => {
@@ -255,10 +266,10 @@ function AdvancesTab() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Operator</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Notes</TableHead>
+                <SortableHead label="Date" sortKey="date" sort={sort} onSort={toggleSort} />
+                <SortableHead label="Operator" sortKey="operatorName" sort={sort} onSort={toggleSort} />
+                <SortableHead label="Amount" sortKey="amount" sort={sort} onSort={toggleSort} right />
+                <SortableHead label="Notes" sortKey="notes" sort={sort} onSort={toggleSort} />
                 <TableHead className="w-16"></TableHead>
               </TableRow>
             </TableHeader>
@@ -273,7 +284,7 @@ function AdvancesTab() {
                   <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No advances found.</TableCell>
                 </TableRow>
               )}
-              {!isLoading && advances.map((a) => (
+              {!isLoading && sortedAdvances.map((a) => (
                 <TableRow key={a.id}>
                   <TableCell className="font-mono text-sm">{formatDate(a.date)}</TableCell>
                   <TableCell>{a.operatorName}</TableCell>
@@ -335,6 +346,14 @@ function PayrollSummaryTab() {
     enabled: hasRun,
   });
 
+  const { sorted: sortedSummary, sort, toggleSort } = useSort(summary, {
+    operatorName: (s: PayrollSummaryItem) => s.operatorName,
+    totalDaysWorked: (s: PayrollSummaryItem) => s.totalDaysWorked,
+    totalSalary: (s: PayrollSummaryItem) => s.totalSalary,
+    totalAdvances: (s: PayrollSummaryItem) => s.totalAdvances,
+    netPayable: (s: PayrollSummaryItem) => s.netPayable,
+  });
+
   function exportPDF() {
     if (summary.length === 0) {
       toast({ variant: "destructive", title: "No data", description: "Run the summary first." });
@@ -349,7 +368,10 @@ function PayrollSummaryTab() {
     autoTable(doc, {
       startY: 26,
       head: [["Operator", "Days Worked", "Total Salary", "Total Advances", "Net Payable"]],
-      body: summary.map((s) => [
+      // Export follows the on-screen order. If the user sorted by Net Payable
+      // to review the largest payouts, a PDF back in API order would not match
+      // what they were looking at when they hit Export.
+      body: sortedSummary.map((s) => [
         s.operatorName,
         s.totalDaysWorked,
         fmtMoney(s.totalSalary),
@@ -362,7 +384,7 @@ function PayrollSummaryTab() {
 
     let yOffset = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
 
-    for (const s of summary) {
+    for (const s of sortedSummary) {
       if (yOffset > 250) { doc.addPage(); yOffset = 14; }
       doc.setFontSize(12);
       doc.text(`${s.operatorName} (${s.operatorCode}) — Daily Breakdown`, 14, yOffset);
@@ -482,15 +504,15 @@ function PayrollSummaryTab() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Operator</TableHead>
-                <TableHead className="text-right">Days Worked</TableHead>
-                <TableHead className="text-right">Total Salary</TableHead>
-                <TableHead className="text-right">Total Advances</TableHead>
-                <TableHead className="text-right">Net Payable</TableHead>
+                <SortableHead label="Operator" sortKey="operatorName" sort={sort} onSort={toggleSort} />
+                <SortableHead label="Days Worked" sortKey="totalDaysWorked" sort={sort} onSort={toggleSort} right />
+                <SortableHead label="Total Salary" sortKey="totalSalary" sort={sort} onSort={toggleSort} right />
+                <SortableHead label="Total Advances" sortKey="totalAdvances" sort={sort} onSort={toggleSort} right />
+                <SortableHead label="Net Payable" sortKey="netPayable" sort={sort} onSort={toggleSort} right />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {summary.map((s) => (
+              {sortedSummary.map((s) => (
                 <TableRow key={s.operatorId}>
                   <TableCell className="font-medium">{s.operatorName} <span className="text-muted-foreground text-xs">({s.operatorCode})</span></TableCell>
                   <TableCell className="text-right">{s.totalDaysWorked}</TableCell>

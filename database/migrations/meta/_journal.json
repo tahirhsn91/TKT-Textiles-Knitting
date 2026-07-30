@@ -15,6 +15,20 @@
       "when": 1784290841989,
       "tag": "0001_clumsy_the_spike",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785398655203,
+      "tag": "0002_sweet_marrow",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785403234994,
+      "tag": "0003_tearful_klaw",
+      "breakpoints": true
     }
   ]
 }

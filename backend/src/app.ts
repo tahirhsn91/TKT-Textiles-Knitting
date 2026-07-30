@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type ErrorRequestHandler } from "express";
 import cors from "cors";
 import { pinoHttp } from "pino-http";
 import router from "./routes/index.js";
@@ -46,5 +46,50 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+// Terminal error handler. Without it, Express 5 falls back to its default
+// handler, which returns an HTML stack page — the frontend's fetch wrapper
+// then chokes on non-JSON and surfaces a generic failure. Drizzle also wraps
+// driver faults, so the useful part (the pg error code) sits on `err.cause`
+// and never reaches the log unless it is unwrapped explicitly.
+const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+  const e = err as {
+    cause?: { code?: string; message?: string };
+    code?: string;
+    status?: number;
+    statusCode?: number;
+    expose?: boolean;
+    message?: string;
+  };
+
+  const cause = e.cause;
+  const code = cause?.code ?? e.code ?? null;
+
+  // Middleware such as body-parser throws errors already tagged with a 4xx
+  // status (a malformed JSON body is the client's fault, not ours). Reporting
+  // those as 500 both misleads the caller and pollutes server error metrics,
+  // so honour the tag and only fall back to 500 for genuinely unexpected
+  // failures. `expose` is body-parser's own signal that the message is safe to
+  // return; anything else gets a generic string so internals don't leak.
+  const tagged = e.status ?? e.statusCode;
+  const isClientError = typeof tagged === "number" && tagged >= 400 && tagged < 500;
+  const status = isClientError ? tagged : 500;
+
+  const logPayload = { err, code, causeMessage: cause?.message, status };
+  if (isClientError) logger.warn(logPayload, "bad request");
+  else logger.error(logPayload, "unhandled request error");
+
+  if (res.headersSent) return;
+  res.status(status).json({
+    error: isClientError && e.expose === true
+      ? e.message ?? "Bad request"
+      : isClientError
+        ? "Bad request"
+        : "Internal server error",
+    code,
+  });
+};
+
+app.use(errorHandler);
 
 export default app;

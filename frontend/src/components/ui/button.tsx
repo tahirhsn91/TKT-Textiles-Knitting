@@ -20,6 +20,12 @@ const buttonVariants = cva(
           "border bg-secondary text-secondary-foreground border border-secondary-border ",
         ghost: "border border-transparent",
         link: "text-primary underline-offset-4 hover:underline",
+        // The one action per screen that earns the brand colour. Use
+        // sparingly — see the "Signal" note in index.css. Mutually exclusive
+        // with the other variants by construction, so there's no cascade
+        // fight with bg-primary/border-primary-border like a bolt-on
+        // className would cause.
+        signal: "bg-signal text-signal-foreground border border-signal hover:bg-signal/90",
       },
       size: {
         default: "min-h-9 px-4 py-2",

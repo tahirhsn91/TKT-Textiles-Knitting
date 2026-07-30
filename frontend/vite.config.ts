@@ -20,7 +20,10 @@ export default defineConfig({
     host: "0.0.0.0",
     proxy: {
       "/api": {
-        target: "http://localhost:8080",
+        // Must match the host port docker-compose publishes for the backend
+        // (BACKEND_PORT, default 8081). Port 8080 is the backend's
+        // *container-internal* port and is not reachable from the host.
+        target: `http://localhost:${process.env.BACKEND_PORT ?? 8081}`,
         changeOrigin: true,
       },
     },

@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
-import { Plus, Edit, Trash2, X, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { Plus, Edit, Trash2, X } from "lucide-react";
+import { SortableHead } from "@/components/sortable-head";
+import { compareValues } from "@/hooks/use-sort";
 import {
   useListTransactions,
   useDeleteTransaction,
@@ -173,7 +175,11 @@ export default function TransactionList() {
         case "location":          av = lookupName(locationMaster, a.locationId);       bv = lookupName(locationMaster, b.locationId);       break;
         case "reference":         av = (a as { reference?: string | null }).reference ?? ""; bv = (b as { reference?: string | null }).reference ?? ""; break;
       }
-      return sort.dir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+      // compareValues instead of a bare localeCompare: the previous version
+      // ordered "10" before "9", so any numeric-ish column (doc numbers,
+      // machine codes like M#2 vs M#10) sorted character by character rather
+      // than by value. Dates were unaffected because they are ISO.
+      return sort.dir === "asc" ? compareValues(av, bv) : compareValues(bv, av);
     });
     return arr;
   }, [filtered, sort, transactionTypeMaster, partyMaster, locationMaster]);
@@ -185,12 +191,8 @@ export default function TransactionList() {
     );
   }
 
-  function SortIcon({ col }: { col: ColKey }) {
-    if (sort.key !== col) return <ChevronsUpDown className="inline h-3 w-3 opacity-35 ml-1" />;
-    return sort.dir === "asc"
-      ? <ChevronUp className="inline h-3 w-3 ml-1" />
-      : <ChevronDown className="inline h-3 w-3 ml-1" />;
-  }
+  // SortIcon and the hand-rolled <TableHead> it lived in were replaced by the
+  // shared SortableHead, which also makes these columns keyboard-sortable.
 
   // ── Drag handlers ──────────────────────────────────────────────────────────
   function handleDragStart(_e: React.DragEvent, key: ColKey) { setDragCol(key); }
@@ -377,18 +379,19 @@ export default function TransactionList() {
             <TableHeader>
               <TableRow>
                 {orderedCols.map((c) => (
-                  <TableHead
+                  <SortableHead
                     key={c.key}
-                    className={`select-none whitespace-nowrap cursor-grab transition-opacity${dragCol === c.key ? " opacity-30" : ""}`}
+                    label={c.label}
+                    sortKey={c.key}
+                    sort={sort}
+                    onSort={(k) => handleSort(k as ColKey)}
                     draggable
-                    onClick={() => handleSort(c.key)}
+                    isDragging={dragCol === c.key}
                     onDragStart={(e) => handleDragStart(e, c.key)}
                     onDragOver={(e) => handleDragOver(e, c.key)}
                     onDrop={(e) => e.preventDefault()}
                     onDragEnd={handleDragEnd}
-                  >
-                    {c.label}<SortIcon col={c.key} />
-                  </TableHead>
+                  />
                 ))}
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>

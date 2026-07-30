@@ -9,6 +9,7 @@ import DashboardPage from "@/pages/dashboard";
 
 const TransactionList = lazy(() => import("@/pages/transactions"));
 const TransactionForm = lazy(() => import("@/pages/transactions/form"));
+const DailyProductionList = lazy(() => import("@/pages/daily-production"));
 const MonthlySalaryEntryPage = lazy(() => import("@/pages/transactions/monthly-salary-entry"));
 const PayrollEntryPage = lazy(() => import("@/pages/transactions/payroll-entry"));
 const MastersPage = lazy(() => import("@/pages/masters"));
@@ -36,6 +37,7 @@ function Router() {
         <Route path="/transactions" component={TransactionList} />
         <Route path="/transactions/new" component={TransactionForm} />
         <Route path="/transactions/:id/edit" component={TransactionForm} />
+        <Route path="/daily-production" component={DailyProductionList} />
         <Route path="/transactions/monthly-salary-entry/new" component={PayrollEntryPage} />
         <Route path="/transactions/monthly-salary-entry/:id/edit" component={PayrollEntryPage} />
         <Route path="/transactions/monthly-salary-entry" component={MonthlySalaryEntryPage} />

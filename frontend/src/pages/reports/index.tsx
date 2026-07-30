@@ -20,7 +20,8 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer,
 } from "recharts";
 import html2canvas from "html2canvas";
-import { Printer, Download, FileText, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown, Upload, Image, Loader2, ClipboardCopy } from "lucide-react";
+import { Printer, Download, FileText, FileSpreadsheet, Upload, Image, Loader2, ClipboardCopy } from "lucide-react";
+import { SortableHead as SortHead } from "@/components/sortable-head";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -331,46 +332,11 @@ function FilterMulti({
 }
 
 // ─── Sortable column header ───────────────────────────────────────────────────
-
-function SortHead({
-  label, sortKey, sort, onSort, right,
-  draggable, onDragStart, onDragOver, onDrop, onDragEnd, isDragging,
-}: {
-  label: string;
-  sortKey: string;
-  sort: { key: string | null; dir: SortDir };
-  onSort: (key: string) => void;
-  right?: boolean;
-  draggable?: boolean;
-  onDragStart?: (e: React.DragEvent<HTMLTableCellElement>) => void;
-  onDragOver?: (e: React.DragEvent<HTMLTableCellElement>) => void;
-  onDrop?: (e: React.DragEvent<HTMLTableCellElement>) => void;
-  onDragEnd?: () => void;
-  isDragging?: boolean;
-}) {
-  const active = sort.key === sortKey;
-  return (
-    <TableHead
-      className={`select-none whitespace-nowrap transition-opacity${right ? " text-right" : ""}${draggable ? " cursor-grab" : " cursor-pointer"}${isDragging ? " opacity-30" : ""}`}
-      onClick={() => onSort(sortKey)}
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      onDragEnd={onDragEnd}
-    >
-      <span className={`inline-flex items-center gap-1${right ? " justify-end w-full" : ""}`}>
-        {label}
-        {active
-          ? sort.dir === "asc"
-            ? <ChevronUp className="h-3 w-3 shrink-0" />
-            : <ChevronDown className="h-3 w-3 shrink-0" />
-          : <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-35" />
-        }
-      </span>
-    </TableHead>
-  );
-}
+// Was a local component duplicated almost verbatim in yarn-to-fabric.tsx. Both
+// now use the shared SortableHead, aliased to the old name so the call sites in
+// this file are unchanged. The sorting *logic* here is untouched — the summary
+// and detail grids still carry each row's running balance by its original
+// index, which is what keeps the balance column correct under any sort.
 
 // ─── Detail column definitions ───────────────────────────────────────────────
 

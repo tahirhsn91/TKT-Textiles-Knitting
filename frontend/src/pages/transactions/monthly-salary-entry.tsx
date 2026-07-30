@@ -19,6 +19,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useSort } from "@/hooks/use-sort";
+import { SortableHead } from "@/components/sortable-head";
 import {
   Select,
   SelectContent,
@@ -225,6 +227,15 @@ function SalaryEntryTab() {
     queryFn: () => apiFetch(`/api/salary-entries?${queryParams.toString()}`),
   });
 
+  const { sorted: sortedHeaders, sort, toggleSort } = useSort(headers, {
+    // Sort the period chronologically, not by the rendered "March 2026" text,
+    // which would order alphabetically and interleave years.
+    period: (h: SalaryHeader) => h.year * 100 + h.month,
+    departments: (h: SalaryHeader) => (h.departmentNames ?? []).join(", "),
+    createdAt: (h: SalaryHeader) => h.createdAt,
+    posted: (h: SalaryHeader) => h.posted,
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiFetch(`/api/salary-entries/${id}`, { method: "DELETE" }),
     onSuccess: () => {
@@ -365,10 +376,10 @@ function SalaryEntryTab() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Month / Year</TableHead>
-                <TableHead>Department(s)</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Status</TableHead>
+                <SortableHead label="Month / Year" sortKey="period" sort={sort} onSort={toggleSort} />
+                <SortableHead label="Department(s)" sortKey="departments" sort={sort} onSort={toggleSort} />
+                <SortableHead label="Created" sortKey="createdAt" sort={sort} onSort={toggleSort} />
+                <SortableHead label="Status" sortKey="posted" sort={sort} onSort={toggleSort} />
                 <TableHead className="w-52 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -387,7 +398,7 @@ function SalaryEntryTab() {
                   </TableCell>
                 </TableRow>
               )}
-              {!isLoading && headers.map((h) => (
+              {!isLoading && sortedHeaders.map((h) => (
                 <TableRow key={h.id}>
                   <TableCell className="font-medium">
                     {MONTHS[h.month - 1]} {h.year}
@@ -533,6 +544,13 @@ function AdvancesTab() {
     queryFn: () => apiFetch(`/api/operators/advances?${advanceParams.toString()}`),
   });
 
+  const { sorted: sortedAdvances, sort: advSort, toggleSort: toggleAdvSort } = useSort(advances, {
+    date: (a: Advance) => a.date,
+    operatorName: (a: Advance) => a.operatorName,
+    amount: (a: Advance) => toNum(a.amount),
+    notes: (a: Advance) => a.notes,
+  });
+
   const addMutation = useMutation({
     mutationFn: (data: object) => apiFetch("/api/operators/advances", { method: "POST", body: JSON.stringify(data) }),
     onSuccess: () => {
@@ -634,10 +652,10 @@ function AdvancesTab() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Operator</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Notes</TableHead>
+                <SortableHead label="Date" sortKey="date" sort={advSort} onSort={toggleAdvSort} />
+                <SortableHead label="Operator" sortKey="operatorName" sort={advSort} onSort={toggleAdvSort} />
+                <SortableHead label="Amount" sortKey="amount" sort={advSort} onSort={toggleAdvSort} right />
+                <SortableHead label="Notes" sortKey="notes" sort={advSort} onSort={toggleAdvSort} />
                 <TableHead className="w-16"></TableHead>
               </TableRow>
             </TableHeader>
@@ -652,7 +670,7 @@ function AdvancesTab() {
                   <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No advances found.</TableCell>
                 </TableRow>
               )}
-              {!isLoading && advances.map((a) => (
+              {!isLoading && sortedAdvances.map((a) => (
                 <TableRow key={a.id}>
                   <TableCell className="font-mono text-sm">{formatDate(a.date)}</TableCell>
                   <TableCell>{a.operatorName}</TableCell>
@@ -712,6 +730,14 @@ function PayrollSummaryTab() {
     queryKey: ["payroll-summary", month, year, operatorId],
     queryFn: () => apiFetch(`/api/operators/payroll-summary?${params.toString()}`),
     enabled: hasRun,
+  });
+
+  const { sorted: sortedSummary, sort: sumSort, toggleSort: toggleSumSort } = useSort(summary, {
+    operatorName: (s: PayrollSummaryItem) => s.operatorName,
+    totalDaysWorked: (s: PayrollSummaryItem) => s.totalDaysWorked,
+    totalSalary: (s: PayrollSummaryItem) => s.totalSalary,
+    totalAdvances: (s: PayrollSummaryItem) => s.totalAdvances,
+    netPayable: (s: PayrollSummaryItem) => s.netPayable,
   });
 
   function exportPDF() {
@@ -861,15 +887,15 @@ function PayrollSummaryTab() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Operator</TableHead>
-                <TableHead className="text-right">Days Worked</TableHead>
-                <TableHead className="text-right">Total Salary</TableHead>
-                <TableHead className="text-right">Total Advances</TableHead>
-                <TableHead className="text-right">Net Payable</TableHead>
+                <SortableHead label="Operator" sortKey="operatorName" sort={sumSort} onSort={toggleSumSort} />
+                <SortableHead label="Days Worked" sortKey="totalDaysWorked" sort={sumSort} onSort={toggleSumSort} right />
+                <SortableHead label="Total Salary" sortKey="totalSalary" sort={sumSort} onSort={toggleSumSort} right />
+                <SortableHead label="Total Advances" sortKey="totalAdvances" sort={sumSort} onSort={toggleSumSort} right />
+                <SortableHead label="Net Payable" sortKey="netPayable" sort={sumSort} onSort={toggleSumSort} right />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {summary.map((s) => (
+              {sortedSummary.map((s) => (
                 <TableRow key={s.operatorId}>
                   <TableCell className="font-medium">{s.operatorName} <span className="text-muted-foreground text-xs">({s.operatorCode})</span></TableCell>
                   <TableCell className="text-right">{s.totalDaysWorked}</TableCell>

@@ -20,7 +20,8 @@ import {
   LineChart, Line, ResponsiveContainer,
 } from "recharts";
 import html2canvas from "html2canvas";
-import { Printer, Download, FileText, FileSpreadsheet, ChevronUp, ChevronDown, ChevronsUpDown, Upload, Image, Loader2, ClipboardCopy } from "lucide-react";
+import { Printer, Download, FileText, FileSpreadsheet, Upload, Image, Loader2, ClipboardCopy } from "lucide-react";
+import { SortableHead as SortHead } from "@/components/sortable-head";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -397,45 +398,8 @@ function FilterMulti({
   );
 }
 
-function SortHead({
-  label, sortKey, sort, onSort, right,
-  draggable, onDragStart, onDragOver, onDrop, onDragEnd, isDragging,
-}: {
-  label: string;
-  sortKey: string;
-  sort: { key: string | null; dir: SortDir };
-  onSort: (key: string) => void;
-  right?: boolean;
-  draggable?: boolean;
-  onDragStart?: (e: React.DragEvent<HTMLTableCellElement>) => void;
-  onDragOver?: (e: React.DragEvent<HTMLTableCellElement>) => void;
-  onDrop?: (e: React.DragEvent<HTMLTableCellElement>) => void;
-  onDragEnd?: () => void;
-  isDragging?: boolean;
-}) {
-  const active = sort.key === sortKey;
-  return (
-    <TableHead
-      className={`select-none whitespace-nowrap transition-opacity${right ? " text-right" : ""}${draggable ? " cursor-grab" : " cursor-pointer"}${isDragging ? " opacity-30" : ""}`}
-      onClick={() => onSort(sortKey)}
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      onDragEnd={onDragEnd}
-    >
-      <span className={`inline-flex items-center gap-1${right ? " justify-end w-full" : ""}`}>
-        {label}
-        {active
-          ? sort.dir === "asc"
-            ? <ChevronUp className="h-3 w-3 shrink-0" />
-            : <ChevronDown className="h-3 w-3 shrink-0" />
-          : <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-35" />
-        }
-      </span>
-    </TableHead>
-  );
-}
+// SortHead was duplicated here from reports/index.tsx. Both now share
+// SortableHead, aliased so the nine call sites below are unchanged.
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
