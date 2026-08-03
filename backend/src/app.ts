@@ -1,6 +1,7 @@
-import express, { type Express, type ErrorRequestHandler } from "express";
+import express, { type Express, type ErrorRequestHandler, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import { pinoHttp } from "pino-http";
+import rateLimit from "express-rate-limit";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 
@@ -11,6 +12,52 @@ const allowedOrigins = (process.env["ALLOWED_ORIGINS"] ?? "http://localhost:3000
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+// Trust the first proxy in the chain so that rate-limiting sees the real
+// client IP instead of the proxy's IP. Safe in this setup because the only
+// proxy is the Docker bridge or the frontend's nginx, which aren't spoofable
+// by external callers.
+app.set("trust proxy", 1);
+
+// ── Rate limiting ───────────────────────────────────────────────────────────
+
+/** Shared key-generator: uses IP. Falls back to "anonymous" when the request
+ *  arrives with no IP (e.g. direct Docker-internal calls from the healthcheck).
+ *  express-rate-limit v7 uses `req.ip` directly when no keyGenerator is given,
+ *  but being explicit about the fallback avoids a potential crash on a
+ *  misconfigured proxy where `req.ip` is undefined. */
+function keyGenerator(req: Request): string {
+  return (req.ip as string | undefined) ?? "anonymous";
+}
+
+/** Standard rate limiter — applies to all API routes. 100 req/min/IP lets
+ *  a single browser tab running the dashboard (which fires 7 queries on load)
+ *  refresh several times per minute while still blocking runaway loops. */
+const apiLimiter = rateLimit({
+  windowMs: 60_000, // 1 minute
+  max: 100,
+  keyGenerator,
+  standardHeaders: true,  // RateLimit-* headers (IETF draft)
+  legacyHeaders: false,   // drop deprecated X-RateLimit-* headers
+  message: { error: "Too many requests — please slow down", retryAfterSeconds: 60 },
+  statusCode: 429,
+  skip: (_req: Request) => _req.path === "/api/healthz",
+});
+
+/** Strict rate limiter for mutation endpoints. 30 req/min/IP stops
+ *  double-click spam without getting in the way of normal form submissions.
+ *  Applied selectively to POST / PUT / DELETE routes below. */
+const mutationLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 30,
+  keyGenerator,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many write requests — please slow down", retryAfterSeconds: 60 },
+  statusCode: 429,
+});
+
+// Logging middleware — placed before rate limiting so that even blocked
+// requests appear in the access log.
 app.use(
   pinoHttp({
     logger,
@@ -44,6 +91,18 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Apply rate limiting: general limiter on all API routes, stricter limiter
+// on mutations. The order matters — apiLimiter runs first (catch-all), then
+// mutationLimiter overrides for write endpoints with a lower threshold.
+app.use("/api", apiLimiter);
+app.use("/api", (req: Request, _res: Response, next: NextFunction) => {
+  // Re-apply stricter limit only on write endpoints.
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    return mutationLimiter(req, _res, next);
+  }
+  next();
+});
 
 app.use("/api", router);
 
