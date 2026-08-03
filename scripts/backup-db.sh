@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_DIR="/home/deploy/project/TKT-Textiles-Knitting"
+PROJECT_DIR="/home/deploy/project/tkt-textiles-prod/app"
 COMPOSE_PROJECT="tkt-textiles-prod"
 BACKUP_FILE="database/backup.sql"
 

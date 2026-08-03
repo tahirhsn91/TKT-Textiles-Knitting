@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_DIR="/home/deploy/project/TKT-Textiles-Knitting"
+PROJECT_DIR="/home/deploy/project/tkt-textiles-prod/app"
 COMPOSE_PROJECT="tkt-textiles-prod"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting deploy..."
@@ -15,8 +15,8 @@ git pull origin main
 
 # Rebuild and restart containers
 echo "Rebuilding containers..."
-docker compose -p "$COMPOSE_PROJECT" build --no-cache
-docker compose -p "$COMPOSE_PROJECT" up -d
+docker compose --env-file .env.prod -p "$COMPOSE_PROJECT" build --no-cache
+docker compose --env-file .env.prod -p "$COMPOSE_PROJECT" up -d
 
 # Wait for healthy
 echo "Waiting for backend to be healthy..."
