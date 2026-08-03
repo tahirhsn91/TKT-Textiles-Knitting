@@ -2,6 +2,10 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    dns:
+      - 195.179.224.53
+      - 209.126.15.53
+      - 8.8.8.8
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-heliumdb}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -19,6 +23,10 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
+    dns:
+      - 195.179.224.53
+      - 209.126.15.53
+      - 8.8.8.8
     environment:
       # Set DATABASE_URL in a local .env file (git-ignored). Falls back to the
       # bundled local Postgres service if unset.
@@ -40,6 +48,10 @@ services:
   frontend:
     build: ./frontend
     restart: unless-stopped
+    dns:
+      - 195.179.224.53
+      - 209.126.15.53
+      - 8.8.8.8
     ports:
       - "${FRONTEND_PORT:-3001}:80"
     depends_on:

@@ -140,4 +140,22 @@ This is a starting point. Add your own conventions, style, and rules as you figu
 - Prefer `git diff` / `git status` output back to the requester before committing.
 - Commit messages should be descriptive; do not commit generated artifacts or secrets.
 
+## Docker & Long-Running Commands
+
+**CRITICAL: Never run Docker builds without background/timeout params.** The default exec timeout is too short for `docker compose build` (npm install inside containers takes several minutes). Every time you time out, the user has to abort and start over — don't make them do that.
+
+### Rules for Docker operations
+
+1. **Always split build from run:**
+   - Build first: `docker compose build --no-cache 2>&1` with `background: true` and `timeout: 600`
+   - Then start: `docker compose up -d` (returns instantly when images exist)
+
+2. **Report progress:** After spawning a background build, tell the user "Building Docker images — this takes a few minutes. I'll check back shortly." Then poll with `process(action="poll")` until it completes or run `docker compose ps` to verify.
+
+3. **For quick checks:** `docker compose ps`, `docker compose logs --tail=20`, `docker ps` are always fast — no special params needed.
+
+4. **For any command expected to run >30 seconds:** use `background: true` and `timeout: 600`. Then poll the process.
+
+5. **Before starting:** always verify `.env` exists. If missing, copy from `.env.example` first.
+
 
