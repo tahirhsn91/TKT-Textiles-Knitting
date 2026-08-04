@@ -218,7 +218,15 @@ export function Layout({ children }: { children: ReactNode }) {
                 <Menu className="h-5 w-5" />
               </button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-72 border-sidebar-border bg-sidebar p-0 text-sidebar-foreground">
+            <SheetContent
+              side="left"
+              closeAriaLabel="Close menu"
+              className="w-[280px] max-w-[85vw] border-sidebar-border bg-sidebar p-0 text-sidebar-foreground"
+              // Backdrop click-to-dismiss: the Sheet is controlled by mobileOpen,
+              // so an outside pointer-down must close it explicitly rather than
+              // relying on the small menu toggle (issue #27).
+              onPointerDownOutside={() => setMobileOpen(false)}
+            >
               <SheetHeader className="border-b border-sidebar-border px-4 py-4 text-left">
                 <SheetTitle asChild>
                   <div><Wordmark /></div>
