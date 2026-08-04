@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, gte, lte } from "drizzle-orm";
+import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   machineOperatorMasterTable,
@@ -14,9 +14,16 @@ function idParam(req: { params: Record<string, string> }) {
   return isNaN(id) ? null : id;
 }
 
-function toNum(val: unknown): number {
-  const n = parseFloat(String(val ?? ""));
-  return isNaN(n) ? 0 : n;
+/**
+ * Strict numeric parser for client input (issue #23). Unlike the old toNum(),
+ * it does NOT silently map NULL/NaN to 0 — an invalid amount is rejected with
+ * a 400 instead of being stored as zero. Returns null for NULL/empty/NaN so
+ * callers can distinguish "missing" from "zero".
+ */
+function toNumStrict(val: unknown): number | null {
+  if (val === null || val === undefined || val === "") return null;
+  const n = Number(val);
+  return Number.isFinite(n) ? n : null;
 }
 
 // ─── Advances ────────────────────────────────────────────────────────────────
@@ -51,7 +58,11 @@ router.post("/operators/advances", async (req, res): Promise<void> => {
     res.status(400).json({ error: "operatorId, date, and amount are required" });
     return;
   }
-  const amt = toNum(amount);
+  const amt = toNumStrict(amount);
+  if (amt === null) {
+    res.status(400).json({ error: "amount must be a valid number" });
+    return;
+  }
   if (amt < 0) { res.status(400).json({ error: "amount must be >= 0" }); return; }
   const [row] = await db
     .insert(operatorAdvancesTable)
@@ -111,12 +122,40 @@ router.get("/operators/payroll-summary", async (req, res): Promise<void> => {
     .from(operatorAdvancesTable)
     .where(and(...advConditions));
 
+  // Totals are aggregated in SQL with COALESCE so a NULL column value
+  // contributes 0 explicitly in the DB layer — never silently coerced by a JS
+  // helper (issue #23). Detail rows are still returned raw for the PDF's
+  // daily breakdown; the frontend formats them for display.
+  const salaryTotals = await db
+    .select({
+      operatorId: operatorSalaryRecordsTable.operatorId,
+      totalDaysWorked: sql<number>`count(*)::int`,
+      totalSalary: sql<string>`coalesce(sum(${operatorSalaryRecordsTable.finalSalary}), 0)`,
+    })
+    .from(operatorSalaryRecordsTable)
+    .where(and(...recConditions))
+    .groupBy(operatorSalaryRecordsTable.operatorId);
+
+  const advanceTotals = await db
+    .select({
+      operatorId: operatorAdvancesTable.operatorId,
+      totalAdvances: sql<string>`coalesce(sum(${operatorAdvancesTable.amount}), 0)`,
+    })
+    .from(operatorAdvancesTable)
+    .where(and(...advConditions))
+    .groupBy(operatorAdvancesTable.operatorId);
+
+  const salaryByOperator = new Map(salaryTotals.map((t) => [t.operatorId, t]));
+  const advanceByOperator = new Map(advanceTotals.map((t) => [t.operatorId, t]));
+
   const summary = operators.map((op) => {
     const opRecords = records.filter((r) => r.operatorId === op.id);
     const opAdvances = advances.filter((a) => a.operatorId === op.id);
-    const totalDaysWorked = opRecords.length;
-    const totalSalary = opRecords.reduce((sum, r) => sum + toNum(r.finalSalary), 0);
-    const totalAdvances = opAdvances.reduce((sum, a) => sum + toNum(a.amount), 0);
+    const salaryTotal = salaryByOperator.get(op.id);
+    const advanceTotal = advanceByOperator.get(op.id);
+    const totalSalary = Number(salaryTotal?.totalSalary ?? 0);
+    const totalAdvances = Number(advanceTotal?.totalAdvances ?? 0);
+    const totalDaysWorked = salaryTotal?.totalDaysWorked ?? 0;
     const netPayable = totalSalary - totalAdvances;
     return {
       operatorId: op.id,
