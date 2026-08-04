@@ -133,7 +133,17 @@ This is a starting point. Add your own conventions, style, and rules as you figu
 
 # TKT-Textiles Agent Operating Rules
 
-- Never work directly on `main`/`master`. Create a feature branch for any change before editing files.
+## Branching Workflow (set 2026-08-04)
+
+- `main` = production. Never work on it, never deploy from it.
+- `develop` = integration branch for this development environment (created from `main` on 2026-08-04). The dev environment always sits on `develop`.
+- **Every piece of work** (bug fix, feature, docs, chore): create a new branch from `develop`, push it, and open a Pull Request against `develop`. Never commit directly to `develop`.
+- Branch naming: `fix/...`, `feat/...`, `docs/...`, `chore/...` (issue id included when relevant, e.g. `fix/issue-8-rate-limiting`).
+- Merge to `main` only via PR from `develop` (release flow, out of scope for this environment).
+
+## Core Rules
+
+- Never work directly on `main` or `develop`. Create a feature branch from `develop` for any change before editing files.
 - Never force-push, never rewrite history on shared branches, never delete remote branches without explicit confirmation in the same conversation.
 - Never modify `.git/config`, `.ssh/`, or any file outside this repo.
 - Before running a destructive or irreversible command (migrations, `rm -rf`, `git reset --hard`, dependency major-version bumps), summarize the intended change and wait for explicit confirmation.
