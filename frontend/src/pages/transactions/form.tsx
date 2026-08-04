@@ -102,7 +102,7 @@ export default function TransactionForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: transaction, isLoading: isLoadingTx } = useGetTransaction(id!, {
+  const { data: transaction, isLoading: isLoadingTx, isError: isErrorTx } = useGetTransaction(id!, {
     query: { enabled: isEditing, queryKey: getGetTransactionQueryKey(id!) }
   });
 
@@ -402,6 +402,23 @@ export default function TransactionForm() {
       inputs?.[inputs.length - 1]?.select();
     }, 50);
   }, [form, append]);
+
+  // The edit gate previously handled only isLoading — a failed fetch left the
+  // user on an endless "Loading..." (issue #2). Error and 404 get their own
+  // message with a back action instead.
+  if (isEditing && isErrorTx) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center gap-3 p-8 text-center">
+          <p className="text-destructive">Couldn't load this transaction.</p>
+          <Button variant="outline" onClick={() => setLocation("/transactions")}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to transactions
+          </Button>
+        </div>
+      </Layout>
+    );
+  }
 
   if (isEditing && isLoadingTx) {
     return <Layout><div className="p-8 text-center text-muted-foreground">Loading...</div></Layout>;
