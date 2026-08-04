@@ -15,6 +15,7 @@ import { ProductionEntryDialog } from "./add-production-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -37,6 +38,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Layout } from "@/components/layout";
 import { useToast } from "@/hooks/use-toast";
+import { ProductionAnalytics } from "./analytics-tab";
 
 const COLUMN_COUNT = 7;
 
@@ -161,6 +163,13 @@ export default function DailyProductionList() {
           />
         </div>
 
+        {/* Entries / Analytics — same date, two views of the same rows */}
+        <Tabs defaultValue="entries">
+          <TabsList>
+            <TabsTrigger value="entries">Entries</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          </TabsList>
+          <TabsContent value="entries" className="mt-4">
         {/* Entries */}
         <Card className="overflow-hidden">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-3.5">
@@ -293,6 +302,15 @@ export default function DailyProductionList() {
         {isFetching && !isLoading && (
           <p className="text-xs text-muted-foreground -mt-4">Refreshing…</p>
         )}
+          </TabsContent>
+          <TabsContent value="analytics" className="mt-4">
+            <ProductionAnalytics
+              rows={rows}
+              isLoading={isLoading}
+              dateLabel={dateLabel}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
 
       <ProductionEntryDialog
