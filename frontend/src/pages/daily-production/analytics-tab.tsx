@@ -41,9 +41,13 @@ const MORNING = "#2A4C7A";
 const NIGHT = "#C8891E";
 const MACHINE = "#2A4C7A";
 const OPERATOR = "#AB3F4C";
+const ROLLS = "#627C50";
 
 const AXIS_TICK = { fontSize: 11, fill: "#656E5E" } as const;
 const AXIS_RULE = "#DFE2DA";
+
+/** Uniform chart body height — keeps every card in a grid row the same size. */
+const CHART_HEIGHT = 260;
 
 const kg = (r: DailyProductionSummaryRow) => parseFloat(r.totalProduction) || 0;
 const fmtKg = (n: number) => `${n.toFixed(3)} kg`;
@@ -51,15 +55,20 @@ const fmtKg = (n: number) => `${n.toFixed(3)} kg`;
 type Slice = { name: string; value: number };
 type MachineShift = { machine: string; Morning: number; Night: number };
 
-/** Sum totalProduction by a row key, descending. Null keys fall under "Unknown". */
+/**
+ * Sum a numeric row field by a row key, descending. Null keys fall under
+ * "Unknown". `valueOf` defaults to weight, but any numeric field works — the
+ * rolls-by-machine chart uses `rollCount`.
+ */
 function sumBy(
   rows: DailyProductionSummaryRow[],
   keyOf: (r: DailyProductionSummaryRow) => string | null,
+  valueOf: (r: DailyProductionSummaryRow) => number = kg,
 ): Slice[] {
   const map = new Map<string, number>();
   for (const r of rows) {
     const k = keyOf(r) ?? "Unknown";
-    map.set(k, (map.get(k) ?? 0) + kg(r));
+    map.set(k, (map.get(k) ?? 0) + valueOf(r));
   }
   return [...map.entries()]
     .map(([name, value]) => ({ name, value }))
@@ -86,6 +95,10 @@ const operatorConfig = {
   production: { label: "Production (kg)", color: OPERATOR },
 } satisfies ChartConfig;
 
+const rollsConfig = {
+  rolls: { label: "Rolls", color: ROLLS },
+} satisfies ChartConfig;
+
 const shiftConfig = {
   Morning: { label: "Morning", color: MORNING },
   Night: { label: "Night", color: NIGHT },
@@ -94,12 +107,10 @@ const shiftConfig = {
 function ChartCard({
   title,
   dateLabel,
-  height = 240,
   children,
 }: {
   title: string;
   dateLabel: string;
-  height?: number;
   children: React.ReactNode;
 }) {
   return (
@@ -126,6 +137,10 @@ export function ProductionAnalytics({
   const byShift = useMemo(() => sumBy(rows, (r) => r.shift), [rows]);
   const byParty = useMemo(() => sumBy(rows, (r) => r.partyName), [rows]);
   const byOperator = useMemo(() => sumBy(rows, (r) => r.operatorName), [rows]);
+  const byRolls = useMemo(
+    () => sumBy(rows, (r) => r.machineName, (r) => r.rollCount),
+    [rows],
+  );
   const machineShift = useMemo(() => machineByShift(rows), [rows]);
 
   const isEmpty = !isLoading && rows.length === 0;
@@ -140,14 +155,14 @@ export function ProductionAnalytics({
     );
   }
 
-  const skeleton = <Skeleton className="h-[240px] w-full" />;
+  const skeleton = <Skeleton className="w-full" style={{ height: CHART_HEIGHT }} />;
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       {/* Production by machine — which machines carried the load */}
-      <ChartCard title="Production by machine" dateLabel={dateLabel} height={260}>
+      <ChartCard title="Production by machine" dateLabel={dateLabel}>
         {isLoading ? skeleton : (
-          <ChartContainer config={productionConfig} style={{ height: 260 }}>
+          <ChartContainer config={productionConfig} style={{ height: CHART_HEIGHT }}>
             <BarChart data={byMachine} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid stroke={AXIS_RULE} vertical={false} />
               <XAxis dataKey="name" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: AXIS_RULE }} />
@@ -160,10 +175,10 @@ export function ProductionAnalytics({
       </ChartCard>
 
       {/* Shift split — Morning vs Night balance */}
-      <ChartCard title="Production by shift" dateLabel={dateLabel} height={260}>
+      <ChartCard title="Production by shift" dateLabel={dateLabel}>
         {isLoading ? skeleton : (
-          <ChartContainer config={shiftConfig} style={{ height: 260 }}>
-            <PieChart>
+          <ChartContainer config={shiftConfig} style={{ height: CHART_HEIGHT }}>
+            <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
               <Pie
                 data={byShift}
                 dataKey="value"
@@ -171,7 +186,7 @@ export function ProductionAnalytics({
                 cx="50%"
                 cy="50%"
                 innerRadius={58}
-                outerRadius={84}
+                outerRadius={80}
                 paddingAngle={1}
                 stroke="#FFFFFF"
                 strokeWidth={2}
@@ -189,10 +204,10 @@ export function ProductionAnalytics({
       </ChartCard>
 
       {/* Party split — who we produced for */}
-      <ChartCard title="Production by party" dateLabel={dateLabel} height={260}>
+      <ChartCard title="Production by party" dateLabel={dateLabel}>
         {isLoading ? skeleton : (
-          <ChartContainer config={productionConfig} style={{ height: 260 }}>
-            <PieChart>
+          <ChartContainer config={productionConfig} style={{ height: CHART_HEIGHT }}>
+            <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
               <Pie
                 data={byParty}
                 dataKey="value"
@@ -200,11 +215,13 @@ export function ProductionAnalytics({
                 cx="50%"
                 cy="50%"
                 innerRadius={58}
-                outerRadius={84}
+                outerRadius={80}
                 paddingAngle={1}
                 stroke="#FFFFFF"
                 strokeWidth={2}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ name, percent }) =>
+                  percent * 100 >= 5 ? `${name} ${(percent * 100).toFixed(0)}%` : ""
+                }
                 labelLine={false}
               >
                 {byParty.map((_, i) => (
@@ -218,9 +235,9 @@ export function ProductionAnalytics({
       </ChartCard>
 
       {/* Operator ranking — top operators by kg */}
-      <ChartCard title="Operator ranking" dateLabel={dateLabel} height={Math.max(240, byOperator.length * 30 + 60)}>
+      <ChartCard title="Operator ranking" dateLabel={dateLabel}>
         {isLoading ? skeleton : (
-          <ChartContainer config={operatorConfig} style={{ height: Math.max(240, byOperator.length * 30 + 60) }}>
+          <ChartContainer config={operatorConfig} style={{ height: CHART_HEIGHT }}>
             <BarChart data={byOperator} layout="vertical" margin={{ top: 4, right: 32, left: 8, bottom: 4 }}>
               <CartesianGrid stroke={AXIS_RULE} horizontal={false} />
               <XAxis type="number" tick={AXIS_TICK} tickLine={false} axisLine={false} />
@@ -240,9 +257,9 @@ export function ProductionAnalytics({
       </ChartCard>
 
       {/* Machine output by shift — grouped comparison */}
-      <ChartCard title="Machine output by shift" dateLabel={dateLabel} height={260}>
+      <ChartCard title="Machine output by shift" dateLabel={dateLabel}>
         {isLoading ? skeleton : (
-          <ChartContainer config={shiftConfig} style={{ height: 260 }}>
+          <ChartContainer config={shiftConfig} style={{ height: CHART_HEIGHT }}>
             <BarChart data={machineShift} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid stroke={AXIS_RULE} vertical={false} />
               <XAxis dataKey="machine" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: AXIS_RULE }} />
@@ -251,6 +268,21 @@ export function ProductionAnalytics({
               <ChartLegend content={<ChartLegendContent />} />
               <Bar dataKey="Morning" fill={MORNING} radius={[2, 2, 0, 0]} barSize={12} />
               <Bar dataKey="Night" fill={NIGHT} radius={[2, 2, 0, 0]} barSize={12} />
+            </BarChart>
+          </ChartContainer>
+        )}
+      </ChartCard>
+
+      {/* Rolls by machine — roll count, the other side of the weight picture */}
+      <ChartCard title="Rolls by machine" dateLabel={dateLabel}>
+        {isLoading ? skeleton : (
+          <ChartContainer config={rollsConfig} style={{ height: CHART_HEIGHT }}>
+            <BarChart data={byRolls} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+              <CartesianGrid stroke={AXIS_RULE} vertical={false} />
+              <XAxis dataKey="name" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: AXIS_RULE }} />
+              <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} width={52} allowDecimals={false} />
+              <ChartTooltip content={<ChartTooltipContent formatter={(v) => `${Number(v)} rolls`} />} cursor={{ fill: "rgba(31,34,28,0.05)" }} />
+              <Bar dataKey="value" fill={ROLLS} radius={[2, 2, 0, 0]} barSize={28} />
             </BarChart>
           </ChartContainer>
         )}
