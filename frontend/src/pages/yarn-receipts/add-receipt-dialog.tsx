@@ -1,3 +1,4 @@
+import { NUM_DECIMALS } from "@/lib/format";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -316,7 +317,7 @@ export function YarnReceiptDialog({
               <div className="pl-4">
                 <p className="eyebrow">Net weight</p>
                 <p className="num mt-1.5 text-3xl font-semibold leading-none text-foreground sm:text-4xl">
-                  {totalNetWeight.toFixed(3)}
+                  {totalNetWeight.toFixed(NUM_DECIMALS)}
                 </p>
               </div>
             </div>

@@ -1,3 +1,4 @@
+import { NUM_DECIMALS } from "@/lib/format";
 import { useState } from "react";
 import { Plus, Pencil, Trash2, Lock, Eye, Sun, CalendarRange } from "lucide-react";
 import { format } from "date-fns";
@@ -197,7 +198,7 @@ export default function DailyProductionList() {
               <div className="min-w-0">
                 <p className="eyebrow">Day total</p>
                 <p className="num mt-1 text-xl font-semibold leading-none text-foreground sm:text-2xl">
-                  {grandTotal.toFixed(3)}
+                  {grandTotal.toFixed(NUM_DECIMALS)}
                   <span className="ml-1.5 text-sm font-medium text-muted-foreground">kg</span>
                 </p>
                 <p className="mt-1.5 text-xs text-muted-foreground">
@@ -212,7 +213,7 @@ export default function DailyProductionList() {
               <div className="min-w-0">
                 <p className="eyebrow">Month to date</p>
                 <p className="num mt-1 text-xl font-semibold leading-none text-foreground sm:text-2xl">
-                  {mtdKg.toFixed(3)}
+                  {mtdKg.toFixed(NUM_DECIMALS)}
                   <span className="ml-1.5 text-sm font-medium text-muted-foreground">kg</span>
                 </p>
                 <p className="mt-1.5 text-xs text-muted-foreground">
@@ -300,7 +301,7 @@ export default function DailyProductionList() {
                         </span>
                       </TableCell>
                       <TableCell className="num text-right">{r.rollCount}</TableCell>
-                      <TableCell className="num text-right font-medium">{Number(r.totalProduction).toFixed(3)}</TableCell>
+                      <TableCell className="num text-right font-medium">{Number(r.totalProduction).toFixed(NUM_DECIMALS)}</TableCell>
                       <TableCell className="px-5 text-right">
                         <div className="flex items-center justify-end gap-1">
                           {r.reconciled ? (
@@ -367,7 +368,7 @@ export default function DailyProductionList() {
                       Grand total
                     </TableCell>
                     <TableCell className="selvedge-top py-4 text-right">
-                      <span className="num text-lg font-semibold text-foreground">{grandTotal.toFixed(3)}</span>
+                      <span className="num text-lg font-semibold text-foreground">{grandTotal.toFixed(NUM_DECIMALS)}</span>
                     </TableCell>
                     <TableCell className="px-5" />
                   </TableRow>
@@ -421,7 +422,7 @@ export default function DailyProductionList() {
                   {" "}
                   <span className="num">{pendingDelete.rollCount}</span> roll
                   {pendingDelete.rollCount === 1 ? "" : "s"} totalling{" "}
-                  <span className="num">{Number(pendingDelete.totalProduction).toFixed(3)}</span>.
+                  <span className="num">{Number(pendingDelete.totalProduction).toFixed(NUM_DECIMALS)}</span>.
                   <br />
                   <br />
                   This permanently removes the entry and all of its yarn roll records. It cannot be undone.

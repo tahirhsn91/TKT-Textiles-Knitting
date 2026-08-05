@@ -9,6 +9,7 @@
  * shadcn ChartContainer), same colour language: charts stay on brand-neutral
  * tints, totals are the app's muted olive text.
  */
+import { NUM_DECIMALS } from "@/lib/format";
 import { useMemo } from "react";
 import {
   Bar,
@@ -47,7 +48,7 @@ const AXIS_RULE = "#DFE2DA";
 const CHART_HEIGHT = 260;
 
 const kg = (r: YarnReceiptAnalyticsLine) => parseFloat(r.netWeight) || 0;
-const fmtKg = (n: number) => `${n.toFixed(3)} kg`;
+const fmtKg = (n: number) => `${n.toFixed(NUM_DECIMALS)} kg`;
 
 type Slice = { name: string; value: number };
 
@@ -254,7 +255,7 @@ export function YarnReceiptAnalytics({
                 stroke="#FFFFFF"
                 strokeWidth={2}
                 label={({ name, percent }) =>
-                  percent * 100 >= 5 ? `${name} ${(percent * 100).toFixed(0)}%` : ""
+                  percent * 100 >= 5 ? `${name} ${(percent * 100).toFixed(NUM_DECIMALS)}%` : ""
                 }
                 labelLine={false}
               >
@@ -311,7 +312,7 @@ export function YarnReceiptAnalytics({
               <CartesianGrid stroke={AXIS_RULE} vertical={false} />
               <XAxis dataKey="name" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: AXIS_RULE }} />
               <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} width={52} />
-              <ChartTooltip content={<ChartTooltipContent formatter={(v) => `${Number(v).toFixed(3)} kg/bag`} />} cursor={{ fill: "rgba(31,34,28,0.05)" }} />
+              <ChartTooltip content={<ChartTooltipContent formatter={(v) => `${Number(v).toFixed(NUM_DECIMALS)} kg/bag`} />} cursor={{ fill: "rgba(31,34,28,0.05)" }} />
               <Bar dataKey="value" fill="#AB3F4C" radius={[2, 2, 0, 0]} barSize={28} />
             </BarChart>
           </ChartContainer>
