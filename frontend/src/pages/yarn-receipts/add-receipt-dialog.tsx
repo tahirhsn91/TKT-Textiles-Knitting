@@ -9,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useListPartyMaster,
   useListYarnCountMaster,
+  useListYarnBrandMaster,
 } from "@workspace/api-client-react";
 import {
   useCreateYarnReceipt,
@@ -50,6 +51,7 @@ type HeaderValues = z.infer<typeof headerSchema>;
 interface LineRow {
   key: number;
   yarnCountId: string;
+  yarnBrandId: string;
   quantity: string;
   netWeight: string;
 }
@@ -86,6 +88,7 @@ export function YarnReceiptDialog({
 
   const { data: partyMaster } = useListPartyMaster();
   const { data: yarnCountMaster } = useListYarnCountMaster();
+  const { data: yarnBrandMaster } = useListYarnBrandMaster();
 
   const createReceipt = useCreateYarnReceipt();
   const updateReceipt = useUpdateYarnReceipt();
@@ -141,6 +144,7 @@ export function YarnReceiptDialog({
       receipt.lines.map((l) => ({
         key: ++lineKeySeq,
         yarnCountId: String(l.yarnCountId),
+        yarnBrandId: String(l.yarnBrandId),
         quantity: String(l.quantity),
         netWeight: l.netWeight,
       })),
@@ -156,6 +160,7 @@ export function YarnReceiptDialog({
       {
         key: ++lineKeySeq,
         yarnCountId: "",
+        yarnBrandId: "",
         quantity: "",
         netWeight: "",
       },
@@ -187,8 +192,8 @@ export function YarnReceiptDialog({
       return;
     }
     for (const l of lines) {
-      if (!l.yarnCountId) {
-        setLineError("Every line needs a yarn count");
+      if (!l.yarnCountId || !l.yarnBrandId) {
+        setLineError("Every line needs a yarn count and yarn brand");
         return;
       }
       const qty = parseInt(l.quantity, 10);
@@ -215,6 +220,7 @@ export function YarnReceiptDialog({
       createdBy: values.enteredBy,
       lines: lines.map((l) => ({
         yarnCountId: parseInt(l.yarnCountId, 10),
+        yarnBrandId: parseInt(l.yarnBrandId, 10),
         quantity: parseInt(l.quantity, 10),
         netWeight: l.netWeight,
       })),
@@ -378,7 +384,7 @@ export function YarnReceiptDialog({
                     <TableBody>
                       {lines.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                          <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
                             No yarn lots added yet
                           </TableCell>
                         </TableRow>
@@ -400,6 +406,19 @@ export function YarnReceiptDialog({
                                 <option value="" disabled>Count</option>
                                 {yarnCountMaster?.map((c) => (
                                   <option key={c.id} value={c.id.toString()}>{c.count}</option>
+                                ))}
+                              </select>
+                            </TableCell>
+                            <TableCell className="py-1.5">
+                              <select
+                                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                value={l.yarnBrandId}
+                                disabled={readOnly}
+                                onChange={(e) => updateLine(l.key, { yarnBrandId: e.target.value })}
+                              >
+                                <option value="" disabled>Brand</option>
+                                {yarnBrandMaster?.map((b) => (
+                                  <option key={b.id} value={b.id.toString()}>{b.name}</option>
                                 ))}
                               </select>
                             </TableCell>
