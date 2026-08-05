@@ -1,3 +1,4 @@
+import { NUM_DECIMALS } from "@/lib/format";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
@@ -1428,7 +1429,7 @@ function ChartSection({ rows, dateRange }: { rows: ReportRow[]; dateRange: strin
     }
     return Array.from(map.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([month, v]) => ({ month, qty: parseFloat(v.qty.toFixed(3)), netWt: parseFloat(v.netWt.toFixed(3)) }));
+      .map(([month, v]) => ({ month, qty: parseFloat(v.qty.toFixed(NUM_DECIMALS)), netWt: parseFloat(v.netWt.toFixed(NUM_DECIMALS)) }));
   }, [rows]);
 
   const byMachine = useMemo(() => {
@@ -1440,7 +1441,7 @@ function ChartSection({ rows, dateRange }: { rows: ReportRow[]; dateRange: strin
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 15)
-      .map(([name, val]) => ({ name, netWt: parseFloat(val.toFixed(3)) }));
+      .map(([name, val]) => ({ name, netWt: parseFloat(val.toFixed(NUM_DECIMALS)) }));
   }, [rows]);
 
   const byYarnCount = useMemo(() => {
@@ -1451,7 +1452,7 @@ function ChartSection({ rows, dateRange }: { rows: ReportRow[]; dateRange: strin
     }
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
-      .map(([name, value]) => ({ name, value: parseFloat(value.toFixed(3)) }));
+      .map(([name, value]) => ({ name, value: parseFloat(value.toFixed(NUM_DECIMALS)) }));
   }, [rows]);
 
   const byTransactionType = useMemo(() => {
@@ -1462,7 +1463,7 @@ function ChartSection({ rows, dateRange }: { rows: ReportRow[]; dateRange: strin
     }
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
-      .map(([name, value]) => ({ name, value: parseFloat(value.toFixed(3)) }));
+      .map(([name, value]) => ({ name, value: parseFloat(value.toFixed(NUM_DECIMALS)) }));
   }, [rows]);
 
   const byParty = useMemo(() => {
@@ -1477,7 +1478,7 @@ function ChartSection({ rows, dateRange }: { rows: ReportRow[]; dateRange: strin
     return Array.from(map.entries())
       .sort((a, b) => b[1].qty - a[1].qty)
       .slice(0, 10)
-      .map(([name, v]) => ({ name, qty: parseFloat(v.qty.toFixed(3)), netWt: parseFloat(v.netWt.toFixed(3)) }));
+      .map(([name, v]) => ({ name, qty: parseFloat(v.qty.toFixed(NUM_DECIMALS)), netWt: parseFloat(v.netWt.toFixed(NUM_DECIMALS)) }));
   }, [rows]);
 
   return (
@@ -1571,7 +1572,7 @@ function ChartSection({ rows, dateRange }: { rows: ReportRow[]; dateRange: strin
                     cx="50%"
                     cy="50%"
                     outerRadius={90}
-                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(1)}%)`}
+                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(NUM_DECIMALS)}%)`}
                     labelLine={false}
                   >
                     {byYarnCount.map((_, i) => (
@@ -1601,7 +1602,7 @@ function ChartSection({ rows, dateRange }: { rows: ReportRow[]; dateRange: strin
                     cx="50%"
                     cy="50%"
                     outerRadius={90}
-                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(1)}%)`}
+                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(NUM_DECIMALS)}%)`}
                     labelLine={false}
                   >
                     {byTransactionType.map((_, i) => (

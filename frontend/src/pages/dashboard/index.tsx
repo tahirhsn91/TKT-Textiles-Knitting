@@ -1,3 +1,4 @@
+import { NUM_DECIMALS } from "@/lib/format";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import {
   AreaChart, Area,
@@ -35,7 +36,7 @@ const DYE = [
   "#4E729E", "#87A173", "#E0AC55", "#C97682", "#FF7A4D",
 ];
 
-function fmt(n: number, decimals = 1) {
+function fmt(n: number, decimals = 2) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(decimals)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(decimals)}K`;
   return n.toFixed(decimals);
@@ -181,7 +182,10 @@ function ReadingPanel() {
         <Reading
           lead
           label="Net weight produced"
-          value={fmt(data.totalNetWeight, 1)}
+          value={data.totalNetWeight.toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
           unit="kg"
           sub="Fabric off the machines this month"
         />
@@ -226,7 +230,7 @@ function MonthlyTrendWidget() {
           <Tooltip
             contentStyle={tooltipStyle}
             cursor={{ stroke: TOKEN.signal, strokeWidth: 1 }}
-            formatter={(v: number) => [`${v.toFixed(2)} kg`, "Net weight"]}
+            formatter={(v: number) => [`${v.toFixed(NUM_DECIMALS)} kg`, "Net weight"]}
           />
           <Area type="monotone" dataKey="netWeight" stroke={DYE[0]} strokeWidth={2} fill="url(#gradNW)" name="Net weight (kg)" />
         </AreaChart>
@@ -262,7 +266,7 @@ function DailyProductionWidget() {
             contentStyle={tooltipStyle}
             cursor={{ fill: "rgba(31,34,28,0.05)" }}
             formatter={(v: number, name: string) => [
-              name === "netWeight" ? `${v.toFixed(2)} kg` : v.toFixed(2),
+              name === "netWeight" ? `${v.toFixed(NUM_DECIMALS)} kg` : v.toFixed(NUM_DECIMALS),
               name === "netWeight" ? "Net weight" : "Quantity",
             ]}
           />
@@ -299,14 +303,14 @@ function FabricBreakdownWidget() {
             nameKey="name"
             stroke={TOKEN.card}
             strokeWidth={2}
-            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(NUM_DECIMALS)}%`}
             labelLine={false}
           >
             {(data ?? []).map((_, i) => (
               <Cell key={i} fill={DYE[i % DYE.length]} />
             ))}
           </Pie>
-          <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v.toFixed(2)} kg`, "Net weight"]} />
+          <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v.toFixed(NUM_DECIMALS)} kg`, "Net weight"]} />
         </PieChart>
       </ResponsiveContainer>
     </ChartCard>
@@ -411,7 +415,7 @@ function OperatorOutputWidget() {
       dataKey="netWeight"
       seriesName="Net weight (kg)"
       color={DYE[3]}
-      formatter={(v: number) => [`${v.toFixed(2)} kg`, "Net weight"]}
+      formatter={(v: number) => [`${v.toFixed(NUM_DECIMALS)} kg`, "Net weight"]}
       numeric
     />
   );
