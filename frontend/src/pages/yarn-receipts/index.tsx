@@ -6,13 +6,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetYarnReceiptsSummary,
   useDeleteYarnReceipt,
+  useYarnReceiptsAnalytics,
   type YarnReceiptSummaryRow,
 } from "@/hooks/use-yarn-receipts";
 import { YarnReceiptDialog } from "./add-receipt-dialog";
+import { YarnReceiptAnalytics } from "./analytics-tab";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -55,6 +58,7 @@ export default function YarnReceiptList() {
   const [pendingDelete, setPendingDelete] = useState<YarnReceiptSummaryRow | null>(null);
 
   const { data, isLoading, isFetching } = useGetYarnReceiptsSummary(date);
+  const { data: analytics } = useYarnReceiptsAnalytics(date);
   const deleteReceipt = useDeleteYarnReceipt();
 
   const rows = data?.rows ?? [];
@@ -179,6 +183,13 @@ export default function YarnReceiptList() {
           </div>
         </Card>
 
+        {/* Entries / Analytics — same date, two views of the same receipts */}
+        <Tabs defaultValue="entries">
+          <TabsList>
+            <TabsTrigger value="entries">Entries</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          </TabsList>
+          <TabsContent value="entries" className="mt-4">
         <Card className="overflow-hidden">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-3.5">
             <h2 className="text-sm font-semibold text-foreground">Yarn receipts</h2>
@@ -308,6 +319,16 @@ export default function YarnReceiptList() {
             </Table>
           </CardContent>
         </Card>
+          </TabsContent>
+          <TabsContent value="analytics" className="mt-4">
+            <YarnReceiptAnalytics
+              lines={analytics?.lines ?? []}
+              monthSeries={analytics?.monthSeries ?? []}
+              isLoading={isLoading}
+              dateLabel={dateLabel}
+            />
+          </TabsContent>
+        </Tabs>
 
         {isFetching && !isLoading && (
           <p className="text-xs text-muted-foreground -mt-4">Refreshing…</p>
