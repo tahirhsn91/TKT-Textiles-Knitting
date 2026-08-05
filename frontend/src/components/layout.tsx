@@ -235,7 +235,10 @@ export function Layout({ children }: { children: ReactNode }) {
       {/* ── Content column (offset by sidebar on desktop) ─────── */}
       <div className={cn(
         "flex min-h-[100dvh] flex-col transition-[margin] duration-200 print:ml-0",
-        collapsed ? "md:ml-16" : "md:ml-64"
+        collapsed ? "md:ml-16" : "md:ml-64",
+        // Push the whole content column below the dev banner (same height as
+        // the sidebar/header offsets above).
+        import.meta.env.DEV && "pt-7"
       )}>
         {/* Top bar — mobile hamburger + wordmark (hidden on desktop) */}
         <header className={cn(
