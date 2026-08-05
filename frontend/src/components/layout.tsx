@@ -171,7 +171,7 @@ export function Layout({ children }: { children: ReactNode }) {
               />
               <SubItem
                 href="/yarn-receipts"
-                label="Yarn Receipts"
+                label="Daily Yarn Receipt"
                 active={isSubItemActive(location, "/yarn-receipts")}
               />
             </DesktopGroup>
@@ -267,7 +267,7 @@ export function Layout({ children }: { children: ReactNode }) {
                     <SubLabel label="Daily Production" active={isSubItemActive(location, "/daily-production")} />
                   </Link>
                   <Link href="/yarn-receipts" onClick={() => setMobileOpen(false)}>
-                    <SubLabel label="Yarn Receipts" active={isSubItemActive(location, "/yarn-receipts")} />
+                    <SubLabel label="Daily Yarn Receipt" active={isSubItemActive(location, "/yarn-receipts")} />
                   </Link>
                 </MobileGroup>
                 <MobileGroup label="Transactions" icon={FileText} active={transactionsActive}>

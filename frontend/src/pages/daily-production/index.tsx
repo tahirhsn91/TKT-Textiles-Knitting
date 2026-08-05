@@ -48,6 +48,10 @@ function yesterdayIso() {
   return format(d, "yyyy-MM-dd");
 }
 
+function todayIso() {
+  return format(new Date(), "yyyy-MM-dd");
+}
+
 /** "Machine 4" repeated on every line of a grouped summary reads like a form,
  *  not a log — a mill ledger only writes the machine when it changes. Same
  *  convention as a paper daybook: a blank means "same as the line above." */
@@ -182,7 +186,7 @@ export default function DailyProductionList() {
                 type="date"
                 className="h-9"
                 value={date}
-                max={yesterdayIso()}
+                max={todayIso()}
                 onChange={(e) => setDate(e.target.value || yesterdayIso())}
               />
             </div>
@@ -393,7 +397,7 @@ export default function DailyProductionList() {
         entryId={editingId ?? viewingId}
         readOnly={viewingId != null}
         defaultDate={date ? new Date(date + "T00:00:00") : undefined}
-        maxDate={new Date(yesterdayIso() + "T00:00:00")}
+        maxDate={new Date(todayIso() + "T00:00:00")}
       />
 
       {/* Deletion is irreversible and cascades to the entry's yarn rolls, so
