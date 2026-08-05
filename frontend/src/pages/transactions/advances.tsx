@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 import { Layout } from "@/components/layout";
@@ -139,8 +139,11 @@ export default function AdvancesPage() {
     mutationFn: (data: object) => apiFetch("/api/employees/advances", { method: "POST", body: JSON.stringify(data) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["employee-advances"] });
-      setForm({ employeeId: "", date: todayStr(), amount: "", notes: "" });
+      // P5: chained entry — keep the employee (and date) so the next advance
+      // starts one keystroke away; clear the amount + notes and refocus.
+      setForm((p) => ({ ...p, amount: "", notes: "" }));
       toast({ title: "Advance recorded." });
+      amountRef.current?.focus();
     },
     onError: (e: Error) => toast({ variant: "destructive", title: "Error", description: e.message }),
   });
@@ -154,14 +157,18 @@ export default function AdvancesPage() {
     onError: (e: Error) => toast({ variant: "destructive", title: "Error", description: e.message }),
   });
 
+  const amountRef = useRef<HTMLInputElement>(null);
+
   function handleAdd() {
     if (!form.employeeId || !form.date || form.amount === "") {
       toast({ variant: "destructive", title: "Validation", description: "Employee, date, and amount are required." });
       return;
     }
     const amt = parseFloat(form.amount);
-    if (isNaN(amt) || amt < 0) {
-      toast({ variant: "destructive", title: "Validation", description: "Amount must be ≥ 0." });
+    // P2: a zero/negative advance is a typo, not a record — same rule as the
+    // daily entry popups.
+    if (isNaN(amt) || amt <= 0) {
+      toast({ variant: "destructive", title: "Validation", description: "Amount must be greater than zero." });
       return;
     }
     addMutation.mutate({ employeeId: parseInt(form.employeeId), date: form.date, amount: amt, notes: form.notes || null });
@@ -210,6 +217,7 @@ export default function AdvancesPage() {
                 <div className="flex flex-col gap-1">
                   <Label>Amount</Label>
                   <Input
+                    ref={amountRef}
                     type="number"
                     min="0"
                     step="0.01"
@@ -305,8 +313,8 @@ export default function AdvancesPage() {
                     <SortableHead label="Date" sortKey="date" sort={advSort} onSort={toggleAdvSort} />
                     <SortableHead label="Employee" sortKey="employeeName" sort={advSort} onSort={toggleAdvSort} />
                     <SortableHead label="Amount" sortKey="amount" sort={advSort} onSort={toggleAdvSort} right />
-                    <SortableHead label="Notes" sortKey="notes" sort={advSort} onSort={toggleAdvSort} />
-                    <TableHead className="w-16"></TableHead>
+                    <SortableHead className="hidden sm:table-cell" label="Notes" sortKey="notes" sort={advSort} onSort={toggleAdvSort} />
+                    <TableHead className="sticky right-0 bg-background w-16"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -317,7 +325,10 @@ export default function AdvancesPage() {
                   ))}
                   {!isLoading && advances.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No advances found.</TableCell>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        No advances for {MONTH_NAMES[Number(filterMonth) - 1]} {filterYear}
+                        {filterOp !== "__all__" ? " for the selected employee" : ""}. Record one above.
+                      </TableCell>
                     </TableRow>
                   )}
                   {!isLoading && sortedAdvances.map((a) => (
@@ -325,11 +336,16 @@ export default function AdvancesPage() {
                       <TableCell className="font-mono text-sm">{formatDate(a.date)}</TableCell>
                       <TableCell>{a.employeeName}</TableCell>
                       <TableCell className="text-right font-mono">{fmtMoney(toNum(a.amount))}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{a.notes || "—"}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-muted-foreground text-sm hidden sm:table-cell">{a.notes || "—"}</TableCell>
+                      <TableCell className="sticky right-0 bg-background">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-11 w-11 text-destructive sm:h-8 sm:w-8"
+                              aria-label={`Delete ${fmtMoney(toNum(a.amount))} advance for ${a.employeeName}`}
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>

@@ -74,23 +74,23 @@ export function AdvanceKpiStrip({
   });
 
   return (
-    <div className="grid grid-cols-2 divide-x divide-border rounded-md border bg-card sm:grid-cols-4">
+    <div className="grid grid-cols-2 rounded-md border bg-card sm:grid-cols-4">
       <div className="px-5 py-4">
         <p className="eyebrow">Total advances</p>
         <p className="num mt-1 text-2xl font-semibold leading-none">{fmtRs(kpis.total)}</p>
         <p className="mt-1.5 text-xs text-muted-foreground">{monthLabel}</p>
       </div>
-      <div className="px-5 py-4">
+      <div className="border-l border-border px-5 py-4 sm:border-l">
         <p className="eyebrow">Advance count</p>
         <p className="num mt-1 text-2xl font-semibold leading-none">{kpis.count}</p>
         <p className="mt-1.5 text-xs text-muted-foreground">records in month</p>
       </div>
-      <div className="px-5 py-4">
+      <div className="border-t border-border px-5 py-4 sm:border-t-0 sm:border-l">
         <p className="eyebrow">Average advance</p>
         <p className="num mt-1 text-2xl font-semibold leading-none">{fmtRs(kpis.avg)}</p>
         <p className="mt-1.5 text-xs text-muted-foreground">per record</p>
       </div>
-      <div className="px-5 py-4">
+      <div className="border-l border-t border-border px-5 py-4 sm:border-t-0 sm:border-l">
         <p className="eyebrow">Largest advance</p>
         <p className="num mt-1 text-2xl font-semibold leading-none">{fmtRs(kpis.max)}</p>
         <p className="mt-1.5 text-xs text-muted-foreground">single record</p>
