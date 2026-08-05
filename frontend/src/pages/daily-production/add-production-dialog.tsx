@@ -77,7 +77,7 @@ function defaultHeaderValues(enteredBy: string, defaultDate: Date = new Date()):
 /**
  * Handles both creating a new production entry and editing an existing one.
  * Pass `entryId` to edit; leave it null/undefined to create. In edit mode the
- * footer drops "Save & Add" — that action exists to chain *new* entries and
+ * footer drops "Save & Add More" — that action exists to chain *new* entries and
  * has no meaning once you are amending a specific record.
  */
 export function ProductionEntryDialog({
@@ -624,7 +624,7 @@ export function ProductionEntryDialog({
                   disabled={isBusy}
                 >
                   {pendingAction === "saveAndAdd" && <Spinner className="mr-2" />}
-                  Save & Add
+                  Save & Add More
                 </Button>
               )}
               <Button
