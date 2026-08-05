@@ -102,6 +102,9 @@ export default function AdvancesPage() {
   const qc = useQueryClient();
 
   const [form, setForm] = useState({ employeeId: "", date: todayStr(), amount: "", notes: "" });
+  // Inline validation message — rendered with role="alert" so screen readers
+  // announce it (toast-only errors aren't reliably announced).
+  const [formError, setFormError] = useState<string | null>(null);
   const [filterOp, setFilterOp] = useState("__all__");
   const now = new Date();
   const [filterMonth, setFilterMonth] = useState(String(now.getMonth() + 1));
@@ -161,16 +164,17 @@ export default function AdvancesPage() {
 
   function handleAdd() {
     if (!form.employeeId || !form.date || form.amount === "") {
-      toast({ variant: "destructive", title: "Validation", description: "Employee, date, and amount are required." });
+      setFormError("Employee, date, and amount are required.");
       return;
     }
     const amt = parseFloat(form.amount);
     // P2: a zero/negative advance is a typo, not a record — same rule as the
     // daily entry popups.
     if (isNaN(amt) || amt <= 0) {
-      toast({ variant: "destructive", title: "Validation", description: "Amount must be greater than zero." });
+      setFormError("Amount must be greater than zero.");
       return;
     }
+    setFormError(null);
     addMutation.mutate({ employeeId: parseInt(form.employeeId), date: form.date, amount: amt, notes: form.notes || null });
   }
 
@@ -194,7 +198,7 @@ export default function AdvancesPage() {
               <div className="grid grid-cols-2 items-end gap-4 sm:flex sm:flex-wrap">
                 <div className="col-span-2 flex flex-col gap-1 sm:col-auto sm:w-48">
                   <Label>Employee</Label>
-                  <Select value={form.employeeId} onValueChange={(v) => setForm((p) => ({ ...p, employeeId: v }))}>
+                  <Select value={form.employeeId} onValueChange={(v) => { setFormError(null); setForm((p) => ({ ...p, employeeId: v })); }}>
                     <SelectTrigger className="h-11 w-full sm:h-9">
                       <SelectValue placeholder="Select employee" />
                     </SelectTrigger>
@@ -213,7 +217,7 @@ export default function AdvancesPage() {
                     // Advances are recorded for the current month only.
                     min={firstDayOfThisMonth()}
                     max={todayStr()}
-                    onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
+                    onChange={(e) => { setFormError(null); setForm((p) => ({ ...p, date: e.target.value })); }}
                   />
                 </div>
                 <div className="flex flex-col gap-1 sm:w-32">
@@ -227,7 +231,7 @@ export default function AdvancesPage() {
                     className="h-11 w-full sm:h-9"
                     placeholder="0.00"
                     value={form.amount}
-                    onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
+                    onChange={(e) => { setFormError(null); setForm((p) => ({ ...p, amount: e.target.value })); }}
                     onKeyDown={(e) => {
                       // Enter in the amount box records the advance — the
                       // common flow is employee → date → amount → done.
@@ -241,23 +245,26 @@ export default function AdvancesPage() {
                 <div className="col-span-2 flex flex-col gap-1 sm:col-auto sm:min-w-40 sm:flex-1">
                   <Label>Notes (optional)</Label>
                   <Input className="h-11 w-full sm:h-9" placeholder="e.g. Festival advance" value={form.notes}
-                    onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
+                    onChange={(e) => { setFormError(null); setForm((p) => ({ ...p, notes: e.target.value })); }} />
                 </div>
                 <Button onClick={handleAdd} disabled={addMutation.isPending} className="col-span-2 sm:col-auto">
                   {addMutation.isPending ? "Adding…" : "Add Advance"}
                 </Button>
               </div>
+              {formError && (
+                <p role="alert" className="mt-3 text-sm font-medium text-destructive">{formError}</p>
+              )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
               <CardTitle>Advance History</CardTitle>
-              <div className="flex flex-wrap gap-4 mt-2">
-                <div className="flex flex-col gap-1">
+              <div className="grid grid-cols-2 gap-4 mt-2 sm:flex sm:flex-wrap">
+                <div className="col-span-2 flex flex-col gap-1 sm:col-auto sm:w-48">
                   <Label className="text-xs">Employee</Label>
                   <Select value={filterOp} onValueChange={setFilterOp}>
-                    <SelectTrigger className="h-11 w-full sm:h-9 sm:w-48">
+                    <SelectTrigger className="h-11 w-full sm:h-8">
                       <SelectValue placeholder="All employees" />
                     </SelectTrigger>
                     <SelectContent>
@@ -268,10 +275,10 @@ export default function AdvancesPage() {
                   </SelectContent>
                   </Select>
                 </div>
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1 sm:w-36">
                   <Label className="text-xs">Month</Label>
                   <Select value={filterMonth} onValueChange={setFilterMonth}>
-                    <SelectTrigger className="h-11 w-36 sm:h-8">
+                    <SelectTrigger className="h-11 w-full sm:h-8">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -281,10 +288,10 @@ export default function AdvancesPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1 sm:w-28">
                   <Label className="text-xs">Year</Label>
                   <Select value={filterYear} onValueChange={setFilterYear}>
-                    <SelectTrigger className="h-11 w-28 sm:h-8">
+                    <SelectTrigger className="h-11 w-full sm:h-8">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
