@@ -1,7 +1,7 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
-  FileText, Database, BarChart2, LayoutDashboard, ClipboardList,
+  FileText, Database, BarChart2, LayoutDashboard, ClipboardList, Wallet,
   ChevronDown, Menu, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,9 @@ const navItems = [
 
 const transactionItems = [
   { href: "/transactions",           label: "Yarn-Fabric Transactions" },
+];
+
+const payrollItems = [
   { href: "/transactions/monthly-salary-entry", label: "Payroll Maintenance" },
 ];
 
@@ -35,6 +38,7 @@ const reportItems = [
 
 // Primary route each collapsed group icon navigates to.
 const TRANSACTIONS_PRIMARY = "/transactions";
+const PAYROLL_PRIMARY = "/transactions/monthly-salary-entry";
 const REPORTS_PRIMARY = "/reports/yarn-balance";
 
 const LS_SIDEBAR_COLLAPSED = "sidebar-collapsed";
@@ -103,7 +107,8 @@ export function Layout({ children }: { children: ReactNode }) {
     try { localStorage.setItem(LS_SIDEBAR_COLLAPSED, String(collapsed)); } catch {}
   }, [collapsed]);
 
-  const transactionsActive = location.startsWith("/transactions");
+  const payrollActive = location.startsWith("/transactions/monthly-salary-entry");
+  const transactionsActive = location.startsWith("/transactions") && !payrollActive;
   const reportsActive = location.startsWith("/reports");
   const dailyProductionActive = location.startsWith("/daily-production");
   const yarnReceiptsActive = location.startsWith("/yarn-receipts");
@@ -208,6 +213,22 @@ export function Layout({ children }: { children: ReactNode }) {
                 />
               ))}
             </DesktopGroup>
+            <DesktopGroup
+              label="Payroll"
+              icon={Wallet}
+              primary={PAYROLL_PRIMARY}
+              active={payrollActive}
+              collapsed={collapsed}
+            >
+              {payrollItems.map((item) => (
+                <SubItem
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  active={isSubItemActive(location, item.href)}
+                />
+              ))}
+            </DesktopGroup>
           </div>
 
           {!collapsed && <NavSection label="Analysis" />}
@@ -301,6 +322,13 @@ export function Layout({ children }: { children: ReactNode }) {
                 </MobileGroup>
                 <MobileGroup label="Transactions" icon={FileText} active={transactionsActive}>
                   {transactionItems.map((item) => (
+                    <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}>
+                      <SubLabel label={item.label} active={isSubItemActive(location, item.href)} />
+                    </Link>
+                  ))}
+                </MobileGroup>
+                <MobileGroup label="Payroll" icon={Wallet} active={payrollActive}>
+                  {payrollItems.map((item) => (
                     <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}>
                       <SubLabel label={item.label} active={isSubItemActive(location, item.href)} />
                     </Link>
