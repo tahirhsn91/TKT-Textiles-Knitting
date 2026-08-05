@@ -16,6 +16,7 @@ import type { ErrorType } from "@/vendor/api-client-react/custom-fetch";
 /** One yarn_receipt_header summary row — one line per receipt in the list. */
 export interface YarnReceiptSummaryRow {
   id: number;
+  docNumber: string;
   receiptDate: string;
   partyId: number;
   partyName: string | null;
@@ -49,6 +50,7 @@ export interface YarnReceiptLine {
 
 export interface YarnReceiptDetail {
   id: number;
+  docNumber: string;
   receiptDate: string;
   partyId: number;
   partyName: string | null;
@@ -60,6 +62,7 @@ export interface YarnReceiptDetail {
 }
 
 export interface YarnReceiptPayload {
+  docNumber: string;
   receiptDate: string;
   partyId: number;
   createdBy: string;
