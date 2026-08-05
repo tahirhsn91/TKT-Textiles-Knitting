@@ -12,7 +12,7 @@ export interface TransactionDetailItem {
   /** @nullable */
   machineId?: number | null;
   /** @nullable */
-  machineEmployeeId?: number | null;
+  employeeId?: number | null;
   /** @nullable */
   yarnTypeId?: number | null;
   /** @nullable */

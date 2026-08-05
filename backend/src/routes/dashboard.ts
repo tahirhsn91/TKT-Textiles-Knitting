@@ -186,7 +186,7 @@ async function getEmployeeOutput() {
     })
     .from(transactionDetailTable)
     .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
-    .leftJoin(employeeMasterTable, eq(transactionDetailTable.machineEmployeeId, employeeMasterTable.id))
+    .leftJoin(employeeMasterTable, eq(transactionDetailTable.employeeId, employeeMasterTable.id))
     .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo)))
     .groupBy(employeeMasterTable.name)
     .orderBy(sql`SUM(${transactionDetailTable.netWt}) DESC`)
