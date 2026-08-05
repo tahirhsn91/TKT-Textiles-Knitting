@@ -214,17 +214,20 @@ export default function AdvancesPage() {
             <CardHeader>
               <CardTitle>Advance History</CardTitle>
               <div className="flex flex-wrap gap-4 mt-2">
-                <Select value={filterOp} onValueChange={setFilterOp}>
-                  <SelectTrigger className="h-11 w-full sm:h-9 sm:w-48">
-                    <SelectValue placeholder="All employees" />
-                  </SelectTrigger>
-                  <SelectContent>
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs">Employee</Label>
+                  <Select value={filterOp} onValueChange={setFilterOp}>
+                    <SelectTrigger className="h-11 w-full sm:h-9 sm:w-48">
+                      <SelectValue placeholder="All employees" />
+                    </SelectTrigger>
+                    <SelectContent>
                     <SelectItem value="__all__">All Employees</SelectItem>
                     {employees.map((op) => (
                       <SelectItem key={op.id} value={String(op.id)}>{op.name}</SelectItem>
                     ))}
                   </SelectContent>
-                </Select>
+                  </Select>
+                </div>
                 <div className="flex flex-col gap-1">
                   <Label className="text-xs">Month</Label>
                   <Select value={filterMonth} onValueChange={setFilterMonth}>
