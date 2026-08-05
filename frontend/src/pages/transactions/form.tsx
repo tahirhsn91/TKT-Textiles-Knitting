@@ -33,6 +33,7 @@ import {
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import {
   Form,
   FormControl,
@@ -585,8 +586,7 @@ export default function TransactionForm() {
                       <FormItem>
                         <FormLabel>Date *</FormLabel>
                         <FormControl>
-                          <Input
-                            type="date"
+                          <DateInput
                             className="h-9"
                             value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
                             onChange={(e) =>
