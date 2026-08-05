@@ -63,6 +63,11 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function currentMonthKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 function firstDayOfThisMonth() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
@@ -137,6 +142,10 @@ export default function AdvancesPage() {
     amount: (a: Advance) => toNum(a.amount),
     notes: (a: Advance) => a.notes,
   });
+
+  // Only the current month's advances can be deleted — earlier months are
+  // locked history.
+  const deletableMonth = currentMonthKey();
 
   const addMutation = useMutation({
     mutationFn: (data: object) => apiFetch("/api/employees/advances", { method: "POST", body: JSON.stringify(data) }),
@@ -340,7 +349,9 @@ export default function AdvancesPage() {
                       </TableCell>
                     </TableRow>
                   )}
-                  {!isLoading && sortedAdvances.map((a) => (
+                  {!isLoading && sortedAdvances.map((a) => {
+                    const deletable = a.date.slice(0, 7) === deletableMonth;
+                    return (
                     <TableRow key={a.id}>
                       <TableCell className="font-mono text-sm">{formatDate(a.date)}</TableCell>
                       <TableCell>{a.employeeName}</TableCell>
@@ -352,8 +363,12 @@ export default function AdvancesPage() {
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="h-11 w-11 text-destructive sm:h-8 sm:w-8"
-                              aria-label={`Delete ${fmtMoney(toNum(a.amount))} advance for ${a.employeeName}`}
+                              disabled={!deletable}
+                              className="h-11 w-11 text-destructive disabled:opacity-30 sm:h-8 sm:w-8"
+                              aria-label={deletable
+                                ? `Delete ${fmtMoney(toNum(a.amount))} advance for ${a.employeeName}`
+                                : "Advances from previous months can't be deleted"}
+                              title={deletable ? undefined : "Advances from previous months can't be deleted"}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -375,7 +390,8 @@ export default function AdvancesPage() {
                         </AlertDialog>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
                 </Table>
                 </TabsContent>
