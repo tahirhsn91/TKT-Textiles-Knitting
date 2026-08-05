@@ -61,6 +61,10 @@ interface LineRow {
 
 let lineKeySeq = 0;
 
+function emptyLine(): LineRow {
+  return { key: ++lineKeySeq, yarnCountId: "", yarnBrandId: "", quantity: "", netWeight: "" };
+}
+
 function defaultHeaderValues(enteredBy: string, defaultDate: Date = new Date()): HeaderValues {
   return {
     docNumber: "",
@@ -140,7 +144,10 @@ export function YarnReceiptDialog({
       if (suggestions?.nextDocNumber) {
         form.setValue("docNumber", suggestions.nextDocNumber);
       }
-      setLines([]);
+      // A fresh receipt starts with one empty line — the common case is a
+      // single yarn lot, so the dialog opens ready to fill rather than
+      // showing an empty state the user has to click past.
+      setLines([emptyLine()]);
       setLineError(null);
       setPendingAction(null);
       return;
@@ -171,16 +178,7 @@ export function YarnReceiptDialog({
   }, [open, isEdit, receiptId, receipt, defaultDate, suggestions]);
 
   const handleAddLine = useCallback(() => {
-    setLines((prev) => [
-      ...prev,
-      {
-        key: ++lineKeySeq,
-        yarnCountId: "",
-        yarnBrandId: "",
-        quantity: "",
-        netWeight: "",
-      },
-    ]);
+    setLines((prev) => [...prev, emptyLine()]);
     setLineError(null);
   }, []);
 
@@ -291,7 +289,7 @@ export function YarnReceiptDialog({
                 if (s?.nextDocNumber) form.setValue("docNumber", s.nextDocNumber);
               })
               .catch(() => {});
-            setLines([]);
+            setLines([emptyLine()]);
             setLineError(null);
             toast({ title: "Saved", description: `${lines.length} lot(s) recorded. Ready for the next receipt.` });
           } else {
