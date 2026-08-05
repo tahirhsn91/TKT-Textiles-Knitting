@@ -1153,7 +1153,7 @@ export default function TransactionForm() {
                         <div>Net Wt</div>
                         <div>Run_Total</div>
                         <div>M/c_Run_Total</div>
-                        <div className="sticky right-0 z-10 bg-card pl-2 text-right">Action</div>
+                        <div className="sticky right-0 z-10 bg-background pl-2 text-right">Action</div>
                       </div>
                     </div>
 
@@ -1349,7 +1349,7 @@ export default function TransactionForm() {
                             {(mcRunTotals[index] ?? 0).toFixed(NUM_DECIMALS)}
                           </div>
 
-                          <div className="sticky right-0 z-10 bg-card pl-2">
+                          <div className="sticky right-0 z-10 bg-background pl-2">
                             <Button
                               type="button"
                               variant="ghost"
