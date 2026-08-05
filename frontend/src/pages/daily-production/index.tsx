@@ -249,7 +249,7 @@ export default function DailyProductionList() {
                   <SortableHead className="eyebrow h-11" label="Shift" sortKey="shift" sort={sort} onSort={toggleSort} />
                   <SortableHead className="eyebrow h-11" label="Rolls" sortKey="rollCount" sort={sort} onSort={toggleSort} right />
                   <SortableHead className="eyebrow h-11" label="Total production" sortKey="totalProduction" sort={sort} onSort={toggleSort} right />
-                  <TableHead className="sticky right-0 bg-background eyebrow h-11 px-2 text-right">Action</TableHead>
+                  <TableHead className="sticky right-0 bg-background eyebrow h-11 px-1.5 text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -314,8 +314,8 @@ export default function DailyProductionList() {
                       </TableCell>
                       <TableCell className="num text-right">{r.rollCount}</TableCell>
                       <TableCell className="num text-right font-medium">{Number(r.totalProduction).toFixed(NUM_DECIMALS)}</TableCell>
-                      <TableCell className={`sticky right-0 ${stickyBg} px-2 text-right`}>
-                        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                      <TableCell className={`sticky right-0 ${stickyBg} px-1.5 text-right`}>
+                        <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
                           {r.reconciled ? (
                             // A reconciled entry is locked, but it should still
                             // be inspectable: the eye opens the same dialog in
@@ -325,7 +325,7 @@ export default function DailyProductionList() {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-11 w-11 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
+                                className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
                                 aria-label={`View entry for ${r.machineName ?? "machine"}, ${r.shift} shift`}
                                 onClick={() => openView(r.id)}
                               >
@@ -349,7 +349,7 @@ export default function DailyProductionList() {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-11 w-11 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
+                                className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
                                 aria-label={`Edit entry for ${r.machineName ?? "machine"}, ${r.shift} shift`}
                                 onClick={() => openEdit(r.id)}
                               >
@@ -359,7 +359,7 @@ export default function DailyProductionList() {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-11 w-11 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8"
+                                className="h-9 w-9 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8"
                                 aria-label={`Delete entry for ${r.machineName ?? "machine"}, ${r.shift} shift`}
                                 onClick={() => setPendingDelete(r)}
                               >
@@ -383,7 +383,7 @@ export default function DailyProductionList() {
                     <TableCell className="selvedge-top py-4 text-right">
                       <span className="num text-lg font-semibold text-foreground">{grandTotal.toFixed(NUM_DECIMALS)}</span>
                     </TableCell>
-                    <TableCell className="sticky right-0 bg-background px-2" />
+                    <TableCell className="sticky right-0 bg-background px-1.5" />
                   </TableRow>
                 </tfoot>
               )}
