@@ -29,6 +29,17 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
+# Verify ALLOWED_ORIGINS is correct — fail loudly instead of deploying broken CORS
+REQUIRED_ORIGIN="http://169.58.108.61:1001"
+ACTUAL_ORIGINS=$(docker exec "${COMPOSE_PROJECT}-backend-1" printenv ALLOWED_ORIGINS 2>/dev/null || echo "MISSING")
+if ! echo "$ACTUAL_ORIGINS" | grep -q "$REQUIRED_ORIGIN"; then
+  echo "ERROR: ALLOWED_ORIGINS missing required origin '$REQUIRED_ORIGIN'"
+  echo "Got: $ACTUAL_ORIGINS"
+  echo "Fix .env.prod and redeploy."
+  exit 1
+fi
+echo "ALLOWED_ORIGINS OK: $ACTUAL_ORIGINS"
+
 # Quick frontend check
 sleep 2
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:1001)
