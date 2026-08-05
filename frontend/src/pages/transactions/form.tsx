@@ -1343,7 +1343,7 @@ export default function TransactionForm() {
                               "Run totals" column, so the row must too. Two
                               separate cells here is what pushed the delete
                               icon onto its own row. */}
-                          <div className="flex h-11 flex-col justify-center gap-0.5 rounded-md border border-input bg-muted px-3 text-sm sm:h-9">
+                          <div className="flex h-12 flex-col justify-center gap-0.5 rounded-md border border-input bg-muted px-3 text-sm sm:h-11">
                             <div className="flex w-full items-baseline justify-between gap-2">
                               <span className="text-muted-foreground">Run</span>
                               <span className="num font-medium">{(runTotals[index] ?? 0).toFixed(NUM_DECIMALS)}</span>
