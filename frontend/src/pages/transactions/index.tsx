@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Plus, Edit, Trash2, X } from "lucide-react";
 import { SortableHead } from "@/components/sortable-head";
 import { compareValues } from "@/hooks/use-sort";
@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Layout } from "@/components/layout";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 
@@ -90,9 +91,14 @@ export default function TransactionList() {
   const deleteTransaction = useDeleteTransaction();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
+  const [, setLocation] = useLocation();
 
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [sort, setSort] = useState<{ key: ColKey; dir: "asc" | "desc" }>({ key: "date", dir: "desc" });
+  // Filters collapse behind a toggle on phones (the 8-field wall is a lot of
+  // scroll for a screen whose primary use is scanning entries).
+  const [filtersOpen, setFiltersOpen] = useState(!isMobile);
 
   // ── Column order (drag-and-drop, persisted) ────────────────────────────────
   const [colOrder, setColOrder] = useState<ColKey[]>(() => {
@@ -248,8 +254,21 @@ export default function TransactionList() {
           </Link>
         </div>
 
-        {/* Filter Bar */}
-        <div className="rounded-md border bg-card p-4 space-y-3">
+        {/* Filter Bar — collapsible on mobile (P4). The toggle is hidden on
+            sm+ where the full grid always shows. */}
+        <div className="rounded-md border bg-card p-4">
+          <div className="flex items-center justify-between sm:hidden">
+            <button
+              type="button"
+              className="flex h-11 flex-1 items-center justify-between rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground"
+              onClick={() => setFiltersOpen((o) => !o)}
+              aria-expanded={filtersOpen}
+            >
+              Filters
+              <span className="text-muted-foreground">{filtersOpen ? "Hide" : "Show"}</span>
+            </button>
+          </div>
+          <div className={`space-y-3 ${filtersOpen ? "mt-3 block" : "hidden"} sm:mt-0 sm:block`}>
           {/* Row 1 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="flex flex-col gap-1.5">
@@ -258,7 +277,7 @@ export default function TransactionList() {
                 value={filters.transactionTypeId || "all"}
                 onValueChange={(v) => setFilter("transactionTypeId", v === "all" ? "" : v)}
               >
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-11 sm:h-9">
                   <SelectValue placeholder="All" />
                 </SelectTrigger>
                 <SelectContent>
@@ -278,7 +297,7 @@ export default function TransactionList() {
                   setFilters((f) => ({ ...f, partyId: v === "all" ? "" : v, jobId: [] }));
                 }}
               >
-                <SelectTrigger className="h-9">
+                <SelectTrigger className="h-11 sm:h-9">
                   <SelectValue placeholder="All" />
                 </SelectTrigger>
                 <SelectContent>
@@ -293,7 +312,7 @@ export default function TransactionList() {
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs text-muted-foreground">Date From</Label>
               <DateInput
-                className="h-9"
+                className="h-11 sm:h-9"
                 value={filters.dateFrom}
                 onChange={(e) => setFilter("dateFrom", e.target.value)}
               />
@@ -302,7 +321,7 @@ export default function TransactionList() {
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs text-muted-foreground">Date To</Label>
               <DateInput
-                className="h-9"
+                className="h-11 sm:h-9"
                 value={filters.dateTo}
                 onChange={(e) => setFilter("dateTo", e.target.value)}
               />
@@ -334,7 +353,7 @@ export default function TransactionList() {
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs text-muted-foreground">Document Number</Label>
               <Input
-                className="h-9"
+                className="h-11 sm:h-9"
                 placeholder="Search doc number…"
                 value={filters.docNumber}
                 onChange={(e) => setFilter("docNumber", e.target.value)}
@@ -345,7 +364,7 @@ export default function TransactionList() {
               <Label className="text-xs text-muted-foreground">Reference</Label>
               <div className="flex gap-2">
                 <Input
-                  className="h-9 flex-1"
+                  className="h-11 flex-1 sm:h-9"
                   placeholder="Search reference…"
                   value={filters.reference}
                   onChange={(e) => setFilter("reference", e.target.value)}
@@ -354,7 +373,7 @@ export default function TransactionList() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
+                    className="h-11 w-11 shrink-0 text-muted-foreground hover:text-foreground sm:h-9 sm:w-9"
                     onClick={() => setFilters(EMPTY_FILTERS)}
                     title="Clear filters"
                   >
@@ -370,6 +389,7 @@ export default function TransactionList() {
               Showing {filtered.length} of {transactions?.length ?? 0} transactions
             </p>
           )}
+          </div>
         </div>
 
         {/* Table */}
@@ -392,7 +412,7 @@ export default function TransactionList() {
                     onDragEnd={handleDragEnd}
                   />
                 ))}
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="sticky right-0 bg-card px-2 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -415,7 +435,13 @@ export default function TransactionList() {
                 sorted.map((t) => {
                   const ref = (t as { reference?: string | null }).reference;
                   return (
-                    <TableRow key={t.id}>
+                    // Whole-row tap opens edit on mobile (P3) — the action
+                    // cell stops propagation so its buttons still work.
+                    <TableRow
+                      key={t.id}
+                      className={isMobile ? "cursor-pointer" : undefined}
+                      onClick={isMobile ? () => setLocation(`/transactions/${t.id}/edit`) : undefined}
+                    >
                       {orderedCols.map((c) => {
                         switch (c.key) {
                           case "docNumber":       return <TableCell key={c.key} className="font-medium whitespace-nowrap">{t.docNumber}</TableCell>;
@@ -427,10 +453,10 @@ export default function TransactionList() {
                           default:                return <TableCell key={c.key} />;
                         }
                       })}
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                      <TableCell className="sticky right-0 bg-card px-2 text-right">
+                        <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                           <Link href={`/transactions/${t.id}/edit`}>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                            <Button variant="ghost" size="icon" className="h-11 w-11 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8">
                               <Edit className="h-4 w-4" />
                               <span className="sr-only">Edit</span>
                             </Button>
@@ -438,7 +464,7 @@ export default function TransactionList() {
 
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                              <Button variant="ghost" size="icon" className="h-11 w-11 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8">
                                 <Trash2 className="h-4 w-4" />
                                 <span className="sr-only">Delete</span>
                               </Button>
@@ -447,7 +473,15 @@ export default function TransactionList() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Delete Transaction?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete transaction {t.docNumber}.
+                                  <span className="font-medium text-foreground">
+                                    {t.docNumber} · {lookupName(transactionTypeMaster, t.transactionTypeId)}
+                                  </span>
+                                  {" — "}
+                                  {lookupName(partyMaster, t.partyId)}
+                                  {ref ? ` · ${ref}` : ""}
+                                  {" on "}
+                                  {new Date(t.date + "T00:00:00").toLocaleDateString()}
+                                  {". This cannot be undone."}
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
