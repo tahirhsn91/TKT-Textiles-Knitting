@@ -109,10 +109,11 @@ export function ProductionEntryDialog({
 
   // Only employees belonging to the Production department appear here — the
   // dropdown feeds a knitting production form, so employees from other
-  // departments (e.g. Administration) would be noise. Matched by name rather
-  // than a hardcoded id, so it keeps working if the seed data changes.
+  // departments (e.g. Administration) would be noise. Matched by department
+  // code (0002) rather than name or a hardcoded id, so it keeps working even
+  // if the department name changes.
   const productionDepartmentId = departments?.find(
-    (d) => d.name.toLowerCase() === "production",
+    (d) => d.code === "0002",
   )?.id;
   const productionEmployees = employeeMaster?.filter(
     (op) =>
