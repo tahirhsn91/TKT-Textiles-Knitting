@@ -81,7 +81,7 @@ export default function DailyProductionList() {
 
   const { sorted: rows, sort, toggleSort } = useSort(data?.rows, {
     machineName: (r) => r.machineName,
-    operatorName: (r) => r.operatorName,
+    employeeName: (r) => r.employeeName,
     partyName: (r) => r.partyName,
     shift: (r) => r.shift,
     rollCount: (r) => r.rollCount,
@@ -242,7 +242,7 @@ export default function DailyProductionList() {
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <SortableHead className="eyebrow h-11 px-5" label="Machine number" sortKey="machineName" sort={sort} onSort={toggleSort} />
-                  <SortableHead className="eyebrow h-11" label="Operator" sortKey="operatorName" sort={sort} onSort={toggleSort} />
+                  <SortableHead className="eyebrow h-11" label="Employee" sortKey="employeeName" sort={sort} onSort={toggleSort} />
                   <SortableHead className="eyebrow h-11" label="Party" sortKey="partyName" sort={sort} onSort={toggleSort} />
                   <SortableHead className="eyebrow h-11" label="Shift" sortKey="shift" sort={sort} onSort={toggleSort} />
                   <SortableHead className="eyebrow h-11" label="Rolls" sortKey="rollCount" sort={sort} onSort={toggleSort} right />
@@ -285,7 +285,7 @@ export default function DailyProductionList() {
                       <TableCell className={`whitespace-nowrap px-5 font-medium ${machineRepeats[i] ? "text-muted-foreground/50" : ""}`}>
                         {machineRepeats[i] ? "—" : (r.machineName ?? "-")}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">{r.operatorName ?? "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{r.employeeName ?? "-"}</TableCell>
                       <TableCell className="whitespace-nowrap">{r.partyName ?? "-"}</TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">
                         <span className="inline-flex items-center gap-2">
@@ -418,7 +418,7 @@ export default function DailyProductionList() {
                     {pendingDelete.machineName ?? "Machine"} · {pendingDelete.shift} shift
                   </span>
                   {" — "}
-                  {pendingDelete.operatorName ?? "operator"}, {pendingDelete.partyName ?? "party"},
+                  {pendingDelete.employeeName ?? "employee"}, {pendingDelete.partyName ?? "party"},
                   {" "}
                   <span className="num">{pendingDelete.rollCount}</span> roll
                   {pendingDelete.rollCount === 1 ? "" : "s"} totalling{" "}

@@ -43,10 +43,10 @@ import {
   useCreateFabricTypeMaster,
   useUpdateFabricTypeMaster,
   useDeleteFabricTypeMaster,
-  useListMachineOperatorMasterCrud,
-  useCreateMachineOperatorMaster,
-  useUpdateMachineOperatorMaster,
-  useDeleteMachineOperatorMaster,
+  useListEmployeeMasterCrud,
+  useCreateEmployeeMaster,
+  useUpdateEmployeeMaster,
+  useDeleteEmployeeMaster,
   useListDepartmentMasterCrud,
   useCreateDepartmentMaster,
   useUpdateDepartmentMaster,
@@ -60,7 +60,7 @@ import {
   getListYarnBrandMasterCrudQueryKey,
   getListUomMasterCrudQueryKey,
   getListFabricTypeMasterCrudQueryKey,
-  getListMachineOperatorMasterCrudQueryKey,
+  getListEmployeeMasterCrudQueryKey,
   getListDepartmentMasterCrudQueryKey,
   getListMachineMasterQueryKey,
   getListJobMasterQueryKey,
@@ -71,7 +71,7 @@ import {
   getListYarnBrandMasterQueryKey,
   getListUomMasterQueryKey,
   getListFabricTypeMasterQueryKey,
-  getListMachineOperatorMasterQueryKey,
+  getListEmployeeMasterQueryKey,
   getListDepartmentMasterQueryKey,
 } from "@workspace/api-client-react";
 import { X } from "lucide-react";
@@ -150,7 +150,7 @@ export default function MastersPage() {
             <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="uom">UOM</TabsTrigger>
             <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="fabric-type">Fabric Type</TabsTrigger>
             <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="department">Departments</TabsTrigger>
-            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="operator">Operators</TabsTrigger>
+            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="employee">Employees</TabsTrigger>
           </TabsList>
 
           <TabsContent value="transaction-type" className="mt-4"><TransactionTypeTab /></TabsContent>
@@ -164,7 +164,7 @@ export default function MastersPage() {
           <TabsContent value="uom" className="mt-4"><UomTab /></TabsContent>
           <TabsContent value="fabric-type" className="mt-4"><FabricTypeTab /></TabsContent>
           <TabsContent value="department" className="mt-4"><DepartmentTab /></TabsContent>
-          <TabsContent value="operator" className="mt-4"><OperatorTab /></TabsContent>
+          <TabsContent value="employee" className="mt-4"><EmployeeTab /></TabsContent>
         </Tabs>
       </div>
     </Layout>
@@ -184,7 +184,7 @@ const TAB_IDS = [
   "uom",
   "fabric-type",
   "department",
-  "operator",
+  "employee",
 ];
 
 // ─── Transaction Type ───────────────────────────────────────────────────────
@@ -513,22 +513,22 @@ function DepartmentTab() {
   );
 }
 
-// ─── Machine Operator (depends on Department for select options) ────────────
-function OperatorTab() {
+// ─── Employee (depends on Department for select options) ─────────────────────
+function EmployeeTab() {
   const invalidateBoth = useInvalidateBoth();
-  const { data: operators, isLoading } = useListMachineOperatorMasterCrud();
+  const { data: employees, isLoading } = useListEmployeeMasterCrud();
   const { data: departments } = useListDepartmentMasterCrud();
-  const create = useCreateMachineOperatorMaster();
-  const update = useUpdateMachineOperatorMaster();
-  const remove = useDeleteMachineOperatorMaster();
-  const done = () => invalidateBoth(getListMachineOperatorMasterCrudQueryKey(), getListMachineOperatorMasterQueryKey());
+  const create = useCreateEmployeeMaster();
+  const update = useUpdateEmployeeMaster();
+  const remove = useDeleteEmployeeMaster();
+  const done = () => invalidateBoth(getListEmployeeMasterCrudQueryKey(), getListEmployeeMasterQueryKey());
 
   return (
     <MasterTable
-      title="Machine Operators"
-      description="Operators assigned to machines during production runs."
+      title="Employees"
+      description="Employees assigned to machines during production runs."
       fields={[
-        { key: "name", label: "Name", placeholder: "e.g. Operator Alpha" },
+        { key: "name", label: "Name", placeholder: "e.g. Employee Alpha" },
         { key: "code", label: "Code", placeholder: "e.g. OPA" },
         { key: "departmentId", label: "Department", type: "select", displayKey: "departmentName", placeholder: "Select department", options: (departments ?? []).map((d) => ({ value: String(d.id), label: d.name })) },
         { key: "baseSalary", label: "Base Salary", placeholder: "e.g. 15000.00", type: "number", step: "0.01" },
@@ -537,7 +537,7 @@ function OperatorTab() {
         { key: "othAllowance", label: "Oth. Allowance", placeholder: "e.g. 200.00", type: "number", step: "0.01" },
         { key: "active", label: "Active", type: "checkbox", defaultValue: "true" },
       ]}
-      rows={(operators ?? []).map((o) => ({
+      rows={(employees ?? []).map((o) => ({
         ...o,
         departmentName: (departments ?? []).find((d) => d.id === (o as { departmentId?: number | null }).departmentId)?.name ?? null,
         active: String((o as { active?: boolean }).active ?? true),

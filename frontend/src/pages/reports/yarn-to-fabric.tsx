@@ -14,7 +14,7 @@ import {
   useListYarnBrandMaster,
   useListUomMaster,
   useListMachineMaster,
-  useListMachineOperatorMaster,
+  useListEmployeeMaster,
 } from "@workspace/api-client-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -83,7 +83,7 @@ interface ReportRow {
   yarnBrandName: string | null;
   uomName: string | null;
   machineName: string | null;
-  machineOperatorName: string | null;
+  machineEmployeeName: string | null;
   partyWastePercent: string | null;
 }
 
@@ -104,13 +104,13 @@ interface Filters {
   yarnBrandId: string[];
   uomId: string[];
   machineId: string[];
-  machineOperatorId: string[];
+  machineEmployeeId: string[];
 }
 
 type GroupByKey =
   | "date" | "month" | "docNumber" | "reference" | "transactionTypeName"
   | "partyName" | "jobName" | "locationName" | "fabricTypeName"
-  | "machineName" | "machineOperatorName"
+  | "machineName" | "machineEmployeeName"
   | "yarnTypeName" | "yarnCountName" | "yarnBrandName" | "uomName";
 
 type SummarySortKey      = "label" | "count" | "qty";
@@ -129,7 +129,7 @@ function defaultFilters(): Filters {
     dateFrom: "", dateTo: "", year: "", month: "", docNumber: "", reference: "",
     transactionTypeId: [], jobId: [], partyId: [], locationId: [], fabricTypeId: [],
     yarnTypeId: [], yarnCountId: [], yarnBrandId: [], uomId: [],
-    machineId: [], machineOperatorId: [],
+    machineId: [], machineEmployeeId: [],
   };
 }
 
@@ -155,7 +155,7 @@ const EMPTY_FILTERS: Filters = {
   dateFrom: "", dateTo: "", year: "", month: "", docNumber: "", reference: "",
   transactionTypeId: [], jobId: [], partyId: [], locationId: [], fabricTypeId: [],
   yarnTypeId: [], yarnCountId: [], yarnBrandId: [], uomId: [],
-  machineId: [], machineOperatorId: [],
+  machineId: [], machineEmployeeId: [],
 };
 
 const GROUP_BY_OPTIONS: { value: GroupByKey; label: string }[] = [
@@ -169,7 +169,7 @@ const GROUP_BY_OPTIONS: { value: GroupByKey; label: string }[] = [
   { value: "locationName",        label: "Location" },
   { value: "fabricTypeName",      label: "Fabric Type" },
   { value: "machineName",         label: "Machine" },
-  { value: "machineOperatorName", label: "Machine Operator" },
+  { value: "machineEmployeeName", label: "Employee" },
   { value: "yarnTypeName",        label: "Yarn Type" },
   { value: "yarnCountName",       label: "Yarn Count" },
   { value: "yarnBrandName",       label: "Yarn Brand" },
@@ -276,7 +276,7 @@ type DetailColKey =
   | "date" | "docNumber" | "reference" | "sl" | "gsm" | "transactionTypeName"
   | "jobName" | "partyName" | "locationName" | "fabricTypeName"
   | "yarnTypeName" | "yarnCountName" | "yarnBrandName" | "uomName"
-  | "machineName" | "machineOperatorName" | "quantity"
+  | "machineName" | "machineEmployeeName" | "quantity"
   | "fabricProduction" | "fabricDelivery" | "wastageWt"
   | "fabricDeliveryReturn" | "runningFabricBalance";
 
@@ -296,7 +296,7 @@ const DETAIL_COLUMNS: { key: DetailColKey; label: string }[] = [
   { key: "yarnBrandName",         label: "Yarn Brand" },
   { key: "uomName",               label: "UOM" },
   { key: "machineName",           label: "Machine" },
-  { key: "machineOperatorName",   label: "Operator" },
+  { key: "machineEmployeeName",   label: "Employee" },
   { key: "quantity",              label: "Qty" },
   { key: "fabricProduction",      label: "Fabric Production" },
   { key: "fabricDelivery",        label: "Fabric Delivery" },
@@ -502,7 +502,7 @@ export default function YarnToFabricPage() {
   const { data: yarnBrands }        = useListYarnBrandMaster();
   const { data: uoms }              = useListUomMaster();
   const { data: machines }          = useListMachineMaster();
-  const { data: machineOperators }  = useListMachineOperatorMaster();
+  const { data: machineEmployees }  = useListEmployeeMaster();
 
   const qs = useMemo(() => buildQueryString(applied), [applied]);
 
@@ -859,7 +859,7 @@ export default function YarnToFabricPage() {
           case "yarnBrandName":         return r.yarnBrandName ?? "";
           case "uomName":               return r.uomName ?? "";
           case "machineName":           return r.machineName ?? "";
-          case "machineOperatorName":   return r.machineOperatorName ?? "";
+          case "machineEmployeeName":   return r.machineEmployeeName ?? "";
           case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "";
           case "fabricProduction":      { const v = signedNetWtIfType(r, "Fabric Production");      return v != null ? fmt(v) : ""; }
           case "fabricDelivery":        { const v = signedNetWtIfType(r, "Fabric Delivery");        return v != null ? fmt(v) : ""; }
@@ -978,7 +978,7 @@ export default function YarnToFabricPage() {
           case "yarnBrandName":         return r.yarnBrandName ?? "—";
           case "uomName":               return r.uomName ?? "—";
           case "machineName":           return r.machineName ?? "—";
-          case "machineOperatorName":   return r.machineOperatorName ?? "—";
+          case "machineEmployeeName":   return r.machineEmployeeName ?? "—";
           case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "—";
           case "fabricProduction":      { const v = signedNetWtIfType(r, "Fabric Production");      return v != null ? fmt(v) : "—"; }
           case "fabricDelivery":        { const v = signedNetWtIfType(r, "Fabric Delivery");        return v != null ? fmt(v) : "—"; }
@@ -1088,7 +1088,7 @@ export default function YarnToFabricPage() {
               <FilterMulti label="Yarn Brand"       values={filters.yarnBrandId}       onChange={(v) => set("yarnBrandId", v)}       options={yarnBrands} />
               <FilterMulti label="UOM"              values={filters.uomId}             onChange={(v) => set("uomId", v)}             options={uomOptions} />
               <FilterMulti label="Machine"          values={filters.machineId}         onChange={(v) => set("machineId", v)}         options={machines} />
-              <FilterMulti label="Machine Operator" values={filters.machineOperatorId} onChange={(v) => set("machineOperatorId", v)} options={machineOperators} />
+              <FilterMulti label="Employee" values={filters.machineEmployeeId} onChange={(v) => set("machineEmployeeId", v)} options={machineEmployees} />
             </div>
 
             <div className="flex items-center gap-2 pt-1">
@@ -1345,7 +1345,7 @@ export default function YarnToFabricPage() {
                                   case "yarnBrandName":        return <TableCell key={c.key} className="whitespace-nowrap">{r.yarnBrandName ?? "—"}</TableCell>;
                                   case "uomName":              return <TableCell key={c.key}>{r.uomName ?? "—"}</TableCell>;
                                   case "machineName":          return <TableCell key={c.key} className="whitespace-nowrap">{r.machineName ?? "—"}</TableCell>;
-                                  case "machineOperatorName":  return <TableCell key={c.key} className="whitespace-nowrap">{r.machineOperatorName ?? "—"}</TableCell>;
+                                  case "machineEmployeeName":  return <TableCell key={c.key} className="whitespace-nowrap">{r.machineEmployeeName ?? "—"}</TableCell>;
                                   case "quantity":             return <TableCell key={c.key} className="text-right whitespace-nowrap">{r.quantity != null ? fmt(signedQty(r)) : "—"}</TableCell>;
                                   case "fabricProduction": {
                                     const v = signedNetWtIfType(r, "Fabric Production");

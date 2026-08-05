@@ -22,7 +22,7 @@ import type {
   CreateJobBody,
   CreateLookupBody,
   CreateMachineBody,
-  CreateMachineOperatorBody,
+  CreateEmployeeBody,
   CreateTransactionBody,
   CreateUomBody,
   CreateYarnCountBody,
@@ -30,7 +30,7 @@ import type {
   JobLookupItem,
   LookupItem,
   MachineLookupItem,
-  MachineOperatorLookupItem,
+  EmployeeLookupItem,
   NotFoundResponse,
   TransactionSummary,
   TransactionWithDetails,
@@ -798,17 +798,17 @@ export function useListFabricTypeMaster<
 }
 
 /**
- * @summary List machine operator master entries
+ * @summary List machine employee master entries
  */
-export const getListMachineOperatorMasterUrl = () => {
-  return `/api/lookups/machine-operator-master`;
+export const getListEmployeeMasterUrl = () => {
+  return `/api/lookups/employee-master`;
 };
 
-export const listMachineOperatorMaster = async (
+export const listEmployeeMaster = async (
   options?: RequestInit,
-): Promise<MachineOperatorLookupItem[]> => {
-  return customFetch<MachineOperatorLookupItem[]>(
-    getListMachineOperatorMasterUrl(),
+): Promise<EmployeeLookupItem[]> => {
+  return customFetch<EmployeeLookupItem[]>(
+    getListEmployeeMasterUrl(),
     {
       ...options,
       method: "GET",
@@ -816,16 +816,16 @@ export const listMachineOperatorMaster = async (
   );
 };
 
-export const getListMachineOperatorMasterQueryKey = () => {
-  return [`/api/lookups/machine-operator-master`] as const;
+export const getListEmployeeMasterQueryKey = () => {
+  return [`/api/lookups/employee-master`] as const;
 };
 
-export const getListMachineOperatorMasterQueryOptions = <
-  TData = Awaited<ReturnType<typeof listMachineOperatorMaster>>,
+export const getListEmployeeMasterQueryOptions = <
+  TData = Awaited<ReturnType<typeof listEmployeeMaster>>,
   TError = ErrorType<unknown>,
 >(options?: {
   query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listMachineOperatorMaster>>,
+    Awaited<ReturnType<typeof listEmployeeMaster>>,
     TError,
     TData
   >;
@@ -834,40 +834,40 @@ export const getListMachineOperatorMasterQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getListMachineOperatorMasterQueryKey();
+    queryOptions?.queryKey ?? getListEmployeeMasterQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listMachineOperatorMaster>>
-  > = ({ signal }) => listMachineOperatorMaster({ signal, ...requestOptions });
+    Awaited<ReturnType<typeof listEmployeeMaster>>
+  > = ({ signal }) => listEmployeeMaster({ signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listMachineOperatorMaster>>,
+    Awaited<ReturnType<typeof listEmployeeMaster>>,
     TError,
     TData
   > & { queryKey: QueryKey };
 };
 
-export type ListMachineOperatorMasterQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listMachineOperatorMaster>>
+export type ListEmployeeMasterQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listEmployeeMaster>>
 >;
-export type ListMachineOperatorMasterQueryError = ErrorType<unknown>;
+export type ListEmployeeMasterQueryError = ErrorType<unknown>;
 
 /**
- * @summary List machine operator master entries
+ * @summary List machine employee master entries
  */
 
-export function useListMachineOperatorMaster<
-  TData = Awaited<ReturnType<typeof listMachineOperatorMaster>>,
+export function useListEmployeeMaster<
+  TData = Awaited<ReturnType<typeof listEmployeeMaster>>,
   TError = ErrorType<unknown>,
 >(options?: {
   query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listMachineOperatorMaster>>,
+    Awaited<ReturnType<typeof listEmployeeMaster>>,
     TError,
     TData
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListMachineOperatorMasterQueryOptions(options);
+  const queryOptions = getListEmployeeMasterQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -4735,17 +4735,17 @@ export const useDeleteDepartmentMaster = <
 };
 
 /**
- * @summary List machine operator master entries (CRUD)
+ * @summary List machine employee master entries (CRUD)
  */
-export const getListMachineOperatorMasterCrudUrl = () => {
-  return `/api/masters/machine-operator`;
+export const getListEmployeeMasterCrudUrl = () => {
+  return `/api/masters/employee`;
 };
 
-export const listMachineOperatorMasterCrud = async (
+export const listEmployeeMasterCrud = async (
   options?: RequestInit,
-): Promise<MachineOperatorLookupItem[]> => {
-  return customFetch<MachineOperatorLookupItem[]>(
-    getListMachineOperatorMasterCrudUrl(),
+): Promise<EmployeeLookupItem[]> => {
+  return customFetch<EmployeeLookupItem[]>(
+    getListEmployeeMasterCrudUrl(),
     {
       ...options,
       method: "GET",
@@ -4753,16 +4753,16 @@ export const listMachineOperatorMasterCrud = async (
   );
 };
 
-export const getListMachineOperatorMasterCrudQueryKey = () => {
-  return [`/api/masters/machine-operator`] as const;
+export const getListEmployeeMasterCrudQueryKey = () => {
+  return [`/api/masters/employee`] as const;
 };
 
-export const getListMachineOperatorMasterCrudQueryOptions = <
-  TData = Awaited<ReturnType<typeof listMachineOperatorMasterCrud>>,
+export const getListEmployeeMasterCrudQueryOptions = <
+  TData = Awaited<ReturnType<typeof listEmployeeMasterCrud>>,
   TError = ErrorType<unknown>,
 >(options?: {
   query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listMachineOperatorMasterCrud>>,
+    Awaited<ReturnType<typeof listEmployeeMasterCrud>>,
     TError,
     TData
   >;
@@ -4771,41 +4771,41 @@ export const getListMachineOperatorMasterCrudQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getListMachineOperatorMasterCrudQueryKey();
+    queryOptions?.queryKey ?? getListEmployeeMasterCrudQueryKey();
 
   const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof listMachineOperatorMasterCrud>>
+    Awaited<ReturnType<typeof listEmployeeMasterCrud>>
   > = ({ signal }) =>
-    listMachineOperatorMasterCrud({ signal, ...requestOptions });
+    listEmployeeMasterCrud({ signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listMachineOperatorMasterCrud>>,
+    Awaited<ReturnType<typeof listEmployeeMasterCrud>>,
     TError,
     TData
   > & { queryKey: QueryKey };
 };
 
-export type ListMachineOperatorMasterCrudQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listMachineOperatorMasterCrud>>
+export type ListEmployeeMasterCrudQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listEmployeeMasterCrud>>
 >;
-export type ListMachineOperatorMasterCrudQueryError = ErrorType<unknown>;
+export type ListEmployeeMasterCrudQueryError = ErrorType<unknown>;
 
 /**
- * @summary List machine operator master entries (CRUD)
+ * @summary List machine employee master entries (CRUD)
  */
 
-export function useListMachineOperatorMasterCrud<
-  TData = Awaited<ReturnType<typeof listMachineOperatorMasterCrud>>,
+export function useListEmployeeMasterCrud<
+  TData = Awaited<ReturnType<typeof listEmployeeMasterCrud>>,
   TError = ErrorType<unknown>,
 >(options?: {
   query?: UseQueryOptions<
-    Awaited<ReturnType<typeof listMachineOperatorMasterCrud>>,
+    Awaited<ReturnType<typeof listEmployeeMasterCrud>>,
     TError,
     TData
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListMachineOperatorMasterCrudQueryOptions(options);
+  const queryOptions = getListEmployeeMasterCrudQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -4815,45 +4815,45 @@ export function useListMachineOperatorMasterCrud<
 }
 
 /**
- * @summary Create machine operator master entry
+ * @summary Create machine employee master entry
  */
-export const getCreateMachineOperatorMasterUrl = () => {
-  return `/api/masters/machine-operator`;
+export const getCreateEmployeeMasterUrl = () => {
+  return `/api/masters/employee`;
 };
 
-export const createMachineOperatorMaster = async (
-  createMachineOperatorBody: CreateMachineOperatorBody,
+export const createEmployeeMaster = async (
+  createEmployeeBody: CreateEmployeeBody,
   options?: RequestInit,
-): Promise<MachineOperatorLookupItem> => {
-  return customFetch<MachineOperatorLookupItem>(
-    getCreateMachineOperatorMasterUrl(),
+): Promise<EmployeeLookupItem> => {
+  return customFetch<EmployeeLookupItem>(
+    getCreateEmployeeMasterUrl(),
     {
       ...options,
       method: "POST",
       headers: { "Content-Type": "application/json", ...options?.headers },
-      body: JSON.stringify(createMachineOperatorBody),
+      body: JSON.stringify(createEmployeeBody),
     },
   );
 };
 
-export const getCreateMachineOperatorMasterMutationOptions = <
+export const getCreateEmployeeMasterMutationOptions = <
   TError = ErrorType<BadRequestResponse | ConflictResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createMachineOperatorMaster>>,
+    Awaited<ReturnType<typeof createEmployeeMaster>>,
     TError,
-    { data: BodyType<CreateMachineOperatorBody> },
+    { data: BodyType<CreateEmployeeBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof createMachineOperatorMaster>>,
+  Awaited<ReturnType<typeof createEmployeeMaster>>,
   TError,
-  { data: BodyType<CreateMachineOperatorBody> },
+  { data: BodyType<CreateEmployeeBody> },
   TContext
 > => {
-  const mutationKey = ["createMachineOperatorMaster"];
+  const mutationKey = ["createEmployeeMaster"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -4863,90 +4863,90 @@ export const getCreateMachineOperatorMasterMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createMachineOperatorMaster>>,
-    { data: BodyType<CreateMachineOperatorBody> }
+    Awaited<ReturnType<typeof createEmployeeMaster>>,
+    { data: BodyType<CreateEmployeeBody> }
   > = (props) => {
     const { data } = props ?? {};
 
-    return createMachineOperatorMaster(data, requestOptions);
+    return createEmployeeMaster(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type CreateMachineOperatorMasterMutationResult = NonNullable<
-  Awaited<ReturnType<typeof createMachineOperatorMaster>>
+export type CreateEmployeeMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createEmployeeMaster>>
 >;
-export type CreateMachineOperatorMasterMutationBody =
-  BodyType<CreateMachineOperatorBody>;
-export type CreateMachineOperatorMasterMutationError = ErrorType<
+export type CreateEmployeeMasterMutationBody =
+  BodyType<CreateEmployeeBody>;
+export type CreateEmployeeMasterMutationError = ErrorType<
   BadRequestResponse | ConflictResponse
 >;
 
 /**
- * @summary Create machine operator master entry
+ * @summary Create machine employee master entry
  */
-export const useCreateMachineOperatorMaster = <
+export const useCreateEmployeeMaster = <
   TError = ErrorType<BadRequestResponse | ConflictResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createMachineOperatorMaster>>,
+    Awaited<ReturnType<typeof createEmployeeMaster>>,
     TError,
-    { data: BodyType<CreateMachineOperatorBody> },
+    { data: BodyType<CreateEmployeeBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
-  Awaited<ReturnType<typeof createMachineOperatorMaster>>,
+  Awaited<ReturnType<typeof createEmployeeMaster>>,
   TError,
-  { data: BodyType<CreateMachineOperatorBody> },
+  { data: BodyType<CreateEmployeeBody> },
   TContext
 > => {
-  return useMutation(getCreateMachineOperatorMasterMutationOptions(options));
+  return useMutation(getCreateEmployeeMasterMutationOptions(options));
 };
 
 /**
- * @summary Update machine operator master entry
+ * @summary Update machine employee master entry
  */
-export const getUpdateMachineOperatorMasterUrl = (id: number) => {
-  return `/api/masters/machine-operator/${id}`;
+export const getUpdateEmployeeMasterUrl = (id: number) => {
+  return `/api/masters/employee/${id}`;
 };
 
-export const updateMachineOperatorMaster = async (
+export const updateEmployeeMaster = async (
   id: number,
-  createMachineOperatorBody: CreateMachineOperatorBody,
+  createEmployeeBody: CreateEmployeeBody,
   options?: RequestInit,
-): Promise<MachineOperatorLookupItem> => {
-  return customFetch<MachineOperatorLookupItem>(
-    getUpdateMachineOperatorMasterUrl(id),
+): Promise<EmployeeLookupItem> => {
+  return customFetch<EmployeeLookupItem>(
+    getUpdateEmployeeMasterUrl(id),
     {
       ...options,
       method: "PUT",
       headers: { "Content-Type": "application/json", ...options?.headers },
-      body: JSON.stringify(createMachineOperatorBody),
+      body: JSON.stringify(createEmployeeBody),
     },
   );
 };
 
-export const getUpdateMachineOperatorMasterMutationOptions = <
+export const getUpdateEmployeeMasterMutationOptions = <
   TError = ErrorType<NotFoundResponse | ConflictResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateMachineOperatorMaster>>,
+    Awaited<ReturnType<typeof updateEmployeeMaster>>,
     TError,
-    { id: number; data: BodyType<CreateMachineOperatorBody> },
+    { id: number; data: BodyType<CreateEmployeeBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof updateMachineOperatorMaster>>,
+  Awaited<ReturnType<typeof updateEmployeeMaster>>,
   TError,
-  { id: number; data: BodyType<CreateMachineOperatorBody> },
+  { id: number; data: BodyType<CreateEmployeeBody> },
   TContext
 > => {
-  const mutationKey = ["updateMachineOperatorMaster"];
+  const mutationKey = ["updateEmployeeMaster"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -4956,84 +4956,84 @@ export const getUpdateMachineOperatorMasterMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof updateMachineOperatorMaster>>,
-    { id: number; data: BodyType<CreateMachineOperatorBody> }
+    Awaited<ReturnType<typeof updateEmployeeMaster>>,
+    { id: number; data: BodyType<CreateEmployeeBody> }
   > = (props) => {
     const { id, data } = props ?? {};
 
-    return updateMachineOperatorMaster(id, data, requestOptions);
+    return updateEmployeeMaster(id, data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type UpdateMachineOperatorMasterMutationResult = NonNullable<
-  Awaited<ReturnType<typeof updateMachineOperatorMaster>>
+export type UpdateEmployeeMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateEmployeeMaster>>
 >;
-export type UpdateMachineOperatorMasterMutationBody =
-  BodyType<CreateMachineOperatorBody>;
-export type UpdateMachineOperatorMasterMutationError = ErrorType<
+export type UpdateEmployeeMasterMutationBody =
+  BodyType<CreateEmployeeBody>;
+export type UpdateEmployeeMasterMutationError = ErrorType<
   NotFoundResponse | ConflictResponse
 >;
 
 /**
- * @summary Update machine operator master entry
+ * @summary Update machine employee master entry
  */
-export const useUpdateMachineOperatorMaster = <
+export const useUpdateEmployeeMaster = <
   TError = ErrorType<NotFoundResponse | ConflictResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof updateMachineOperatorMaster>>,
+    Awaited<ReturnType<typeof updateEmployeeMaster>>,
     TError,
-    { id: number; data: BodyType<CreateMachineOperatorBody> },
+    { id: number; data: BodyType<CreateEmployeeBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
-  Awaited<ReturnType<typeof updateMachineOperatorMaster>>,
+  Awaited<ReturnType<typeof updateEmployeeMaster>>,
   TError,
-  { id: number; data: BodyType<CreateMachineOperatorBody> },
+  { id: number; data: BodyType<CreateEmployeeBody> },
   TContext
 > => {
-  return useMutation(getUpdateMachineOperatorMasterMutationOptions(options));
+  return useMutation(getUpdateEmployeeMasterMutationOptions(options));
 };
 
 /**
- * @summary Delete machine operator master entry
+ * @summary Delete machine employee master entry
  */
-export const getDeleteMachineOperatorMasterUrl = (id: number) => {
-  return `/api/masters/machine-operator/${id}`;
+export const getDeleteEmployeeMasterUrl = (id: number) => {
+  return `/api/masters/employee/${id}`;
 };
 
-export const deleteMachineOperatorMaster = async (
+export const deleteEmployeeMaster = async (
   id: number,
   options?: RequestInit,
 ): Promise<void> => {
-  return customFetch<void>(getDeleteMachineOperatorMasterUrl(id), {
+  return customFetch<void>(getDeleteEmployeeMasterUrl(id), {
     ...options,
     method: "DELETE",
   });
 };
 
-export const getDeleteMachineOperatorMasterMutationOptions = <
+export const getDeleteEmployeeMasterMutationOptions = <
   TError = ErrorType<NotFoundResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteMachineOperatorMaster>>,
+    Awaited<ReturnType<typeof deleteEmployeeMaster>>,
     TError,
     { id: number },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof deleteMachineOperatorMaster>>,
+  Awaited<ReturnType<typeof deleteEmployeeMaster>>,
   TError,
   { id: number },
   TContext
 > => {
-  const mutationKey = ["deleteMachineOperatorMaster"];
+  const mutationKey = ["deleteEmployeeMaster"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -5043,45 +5043,45 @@ export const getDeleteMachineOperatorMasterMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof deleteMachineOperatorMaster>>,
+    Awaited<ReturnType<typeof deleteEmployeeMaster>>,
     { id: number }
   > = (props) => {
     const { id } = props ?? {};
 
-    return deleteMachineOperatorMaster(id, requestOptions);
+    return deleteEmployeeMaster(id, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type DeleteMachineOperatorMasterMutationResult = NonNullable<
-  Awaited<ReturnType<typeof deleteMachineOperatorMaster>>
+export type DeleteEmployeeMasterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteEmployeeMaster>>
 >;
 
-export type DeleteMachineOperatorMasterMutationError =
+export type DeleteEmployeeMasterMutationError =
   ErrorType<NotFoundResponse>;
 
 /**
- * @summary Delete machine operator master entry
+ * @summary Delete machine employee master entry
  */
-export const useDeleteMachineOperatorMaster = <
+export const useDeleteEmployeeMaster = <
   TError = ErrorType<NotFoundResponse>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof deleteMachineOperatorMaster>>,
+    Awaited<ReturnType<typeof deleteEmployeeMaster>>,
     TError,
     { id: number },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
-  Awaited<ReturnType<typeof deleteMachineOperatorMaster>>,
+  Awaited<ReturnType<typeof deleteEmployeeMaster>>,
   TError,
   { id: number },
   TContext
 > => {
-  return useMutation(getDeleteMachineOperatorMasterMutationOptions(options));
+  return useMutation(getDeleteEmployeeMasterMutationOptions(options));
 };
 
 /**

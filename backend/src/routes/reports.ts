@@ -14,7 +14,7 @@ import {
   yarnBrandMasterTable,
   uomMasterTable,
   machineMasterTable,
-  machineOperatorMasterTable,
+  employeeMasterTable,
 } from "../db/index.js";
 
 const router: IRouter = Router();
@@ -47,7 +47,7 @@ router.get("/reports/data", async (req, res): Promise<void> => {
   const ybIds  = ids(q.yarnBrandId);
   const uIds   = ids(q.uomId);
   const mIds   = ids(q.machineId);
-  const moIds  = ids(q.machineOperatorId);
+  const moIds  = ids(q.machineEmployeeId);
 
   if (ttIds)  conditions.push(ttIds.length === 1  ? eq(transactionHeaderTable.transactionTypeId, ttIds[0])  : inArray(transactionHeaderTable.transactionTypeId, ttIds));
   if (jobIds) conditions.push(jobIds.length === 1 ? eq(transactionHeaderTable.jobId, jobIds[0])            : inArray(transactionHeaderTable.jobId, jobIds));
@@ -59,7 +59,7 @@ router.get("/reports/data", async (req, res): Promise<void> => {
   if (ybIds)  conditions.push(ybIds.length === 1  ? eq(transactionDetailTable.yarnBrandId, ybIds[0])       : inArray(transactionDetailTable.yarnBrandId, ybIds));
   if (uIds)   conditions.push(uIds.length === 1   ? eq(transactionDetailTable.uomId, uIds[0])              : inArray(transactionDetailTable.uomId, uIds));
   if (mIds)   conditions.push(mIds.length === 1   ? eq(transactionDetailTable.machineId, mIds[0])          : inArray(transactionDetailTable.machineId, mIds));
-  if (moIds)  conditions.push(moIds.length === 1  ? eq(transactionDetailTable.machineOperatorId, moIds[0]) : inArray(transactionDetailTable.machineOperatorId, moIds));
+  if (moIds)  conditions.push(moIds.length === 1  ? eq(transactionDetailTable.machineEmployeeId, moIds[0]) : inArray(transactionDetailTable.machineEmployeeId, moIds));
 
   const rows = await db
     .select({
@@ -84,7 +84,7 @@ router.get("/reports/data", async (req, res): Promise<void> => {
       yarnBrandName:        yarnBrandMasterTable.name,
       uomName:              uomMasterTable.name,
       machineName:          machineMasterTable.name,
-      machineOperatorName:  machineOperatorMasterTable.name,
+      machineEmployeeName:  employeeMasterTable.name,
     })
     .from(transactionDetailTable)
     .innerJoin(transactionHeaderTable,        eq(transactionDetailTable.headerId,             transactionHeaderTable.id))
@@ -98,7 +98,7 @@ router.get("/reports/data", async (req, res): Promise<void> => {
     .leftJoin(yarnBrandMasterTable,           eq(transactionDetailTable.yarnBrandId,           yarnBrandMasterTable.id))
     .leftJoin(uomMasterTable,                 eq(transactionDetailTable.uomId,                 uomMasterTable.id))
     .leftJoin(machineMasterTable,             eq(transactionDetailTable.machineId,             machineMasterTable.id))
-    .leftJoin(machineOperatorMasterTable,     eq(transactionDetailTable.machineOperatorId,     machineOperatorMasterTable.id))
+    .leftJoin(employeeMasterTable,     eq(transactionDetailTable.machineEmployeeId,     employeeMasterTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(transactionHeaderTable.date, transactionHeaderTable.id, transactionDetailTable.id);
 

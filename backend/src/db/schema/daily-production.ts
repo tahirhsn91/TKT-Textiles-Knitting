@@ -17,7 +17,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import {
   machineMasterTable,
-  machineOperatorMasterTable,
+  employeeMasterTable,
   partyMasterTable,
 } from "./lookups.js";
 import { transactionHeaderTable } from "./transactions.js";
@@ -30,7 +30,7 @@ import { transactionHeaderTable } from "./transactions.js";
 export const shiftEnum = pgEnum("shift", ["Morning", "Night"]);
 
 // ─── Daily Production Header ───────────────────────────────────────────────
-// One row per (date, machine, operator, party, shift) production *entry*.
+// One row per (date, machine, employee, party, shift) production *entry*.
 // Multiple headers can legitimately share the same 5-way combination — e.g.
 // a supervisor uses "Save & Add" twice for the same machine/shift — the main
 // screen's summary grid aggregates SUM(roll_weight) across all of them
@@ -42,9 +42,9 @@ export const dailyProductionHeaderTable = pgTable("daily_production_header", {
   machineId: integer("machine_id")
     .notNull()
     .references(() => machineMasterTable.id),
-  operatorId: integer("operator_id")
+  employeeId: integer("employee_id")
     .notNull()
-    .references(() => machineOperatorMasterTable.id),
+    .references(() => employeeMasterTable.id),
   partyId: integer("party_id")
     .notNull()
     .references(() => partyMasterTable.id),
@@ -79,9 +79,9 @@ export const dailyProductionHeaderTable = pgTable("daily_production_header", {
     t.productionDate, t.partyId, t.reconciled,
   ),
   // Serves the "Get production summary by date" query directly: filter by
-  // production_date, group by machine/operator/party/shift.
+  // production_date, group by machine/employee/party/shift.
   index("daily_production_header_summary_idx").on(
-    t.productionDate, t.machineId, t.operatorId, t.partyId, t.shift,
+    t.productionDate, t.machineId, t.employeeId, t.partyId, t.shift,
   ),
 ]);
 

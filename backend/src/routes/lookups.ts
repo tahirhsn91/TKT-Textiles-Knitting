@@ -12,7 +12,7 @@ import {
   yarnBrandMasterTable,
   uomMasterTable,
   fabricTypeMasterTable,
-  machineOperatorMasterTable,
+  employeeMasterTable,
   departmentMasterTable,
 } from "../db/index.js";
 import {
@@ -26,7 +26,7 @@ import {
   ListYarnBrandMasterResponse,
   ListUomMasterResponse,
   ListFabricTypeMasterResponse,
-  ListMachineOperatorMasterResponse,
+  ListEmployeeMasterResponse,
   ListDepartmentMasterResponse,
 } from "../api-zod/index.js";
 
@@ -87,9 +87,9 @@ router.get("/lookups/fabric-type-master", async (_req, res): Promise<void> => {
   res.json(ListFabricTypeMasterResponse.parse(rows));
 });
 
-router.get("/lookups/machine-operator-master", async (_req, res): Promise<void> => {
-  const rows = await db.select().from(machineOperatorMasterTable).orderBy(machineOperatorMasterTable.name);
-  res.json(ListMachineOperatorMasterResponse.parse(rows));
+router.get("/lookups/employee-master", async (_req, res): Promise<void> => {
+  const rows = await db.select().from(employeeMasterTable).orderBy(employeeMasterTable.name);
+  res.json(ListEmployeeMasterResponse.parse(rows));
 });
 
 router.get("/lookups/transaction-type-master", async (_req, res): Promise<void> => {

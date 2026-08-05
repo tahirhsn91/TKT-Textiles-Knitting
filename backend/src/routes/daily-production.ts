@@ -6,7 +6,7 @@ import {
   dailyProductionHeaderTable,
   dailyProductionDetailTable,
   machineMasterTable,
-  machineOperatorMasterTable,
+  employeeMasterTable,
   partyMasterTable,
 } from "../db/index.js";
 
@@ -29,7 +29,7 @@ const rollSchema = z.object({
 const createSchema = z.object({
   productionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "productionDate must be YYYY-MM-DD"),
   machineId: z.coerce.number().int().positive("Machine is required"),
-  operatorId: z.coerce.number().int().positive("Operator is required"),
+  employeeId: z.coerce.number().int().positive("Employee is required"),
   partyId: z.coerce.number().int().positive("Party is required"),
   shift: shiftSchema,
   remarks: z.string().trim().nullable().optional(),
@@ -83,7 +83,7 @@ async function reconciliationBlock(
 
 // ─── Get production summary by date ────────────────────────────────────────
 // Landing-screen grid: SUM(roll_weight) / COUNT(*) grouped by
-// Machine + Operator + Party + Shift for the selected Production Date.
+// Machine + Employee + Party + Shift for the selected Production Date.
 // Cancelled entries are excluded from totals but not deleted (Section 4.5 of
 // the TDD).
 //
@@ -107,8 +107,8 @@ router.get("/daily-production", async (req, res): Promise<void> => {
       id: dailyProductionHeaderTable.id,
       machineId: dailyProductionHeaderTable.machineId,
       machineName: machineMasterTable.name,
-      operatorId: dailyProductionHeaderTable.operatorId,
-      operatorName: machineOperatorMasterTable.name,
+      employeeId: dailyProductionHeaderTable.employeeId,
+      employeeName: employeeMasterTable.name,
       partyId: dailyProductionHeaderTable.partyId,
       partyName: partyMasterTable.name,
       shift: dailyProductionHeaderTable.shift,
@@ -126,7 +126,7 @@ router.get("/daily-production", async (req, res): Promise<void> => {
     // an invisible orphan.
     .leftJoin(dailyProductionDetailTable, eq(dailyProductionDetailTable.headerId, dailyProductionHeaderTable.id))
     .leftJoin(machineMasterTable, eq(dailyProductionHeaderTable.machineId, machineMasterTable.id))
-    .leftJoin(machineOperatorMasterTable, eq(dailyProductionHeaderTable.operatorId, machineOperatorMasterTable.id))
+    .leftJoin(employeeMasterTable, eq(dailyProductionHeaderTable.employeeId, employeeMasterTable.id))
     .leftJoin(partyMasterTable, eq(dailyProductionHeaderTable.partyId, partyMasterTable.id))
     .where(and(
       eq(dailyProductionHeaderTable.productionDate, date),
@@ -135,7 +135,7 @@ router.get("/daily-production", async (req, res): Promise<void> => {
     .groupBy(
       dailyProductionHeaderTable.id,
       machineMasterTable.name,
-      machineOperatorMasterTable.name,
+      employeeMasterTable.name,
       partyMasterTable.name,
     )
     .orderBy(machineMasterTable.name, dailyProductionHeaderTable.shift, dailyProductionHeaderTable.id);
@@ -191,8 +191,8 @@ router.get("/daily-production/unreconciled", async (req, res): Promise<void> => 
       productionDate: dailyProductionHeaderTable.productionDate,
       machineId: dailyProductionHeaderTable.machineId,
       machineName: machineMasterTable.name,
-      operatorId: dailyProductionHeaderTable.operatorId,
-      operatorName: machineOperatorMasterTable.name,
+      employeeId: dailyProductionHeaderTable.employeeId,
+      employeeName: employeeMasterTable.name,
       partyId: dailyProductionHeaderTable.partyId,
       partyName: partyMasterTable.name,
       shift: dailyProductionHeaderTable.shift,
@@ -202,7 +202,7 @@ router.get("/daily-production/unreconciled", async (req, res): Promise<void> => 
     .from(dailyProductionHeaderTable)
     .leftJoin(dailyProductionDetailTable, eq(dailyProductionDetailTable.headerId, dailyProductionHeaderTable.id))
     .leftJoin(machineMasterTable, eq(dailyProductionHeaderTable.machineId, machineMasterTable.id))
-    .leftJoin(machineOperatorMasterTable, eq(dailyProductionHeaderTable.operatorId, machineOperatorMasterTable.id))
+    .leftJoin(employeeMasterTable, eq(dailyProductionHeaderTable.employeeId, employeeMasterTable.id))
     .leftJoin(partyMasterTable, eq(dailyProductionHeaderTable.partyId, partyMasterTable.id))
     .where(and(
       eq(dailyProductionHeaderTable.productionDate, date),
@@ -213,7 +213,7 @@ router.get("/daily-production/unreconciled", async (req, res): Promise<void> => 
     .groupBy(
       dailyProductionHeaderTable.id,
       machineMasterTable.name,
-      machineOperatorMasterTable.name,
+      employeeMasterTable.name,
       partyMasterTable.name,
     )
     .orderBy(machineMasterTable.name, dailyProductionHeaderTable.shift, dailyProductionHeaderTable.id);
@@ -282,7 +282,7 @@ router.post("/daily-production", async (req, res): Promise<void> => {
 
     res.status(201).json(result);
   } catch (err) {
-    if (isFkViolation(err)) { res.status(400).json({ error: "Machine, Operator, or Party does not exist" }); return; }
+    if (isFkViolation(err)) { res.status(400).json({ error: "Machine, Employee, or Party does not exist" }); return; }
     throw err;
   }
 });
@@ -337,7 +337,7 @@ router.put("/daily-production/:id", async (req, res): Promise<void> => {
     if (!result) { res.status(404).json({ error: "Daily production entry not found" }); return; }
     res.json(result);
   } catch (err) {
-    if (isFkViolation(err)) { res.status(400).json({ error: "Machine, Operator, or Party does not exist" }); return; }
+    if (isFkViolation(err)) { res.status(400).json({ error: "Machine, Employee, or Party does not exist" }); return; }
     throw err;
   }
 });

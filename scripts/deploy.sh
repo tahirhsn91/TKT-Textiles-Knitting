@@ -44,6 +44,14 @@ echo "ALLOWED_ORIGINS OK: $ACTUAL_ORIGINS"
 # (prevents the yarn-receipt incident: code deployed but tables missing in heliumdb_prod)
 echo "Verifying DB schema against migrations..."
 EXPECTED_TABLES=$(grep -hoP 'CREATE TABLE (?:IF NOT EXISTS )?"\K[^"]+' "$PROJECT_DIR/database/migrations"/*.sql 2>/dev/null | sort -u)
+# Tables renamed by later migrations (e.g. machine_operator_master -> employee_master)
+# no longer exist under their old names — swap the pre-rename names for the new ones.
+RENAMED_AWAY=$(grep -hoP 'ALTER TABLE "\K[^"]+(?=" RENAME TO)' "$PROJECT_DIR/database/migrations"/*.sql 2>/dev/null | sort -u)
+RENAMED_TO=$(grep -hoP 'ALTER TABLE "[^"]+" RENAME TO "\K[^"]+' "$PROJECT_DIR/database/migrations"/*.sql 2>/dev/null | sort -u)
+if [ -n "$RENAMED_AWAY" ]; then
+  EXPECTED_TABLES=$(comm -23 <(echo "$EXPECTED_TABLES" | tr ' ' '\n' | sort -u) <(echo "$RENAMED_AWAY" | sort -u))
+  EXPECTED_TABLES=$(printf '%s\n%s\n' "$EXPECTED_TABLES" "$RENAMED_TO" | sort -u)
+fi
 MISSING=""
 for t in $EXPECTED_TABLES; do
   EXISTS=$(docker exec "${COMPOSE_PROJECT}-postgres-1" psql -U postgres -d heliumdb_prod -tAc "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='$t'" 2>/dev/null)

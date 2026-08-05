@@ -3,7 +3,7 @@
  *
  * Charts for a SINGLE selected date, aggregated client-side from the same
  * summary rows the Entries tab renders — no extra API call, because
- * `GET /api/daily-production?date=` already returns machine / operator /
+ * `GET /api/daily-production?date=` already returns machine / employee /
  * party / shift / rollCount / totalProduction per header. Issue #33.
  *
  * Charting stack: shadcn/ui chart components (Recharts under the hood),
@@ -41,7 +41,7 @@ const DYE = [
 const MORNING = "#2A4C7A";
 const NIGHT = "#C8891E";
 const MACHINE = "#2A4C7A";
-const OPERATOR = "#AB3F4C";
+const EMPLOYEE = "#AB3F4C";
 const ROLLS = "#627C50";
 
 const AXIS_TICK = { fontSize: 11, fill: "#656E5E" } as const;
@@ -92,8 +92,8 @@ const productionConfig = {
   production: { label: "Production (kg)", color: MACHINE },
 } satisfies ChartConfig;
 
-const operatorConfig = {
-  production: { label: "Production (kg)", color: OPERATOR },
+const employeeConfig = {
+  production: { label: "Production (kg)", color: EMPLOYEE },
 } satisfies ChartConfig;
 
 const rollsConfig = {
@@ -137,7 +137,7 @@ export function ProductionAnalytics({
   const byMachine = useMemo(() => sumBy(rows, (r) => r.machineName), [rows]);
   const byShift = useMemo(() => sumBy(rows, (r) => r.shift), [rows]);
   const byParty = useMemo(() => sumBy(rows, (r) => r.partyName), [rows]);
-  const byOperator = useMemo(() => sumBy(rows, (r) => r.operatorName), [rows]);
+  const byEmployee = useMemo(() => sumBy(rows, (r) => r.employeeName), [rows]);
   const byRolls = useMemo(
     () => sumBy(rows, (r) => r.machineName, (r) => r.rollCount),
     [rows],
@@ -235,11 +235,11 @@ export function ProductionAnalytics({
         )}
       </ChartCard>
 
-      {/* Operator ranking — top operators by kg */}
-      <ChartCard title="Operator ranking" dateLabel={dateLabel}>
+      {/* Employee ranking — top employees by kg */}
+      <ChartCard title="Employee ranking" dateLabel={dateLabel}>
         {isLoading ? skeleton : (
-          <ChartContainer className="w-full aspect-auto" config={operatorConfig} style={{ height: CHART_HEIGHT }}>
-            <BarChart data={byOperator} layout="vertical" margin={{ top: 4, right: 32, left: 8, bottom: 4 }}>
+          <ChartContainer className="w-full aspect-auto" config={employeeConfig} style={{ height: CHART_HEIGHT }}>
+            <BarChart data={byEmployee} layout="vertical" margin={{ top: 4, right: 32, left: 8, bottom: 4 }}>
               <CartesianGrid stroke={AXIS_RULE} horizontal={false} />
               <XAxis type="number" tick={AXIS_TICK} tickLine={false} axisLine={false} />
               <YAxis
@@ -251,7 +251,7 @@ export function ProductionAnalytics({
                 width={110}
               />
               <ChartTooltip content={<ChartTooltipContent formatter={(v) => fmtKg(Number(v))} />} cursor={{ fill: "rgba(31,34,28,0.05)" }} />
-              <Bar dataKey="value" fill={OPERATOR} radius={[0, 2, 2, 0]} barSize={14} />
+              <Bar dataKey="value" fill={EMPLOYEE} radius={[0, 2, 2, 0]} barSize={14} />
             </BarChart>
           </ChartContainer>
         )}
