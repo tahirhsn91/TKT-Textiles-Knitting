@@ -121,6 +121,62 @@ router.get("/yarn-receipts", async (req, res): Promise<void> => {
   });
 });
 
+// ─── Analytics for the Yarn Receipts screen ────────────────────────────────
+// Two payloads in one call: every receipt line for the selected date (with
+// count/brand/party names for the day charts) and a per-day series for the
+// current month up to the selected date (for the month-trend chart).
+//
+// MUST stay above "/yarn-receipts/:id" — same route-order rule as
+// "unreconciled".
+
+router.get("/yarn-receipts/analytics", async (req, res): Promise<void> => {
+  const date = typeof req.query.date === "string" && req.query.date ? req.query.date : todayIso();
+
+  const lines = await db
+    .select({
+      lineId: yarnReceiptDetailTable.id,
+      receiptId: yarnReceiptHeaderTable.id,
+      partyName: partyMasterTable.name,
+      yarnCountId: yarnReceiptDetailTable.yarnCountId,
+      yarnCountName: yarnCountMasterTable.count,
+      yarnBrandId: yarnReceiptDetailTable.yarnBrandId,
+      yarnBrandName: yarnBrandMasterTable.name,
+      quantity: yarnReceiptDetailTable.quantity,
+      netWeight: yarnReceiptDetailTable.netWeight,
+    })
+    .from(yarnReceiptHeaderTable)
+    .leftJoin(yarnReceiptDetailTable, eq(yarnReceiptDetailTable.headerId, yarnReceiptHeaderTable.id))
+    .leftJoin(partyMasterTable, eq(yarnReceiptHeaderTable.partyId, partyMasterTable.id))
+    .leftJoin(yarnCountMasterTable, eq(yarnReceiptDetailTable.yarnCountId, yarnCountMasterTable.id))
+    .leftJoin(yarnBrandMasterTable, eq(yarnReceiptDetailTable.yarnBrandId, yarnBrandMasterTable.id))
+    .where(and(
+      eq(yarnReceiptHeaderTable.receiptDate, date),
+      eq(yarnReceiptHeaderTable.status, "submitted"),
+    ))
+    .orderBy(yarnReceiptDetailTable.id);
+
+  // Per-day totals from the 1st of the month through the selected date.
+  // The frontend fills any gaps (days with no receipts) to draw a full axis.
+  const monthStart = `${date.slice(0, 7)}-01`;
+  const monthSeries = await db
+    .select({
+      date: yarnReceiptHeaderTable.receiptDate,
+      totalQty: sql<number>`coalesce(sum(${yarnReceiptDetailTable.quantity}), 0)::int`,
+      totalNetWeight: sql<string>`coalesce(sum(${yarnReceiptDetailTable.netWeight}), 0)`,
+    })
+    .from(yarnReceiptHeaderTable)
+    .leftJoin(yarnReceiptDetailTable, eq(yarnReceiptDetailTable.headerId, yarnReceiptHeaderTable.id))
+    .where(and(
+      gte(yarnReceiptHeaderTable.receiptDate, monthStart),
+      lte(yarnReceiptHeaderTable.receiptDate, date),
+      eq(yarnReceiptHeaderTable.status, "submitted"),
+    ))
+    .groupBy(yarnReceiptHeaderTable.receiptDate)
+    .orderBy(yarnReceiptHeaderTable.receiptDate);
+
+  res.json({ receiptDate: date, lines, monthSeries });
+});
+
 // ─── Unreconciled receipts for a date + party ─────────────────────────────
 // Feeds the New Transaction screen when the type is Yarn Receipt. Only
 // returns receipts not yet consumed by another transaction, so the same
