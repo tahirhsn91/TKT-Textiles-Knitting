@@ -431,7 +431,7 @@ export default function PayrollEntryPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="text-xs">
-                    <TableHead className="min-w-[140px]">Employee</TableHead>
+                    <TableHead className="sticky left-0 bg-card min-w-[140px]">Employee</TableHead>
                     <TableHead className="text-right min-w-[90px]">Basic Salary</TableHead>
                     <TableHead className="text-right min-w-[80px]">OT Rate/Hr</TableHead>
                     <TableHead className="text-right min-w-[80px]">Att. Allow.</TableHead>
@@ -455,7 +455,9 @@ export default function PayrollEntryPage() {
                     const ro = "h-7 text-right font-mono text-xs p-1 w-full bg-muted/40 cursor-not-allowed";
                     return (
                       <TableRow key={row.employeeId} className={i % 2 === 0 ? "bg-muted/10" : ""}>
-                        <TableCell className="font-medium text-sm py-1">{row.employeeName}</TableCell>
+                        {/* Sticky-left employee name so the numbers never
+                            scroll away from whose row they belong to (P9). */}
+                        <TableCell className="sticky left-0 bg-card font-medium text-sm py-1">{row.employeeName}</TableCell>
                         {/* Master snapshot — display only */}
                         <TableCell className="py-1"><Input disabled className={ro} value={row.basicSalary} /></TableCell>
                         <TableCell className="py-1"><Input disabled className={ro} value={row.otRateHr} /></TableCell>
