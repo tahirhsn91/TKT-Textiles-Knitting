@@ -17,6 +17,7 @@ const DailyProductionList = lazyRetry(() => import("@/pages/daily-production"));
 const YarnReceiptList = lazyRetry(() => import("@/pages/yarn-receipts"));
 const DailyDeliveryList = lazyRetry(() => import("@/pages/daily-deliveries"));
 const MonthlySalaryEntryPage = lazyRetry(() => import("@/pages/transactions/monthly-salary-entry"));
+const AdvancesPage = lazyRetry(() => import("@/pages/transactions/advances"));
 const PayrollEntryPage = lazyRetry(() => import("@/pages/transactions/payroll-entry"));
 const MastersPage = lazyRetry(() => import("@/pages/masters"));
 const YarnBalancePage = lazyRetry(() => import("@/pages/reports/index"));
@@ -40,6 +41,7 @@ function Router() {
           <Route path="/transactions/monthly-salary-entry/new" component={PayrollEntryPage} />
           <Route path="/transactions/monthly-salary-entry/:id/edit" component={PayrollEntryPage} />
           <Route path="/transactions/monthly-salary-entry" component={MonthlySalaryEntryPage} />
+          <Route path="/transactions/advances" component={AdvancesPage} />
           <Route path="/masters" component={MastersPage} />
           <Route path="/reports" component={() => <Redirect to="/reports/yarn-balance" />} />
           <Route path="/reports/yarn-balance" component={YarnBalancePage} />

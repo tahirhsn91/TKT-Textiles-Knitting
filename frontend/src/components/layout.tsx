@@ -29,6 +29,7 @@ const transactionItems = [
 
 const payrollItems = [
   { href: "/transactions/monthly-salary-entry", label: "Payroll Maintenance" },
+  { href: "/transactions/advances",             label: "Advances" },
 ];
 
 const reportItems = [
@@ -107,7 +108,7 @@ export function Layout({ children }: { children: ReactNode }) {
     try { localStorage.setItem(LS_SIDEBAR_COLLAPSED, String(collapsed)); } catch {}
   }, [collapsed]);
 
-  const payrollActive = location.startsWith("/transactions/monthly-salary-entry");
+  const payrollActive = location.startsWith("/transactions/monthly-salary-entry") || location.startsWith("/transactions/advances");
   const transactionsActive = location.startsWith("/transactions") && !payrollActive;
   const reportsActive = location.startsWith("/reports");
   const dailyProductionActive = location.startsWith("/daily-production");
