@@ -33,7 +33,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres/${POSTGRES_DB:-heliumdb}?sslmode=disable}
       PORT: "8080"
       NODE_ENV: production
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:1000,http://169.58.108.61:1001,https://tahir.servecounterstrike.com}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001,http://169.58.108.61:3001,https://tahir.servecounterstrike.com}
     # No host port exposed — internal Docker network only
     depends_on:
       postgres:
