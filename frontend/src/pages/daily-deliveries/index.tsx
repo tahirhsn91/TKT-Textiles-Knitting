@@ -1,16 +1,15 @@
 import { useState } from "react";
-import { Plus, Pencil, Trash2, Package, Lock, Eye } from "lucide-react";
+import { Plus, Pencil, Trash2, Lock, Eye, Truck } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 
 import {
-  useGetYarnReceiptsSummary,
-  useDeleteYarnReceipt,
-  useYarnReceiptsAnalytics,
-  type YarnReceiptSummaryRow,
-} from "@/hooks/use-yarn-receipts";
-import { YarnReceiptDialog } from "./add-receipt-dialog";
-import { YarnReceiptAnalytics } from "./analytics-tab";
+  useGetDailyDeliveriesSummary,
+  useDeleteDailyDelivery,
+  type DailyDeliveryRow,
+} from "@/hooks/use-daily-deliveries";
+import { DailyDeliveryDialog } from "./add-delivery-dialog";
+import { DailyDeliveryAnalytics } from "./analytics-tab";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,13 +38,13 @@ import { Spinner } from "@/components/ui/spinner";
 import { Layout } from "@/components/layout";
 import { useToast } from "@/hooks/use-toast";
 
-const COLUMN_COUNT = 6;
+const COLUMN_COUNT = 7;
 
 function todayIso() {
   return format(new Date(), "yyyy-MM-dd");
 }
 
-export default function YarnReceiptList() {
+export default function DailyDeliveryList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -53,16 +52,15 @@ export default function YarnReceiptList() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [viewingId, setViewingId] = useState<number | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<YarnReceiptSummaryRow | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<DailyDeliveryRow | null>(null);
 
-  const { data, isLoading, isFetching } = useGetYarnReceiptsSummary(date);
-  const { data: analytics } = useYarnReceiptsAnalytics(date);
-  const deleteReceipt = useDeleteYarnReceipt();
+  const { data, isLoading, isFetching } = useGetDailyDeliveriesSummary(date);
+  const deleteDelivery = useDeleteDailyDelivery();
 
   const rows = data?.rows ?? [];
 
-  const dayQty = rows.reduce((s, r) => s + (r.totalQty || 0), 0);
-  const dayKg = rows.reduce((s, r) => s + (parseFloat(r.totalNetWeight) || 0), 0);
+  const dayQty = rows.reduce((s, r) => s + (r.quantity || 0), 0);
+  const dayKg = rows.reduce((s, r) => s + (parseFloat(r.netWeight) || 0), 0);
   const mtdQty = data?.monthToDate?.totalQty ?? 0;
   const mtdKg = parseFloat(data?.monthToDate?.totalNetWeight ?? "0") || 0;
   const monthLabel = format(new Date(date + "T00:00:00"), "MMM yyyy");
@@ -96,17 +94,17 @@ export default function YarnReceiptList() {
 
   const confirmDelete = () => {
     if (!pendingDelete) return;
-    deleteReceipt.mutate(
+    deleteDelivery.mutate(
       { id: pendingDelete.id },
       {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ["/api/yarn-receipts"] });
-          toast({ title: "Yarn receipt deleted" });
+          queryClient.invalidateQueries({ queryKey: ["/api/daily-deliveries"] });
+          toast({ title: "Delivery deleted" });
           setPendingDelete(null);
         },
         onError: (err) => {
           toast({
-            title: "Failed to delete yarn receipt",
+            title: "Failed to delete delivery",
             description: err instanceof Error ? err.message : undefined,
             variant: "destructive",
           });
@@ -123,10 +121,10 @@ export default function YarnReceiptList() {
           <div>
             <p className="eyebrow">Knitting operations</p>
             <h1 className="mt-2 text-[1.75rem] font-semibold leading-none text-foreground">
-              Yarn receipts
+              Daily deliveries
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Yarn deliveries received on <span className="num">{dateLabel}</span>, one row per receipt.
+              Fabric deliveries out on <span className="num">{dateLabel}</span>, one row per delivery.
             </p>
           </div>
           <Button onClick={openAdd} className="shrink-0">
@@ -135,11 +133,11 @@ export default function YarnReceiptList() {
           </Button>
         </header>
 
-        {/* Filter + totals — one strip, same shape as daily production. */}
+        {/* Filter + totals — one strip, same shape as the other daily screens. */}
         <Card className="overflow-hidden">
           <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-[220px_1fr_1fr] sm:divide-x sm:divide-y-0">
             <div className="flex flex-col justify-center gap-2 px-5 py-4">
-              <label className="eyebrow">Receipt date</label>
+              <label className="eyebrow">Delivery date</label>
               <Input
                 type="date"
                 className="h-9"
@@ -150,7 +148,7 @@ export default function YarnReceiptList() {
             </div>
             <div className="flex items-center gap-4 px-5 py-4">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted">
-                <Package className="h-5 w-5 text-muted-foreground" />
+                <Truck className="h-5 w-5 text-muted-foreground" />
               </div>
               <div className="min-w-0">
                 <p className="eyebrow">Day total</p>
@@ -159,13 +157,13 @@ export default function YarnReceiptList() {
                   <span className="ml-1.5 text-sm font-medium text-muted-foreground">kg</span>
                 </p>
                 <p className="mt-1.5 text-xs text-muted-foreground">
-                  <span className="num">{dayQty}</span> bag{dayQty === 1 ? "" : "s"} · <span className="num">{rows.length}</span> receipt{rows.length === 1 ? "" : "s"}
+                  <span className="num">{dayQty}</span> roll{dayQty === 1 ? "" : "s"} · <span className="num">{rows.length}</span> delivery{rows.length === 1 ? "" : "s"}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-4 px-5 py-4">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted">
-                <Package className="h-5 w-5 text-muted-foreground" />
+                <Truck className="h-5 w-5 text-muted-foreground" />
               </div>
               <div className="min-w-0">
                 <p className="eyebrow">Month to date</p>
@@ -174,14 +172,14 @@ export default function YarnReceiptList() {
                   <span className="ml-1.5 text-sm font-medium text-muted-foreground">kg</span>
                 </p>
                 <p className="mt-1.5 text-xs text-muted-foreground">
-                  <span className="num">{mtdQty}</span> bag{mtdQty === 1 ? "" : "s"} · {monthLabel}
+                  <span className="num">{mtdQty}</span> roll{mtdQty === 1 ? "" : "s"} · {monthLabel}
                 </p>
               </div>
             </div>
           </div>
         </Card>
 
-        {/* Entries / Analytics — same date, two views of the same receipts */}
+        {/* Entries / Analytics — same date, two views of the same deliveries */}
         <Tabs defaultValue="entries">
           <TabsList>
             <TabsTrigger value="entries">Entries</TabsTrigger>
@@ -190,17 +188,19 @@ export default function YarnReceiptList() {
           <TabsContent value="entries" className="mt-4">
         <Card className="overflow-hidden">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-3.5">
-            <h2 className="text-sm font-semibold text-foreground">Yarn receipts</h2>
+            <h2 className="text-sm font-semibold text-foreground">Daily deliveries</h2>
             <span className="eyebrow">{dateLabel}</span>
           </div>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="eyebrow h-11 px-5">Doc #</TableHead>
+                  <TableHead className="eyebrow h-11 px-5">Challan #</TableHead>
                   <TableHead className="eyebrow h-11">Party</TableHead>
-                  <TableHead className="eyebrow h-11">Lots</TableHead>
-                  <TableHead className="eyebrow h-11">Bags</TableHead>
+                  <TableHead className="eyebrow h-11">Yarn Type</TableHead>
+                  <TableHead className="eyebrow h-11">SL</TableHead>
+                  <TableHead className="eyebrow h-11">GSM</TableHead>
+                  <TableHead className="eyebrow h-11 text-right">Rolls</TableHead>
                   <TableHead className="eyebrow h-11 text-right">Net weight</TableHead>
                   <TableHead className="eyebrow h-11 px-5 text-right">Action</TableHead>
                 </TableRow>
@@ -209,21 +209,21 @@ export default function YarnReceiptList() {
                 {isLoading ? (
                   Array.from({ length: 4 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: COLUMN_COUNT }).map((_, j) => (
+                      {Array.from({ length: COLUMN_COUNT + 1 }).map((_, j) => (
                         <TableCell key={j} className="px-5"><Skeleton className="h-5 w-20" /></TableCell>
                       ))}
                     </TableRow>
                   ))
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={COLUMN_COUNT} className="text-center py-10 text-muted-foreground">
-                      No yarn receipts for {dateLabel} yet. Add one to get started.
+                    <TableCell colSpan={COLUMN_COUNT + 1} className="text-center py-10 text-muted-foreground">
+                      No deliveries for {dateLabel} yet. Add one to get started.
                     </TableCell>
                   </TableRow>
                 ) : (
                   rows.map((r) => (
-                    // Receipts booked into a transaction are tinted yellow and
-                    // locked — same convention as reconciled production rows.
+                    // Booked deliveries are tinted yellow and locked — same
+                    // convention as reconciled production / yarn receipts.
                     <TableRow
                       key={r.id}
                       className={
@@ -233,7 +233,7 @@ export default function YarnReceiptList() {
                       }
                     >
                       <TableCell className="whitespace-nowrap px-5 font-medium text-muted-foreground">
-                        {r.docNumber}
+                        {r.challanNo}
                       </TableCell>
                       <TableCell className="whitespace-nowrap font-medium">
                         <span className="inline-flex items-center gap-2">
@@ -246,10 +246,12 @@ export default function YarnReceiptList() {
                           )}
                         </span>
                       </TableCell>
-                      <TableCell className="num">{r.lineCount}</TableCell>
-                      <TableCell className="num">{r.totalQty}</TableCell>
+                      <TableCell className="whitespace-nowrap">{r.yarnTypeName ?? "-"}</TableCell>
+                      <TableCell className="num">{r.sl ?? "-"}</TableCell>
+                      <TableCell className="num">{r.gsm ?? "-"}</TableCell>
+                      <TableCell className="num text-right">{r.quantity}</TableCell>
                       <TableCell className="num text-right font-medium">
-                        {Number(r.totalNetWeight).toFixed(3)}
+                        {Number(r.netWeight).toFixed(3)}
                       </TableCell>
                       <TableCell className="px-5 text-right">
                         {r.reconciled ? (
@@ -259,7 +261,7 @@ export default function YarnReceiptList() {
                               variant="ghost"
                               size="icon"
                               className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
-                              aria-label={`View receipt from ${r.partyName ?? "party"}`}
+                              aria-label={`View delivery ${r.challanNo}`}
                               onClick={() => openView(r.id)}
                             >
                               <Eye className="h-4 w-4" />
@@ -268,8 +270,8 @@ export default function YarnReceiptList() {
                               className="inline-flex items-center gap-1.5 pr-1 text-xs text-muted-foreground"
                               title={
                                 r.reconciledTransactionId
-                                  ? `Booked into transaction #${r.reconciledTransactionId}. This receipt can't be changed once consumed.`
-                                  : "Booked into a Yarn Receipt transaction. This receipt can't be changed once consumed."
+                                  ? `Booked into transaction #${r.reconciledTransactionId}. This delivery can't be changed once consumed.`
+                                  : "Booked into a Fabric Delivery transaction. This delivery can't be changed once consumed."
                               }
                             >
                               <Lock className="h-3.5 w-3.5" />
@@ -283,7 +285,7 @@ export default function YarnReceiptList() {
                               variant="ghost"
                               size="icon"
                               className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
-                              aria-label={`Edit receipt from ${r.partyName ?? "party"}`}
+                              aria-label={`Edit delivery ${r.challanNo}`}
                               onClick={() => openEdit(r.id)}
                             >
                               <Pencil className="h-4 w-4" />
@@ -293,7 +295,7 @@ export default function YarnReceiptList() {
                               variant="ghost"
                               size="icon"
                               className="h-9 w-9 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8"
-                              aria-label={`Delete receipt from ${r.partyName ?? "party"}`}
+                              aria-label={`Delete delivery ${r.challanNo}`}
                               onClick={() => setPendingDelete(r)}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -308,7 +310,7 @@ export default function YarnReceiptList() {
               {rows.length > 0 && (
                 <tfoot>
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={4} className="px-5 text-right text-sm text-muted-foreground">
+                    <TableCell colSpan={6} className="px-5 text-right text-sm text-muted-foreground">
                       Grand total
                     </TableCell>
                     <TableCell className="selvedge-top py-4 text-right">
@@ -323,9 +325,9 @@ export default function YarnReceiptList() {
         </Card>
           </TabsContent>
           <TabsContent value="analytics" className="mt-4">
-            <YarnReceiptAnalytics
-              lines={analytics?.lines ?? []}
-              monthSeries={analytics?.monthSeries ?? []}
+            <DailyDeliveryAnalytics
+              rows={rows}
+              monthSeries={data?.monthSeries ?? []}
               isLoading={isLoading}
               dateLabel={dateLabel}
             />
@@ -337,10 +339,10 @@ export default function YarnReceiptList() {
         )}
       </div>
 
-      <YarnReceiptDialog
+      <DailyDeliveryDialog
         open={dialogOpen}
         onOpenChange={handleDialogOpenChange}
-        receiptId={editingId ?? viewingId}
+        deliveryId={editingId ?? viewingId}
         readOnly={viewingId != null}
         defaultDate={date ? new Date(date + "T00:00:00") : undefined}
         maxDate={new Date(todayIso() + "T00:00:00")}
@@ -348,36 +350,36 @@ export default function YarnReceiptList() {
 
       <AlertDialog
         open={pendingDelete !== null}
-        onOpenChange={(o) => { if (!o && !deleteReceipt.isPending) setPendingDelete(null); }}
+        onOpenChange={(o) => { if (!o && !deleteDelivery.isPending) setPendingDelete(null); }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this yarn receipt?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this delivery?</AlertDialogTitle>
             <AlertDialogDescription>
               {pendingDelete && (
                 <>
                   <span className="font-medium text-foreground">
-                    {pendingDelete.partyName ?? "Party"}
+                    {pendingDelete.challanNo} · {pendingDelete.partyName ?? "Party"}
                   </span>
                   {" — "}
-                  <span className="num">{pendingDelete.totalQty}</span> bag
-                  {pendingDelete.totalQty === 1 ? "" : "s"} totalling{" "}
-                  <span className="num">{Number(pendingDelete.totalNetWeight).toFixed(3)}</span>.
+                  <span className="num">{pendingDelete.quantity}</span> roll
+                  {pendingDelete.quantity === 1 ? "" : "s"} totalling{" "}
+                  <span className="num">{Number(pendingDelete.netWeight).toFixed(3)}</span>.
                   <br />
                   <br />
-                  This permanently removes the receipt and all of its yarn lots. It cannot be undone.
+                  This permanently removes the delivery. It cannot be undone.
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteReceipt.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteDelivery.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => { e.preventDefault(); confirmDelete(); }}
-              disabled={deleteReceipt.isPending}
+              disabled={deleteDelivery.isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteReceipt.isPending && <Spinner className="mr-2" />}
+              {deleteDelivery.isPending && <Spinner className="mr-2" />}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -107,6 +107,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const reportsActive = location.startsWith("/reports");
   const dailyProductionActive = location.startsWith("/daily-production");
   const yarnReceiptsActive = location.startsWith("/yarn-receipts");
+  const dailyDeliveriesActive = location.startsWith("/daily-deliveries");
 
   return (
     <div className="min-h-[100dvh] w-full bg-background">
@@ -161,7 +162,7 @@ export function Layout({ children }: { children: ReactNode }) {
               label="Daily Operations"
               icon={ClipboardList}
               primary="/daily-production"
-              active={dailyProductionActive || yarnReceiptsActive}
+              active={dailyProductionActive || yarnReceiptsActive || dailyDeliveriesActive}
               collapsed={collapsed}
             >
               <SubItem
@@ -173,6 +174,11 @@ export function Layout({ children }: { children: ReactNode }) {
                 href="/yarn-receipts"
                 label="Daily Yarn Receipt"
                 active={isSubItemActive(location, "/yarn-receipts")}
+              />
+              <SubItem
+                href="/daily-deliveries"
+                label="Daily Delivery"
+                active={isSubItemActive(location, "/daily-deliveries")}
               />
             </DesktopGroup>
             <DesktopGroup
@@ -262,12 +268,15 @@ export function Layout({ children }: { children: ReactNode }) {
                 ))}
 
                 <NavSection label="Daily Work" />
-                <MobileGroup label="Daily Operations" icon={ClipboardList} active={dailyProductionActive || yarnReceiptsActive}>
+                <MobileGroup label="Daily Operations" icon={ClipboardList} active={dailyProductionActive || yarnReceiptsActive || dailyDeliveriesActive}>
                   <Link href="/daily-production" onClick={() => setMobileOpen(false)}>
                     <SubLabel label="Daily Production" active={isSubItemActive(location, "/daily-production")} />
                   </Link>
                   <Link href="/yarn-receipts" onClick={() => setMobileOpen(false)}>
                     <SubLabel label="Daily Yarn Receipt" active={isSubItemActive(location, "/yarn-receipts")} />
+                  </Link>
+                  <Link href="/daily-deliveries" onClick={() => setMobileOpen(false)}>
+                    <SubLabel label="Daily Delivery" active={isSubItemActive(location, "/daily-deliveries")} />
                   </Link>
                 </MobileGroup>
                 <MobileGroup label="Transactions" icon={FileText} active={transactionsActive}>
