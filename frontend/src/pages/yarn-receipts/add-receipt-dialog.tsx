@@ -622,9 +622,9 @@ export function YarnReceiptDialog({
                 </div>
                 {lineError && <p className="text-sm font-medium text-destructive mt-1.5">{lineError}</p>}
                 {!readOnly && (
-                  <Button type="button" variant="outline" className="mt-2" onClick={handleAddLine}>
+                  <Button type="button" className="mt-2 h-11 shrink-0 sm:h-9" onClick={handleAddLine}>
                     <Plus className="mr-2 h-4 w-4" />
-                    Add line
+                    Add
                   </Button>
                 )}
               </div>
