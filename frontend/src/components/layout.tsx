@@ -28,8 +28,8 @@ const transactionItems = [
 ];
 
 const payrollItems = [
-  { href: "/transactions/monthly-salary-entry", label: "Payroll Maintenance" },
   { href: "/transactions/advances",             label: "Advances" },
+  { href: "/transactions/monthly-salary-entry", label: "Payroll Maintenance" },
 ];
 
 const reportItems = [
