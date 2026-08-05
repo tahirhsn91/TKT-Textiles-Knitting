@@ -1,3 +1,4 @@
+import { NUM_DECIMALS } from "@/lib/format";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -112,7 +113,7 @@ function recomputePayable(row: DetailRow): DetailRow {
     toNum(row.advanceDeduction) -
     toNum(row.loanDeduction) -
     toNum(row.otherDeduction);
-  return { ...row, payableSalary: payable.toFixed(2) };
+  return { ...row, payableSalary: payable.toFixed(NUM_DECIMALS) };
 }
 
 function recomputeAll(row: DetailRow, totalDays: number): DetailRow {
@@ -121,8 +122,8 @@ function recomputeAll(row: DetailRow, totalDays: number): DetailRow {
   const otAmount = toNum(row.otHours) * toNum(row.otRateHr);
   return recomputePayable({
     ...row,
-    totalSalary: totalSalary.toFixed(2),
-    otAmount: otAmount.toFixed(2),
+    totalSalary: totalSalary.toFixed(NUM_DECIMALS),
+    otAmount: otAmount.toFixed(NUM_DECIMALS),
   });
 }
 
@@ -131,10 +132,10 @@ function rowFromOperator(op: Operator, totalDays: number): DetailRow {
     operatorId: op.id,
     departmentId: op.departmentId,
     operatorName: op.name,
-    basicSalary: toNum(op.baseSalary).toFixed(2),
-    otRateHr: toNum(op.overtimeRateHr).toFixed(2),
-    attAllowance: toNum(op.attAllowance).toFixed(2),
-    othAllowance: toNum(op.othAllowance).toFixed(2),
+    basicSalary: toNum(op.baseSalary).toFixed(NUM_DECIMALS),
+    otRateHr: toNum(op.overtimeRateHr).toFixed(NUM_DECIMALS),
+    attAllowance: toNum(op.attAllowance).toFixed(NUM_DECIMALS),
+    othAllowance: toNum(op.othAllowance).toFixed(NUM_DECIMALS),
     presentDays: "0",
     absentDays: "0",
     holidays: "0",

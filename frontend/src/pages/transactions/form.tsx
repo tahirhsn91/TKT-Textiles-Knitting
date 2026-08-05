@@ -1,3 +1,4 @@
+import { NUM_DECIMALS } from "@/lib/format";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useLocation, useParams } from "wouter";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
@@ -875,7 +876,7 @@ export default function TransactionForm() {
 
                 <div className="text-sm font-bold text-foreground mt-1">
                   Total_Net Wt.:&nbsp;
-                  {(watchedDetails?.reduce((s, d) => s + (parseFloat(d?.netWt?.toString() ?? "0") || 0), 0) ?? 0).toFixed(3)}
+                  {(watchedDetails?.reduce((s, d) => s + (parseFloat(d?.netWt?.toString() ?? "0") || 0), 0) ?? 0).toFixed(NUM_DECIMALS)}
                 </div>
               </CardHeader>
               <CardContent className="p-0">
@@ -1078,11 +1079,11 @@ export default function TransactionForm() {
                           />
 
                           <div className="h-9 flex items-center px-3 rounded-md border border-input bg-muted text-sm font-medium text-muted-foreground">
-                            {(runTotals[index] ?? 0).toFixed(3)}
+                            {(runTotals[index] ?? 0).toFixed(NUM_DECIMALS)}
                           </div>
 
                           <div className="h-9 flex items-center px-3 rounded-md border border-input bg-muted text-sm font-medium text-muted-foreground">
-                            {(mcRunTotals[index] ?? 0).toFixed(3)}
+                            {(mcRunTotals[index] ?? 0).toFixed(NUM_DECIMALS)}
                           </div>
 
                           <Button

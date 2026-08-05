@@ -1,3 +1,4 @@
+import { NUM_DECIMALS } from "@/lib/format";
 import { useState } from "react";
 import { Plus, Pencil, Trash2, Lock, Eye, Truck } from "lucide-react";
 import { format } from "date-fns";
@@ -153,7 +154,7 @@ export default function DailyDeliveryList() {
               <div className="min-w-0">
                 <p className="eyebrow">Day total</p>
                 <p className="num mt-1 text-xl font-semibold leading-none text-foreground sm:text-2xl">
-                  {dayKg.toFixed(3)}
+                  {dayKg.toFixed(NUM_DECIMALS)}
                   <span className="ml-1.5 text-sm font-medium text-muted-foreground">kg</span>
                 </p>
                 <p className="mt-1.5 text-xs text-muted-foreground">
@@ -168,7 +169,7 @@ export default function DailyDeliveryList() {
               <div className="min-w-0">
                 <p className="eyebrow">Month to date</p>
                 <p className="num mt-1 text-xl font-semibold leading-none text-foreground sm:text-2xl">
-                  {mtdKg.toFixed(3)}
+                  {mtdKg.toFixed(NUM_DECIMALS)}
                   <span className="ml-1.5 text-sm font-medium text-muted-foreground">kg</span>
                 </p>
                 <p className="mt-1.5 text-xs text-muted-foreground">
@@ -251,7 +252,7 @@ export default function DailyDeliveryList() {
                       <TableCell className="num">{r.gsm ?? "-"}</TableCell>
                       <TableCell className="num text-right">{r.quantity}</TableCell>
                       <TableCell className="num text-right font-medium">
-                        {Number(r.netWeight).toFixed(3)}
+                        {Number(r.netWeight).toFixed(NUM_DECIMALS)}
                       </TableCell>
                       <TableCell className="px-5 text-right">
                         {r.reconciled ? (
@@ -314,7 +315,7 @@ export default function DailyDeliveryList() {
                       Grand total
                     </TableCell>
                     <TableCell className="selvedge-top py-4 text-right">
-                      <span className="num text-lg font-semibold text-foreground">{dayKg.toFixed(3)}</span>
+                      <span className="num text-lg font-semibold text-foreground">{dayKg.toFixed(NUM_DECIMALS)}</span>
                     </TableCell>
                     <TableCell className="px-5" />
                   </TableRow>
@@ -364,7 +365,7 @@ export default function DailyDeliveryList() {
                   {" — "}
                   <span className="num">{pendingDelete.quantity}</span> roll
                   {pendingDelete.quantity === 1 ? "" : "s"} totalling{" "}
-                  <span className="num">{Number(pendingDelete.netWeight).toFixed(3)}</span>.
+                  <span className="num">{Number(pendingDelete.netWeight).toFixed(NUM_DECIMALS)}</span>.
                   <br />
                   <br />
                   This permanently removes the delivery. It cannot be undone.

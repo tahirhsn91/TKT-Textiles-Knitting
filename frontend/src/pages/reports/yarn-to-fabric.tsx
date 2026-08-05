@@ -1,3 +1,4 @@
+import { NUM_DECIMALS } from "@/lib/format";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import jsPDF from "jspdf";
@@ -1480,7 +1481,7 @@ function YtfChartSection({
     }
     return Array.from(map.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([month, v]) => ({ month, "Fabric Production": +v.production.toFixed(3), "Fabric Delivery": +v.delivery.toFixed(3) }));
+      .map(([month, v]) => ({ month, "Fabric Production": +v.production.toFixed(NUM_DECIMALS), "Fabric Delivery": +v.delivery.toFixed(NUM_DECIMALS) }));
   }, [rows]);
 
   // Wastage Wt by Party
@@ -1495,7 +1496,7 @@ function YtfChartSection({
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 15)
-      .map(([name, val]) => ({ name, "Wastage Wt": +val.toFixed(3) }));
+      .map(([name, val]) => ({ name, "Wastage Wt": +val.toFixed(NUM_DECIMALS) }));
   }, [rows]);
 
   // Running Fabric Balance over time (by date)
@@ -1506,8 +1507,8 @@ function YtfChartSection({
     });
     const entries = Array.from(dateMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
     return [
-      { date: "Opening", balance: +openingFabricBalance.toFixed(3) },
-      ...entries.map(([date, bal]) => ({ date, balance: +bal.toFixed(3) })),
+      { date: "Opening", balance: +openingFabricBalance.toFixed(NUM_DECIMALS) },
+      ...entries.map(([date, bal]) => ({ date, balance: +bal.toFixed(NUM_DECIMALS) })),
     ];
   }, [rows, runningFabricBalances, openingFabricBalance]);
 

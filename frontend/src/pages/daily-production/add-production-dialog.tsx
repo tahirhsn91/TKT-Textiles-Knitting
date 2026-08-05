@@ -1,3 +1,4 @@
+import { NUM_DECIMALS } from "@/lib/format";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -349,7 +350,7 @@ export function ProductionEntryDialog({
               <div className="pl-4">
                 <p className="eyebrow">Total weight</p>
                 <p className="num mt-1.5 text-3xl font-semibold leading-none text-foreground sm:text-4xl">
-                  {totalWeight.toFixed(3)}
+                  {totalWeight.toFixed(NUM_DECIMALS)}
                 </p>
               </div>
             </div>
@@ -554,7 +555,7 @@ export function ProductionEntryDialog({
                               {i + 1}
                             </span>
                           </TableCell>
-                          <TableCell className="num py-1.5">{Number(r.weight).toFixed(3)}</TableCell>
+                          <TableCell className="num py-1.5">{Number(r.weight).toFixed(NUM_DECIMALS)}</TableCell>
                           <TableCell className="w-12 py-1.5 text-right">
                             {!readOnly && (
                               <Button

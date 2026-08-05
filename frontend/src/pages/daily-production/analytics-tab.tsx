@@ -9,6 +9,7 @@
  * Charting stack: shadcn/ui chart components (Recharts under the hood),
  * already shipped in `components/ui/chart.tsx`.
  */
+import { NUM_DECIMALS } from "@/lib/format";
 import { useMemo } from "react";
 import {
   Bar,
@@ -50,7 +51,7 @@ const AXIS_RULE = "#DFE2DA";
 const CHART_HEIGHT = 260;
 
 const kg = (r: DailyProductionSummaryRow) => parseFloat(r.totalProduction) || 0;
-const fmtKg = (n: number) => `${n.toFixed(3)} kg`;
+const fmtKg = (n: number) => `${n.toFixed(NUM_DECIMALS)} kg`;
 
 type Slice = { name: string; value: number };
 type MachineShift = { machine: string; Morning: number; Night: number };
@@ -190,7 +191,7 @@ export function ProductionAnalytics({
                 paddingAngle={1}
                 stroke="#FFFFFF"
                 strokeWidth={2}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(NUM_DECIMALS)}%`}
                 labelLine={false}
               >
                 {byShift.map((s) => (
@@ -220,7 +221,7 @@ export function ProductionAnalytics({
                 stroke="#FFFFFF"
                 strokeWidth={2}
                 label={({ name, percent }) =>
-                  percent * 100 >= 5 ? `${name} ${(percent * 100).toFixed(0)}%` : ""
+                  percent * 100 >= 5 ? `${name} ${(percent * 100).toFixed(NUM_DECIMALS)}%` : ""
                 }
                 labelLine={false}
               >
