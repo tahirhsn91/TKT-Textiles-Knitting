@@ -215,7 +215,7 @@ export default function DailyDeliveryList() {
                   <SortableHead className="eyebrow h-11 hidden sm:table-cell" label="GSM" sortKey="gsm" sort={sort} onSort={toggleSort} />
                   <SortableHead className="eyebrow h-11" label="Rolls" sortKey="quantity" sort={sort} onSort={toggleSort} right />
                   <SortableHead className="eyebrow h-11" label="Net weight" sortKey="netWeight" sort={sort} onSort={toggleSort} right />
-                  <TableHead className="sticky right-0 bg-background eyebrow h-11 px-5 text-right">Action</TableHead>
+                  <TableHead className="sticky right-0 bg-background eyebrow h-11 px-2 text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -266,7 +266,7 @@ export default function DailyDeliveryList() {
                       <TableCell className="num text-right font-medium">
                         {Number(r.netWeight).toFixed(NUM_DECIMALS)}
                       </TableCell>
-                      <TableCell className={`sticky right-0 ${stickyBg} px-5 text-right`}>
+                      <TableCell className={`sticky right-0 ${stickyBg} px-2 text-right`}>
                         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                         {r.reconciled ? (
                           <>
@@ -332,7 +332,7 @@ export default function DailyDeliveryList() {
                     <TableCell className="selvedge-top py-4 text-right">
                       <span className="num text-lg font-semibold text-foreground">{dayKg.toFixed(NUM_DECIMALS)}</span>
                     </TableCell>
-                    <TableCell className="sticky right-0 bg-background px-5" />
+                    <TableCell className="sticky right-0 bg-background px-2" />
                   </TableRow>
                 </tfoot>
               )}
