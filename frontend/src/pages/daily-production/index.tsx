@@ -39,6 +39,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Layout } from "@/components/layout";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ProductionAnalytics } from "./analytics-tab";
 
 const COLUMN_COUNT = 7;
@@ -69,6 +70,7 @@ function useLedgerFade<T>(rows: T[], keyOf: (r: T) => unknown) {
 export default function DailyProductionList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
 
   const [date, setDate] = useState(yesterdayIso());
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -247,7 +249,7 @@ export default function DailyProductionList() {
                   <SortableHead className="eyebrow h-11" label="Shift" sortKey="shift" sort={sort} onSort={toggleSort} />
                   <SortableHead className="eyebrow h-11" label="Rolls" sortKey="rollCount" sort={sort} onSort={toggleSort} right />
                   <SortableHead className="eyebrow h-11" label="Total production" sortKey="totalProduction" sort={sort} onSort={toggleSort} right />
-                  <TableHead className="eyebrow h-11 px-5 text-right">Action</TableHead>
+                  <TableHead className="sticky right-0 bg-background eyebrow h-11 px-5 text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -266,21 +268,31 @@ export default function DailyProductionList() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rows.map((r, i) => (
+                  rows.map((r, i) => {
                     // A row with any roll over 30 kg is flagged red (heavy
                     // takes precedence over the reconciled yellow — the
                     // warning matters more than the lock tint). The dark
                     // variants exist because index.css ships a full dark-mode
                     // block; the light ones are the exact Tailwind shades.
+                    const rowBg = r.hasHeavyRoll
+                      ? "bg-red-300 hover:bg-red-300 dark:bg-red-900/80 dark:hover:bg-red-900/80"
+                      : r.reconciled
+                        ? "bg-yellow-100 hover:bg-yellow-100 dark:bg-yellow-950/40 dark:hover:bg-yellow-950/40"
+                        : undefined;
+                    // The sticky action cell sits over the scrolled cells, so
+                    // it needs the same tint as the row it belongs to.
+                    const stickyBg = r.hasHeavyRoll
+                      ? "bg-red-300 dark:bg-red-900/80"
+                      : r.reconciled
+                        ? "bg-yellow-100 dark:bg-yellow-950/40"
+                        : "bg-background";
+                    return (
                     <TableRow
                       key={r.id}
-                      className={
-                        r.hasHeavyRoll
-                          ? "bg-red-300 hover:bg-red-300 dark:bg-red-900/80 dark:hover:bg-red-900/80"
-                          : r.reconciled
-                            ? "bg-yellow-100 hover:bg-yellow-100 dark:bg-yellow-950/40 dark:hover:bg-yellow-950/40"
-                            : undefined
-                      }
+                      className={`${rowBg ?? ""} ${isMobile ? "cursor-pointer" : ""}`.trim() || undefined}
+                      // On a phone the row itself is the edit target — no
+                      // hunting for the pencil. Reconciled rows open view.
+                      onClick={isMobile ? () => (r.reconciled ? openView(r.id) : openEdit(r.id)) : undefined}
                     >
                       <TableCell className={`whitespace-nowrap px-5 font-medium ${machineRepeats[i] ? "text-muted-foreground/50" : ""}`}>
                         {machineRepeats[i] ? "—" : (r.machineName ?? "-")}
@@ -302,8 +314,8 @@ export default function DailyProductionList() {
                       </TableCell>
                       <TableCell className="num text-right">{r.rollCount}</TableCell>
                       <TableCell className="num text-right font-medium">{Number(r.totalProduction).toFixed(NUM_DECIMALS)}</TableCell>
-                      <TableCell className="px-5 text-right">
-                        <div className="flex items-center justify-end gap-1">
+                      <TableCell className={`sticky right-0 ${stickyBg} px-5 text-right`}>
+                        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                           {r.reconciled ? (
                             // A reconciled entry is locked, but it should still
                             // be inspectable: the eye opens the same dialog in
@@ -313,7 +325,7 @@ export default function DailyProductionList() {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
+                                className="h-11 w-11 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
                                 aria-label={`View entry for ${r.machineName ?? "machine"}, ${r.shift} shift`}
                                 onClick={() => openView(r.id)}
                               >
@@ -337,7 +349,7 @@ export default function DailyProductionList() {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
+                                className="h-11 w-11 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
                                 aria-label={`Edit entry for ${r.machineName ?? "machine"}, ${r.shift} shift`}
                                 onClick={() => openEdit(r.id)}
                               >
@@ -347,7 +359,7 @@ export default function DailyProductionList() {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-9 w-9 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8"
+                                className="h-11 w-11 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8"
                                 aria-label={`Delete entry for ${r.machineName ?? "machine"}, ${r.shift} shift`}
                                 onClick={() => setPendingDelete(r)}
                               >
@@ -358,7 +370,8 @@ export default function DailyProductionList() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
               {rows.length > 0 && (
@@ -370,7 +383,7 @@ export default function DailyProductionList() {
                     <TableCell className="selvedge-top py-4 text-right">
                       <span className="num text-lg font-semibold text-foreground">{grandTotal.toFixed(NUM_DECIMALS)}</span>
                     </TableCell>
-                    <TableCell className="px-5" />
+                    <TableCell className="sticky right-0 bg-background px-5" />
                   </TableRow>
                 </tfoot>
               )}

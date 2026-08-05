@@ -12,6 +12,9 @@ import {
 } from "@/hooks/use-yarn-receipts";
 import { YarnReceiptDialog } from "./add-receipt-dialog";
 import { YarnReceiptAnalytics } from "./analytics-tab";
+import { useSort } from "@/hooks/use-sort";
+import { SortableHead } from "@/components/sortable-head";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -49,6 +52,7 @@ function todayIso() {
 export default function YarnReceiptList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
 
   const [date, setDate] = useState(todayIso());
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -60,7 +64,13 @@ export default function YarnReceiptList() {
   const { data: analytics } = useYarnReceiptsAnalytics(date);
   const deleteReceipt = useDeleteYarnReceipt();
 
-  const rows = data?.rows ?? [];
+  const { sorted: rows, sort, toggleSort } = useSort(data?.rows, {
+    docNumber: (r) => r.docNumber,
+    partyName: (r) => r.partyName,
+    lineCount: (r) => r.lineCount,
+    totalQty: (r) => r.totalQty,
+    totalNetWeight: (r) => parseFloat(r.totalNetWeight),
+  });
 
   const dayQty = rows.reduce((s, r) => s + (r.totalQty || 0), 0);
   const dayKg = rows.reduce((s, r) => s + (parseFloat(r.totalNetWeight) || 0), 0);
@@ -198,12 +208,12 @@ export default function YarnReceiptList() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="eyebrow h-11 px-5">Doc #</TableHead>
-                  <TableHead className="eyebrow h-11">Party</TableHead>
-                  <TableHead className="eyebrow h-11">Lots</TableHead>
-                  <TableHead className="eyebrow h-11">Bags</TableHead>
-                  <TableHead className="eyebrow h-11 text-right">Net weight</TableHead>
-                  <TableHead className="eyebrow h-11 px-5 text-right">Action</TableHead>
+                  <SortableHead className="eyebrow h-11 px-5" label="Doc #" sortKey="docNumber" sort={sort} onSort={toggleSort} />
+                  <SortableHead className="eyebrow h-11" label="Party" sortKey="partyName" sort={sort} onSort={toggleSort} />
+                  <SortableHead className="eyebrow h-11" label="Lots" sortKey="lineCount" sort={sort} onSort={toggleSort} />
+                  <SortableHead className="eyebrow h-11" label="Bags" sortKey="totalQty" sort={sort} onSort={toggleSort} />
+                  <SortableHead className="eyebrow h-11" label="Net weight" sortKey="totalNetWeight" sort={sort} onSort={toggleSort} right />
+                  <TableHead className="sticky right-0 bg-background eyebrow h-11 px-5 text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -222,16 +232,16 @@ export default function YarnReceiptList() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rows.map((r) => (
+                  rows.map((r) => {
+                    const stickyBg = r.reconciled ? "bg-yellow-100 dark:bg-yellow-950/40" : "bg-background";
+                    return (
                     // Receipts booked into a transaction are tinted yellow and
                     // locked — same convention as reconciled production rows.
                     <TableRow
                       key={r.id}
-                      className={
-                        r.reconciled
-                          ? "bg-yellow-100 hover:bg-yellow-100 dark:bg-yellow-950/40 dark:hover:bg-yellow-950/40"
-                          : undefined
-                      }
+                      className={`${r.reconciled ? "bg-yellow-100 hover:bg-yellow-100 dark:bg-yellow-950/40 dark:hover:bg-yellow-950/40" : ""} ${isMobile ? "cursor-pointer" : ""}`.trim() || undefined}
+                      // Whole-row tap opens the receipt on mobile.
+                      onClick={isMobile ? () => (r.reconciled ? openView(r.id) : openEdit(r.id)) : undefined}
                     >
                       <TableCell className="whitespace-nowrap px-5 font-medium text-muted-foreground">
                         {r.docNumber}
@@ -252,14 +262,15 @@ export default function YarnReceiptList() {
                       <TableCell className="num text-right font-medium">
                         {Number(r.totalNetWeight).toFixed(NUM_DECIMALS)}
                       </TableCell>
-                      <TableCell className="px-5 text-right">
+                      <TableCell className={`sticky right-0 ${stickyBg} px-5 text-right`}>
+                        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                         {r.reconciled ? (
-                          <div className="flex items-center justify-end gap-1">
+                          <>
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
+                              className="h-11 w-11 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
                               aria-label={`View receipt from ${r.partyName ?? "party"}`}
                               onClick={() => openView(r.id)}
                             >
@@ -276,14 +287,14 @@ export default function YarnReceiptList() {
                               <Lock className="h-3.5 w-3.5" />
                               Locked
                             </span>
-                          </div>
+                          </>
                         ) : (
-                          <div className="flex items-center justify-end gap-1">
+                          <>
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
+                              className="h-11 w-11 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
                               aria-label={`Edit receipt from ${r.partyName ?? "party"}`}
                               onClick={() => openEdit(r.id)}
                             >
@@ -293,17 +304,19 @@ export default function YarnReceiptList() {
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-9 w-9 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8"
+                              className="h-11 w-11 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8"
                               aria-label={`Delete receipt from ${r.partyName ?? "party"}`}
                               onClick={() => setPendingDelete(r)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
-                          </div>
+                          </>
                         )}
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
               {rows.length > 0 && (
@@ -315,7 +328,7 @@ export default function YarnReceiptList() {
                     <TableCell className="selvedge-top py-4 text-right">
                       <span className="num text-lg font-semibold text-foreground">{dayKg.toFixed(NUM_DECIMALS)}</span>
                     </TableCell>
-                    <TableCell className="px-5" />
+                    <TableCell className="sticky right-0 bg-background px-5" />
                   </TableRow>
                 </tfoot>
               )}

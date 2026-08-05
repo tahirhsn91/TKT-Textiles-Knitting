@@ -11,6 +11,9 @@ import {
 } from "@/hooks/use-daily-deliveries";
 import { DailyDeliveryDialog } from "./add-delivery-dialog";
 import { DailyDeliveryAnalytics } from "./analytics-tab";
+import { useSort } from "@/hooks/use-sort";
+import { SortableHead } from "@/components/sortable-head";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -48,6 +51,7 @@ function todayIso() {
 export default function DailyDeliveryList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
 
   const [date, setDate] = useState(todayIso());
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -58,7 +62,15 @@ export default function DailyDeliveryList() {
   const { data, isLoading, isFetching } = useGetDailyDeliveriesSummary(date);
   const deleteDelivery = useDeleteDailyDelivery();
 
-  const rows = data?.rows ?? [];
+  const { sorted: rows, sort, toggleSort } = useSort(data?.rows, {
+    challanNo: (r) => r.challanNo,
+    partyName: (r) => r.partyName,
+    yarnTypeName: (r) => r.yarnTypeName,
+    sl: (r) => r.sl,
+    gsm: (r) => r.gsm,
+    quantity: (r) => r.quantity,
+    netWeight: (r) => parseFloat(r.netWeight),
+  });
 
   const dayQty = rows.reduce((s, r) => s + (r.quantity || 0), 0);
   const dayKg = rows.reduce((s, r) => s + (parseFloat(r.netWeight) || 0), 0);
@@ -196,14 +208,14 @@ export default function DailyDeliveryList() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="eyebrow h-11 px-5">Challan #</TableHead>
-                  <TableHead className="eyebrow h-11">Party</TableHead>
-                  <TableHead className="eyebrow h-11">Yarn Type</TableHead>
-                  <TableHead className="eyebrow h-11">SL</TableHead>
-                  <TableHead className="eyebrow h-11">GSM</TableHead>
-                  <TableHead className="eyebrow h-11 text-right">Rolls</TableHead>
-                  <TableHead className="eyebrow h-11 text-right">Net weight</TableHead>
-                  <TableHead className="eyebrow h-11 px-5 text-right">Action</TableHead>
+                  <SortableHead className="eyebrow h-11 px-5" label="Challan #" sortKey="challanNo" sort={sort} onSort={toggleSort} />
+                  <SortableHead className="eyebrow h-11" label="Party" sortKey="partyName" sort={sort} onSort={toggleSort} />
+                  <SortableHead className="eyebrow h-11" label="Yarn Type" sortKey="yarnTypeName" sort={sort} onSort={toggleSort} />
+                  <SortableHead className="eyebrow h-11 hidden sm:table-cell" label="SL" sortKey="sl" sort={sort} onSort={toggleSort} />
+                  <SortableHead className="eyebrow h-11 hidden sm:table-cell" label="GSM" sortKey="gsm" sort={sort} onSort={toggleSort} />
+                  <SortableHead className="eyebrow h-11" label="Rolls" sortKey="quantity" sort={sort} onSort={toggleSort} right />
+                  <SortableHead className="eyebrow h-11" label="Net weight" sortKey="netWeight" sort={sort} onSort={toggleSort} right />
+                  <TableHead className="sticky right-0 bg-background eyebrow h-11 px-5 text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -222,16 +234,16 @@ export default function DailyDeliveryList() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rows.map((r) => (
+                  rows.map((r) => {
+                    const stickyBg = r.reconciled ? "bg-yellow-100 dark:bg-yellow-950/40" : "bg-background";
+                    return (
                     // Booked deliveries are tinted yellow and locked — same
                     // convention as reconciled production / yarn receipts.
                     <TableRow
                       key={r.id}
-                      className={
-                        r.reconciled
-                          ? "bg-yellow-100 hover:bg-yellow-100 dark:bg-yellow-950/40 dark:hover:bg-yellow-950/40"
-                          : undefined
-                      }
+                      className={`${r.reconciled ? "bg-yellow-100 hover:bg-yellow-100 dark:bg-yellow-950/40 dark:hover:bg-yellow-950/40" : ""} ${isMobile ? "cursor-pointer" : ""}`.trim() || undefined}
+                      // Whole-row tap opens the delivery on mobile.
+                      onClick={isMobile ? () => (r.reconciled ? openView(r.id) : openEdit(r.id)) : undefined}
                     >
                       <TableCell className="whitespace-nowrap px-5 font-medium text-muted-foreground">
                         {r.challanNo}
@@ -248,20 +260,21 @@ export default function DailyDeliveryList() {
                         </span>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">{r.yarnTypeName ?? "-"}</TableCell>
-                      <TableCell className="num">{r.sl ?? "-"}</TableCell>
-                      <TableCell className="num">{r.gsm ?? "-"}</TableCell>
+                      <TableCell className="num hidden sm:table-cell">{r.sl ?? "-"}</TableCell>
+                      <TableCell className="num hidden sm:table-cell">{r.gsm ?? "-"}</TableCell>
                       <TableCell className="num text-right">{r.quantity}</TableCell>
                       <TableCell className="num text-right font-medium">
                         {Number(r.netWeight).toFixed(NUM_DECIMALS)}
                       </TableCell>
-                      <TableCell className="px-5 text-right">
+                      <TableCell className={`sticky right-0 ${stickyBg} px-5 text-right`}>
+                        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                         {r.reconciled ? (
-                          <div className="flex items-center justify-end gap-1">
+                          <>
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
+                              className="h-11 w-11 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
                               aria-label={`View delivery ${r.challanNo}`}
                               onClick={() => openView(r.id)}
                             >
@@ -278,14 +291,14 @@ export default function DailyDeliveryList() {
                               <Lock className="h-3.5 w-3.5" />
                               Locked
                             </span>
-                          </div>
+                          </>
                         ) : (
-                          <div className="flex items-center justify-end gap-1">
+                          <>
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
+                              className="h-11 w-11 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
                               aria-label={`Edit delivery ${r.challanNo}`}
                               onClick={() => openEdit(r.id)}
                             >
@@ -295,29 +308,31 @@ export default function DailyDeliveryList() {
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-9 w-9 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8"
+                              className="h-11 w-11 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8"
                               aria-label={`Delete delivery ${r.challanNo}`}
                               onClick={() => setPendingDelete(r)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
-                          </div>
+                          </>
                         )}
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
               {rows.length > 0 && (
                 <tfoot>
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={6} className="px-5 text-right text-sm text-muted-foreground">
+                    <TableCell colSpan={isMobile ? 4 : 6} className="px-5 text-right text-sm text-muted-foreground">
                       Grand total
                     </TableCell>
                     <TableCell className="selvedge-top py-4 text-right">
                       <span className="num text-lg font-semibold text-foreground">{dayKg.toFixed(NUM_DECIMALS)}</span>
                     </TableCell>
-                    <TableCell className="px-5" />
+                    <TableCell className="sticky right-0 bg-background px-5" />
                   </TableRow>
                 </tfoot>
               )}

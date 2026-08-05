@@ -370,7 +370,7 @@ export function ProductionEntryDialog({
                     <FormControl>
                       <Input
                         type="date"
-                        className="h-9"
+                        className="h-11 sm:h-9"
                         value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
                         max={maxDate ? format(maxDate, "yyyy-MM-dd") : undefined}
                         disabled={readOnly}
@@ -394,7 +394,7 @@ export function ProductionEntryDialog({
                     <FormLabel>Shift *</FormLabel>
                     <FormControl>
                       <select
-                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
                         value={field.value ?? ""}
                         disabled={readOnly}
                         onChange={(e) => field.onChange(e.target.value || undefined)}
@@ -417,7 +417,7 @@ export function ProductionEntryDialog({
                     <FormLabel>Machine Number *</FormLabel>
                     <FormControl>
                       <select
-                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
                         value={field.value?.toString() ?? ""}
                         disabled={readOnly}
                         onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
@@ -441,7 +441,7 @@ export function ProductionEntryDialog({
                     <FormLabel>Employee *</FormLabel>
                     <FormControl>
                       <select
-                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
                         value={field.value?.toString() ?? ""}
                         disabled={readOnly}
                         onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
@@ -465,7 +465,7 @@ export function ProductionEntryDialog({
                     <FormLabel>Party *</FormLabel>
                     <FormControl>
                       <select
-                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
                         value={field.value?.toString() ?? ""}
                         disabled={readOnly}
                         onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
@@ -488,7 +488,7 @@ export function ProductionEntryDialog({
                   <FormItem>
                     <FormLabel>{isEdit ? "Updated By *" : "Entered By *"}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Your name" disabled={readOnly} {...field} />
+                      <Input placeholder="Your name" className="h-11 sm:h-9" disabled={readOnly} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -563,7 +563,7 @@ export function ProductionEntryDialog({
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-10 w-10 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8"
+                                className="h-11 w-11 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8"
                                 aria-label={`Remove roll ${i + 1}`}
                                 onClick={() => handleRemoveRoll(r.key)}
                               >
