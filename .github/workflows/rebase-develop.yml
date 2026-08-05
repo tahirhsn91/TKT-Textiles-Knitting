@@ -1,0 +1,44 @@
+name: Rebase develop onto main
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  rebase:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Rebase develop onto main and force-push
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+
+          # Already up to date — nothing to rebase. This also breaks the
+          # trigger loop: our own force-push re-fires this workflow, and the
+          # next run sees main already contained and exits immediately.
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "develop already contains main — nothing to rebase."
+            exit 0
+          fi
+
+          git rebase origin/main || {
+            echo "::error::Rebase conflicts — resolve manually on a local clone (git fetch && git rebase origin/main)."
+            git rebase --abort
+            exit 1
+          }
+
+          # Rebase rewritten local develop; fetch first so --force-with-lease
+          # has a lease to compare against (refuses if the remote moved).
+          git fetch origin develop
+          git push --force-with-lease origin HEAD:develop
+          echo "Rebased develop onto main and force-pushed."
