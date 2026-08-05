@@ -102,7 +102,7 @@ export function DailyDeliveryDialog({
     defaultValues: defaultValues(savedEnteredBy, defaultDate),
   });
 
-  const [pendingAction, setPendingAction] = useState<"save" | null>(null);
+  const [pendingAction, setPendingAction] = useState<"save" | "saveAndAdd" | null>(null);
 
   const prefilledFor = useRef<number | null | undefined>(undefined);
 
@@ -152,7 +152,7 @@ export function DailyDeliveryDialog({
   const isBusy = createDelivery.isPending || updateDelivery.isPending;
   const isLoadingDelivery = isEdit && deliveryQuery.isLoading;
 
-  const doSave = async () => {
+  const doSave = async (keepOpen: boolean) => {
     if (isBusy) return;
     const valid = await form.trigger();
     if (!valid) return;
@@ -160,7 +160,7 @@ export function DailyDeliveryDialog({
     const values = form.getValues();
     try { localStorage.setItem(LS_ENTERED_BY, values.enteredBy); } catch {}
 
-    setPendingAction("save");
+    setPendingAction(keepOpen ? "saveAndAdd" : "save");
 
     const payload = {
       challanNo: values.challanNo,
@@ -206,8 +206,26 @@ export function DailyDeliveryDialog({
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["/api/daily-deliveries"] });
           setPendingAction(null);
-          toast({ title: "Delivery saved" });
-          onOpenChange(false);
+
+          if (keepOpen) {
+            // Chained entry: same party/yarn type/date, cleared fields and
+            // the next challan suggestion (D-<n> advances).
+            queryClient.invalidateQueries({ queryKey: ["/api/daily-deliveries/suggestions"] });
+            queryClient
+              .fetchQuery({ queryKey: ["/api/daily-deliveries/suggestions"], queryFn: () => fetch("/api/daily-deliveries/suggestions").then((r) => r.json()) as Promise<{ nextChallanNo: string }> })
+              .then((s) => {
+                if (s?.nextChallanNo) form.setValue("challanNo", s.nextChallanNo);
+              })
+              .catch(() => {});
+            form.setValue("sl", "");
+            form.setValue("gsm", "");
+            form.setValue("quantity", "");
+            form.setValue("netWeight", "");
+            toast({ title: "Saved", description: "Delivery recorded. Ready for the next one." });
+          } else {
+            toast({ title: "Delivery saved" });
+            onOpenChange(false);
+          }
         },
         onError: handleError("save"),
       },
@@ -249,7 +267,7 @@ export function DailyDeliveryDialog({
                     <FormItem>
                       <FormLabel>Challan # *</FormLabel>
                       <FormControl>
-                        <Input placeholder="D-1" className="h-9" disabled={readOnly} {...field} />
+                        <Input placeholder="D-1" className="h-11 sm:h-9" disabled={readOnly} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -265,7 +283,7 @@ export function DailyDeliveryDialog({
                       <FormControl>
                         <Input
                           type="date"
-                          className="h-9"
+                          className="h-11 sm:h-9"
                           value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
                           max={maxDate ? format(maxDate, "yyyy-MM-dd") : undefined}
                           disabled={readOnly}
@@ -289,7 +307,7 @@ export function DailyDeliveryDialog({
                       <FormLabel>Party *</FormLabel>
                       <FormControl>
                         <select
-                          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                          className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
                           value={field.value?.toString() ?? ""}
                           disabled={readOnly}
                           onChange={(e) =>
@@ -315,7 +333,7 @@ export function DailyDeliveryDialog({
                       <FormLabel>Yarn Type *</FormLabel>
                       <FormControl>
                         <select
-                          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                          className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
                           value={field.value?.toString() ?? ""}
                           disabled={readOnly}
                           onChange={(e) =>
@@ -340,7 +358,7 @@ export function DailyDeliveryDialog({
                     <FormItem>
                       <FormLabel>SL</FormLabel>
                       <FormControl>
-                        <Input placeholder="Optional" className="h-9" disabled={readOnly} {...field} />
+                        <Input placeholder="Optional" className="h-11 sm:h-9" disabled={readOnly} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -360,7 +378,7 @@ export function DailyDeliveryDialog({
                           step="1"
                           inputMode="numeric"
                           placeholder="Optional"
-                          className="h-9"
+                          className="h-11 sm:h-9"
                           disabled={readOnly}
                           {...field}
                         />
@@ -423,7 +441,7 @@ export function DailyDeliveryDialog({
                     <FormItem className="sm:col-span-2">
                       <FormLabel>{isEdit ? "Updated By *" : "Entered By *"}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Your name" className="h-9" disabled={readOnly} {...field} />
+                        <Input placeholder="Your name" className="h-11 sm:h-9" disabled={readOnly} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -455,11 +473,23 @@ export function DailyDeliveryDialog({
               >
                 Cancel
               </Button>
+              {!isEdit && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full sm:w-auto"
+                  onClick={() => doSave(true)}
+                  disabled={isBusy}
+                >
+                  {pendingAction === "saveAndAdd" && <Spinner className="mr-2" />}
+                  Save & Add
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="signal"
                 className="w-full sm:w-auto"
-                onClick={doSave}
+                onClick={() => doSave(false)}
                 disabled={isBusy || isLoadingDelivery}
               >
                 {pendingAction === "save" && <Spinner className="mr-2" />}

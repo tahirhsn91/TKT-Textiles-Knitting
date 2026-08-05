@@ -119,7 +119,7 @@ export function YarnReceiptDialog({
 
   const [lines, setLines] = useState<LineRow[]>([]);
   const [lineError, setLineError] = useState<string | null>(null);
-  const [pendingAction, setPendingAction] = useState<"save" | null>(null);
+  const [pendingAction, setPendingAction] = useState<"save" | "saveAndAdd" | null>(null);
 
   const prefilledFor = useRef<number | null | undefined>(undefined);
 
@@ -197,7 +197,7 @@ export function YarnReceiptDialog({
   const isBusy = createReceipt.isPending || updateReceipt.isPending;
   const isLoadingReceipt = isEdit && receiptQuery.isLoading;
 
-  const doSave = async () => {
+  const doSave = async (keepOpen: boolean) => {
     if (isBusy) return;
     const valid = await form.trigger();
     if (!valid) return;
@@ -227,7 +227,7 @@ export function YarnReceiptDialog({
     const values = form.getValues();
     try { localStorage.setItem(LS_ENTERED_BY, values.enteredBy); } catch {}
 
-    setPendingAction("save");
+    setPendingAction(keepOpen ? "saveAndAdd" : "save");
 
     const payload = {
       docNumber: values.docNumber,
@@ -274,8 +274,24 @@ export function YarnReceiptDialog({
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["/api/yarn-receipts"] });
           setPendingAction(null);
-          toast({ title: "Yarn receipt saved" });
-          onOpenChange(false);
+
+          if (keepOpen) {
+            // Chained entry: same party/date, fresh lines and the next doc
+            // number — refetch the suggestion so YR-<n> advances.
+            queryClient.invalidateQueries({ queryKey: ["/api/yarn-receipts/suggestions"] });
+            queryClient
+              .fetchQuery({ queryKey: ["/api/yarn-receipts/suggestions"], queryFn: () => fetch("/api/yarn-receipts/suggestions").then((r) => r.json()) as Promise<{ nextDocNumber: string }> })
+              .then((s) => {
+                if (s?.nextDocNumber) form.setValue("docNumber", s.nextDocNumber);
+              })
+              .catch(() => {});
+            setLines([]);
+            setLineError(null);
+            toast({ title: "Saved", description: `${lines.length} lot(s) recorded. Ready for the next receipt.` });
+          } else {
+            toast({ title: "Yarn receipt saved" });
+            onOpenChange(false);
+          }
         },
         onError: handleError("save"),
       },
@@ -336,7 +352,7 @@ export function YarnReceiptDialog({
                       <FormControl>
                         <Input
                           placeholder="YR-1"
-                          className="h-9"
+                          className="h-11 sm:h-9"
                           disabled={readOnly}
                           {...field}
                         />
@@ -355,7 +371,7 @@ export function YarnReceiptDialog({
                       <FormControl>
                         <Input
                           type="date"
-                          className="h-9"
+                          className="h-11 sm:h-9"
                           value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
                           max={maxDate ? format(maxDate, "yyyy-MM-dd") : undefined}
                           disabled={readOnly}
@@ -378,7 +394,7 @@ export function YarnReceiptDialog({
                     <FormItem>
                       <FormLabel>{isEdit ? "Updated By *" : "Entered By *"}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Your name" disabled={readOnly} {...field} />
+                        <Input placeholder="Your name" className="h-11 sm:h-9" disabled={readOnly} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -393,7 +409,7 @@ export function YarnReceiptDialog({
                       <FormLabel>Party *</FormLabel>
                       <FormControl>
                         <select
-                          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                          className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
                           value={field.value?.toString() ?? ""}
                           disabled={readOnly}
                           onChange={(e) =>
@@ -414,7 +430,95 @@ export function YarnReceiptDialog({
 
               <div className="border-t pt-4">
                 <p className="eyebrow">Yarn lots</p>
-                <div className="mt-2 rounded-md border">
+
+                {/* Mobile: one stacked card per lot — the wide table is
+                    unscrollable inside the modal on a phone. Desktop keeps
+                    the dense table (hidden sm:block). */}
+                <div className="mt-3 space-y-3 sm:hidden">
+                  {lines.length === 0 ? (
+                    <p className="rounded-md border py-6 text-center text-sm text-muted-foreground">
+                      No yarn lots added yet
+                    </p>
+                  ) : (
+                    lines.map((l, i) => (
+                      <div key={l.key} className="rounded-md border p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="num inline-flex h-6 min-w-6 items-center justify-center rounded-sm border border-border bg-muted px-1.5 text-xs text-muted-foreground">
+                            {i + 1}
+                          </span>
+                          {!readOnly && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-11 w-11 text-muted-foreground hover:text-destructive"
+                              aria-label={`Remove line ${i + 1}`}
+                              onClick={() => handleRemoveLine(l.key)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <select
+                            className="h-11 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                            value={l.yarnCountId}
+                            disabled={readOnly}
+                            onChange={(e) => updateLine(l.key, { yarnCountId: e.target.value })}
+                          >
+                            <option value="" disabled>Count</option>
+                            {yarnCountMaster?.map((c) => (
+                              <option key={c.id} value={c.id.toString()}>{c.count}</option>
+                            ))}
+                          </select>
+                          <select
+                            className="h-11 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                            value={l.yarnBrandId}
+                            disabled={readOnly}
+                            onChange={(e) => updateLine(l.key, { yarnBrandId: e.target.value })}
+                          >
+                            <option value="" disabled>Brand</option>
+                            {yarnBrandMaster?.map((b) => (
+                              <option key={b.id} value={b.id.toString()}>{b.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-muted-foreground">Bags</label>
+                            <Input
+                              type="number"
+                              min="1"
+                              step="1"
+                              inputMode="numeric"
+                              placeholder="Bags"
+                              className="num h-11"
+                              value={l.quantity}
+                              disabled={readOnly}
+                              onChange={(e) => updateLine(l.key, { quantity: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-muted-foreground">Net kg</label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="any"
+                              inputMode="decimal"
+                              placeholder="Net kg"
+                              className="num h-11"
+                              value={l.netWeight}
+                              disabled={readOnly}
+                              onChange={(e) => updateLine(l.key, { netWeight: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="mt-2 hidden rounded-md border sm:block">
                   <Table>
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
@@ -443,7 +547,7 @@ export function YarnReceiptDialog({
                             </TableCell>
                             <TableCell className="w-[7.5rem] py-1.5">
                               <select
-                                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                className="h-11 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
                                 value={l.yarnCountId}
                                 disabled={readOnly}
                                 onChange={(e) => updateLine(l.key, { yarnCountId: e.target.value })}
@@ -456,7 +560,7 @@ export function YarnReceiptDialog({
                             </TableCell>
                             <TableCell className="w-[9rem] py-1.5">
                               <select
-                                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                className="h-11 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
                                 value={l.yarnBrandId}
                                 disabled={readOnly}
                                 onChange={(e) => updateLine(l.key, { yarnBrandId: e.target.value })}
@@ -474,7 +578,7 @@ export function YarnReceiptDialog({
                                 step="1"
                                 inputMode="numeric"
                                 placeholder="Bags"
-                                className="num h-9"
+                                className="num h-11 sm:h-9"
                                 value={l.quantity}
                                 disabled={readOnly}
                                 onChange={(e) => updateLine(l.key, { quantity: e.target.value })}
@@ -487,7 +591,7 @@ export function YarnReceiptDialog({
                                 step="any"
                                 inputMode="decimal"
                                 placeholder="Net kg"
-                                className="num h-9"
+                                className="num h-11 sm:h-9"
                                 value={l.netWeight}
                                 disabled={readOnly}
                                 onChange={(e) => updateLine(l.key, { netWeight: e.target.value })}
@@ -499,7 +603,7 @@ export function YarnReceiptDialog({
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  className="h-11 w-11 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8"
                                   aria-label={`Remove line ${i + 1}`}
                                   onClick={() => handleRemoveLine(l.key)}
                                 >
@@ -546,11 +650,23 @@ export function YarnReceiptDialog({
               >
                 Cancel
               </Button>
+              {!isEdit && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full sm:w-auto"
+                  onClick={() => doSave(true)}
+                  disabled={isBusy}
+                >
+                  {pendingAction === "saveAndAdd" && <Spinner className="mr-2" />}
+                  Save & Add
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="signal"
                 className="w-full sm:w-auto"
-                onClick={doSave}
+                onClick={() => doSave(false)}
                 disabled={isBusy || isLoadingReceipt}
               >
                 {pendingAction === "save" && <Spinner className="mr-2" />}
