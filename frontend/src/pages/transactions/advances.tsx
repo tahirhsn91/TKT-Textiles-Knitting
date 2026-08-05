@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AdvancesAnalytics } from "./advances-analytics";
+import { AdvancesAnalytics, AdvanceKpiStrip } from "./advances-analytics";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -270,6 +270,10 @@ export default function AdvancesPage() {
                 </div>
               </div>
             </CardHeader>
+            {/* KPI strip sits right under the filters, visible on both tabs. */}
+            <div className="border-b px-4 py-4">
+              <AdvanceKpiStrip advances={advances} month={filterMonth} year={filterYear} />
+            </div>
             <CardContent className="p-0">
               <Tabs defaultValue="history">
                 <div className="border-b px-4 pt-3">

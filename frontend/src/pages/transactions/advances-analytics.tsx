@@ -49,6 +49,56 @@ const byEmployeeConfig = {
 
 const fmtRs = (n: number) => n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
 
+/** KPI strip for the selected filters — rendered above the tabs so it's
+ *  visible regardless of which tab is open. */
+export function AdvanceKpiStrip({
+  advances,
+  month,
+  year,
+}: {
+  advances: AdvanceAnalyticsRow[];
+  month: string; // 1-12
+  year: string;
+}) {
+  const kpis = useMemo(() => {
+    const total = advances.reduce((s, a) => s + amount(a), 0);
+    const count = advances.length;
+    const avg = count > 0 ? total / count : 0;
+    const max = advances.reduce((m, a) => Math.max(m, amount(a)), 0);
+    return { total, count, avg, max };
+  }, [advances]);
+
+  const monthLabel = new Date(Number(year), Number(month) - 1, 1).toLocaleString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
+  return (
+    <div className="grid grid-cols-2 divide-x divide-border rounded-md border bg-card sm:grid-cols-4">
+      <div className="px-5 py-4">
+        <p className="eyebrow">Total advances</p>
+        <p className="num mt-1 text-2xl font-semibold leading-none">{fmtRs(kpis.total)}</p>
+        <p className="mt-1.5 text-xs text-muted-foreground">{monthLabel}</p>
+      </div>
+      <div className="px-5 py-4">
+        <p className="eyebrow">Advance count</p>
+        <p className="num mt-1 text-2xl font-semibold leading-none">{kpis.count}</p>
+        <p className="mt-1.5 text-xs text-muted-foreground">records in month</p>
+      </div>
+      <div className="px-5 py-4">
+        <p className="eyebrow">Average advance</p>
+        <p className="num mt-1 text-2xl font-semibold leading-none">{fmtRs(kpis.avg)}</p>
+        <p className="mt-1.5 text-xs text-muted-foreground">per record</p>
+      </div>
+      <div className="px-5 py-4">
+        <p className="eyebrow">Largest advance</p>
+        <p className="num mt-1 text-2xl font-semibold leading-none">{fmtRs(kpis.max)}</p>
+        <p className="mt-1.5 text-xs text-muted-foreground">single record</p>
+      </div>
+    </div>
+  );
+}
+
 function ChartCard({
   title,
   subtitle,
@@ -84,15 +134,6 @@ export function AdvancesAnalytics({
     month: "long",
     year: "numeric",
   });
-
-  // KPI strip
-  const kpis = useMemo(() => {
-    const total = advances.reduce((s, a) => s + amount(a), 0);
-    const count = advances.length;
-    const avg = count > 0 ? total / count : 0;
-    const max = advances.reduce((m, a) => Math.max(m, amount(a)), 0);
-    return { total, count, avg, max };
-  }, [advances]);
 
   // Daily series, gap-filled across the whole month (days with no advance = 0)
   const daily = useMemo(() => {
@@ -135,32 +176,6 @@ export function AdvancesAnalytics({
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      {/* KPI strip */}
-      <Card className="overflow-hidden lg:col-span-2">
-        <div className="grid grid-cols-2 divide-x divide-border sm:grid-cols-4">
-          <div className="px-5 py-4">
-            <p className="eyebrow">Total advances</p>
-            <p className="num mt-1 text-2xl font-semibold leading-none">{fmtRs(kpis.total)}</p>
-            <p className="mt-1.5 text-xs text-muted-foreground">{monthLabel}</p>
-          </div>
-          <div className="px-5 py-4">
-            <p className="eyebrow">Advance count</p>
-            <p className="num mt-1 text-2xl font-semibold leading-none">{kpis.count}</p>
-            <p className="mt-1.5 text-xs text-muted-foreground">records in month</p>
-          </div>
-          <div className="px-5 py-4">
-            <p className="eyebrow">Average advance</p>
-            <p className="num mt-1 text-2xl font-semibold leading-none">{fmtRs(kpis.avg)}</p>
-            <p className="mt-1.5 text-xs text-muted-foreground">per record</p>
-          </div>
-          <div className="px-5 py-4">
-            <p className="eyebrow">Largest advance</p>
-            <p className="num mt-1 text-2xl font-semibold leading-none">{fmtRs(kpis.max)}</p>
-            <p className="mt-1.5 text-xs text-muted-foreground">single record</p>
-          </div>
-        </div>
-      </Card>
-
       {/* Daily trend */}
       <ChartCard title="Advances by day" subtitle={monthLabel}>
         <ChartContainer config={dailyConfig} className="w-full aspect-auto" style={{ height: CHART_HEIGHT }}>
