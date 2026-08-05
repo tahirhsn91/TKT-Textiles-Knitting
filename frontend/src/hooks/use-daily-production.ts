@@ -40,6 +40,8 @@ export interface DailyProductionSummaryRow {
   reconciledTransactionId: number | null;
   rollCount: number;
   totalProduction: string;
+  /** True when at least one roll in this entry weighs more than 30 kg. */
+  hasHeavyRoll: boolean;
 }
 
 /** A production entry available to reconcile, for the New Transaction screen. */
@@ -66,6 +68,11 @@ export interface UnreconciledProductionResponse {
 export interface DailyProductionSummaryResponse {
   productionDate: string;
   rows: DailyProductionSummaryRow[];
+  /** Aggregated totals for the whole month up to and including the selected date. */
+  monthToDate: {
+    rollCount: number;
+    totalProduction: string;
+  };
 }
 
 export interface DailyProductionDetailResponse {
