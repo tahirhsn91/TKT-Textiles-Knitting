@@ -7,6 +7,7 @@ import {
   yarnReceiptDetailTable,
   partyMasterTable,
   yarnCountMasterTable,
+  yarnBrandMasterTable,
   insertYarnReceiptHeaderSchema,
   insertYarnReceiptDetailSchema,
 } from "../db/index.js";
@@ -22,6 +23,7 @@ const headerSchema = insertYarnReceiptHeaderSchema.extend({
 
 const detailSchema = insertYarnReceiptDetailSchema.extend({
   yarnCountId: z.coerce.number().int().positive("Yarn count is required"),
+  yarnBrandId: z.coerce.number().int().positive("Yarn brand is required"),
   quantity: z.coerce.number().int().positive("Quantity must be a whole number greater than zero"),
   netWeight: z.coerce.number().positive("Net weight must be greater than zero"),
 });
@@ -145,6 +147,8 @@ router.get("/yarn-receipts/unreconciled", async (req, res): Promise<void> => {
       lineId: yarnReceiptDetailTable.id,
       yarnCountId: yarnReceiptDetailTable.yarnCountId,
       yarnCountName: yarnCountMasterTable.count,
+      yarnBrandId: yarnReceiptDetailTable.yarnBrandId,
+      yarnBrandName: yarnBrandMasterTable.name,
       quantity: yarnReceiptDetailTable.quantity,
       netWeight: yarnReceiptDetailTable.netWeight,
     })
@@ -152,6 +156,7 @@ router.get("/yarn-receipts/unreconciled", async (req, res): Promise<void> => {
     .leftJoin(yarnReceiptDetailTable, eq(yarnReceiptDetailTable.headerId, yarnReceiptHeaderTable.id))
     .leftJoin(partyMasterTable, eq(yarnReceiptHeaderTable.partyId, partyMasterTable.id))
     .leftJoin(yarnCountMasterTable, eq(yarnReceiptDetailTable.yarnCountId, yarnCountMasterTable.id))
+    .leftJoin(yarnBrandMasterTable, eq(yarnReceiptDetailTable.yarnBrandId, yarnBrandMasterTable.id))
     .where(and(
       eq(yarnReceiptHeaderTable.receiptDate, date),
       eq(yarnReceiptHeaderTable.partyId, partyId),
@@ -202,11 +207,14 @@ router.get("/yarn-receipts/:id", async (req, res): Promise<void> => {
       id: yarnReceiptDetailTable.id,
       yarnCountId: yarnReceiptDetailTable.yarnCountId,
       yarnCountName: yarnCountMasterTable.count,
+      yarnBrandId: yarnReceiptDetailTable.yarnBrandId,
+      yarnBrandName: yarnBrandMasterTable.name,
       quantity: yarnReceiptDetailTable.quantity,
       netWeight: yarnReceiptDetailTable.netWeight,
     })
     .from(yarnReceiptDetailTable)
     .leftJoin(yarnCountMasterTable, eq(yarnReceiptDetailTable.yarnCountId, yarnCountMasterTable.id))
+    .leftJoin(yarnBrandMasterTable, eq(yarnReceiptDetailTable.yarnBrandId, yarnBrandMasterTable.id))
     .where(eq(yarnReceiptDetailTable.headerId, id))
     .orderBy(yarnReceiptDetailTable.id);
 
@@ -232,6 +240,7 @@ router.post("/yarn-receipts", async (req, res): Promise<void> => {
       lines.map((l) => ({
         headerId: header.id,
         yarnCountId: l.yarnCountId,
+        yarnBrandId: l.yarnBrandId,
         quantity: l.quantity,
         netWeight: String(l.netWeight),
       })),
@@ -280,6 +289,7 @@ router.put("/yarn-receipts/:id", async (req, res): Promise<void> => {
       lines.map((l) => ({
         headerId: id,
         yarnCountId: l.yarnCountId,
+        yarnBrandId: l.yarnBrandId,
         quantity: l.quantity,
         netWeight: String(l.netWeight),
       })),

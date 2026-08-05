@@ -13,7 +13,7 @@ import {
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { partyMasterTable, yarnCountMasterTable } from "./lookups.js";
+import { partyMasterTable, yarnCountMasterTable, yarnBrandMasterTable } from "./lookups.js";
 import { transactionHeaderTable } from "./transactions.js";
 
 // ─── Yarn Receipt Header ───────────────────────────────────────────────────
@@ -69,8 +69,8 @@ export type InsertYarnReceiptHeader = z.infer<typeof insertYarnReceiptHeaderSche
 export type YarnReceiptHeader = typeof yarnReceiptHeaderTable.$inferSelect;
 
 // ─── Yarn Receipt Detail ───────────────────────────────────────────────────
-// One line per yarn lot: which yarn count, how many bags, and the net
-// weight of those bags. Quantity is whole bags (requirement Q10-A); net
+// One line per yarn lot: which yarn count + brand, how many bags, and the
+// net weight of those bags. Quantity is whole bags (requirement Q10-A); net
 // weight is kg with 3 decimals, matching the rest of the app.
 export const yarnReceiptDetailTable = pgTable("yarn_receipt_detail", {
   id: serial("id").primaryKey(),
@@ -80,6 +80,9 @@ export const yarnReceiptDetailTable = pgTable("yarn_receipt_detail", {
   yarnCountId: integer("yarn_count_id")
     .notNull()
     .references(() => yarnCountMasterTable.id),
+  yarnBrandId: integer("yarn_brand_id")
+    .notNull()
+    .references(() => yarnBrandMasterTable.id),
   quantity: integer("quantity").notNull(),
   netWeight: numeric("net_weight", { precision: 12, scale: 3 }).notNull(),
 }, (t) => [

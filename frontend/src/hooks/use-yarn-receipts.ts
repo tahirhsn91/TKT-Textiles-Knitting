@@ -41,6 +41,8 @@ export interface YarnReceiptLine {
   id: number;
   yarnCountId: number;
   yarnCountName: string | null;
+  yarnBrandId: number;
+  yarnBrandName: string | null;
   quantity: number;
   netWeight: string;
 }
@@ -62,7 +64,7 @@ export interface YarnReceiptPayload {
   partyId: number;
   createdBy: string;
   updatedBy?: string;
-  lines: { yarnCountId: number; quantity: number; netWeight: string }[];
+  lines: { yarnCountId: number; yarnBrandId: number; quantity: number; netWeight: string }[];
 }
 
 // ─── Get receipt summary by date ───────────────────────────────────────────
@@ -94,6 +96,8 @@ export interface UnreconciledYarnReceiptRow {
   lineId: number;
   yarnCountId: number;
   yarnCountName: string | null;
+  yarnBrandId: number;
+  yarnBrandName: string | null;
   quantity: number;
   netWeight: string;
 }
