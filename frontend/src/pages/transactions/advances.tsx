@@ -96,8 +96,15 @@ export default function AdvancesPage() {
 
   const [form, setForm] = useState({ employeeId: "", date: todayStr(), amount: "", notes: "" });
   const [filterOp, setFilterOp] = useState("__all__");
-  const [filterFrom, setFilterFrom] = useState("");
-  const [filterTo, setFilterTo] = useState("");
+  const now = new Date();
+  const [filterMonth, setFilterMonth] = useState(String(now.getMonth() + 1));
+  const [filterYear, setFilterYear] = useState(String(now.getFullYear()));
+
+  const MONTH_NAMES = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+  const YEARS = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i);
 
   const { data: employees = [] } = useQuery<EmployeeLookup[]>({
     queryKey: ["employee-lookup"],
@@ -106,11 +113,11 @@ export default function AdvancesPage() {
 
   const advanceParams = new URLSearchParams();
   if (filterOp !== "__all__") advanceParams.set("employeeId", filterOp);
-  if (filterFrom) advanceParams.set("dateFrom", filterFrom);
-  if (filterTo) advanceParams.set("dateTo", filterTo);
+  advanceParams.set("month", filterMonth);
+  advanceParams.set("year", filterYear);
 
   const { data: advances = [], isLoading } = useQuery<Advance[]>({
-    queryKey: ["employee-advances", filterOp, filterFrom, filterTo],
+    queryKey: ["employee-advances", filterOp, filterMonth, filterYear],
     queryFn: () => apiFetch(`/api/employees/advances?${advanceParams.toString()}`),
   });
 
@@ -218,13 +225,31 @@ export default function AdvancesPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs">From</Label>
-                  <DateInput className="h-11 w-36 sm:h-8" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} />
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs">Month</Label>
+                  <Select value={filterMonth} onValueChange={setFilterMonth}>
+                    <SelectTrigger className="h-11 w-36 sm:h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTH_NAMES.map((m, i) => (
+                        <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs">To</Label>
-                  <DateInput className="h-11 w-36 sm:h-8" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs">Year</Label>
+                  <Select value={filterYear} onValueChange={setFilterYear}>
+                    <SelectTrigger className="h-11 w-28 sm:h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {YEARS.map((y) => (
+                        <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </CardHeader>
