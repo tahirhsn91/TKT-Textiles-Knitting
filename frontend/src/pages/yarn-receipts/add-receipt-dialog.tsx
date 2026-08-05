@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
 import { Plus, Trash2 } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 
 import {
   useListPartyMaster,
@@ -42,6 +42,7 @@ import { useToast } from "@/hooks/use-toast";
 const LS_ENTERED_BY = "yarn-receipt-entered-by";
 
 const headerSchema = z.object({
+  docNumber: z.string().min(1, "Document number is required"),
   receiptDate: z.date({ required_error: "Receipt date is required" }),
   partyId: z.number({ required_error: "Party is required" }),
   enteredBy: z.string().min(1, "Enter your name"),
@@ -60,6 +61,7 @@ let lineKeySeq = 0;
 
 function defaultHeaderValues(enteredBy: string, defaultDate: Date = new Date()): HeaderValues {
   return {
+    docNumber: "",
     receiptDate: defaultDate,
     partyId: undefined as unknown as number,
     enteredBy,
@@ -93,6 +95,13 @@ export function YarnReceiptDialog({
   const createReceipt = useCreateYarnReceipt();
   const updateReceipt = useUpdateYarnReceipt();
 
+  // Next doc number suggestion (YR-<n>), like the transactions screen.
+  const { data: suggestions } = useQuery<{ nextDocNumber: string }>({
+    queryKey: ["/api/yarn-receipts/suggestions"],
+    queryFn: () =>
+      fetch("/api/yarn-receipts/suggestions").then((r) => r.json()) as Promise<{ nextDocNumber: string }>,
+  });
+
   const receiptQuery = useGetYarnReceipt(receiptId ?? null, {
     query: { enabled: open && isEdit },
   });
@@ -125,6 +134,10 @@ export function YarnReceiptDialog({
       if (prefilledFor.current === null) return;
       prefilledFor.current = null;
       form.reset(defaultHeaderValues(savedEnteredBy, defaultDate));
+      // Auto-fill the next doc number on a fresh receipt.
+      if (suggestions?.nextDocNumber) {
+        form.setValue("docNumber", suggestions.nextDocNumber);
+      }
       setLines([]);
       setLineError(null);
       setPendingAction(null);
@@ -136,6 +149,7 @@ export function YarnReceiptDialog({
     prefilledFor.current = receiptId;
 
     form.reset({
+      docNumber: receipt.docNumber,
       receiptDate: new Date(`${receipt.receiptDate}T00:00:00`),
       partyId: receipt.partyId,
       enteredBy: savedEnteredBy || receipt.createdBy,
@@ -152,7 +166,7 @@ export function YarnReceiptDialog({
     setLineError(null);
     setPendingAction(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, isEdit, receiptId, receipt, defaultDate]);
+  }, [open, isEdit, receiptId, receipt, defaultDate, suggestions]);
 
   const handleAddLine = useCallback(() => {
     setLines((prev) => [
@@ -215,6 +229,7 @@ export function YarnReceiptDialog({
     setPendingAction("save");
 
     const payload = {
+      docNumber: values.docNumber,
       receiptDate: format(values.receiptDate, "yyyy-MM-dd"),
       partyId: values.partyId,
       createdBy: values.enteredBy,
@@ -311,6 +326,25 @@ export function YarnReceiptDialog({
             <div className="space-y-4 pt-5">
               <p className="eyebrow">Receipt details</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="docNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Document Number *</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="YR-1"
+                          className="h-9"
+                          disabled={readOnly}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <FormField
                   control={form.control}
                   name="receiptDate"
