@@ -1153,12 +1153,15 @@ export default function TransactionForm() {
                         <div>Net Wt</div>
                         <div>Run_Total</div>
                         <div>M/c_Run_Total</div>
-                        <div className="text-right">Action</div>
+                        <div className="sticky right-0 z-10 bg-card pl-2 text-right">Action</div>
                       </div>
                     </div>
 
-                    {/* Scrollable rows — 5 rows visible */}
-                    <div className="overflow-y-auto max-h-[212px] px-4 py-2">
+                    {/* Scrollable rows — 5 rows visible. overflow-x-clip keeps
+                        this a vertical-only scrollport so the sticky Action
+                        column pins to the outer horizontal scroller instead of
+                        being trapped here (same pattern as the list screens). */}
+                    <div className="overflow-y-auto overflow-x-clip max-h-[212px] px-4 py-2">
                     <div className="space-y-2" ref={lineItemsRef}>
                       {fields.map((field, index) => (
                         <div key={field.id} className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_1.5fr_1.5fr_auto] gap-2 items-start">
@@ -1346,15 +1349,17 @@ export default function TransactionForm() {
                             {(mcRunTotals[index] ?? 0).toFixed(NUM_DECIMALS)}
                           </div>
 
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-11 w-11 text-muted-foreground hover:text-destructive shrink-0 sm:h-8 sm:w-8"
-                            onClick={() => remove(index)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="sticky right-0 z-10 bg-card pl-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-11 w-11 text-muted-foreground hover:text-destructive shrink-0 sm:h-8 sm:w-8"
+                              onClick={() => remove(index)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
