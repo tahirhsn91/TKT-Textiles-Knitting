@@ -86,6 +86,46 @@ export function useGetYarnReceiptsSummary(
   });
 }
 
+// ─── Analytics (day lines + month series) ──────────────────────────────────
+
+export interface YarnReceiptAnalyticsLine {
+  lineId: number;
+  receiptId: number;
+  partyName: string | null;
+  yarnCountId: number;
+  yarnCountName: string | null;
+  yarnBrandId: number;
+  yarnBrandName: string | null;
+  quantity: number;
+  netWeight: string;
+}
+
+export interface YarnReceiptMonthPoint {
+  date: string;
+  totalQty: number;
+  totalNetWeight: string;
+}
+
+export interface YarnReceiptAnalyticsResponse {
+  receiptDate: string;
+  lines: YarnReceiptAnalyticsLine[];
+  monthSeries: YarnReceiptMonthPoint[];
+}
+
+export function useYarnReceiptsAnalytics(
+  date: string,
+  options?: { query?: Partial<UseQueryOptions<YarnReceiptAnalyticsResponse, ErrorType<unknown>>> },
+) {
+  return useQuery<YarnReceiptAnalyticsResponse, ErrorType<unknown>>({
+    queryKey: [`/api/yarn-receipts/analytics`, { date }] as QueryKey,
+    queryFn: () =>
+      customFetch<YarnReceiptAnalyticsResponse>(
+        `/api/yarn-receipts/analytics?date=${encodeURIComponent(date)}`,
+      ),
+    ...options?.query,
+  });
+}
+
 // ─── Unreconciled receipts for a date + party (New Transaction screen) ─────
 
 export interface UnreconciledYarnReceiptRow {
