@@ -191,7 +191,12 @@ export default function AdvancesPage() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <Label>Date</Label>
-                  <DateInput className="h-11 w-full sm:h-9 sm:w-40" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
+                  <DateInput
+                    className="h-11 w-full sm:h-9 sm:w-40"
+                    value={form.date}
+                    max={todayStr()}
+                    onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
+                  />
                 </div>
                 <div className="flex flex-col gap-1">
                   <Label>Amount</Label>
