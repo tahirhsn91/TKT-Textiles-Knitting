@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Pencil, Trash2, Lock } from "lucide-react";
+import { Plus, Pencil, Trash2, Lock, Eye, Sun, CalendarRange } from "lucide-react";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -42,8 +42,10 @@ import { ProductionAnalytics } from "./analytics-tab";
 
 const COLUMN_COUNT = 7;
 
-function todayIso() {
-  return format(new Date(), "yyyy-MM-dd");
+function yesterdayIso() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return format(d, "yyyy-MM-dd");
 }
 
 /** "Machine 4" repeated on every line of a grouped summary reads like a form,
@@ -63,9 +65,10 @@ export default function DailyProductionList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [date, setDate] = useState(todayIso());
+  const [date, setDate] = useState(yesterdayIso());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [viewingId, setViewingId] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState<DailyProductionSummaryRow | null>(null);
 
   const { data, isLoading, isFetching } = useGetDailyProductionSummary(date);
@@ -92,15 +95,27 @@ export default function DailyProductionList() {
     : rawMachineRepeats.map(() => false);
 
   const grandTotal = rows.reduce((s, r) => s + (parseFloat(r.totalProduction) || 0), 0);
+  const totalRolls = rows.reduce((s, r) => s + (r.rollCount || 0), 0);
+  const mtdKg = parseFloat(data?.monthToDate?.totalProduction ?? "0") || 0;
+  const mtdRolls = data?.monthToDate?.rollCount ?? 0;
+  const monthLabel = format(new Date(date + "T00:00:00"), "MMM yyyy");
   const dateLabel = format(new Date(date + "T00:00:00"), "d MMM yyyy");
 
   const openAdd = () => {
     setEditingId(null);
+    setViewingId(null);
     setDialogOpen(true);
   };
 
   const openEdit = (id: number) => {
+    setViewingId(null);
     setEditingId(id);
+    setDialogOpen(true);
+  };
+
+  const openView = (id: number) => {
+    setEditingId(null);
+    setViewingId(id);
     setDialogOpen(true);
   };
 
@@ -108,7 +123,10 @@ export default function DailyProductionList() {
   // entryId, so leaving a stale id behind would reopen "Add" in edit mode.
   const handleDialogOpenChange = (o: boolean) => {
     setDialogOpen(o);
-    if (!o) setEditingId(null);
+    if (!o) {
+      setEditingId(null);
+      setViewingId(null);
+    }
   };
 
   const confirmDelete = () => {
@@ -152,16 +170,54 @@ export default function DailyProductionList() {
           </Button>
         </header>
 
-        {/* Filter */}
-        <div className="flex flex-col gap-1.5 max-w-[220px]">
-          <label className="eyebrow">Production date</label>
-          <Input
-            type="date"
-            className="h-9"
-            value={date}
-            onChange={(e) => setDate(e.target.value || todayIso())}
-          />
-        </div>
+        {/* Filter + totals — one strip: date picker, day total, month-to-date.
+            The day figures are the same rows the Entries tab lists below;
+            month-to-date comes from the API (sum of every submitted entry
+            from the 1st through the selected date). */}
+        <Card className="overflow-hidden">
+          <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-[220px_1fr_1fr] sm:divide-x sm:divide-y-0">
+            <div className="flex flex-col justify-center gap-2 px-5 py-4">
+              <label className="eyebrow">Production date</label>
+              <Input
+                type="date"
+                className="h-9"
+                value={date}
+                max={yesterdayIso()}
+                onChange={(e) => setDate(e.target.value || yesterdayIso())}
+              />
+            </div>
+            <div className="flex items-center gap-4 px-5 py-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted">
+                <Sun className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="min-w-0">
+                <p className="eyebrow">Day total</p>
+                <p className="num mt-1 text-xl font-semibold leading-none text-foreground sm:text-2xl">
+                  {grandTotal.toFixed(3)}
+                  <span className="ml-1.5 text-sm font-medium text-muted-foreground">kg</span>
+                </p>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  <span className="num">{totalRolls}</span> roll{totalRolls === 1 ? "" : "s"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 px-5 py-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted">
+                <CalendarRange className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="min-w-0">
+                <p className="eyebrow">Month to date</p>
+                <p className="num mt-1 text-xl font-semibold leading-none text-foreground sm:text-2xl">
+                  {mtdKg.toFixed(3)}
+                  <span className="ml-1.5 text-sm font-medium text-muted-foreground">kg</span>
+                </p>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  <span className="num">{mtdRolls}</span> roll{mtdRolls === 1 ? "" : "s"} · {monthLabel}
+                </p>
+              </div>
+            </div>
+          </div>
+        </Card>
 
         {/* Entries / Analytics — same date, two views of the same rows */}
         <Tabs defaultValue="entries">
@@ -206,13 +262,20 @@ export default function DailyProductionList() {
                   </TableRow>
                 ) : (
                   rows.map((r, i) => (
-                    // Reconciled rows are tinted yellow. The dark variant is
-                    // there because index.css ships a full dark-mode block —
-                    // bg-yellow-100 alone would vanish against it. Light mode
-                    // is exactly bg-yellow-100.
+                    // A row with any roll over 30 kg is flagged red (heavy
+                    // takes precedence over the reconciled yellow — the
+                    // warning matters more than the lock tint). The dark
+                    // variants exist because index.css ships a full dark-mode
+                    // block; the light ones are the exact Tailwind shades.
                     <TableRow
                       key={r.id}
-                      className={r.reconciled ? "bg-yellow-100 hover:bg-yellow-100 dark:bg-yellow-950/40 dark:hover:bg-yellow-950/40" : undefined}
+                      className={
+                        r.hasHeavyRoll
+                          ? "bg-red-300 hover:bg-red-300 dark:bg-red-900/80 dark:hover:bg-red-900/80"
+                          : r.reconciled
+                            ? "bg-yellow-100 hover:bg-yellow-100 dark:bg-yellow-950/40 dark:hover:bg-yellow-950/40"
+                            : undefined
+                      }
                     >
                       <TableCell className={`whitespace-nowrap px-5 font-medium ${machineRepeats[i] ? "text-muted-foreground/50" : ""}`}>
                         {machineRepeats[i] ? "—" : (r.machineName ?? "-")}
@@ -237,21 +300,32 @@ export default function DailyProductionList() {
                       <TableCell className="px-5 text-right">
                         <div className="flex items-center justify-end gap-1">
                           {r.reconciled ? (
-                            // Disabled rather than hidden: a vanished control
-                            // reads as a bug, whereas a disabled one with a
-                            // reason explains itself. The API refuses these
-                            // writes independently — this is only the signpost.
-                            <span
-                              className="inline-flex items-center gap-1.5 pr-1 text-xs text-muted-foreground"
-                              title={
-                                r.reconciledTransactionId
-                                  ? `Reconciled into transaction #${r.reconciledTransactionId}. Production entries can't be changed once reconciled.`
-                                  : "Reconciled into a Fabric Production transaction. Production entries can't be changed once reconciled."
-                              }
-                            >
-                              <Lock className="h-3.5 w-3.5" />
-                              Locked
-                            </span>
+                            // A reconciled entry is locked, but it should still
+                            // be inspectable: the eye opens the same dialog in
+                            // read-only mode — same data, no way to write.
+                            <>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8"
+                                aria-label={`View entry for ${r.machineName ?? "machine"}, ${r.shift} shift`}
+                                onClick={() => openView(r.id)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <span
+                                className="inline-flex items-center gap-1.5 pr-1 text-xs text-muted-foreground"
+                                title={
+                                  r.reconciledTransactionId
+                                    ? `Reconciled into transaction #${r.reconciledTransactionId}. Production entries can't be changed once reconciled.`
+                                    : "Reconciled into a Fabric Production transaction. Production entries can't be changed once reconciled."
+                                }
+                              >
+                                <Lock className="h-3.5 w-3.5" />
+                                Locked
+                              </span>
+                            </>
                           ) : (
                             <>
                               <Button
@@ -316,7 +390,10 @@ export default function DailyProductionList() {
       <ProductionEntryDialog
         open={dialogOpen}
         onOpenChange={handleDialogOpenChange}
-        entryId={editingId}
+        entryId={editingId ?? viewingId}
+        readOnly={viewingId != null}
+        defaultDate={date ? new Date(date + "T00:00:00") : undefined}
+        maxDate={new Date(yesterdayIso() + "T00:00:00")}
       />
 
       {/* Deletion is irreversible and cascades to the entry's yarn rolls, so

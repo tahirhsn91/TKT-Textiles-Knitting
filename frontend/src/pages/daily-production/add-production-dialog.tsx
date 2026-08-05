@@ -10,6 +10,7 @@ import {
   useListMachineMaster,
   useListPartyMaster,
   useListMachineOperatorMaster,
+  useListDepartmentMaster,
 } from "@workspace/api-client-react";
 import {
   useCreateDailyProduction,
@@ -36,14 +37,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { DatePicker } from "@/components/ui/date-picker";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
@@ -68,9 +61,9 @@ interface RollRow {
 
 let rollKeySeq = 0;
 
-function defaultHeaderValues(enteredBy: string): HeaderValues {
+function defaultHeaderValues(enteredBy: string, defaultDate: Date = new Date()): HeaderValues {
   return {
-    productionDate: new Date(),
+    productionDate: defaultDate,
     machineId: undefined as unknown as number,
     operatorId: undefined as unknown as number,
     partyId: undefined as unknown as number,
@@ -89,10 +82,18 @@ export function ProductionEntryDialog({
   open,
   onOpenChange,
   entryId = null,
+  readOnly = false,
+  defaultDate,
+  maxDate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   entryId?: number | null;
+  readOnly?: boolean;
+  /** Date prefilled for a new entry — the page passes its selected date. */
+  defaultDate?: Date;
+  /** Latest selectable date in the picker (the page blocks today onwards). */
+  maxDate?: Date;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -103,7 +104,21 @@ export function ProductionEntryDialog({
   const { data: machineMaster } = useListMachineMaster();
   const { data: partyMaster } = useListPartyMaster();
   const { data: machineOperatorMaster } = useListMachineOperatorMaster();
+  const { data: departments } = useListDepartmentMaster();
 
+  // Only operators belonging to the Production department appear here — the
+  // dropdown feeds a knitting production form, so operators from other
+  // departments (e.g. Administration) would be noise. Matched by name rather
+  // than a hardcoded id, so it keeps working if the seed data changes.
+  const productionDepartmentId = departments?.find(
+    (d) => d.name.toLowerCase() === "production",
+  )?.id;
+  const productionOperators = machineOperatorMaster?.filter(
+    (op) =>
+      (op as { active?: boolean }).active !== false &&
+      op.departmentId != null &&
+      op.departmentId === productionDepartmentId,
+  );
   const createEntry = useCreateDailyProduction();
   const updateEntry = useUpdateDailyProduction();
 
@@ -118,7 +133,7 @@ export function ProductionEntryDialog({
 
   const form = useForm<HeaderValues>({
     resolver: zodResolver(headerSchema),
-    defaultValues: defaultHeaderValues(savedEnteredBy),
+    defaultValues: defaultHeaderValues(savedEnteredBy, defaultDate),
   });
 
   const [rolls, setRolls] = useState<RollRow[]>([]);
@@ -145,7 +160,7 @@ export function ProductionEntryDialog({
     if (!isEdit) {
       if (prefilledFor.current === null) return;
       prefilledFor.current = null;
-      form.reset(defaultHeaderValues(savedEnteredBy));
+      form.reset(defaultHeaderValues(savedEnteredBy, defaultDate));
       setRolls([]);
       setRollInput("");
       setRollError(null);
@@ -170,7 +185,7 @@ export function ProductionEntryDialog({
     setRollError(null);
     setPendingAction(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, isEdit, entryId, entry]);
+  }, [open, isEdit, entryId, entry, defaultDate]);
 
   const handleAddRoll = useCallback(() => {
     const trimmed = rollInput.trim();
@@ -291,11 +306,19 @@ export function ProductionEntryDialog({
           chrome doesn't eat the footer. */}
       <DialogContent className="grid max-h-[92dvh] max-w-2xl grid-rows-[auto_minmax(0,1fr)_auto] gap-0 p-0">
         <DialogHeader className="px-4 pb-3 pr-12 pt-5 text-left sm:px-6 sm:pr-12 sm:pt-6">
-          <DialogTitle>{isEdit ? "Edit Daily Production" : "Add Daily Production"}</DialogTitle>
+          <DialogTitle>
+            {readOnly
+              ? "View Daily Production"
+              : isEdit
+                ? "Edit Daily Production"
+                : "Add Daily Production"}
+          </DialogTitle>
           <DialogDescription>
-            {isEdit
-              ? "Amend the machine run details or the recorded yarn roll weights."
-              : "Enter the machine run details, then record each yarn roll weight below."}
+            {readOnly
+              ? "This entry has been reconciled into a Fabric Production transaction and is locked. Viewing only — it can't be changed."
+              : isEdit
+                ? "Amend the machine run details or the recorded yarn roll weights."
+                : "Enter the machine run details, then record each yarn roll weight below."}
           </DialogDescription>
         </DialogHeader>
 
@@ -342,7 +365,20 @@ export function ProductionEntryDialog({
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Production Date *</FormLabel>
-                    <DatePicker date={field.value} setDate={field.onChange} />
+                    <FormControl>
+                      <Input
+                        type="date"
+                        className="h-9"
+                        value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
+                        max={maxDate ? format(maxDate, "yyyy-MM-dd") : undefined}
+                        disabled={readOnly}
+                        onChange={(e) =>
+                          field.onChange(
+                            e.target.value ? new Date(e.target.value + "T00:00:00") : undefined,
+                          )
+                        }
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -354,17 +390,18 @@ export function ProductionEntryDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Shift *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select shift" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Morning">Morning</SelectItem>
-                        <SelectItem value="Night">Night</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <select
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        value={field.value ?? ""}
+                        disabled={readOnly}
+                        onChange={(e) => field.onChange(e.target.value || undefined)}
+                      >
+                        <option value="" disabled>Select shift</option>
+                        <option value="Morning">Morning</option>
+                        <option value="Night">Night</option>
+                      </select>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -376,21 +413,19 @@ export function ProductionEntryDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Machine Number *</FormLabel>
-                    <Select
-                      onValueChange={(v) => field.onChange(parseInt(v))}
-                      value={field.value?.toString() ?? ""}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select machine" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
+                    <FormControl>
+                      <select
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        value={field.value?.toString() ?? ""}
+                        disabled={readOnly}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                      >
+                        <option value="" disabled>Select machine</option>
                         {machineMaster?.map((m) => (
-                          <SelectItem key={m.id} value={m.id.toString()}>{m.name}</SelectItem>
+                          <option key={m.id} value={m.id.toString()}>{m.name}</option>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </select>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -402,23 +437,19 @@ export function ProductionEntryDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Operator *</FormLabel>
-                    <Select
-                      onValueChange={(v) => field.onChange(parseInt(v))}
-                      value={field.value?.toString() ?? ""}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select operator" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {machineOperatorMaster
-                          ?.filter((op) => (op as { active?: boolean }).active !== false)
-                          .map((op) => (
-                            <SelectItem key={op.id} value={op.id.toString()}>{op.name}</SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <select
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        value={field.value?.toString() ?? ""}
+                        disabled={readOnly}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                      >
+                        <option value="" disabled>Select operator</option>
+                        {productionOperators?.map((op) => (
+                          <option key={op.id} value={op.id.toString()}>{op.name}</option>
+                        ))}
+                      </select>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -430,21 +461,19 @@ export function ProductionEntryDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Party *</FormLabel>
-                    <Select
-                      onValueChange={(v) => field.onChange(parseInt(v))}
-                      value={field.value?.toString() ?? ""}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select party" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
+                    <FormControl>
+                      <select
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        value={field.value?.toString() ?? ""}
+                        disabled={readOnly}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                      >
+                        <option value="" disabled>Select party</option>
                         {partyMaster?.map((p) => (
-                          <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                          <option key={p.id} value={p.id.toString()}>{p.name}</option>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </select>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -457,7 +486,7 @@ export function ProductionEntryDialog({
                   <FormItem>
                     <FormLabel>{isEdit ? "Updated By *" : "Entered By *"}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Your name" {...field} />
+                      <Input placeholder="Your name" disabled={readOnly} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -467,7 +496,8 @@ export function ProductionEntryDialog({
 
             <div className="border-t pt-4">
               <p className="eyebrow">Yarn roll entries</p>
-              <div className="mt-2 flex items-end gap-2">
+              {!readOnly && (
+                <div className="mt-2 flex items-end gap-2">
                 <div className="flex-1">
                   <label className="text-sm font-medium mb-1.5 block">Roll weight</label>
                   <Input
@@ -475,6 +505,7 @@ export function ProductionEntryDialog({
                     type="number"
                     step="any"
                     min="0"
+                    disabled={readOnly}
                     // Brings up the numeric keypad with a decimal key on iOS
                     // and Android instead of the full alphabetic keyboard.
                     inputMode="decimal"
@@ -493,7 +524,8 @@ export function ProductionEntryDialog({
                   <Plus className="mr-2 h-4 w-4" />
                   Add
                 </Button>
-              </div>
+                </div>
+              )}
               {rollError && <p className="text-sm font-medium text-destructive mt-1.5">{rollError}</p>}
 
               <div className="mt-3 rounded-md border">
@@ -507,7 +539,13 @@ export function ProductionEntryDialog({
                       </TableRow>
                     ) : (
                       rolls.map((r, i) => (
-                        <TableRow key={r.key}>
+                        // A roll over 30 kg is out of the ordinary for this
+                        // line — tint the row red so the floor can see at a
+                        // glance which rolls deserve a second look.
+                        <TableRow
+                          key={r.key}
+                          className={parseFloat(r.weight) > 30 ? "bg-red-300 dark:bg-red-900/80" : undefined}
+                        >
                           <TableCell className="w-14 py-1.5">
                             {/* A roll tag: this really is the sequence a physical
                                 roll gets tagged with on the floor, not a
@@ -518,16 +556,18 @@ export function ProductionEntryDialog({
                           </TableCell>
                           <TableCell className="num py-1.5">{Number(r.weight).toFixed(3)}</TableCell>
                           <TableCell className="w-12 py-1.5 text-right">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-10 w-10 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8"
-                              aria-label={`Remove roll ${i + 1}`}
-                              onClick={() => handleRemoveRoll(r.key)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            {!readOnly && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-10 w-10 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8"
+                                aria-label={`Remove roll ${i + 1}`}
+                                onClick={() => handleRemoveRoll(r.key)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))
@@ -545,37 +585,50 @@ export function ProductionEntryDialog({
             leaves stacked mobile buttons flush against each other — hence the
             explicit gap. */}
         <DialogFooter className="gap-2 border-t bg-background px-4 py-4 sm:px-6">
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full sm:w-auto"
-            onClick={() => onOpenChange(false)}
-            disabled={isBusy}
-          >
-            Cancel
-          </Button>
-          {!isEdit && (
+          {readOnly ? (
             <Button
               type="button"
-              variant="secondary"
+              variant="outline"
               className="w-full sm:w-auto"
-              onClick={() => doSave(true)}
-              disabled={isBusy}
+              onClick={() => onOpenChange(false)}
             >
-              {pendingAction === "saveAndAdd" && <Spinner className="mr-2" />}
-              Save & Add
+              Close
             </Button>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => onOpenChange(false)}
+                disabled={isBusy}
+              >
+                Cancel
+              </Button>
+              {!isEdit && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full sm:w-auto"
+                  onClick={() => doSave(true)}
+                  disabled={isBusy}
+                >
+                  {pendingAction === "saveAndAdd" && <Spinner className="mr-2" />}
+                  Save & Add
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="signal"
+                className="w-full sm:w-auto"
+                onClick={() => doSave(false)}
+                disabled={isBusy || isLoadingEntry}
+              >
+                {pendingAction === "save" && <Spinner className="mr-2" />}
+                Save
+              </Button>
+            </>
           )}
-          <Button
-            type="button"
-            variant="signal"
-            className="w-full sm:w-auto"
-            onClick={() => doSave(false)}
-            disabled={isBusy || isLoadingEntry}
-          >
-            {pendingAction === "save" && <Spinner className="mr-2" />}
-            Save
-          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
