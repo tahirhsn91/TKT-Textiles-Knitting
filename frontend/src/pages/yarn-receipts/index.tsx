@@ -19,6 +19,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -151,8 +152,7 @@ export default function YarnReceiptList() {
           <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-[220px_1fr_1fr] sm:divide-x sm:divide-y-0">
             <div className="flex flex-col justify-center gap-2 px-5 py-4">
               <label className="eyebrow">Receipt date</label>
-              <Input
-                type="date"
+              <DateInput
                 className="h-9"
                 value={date}
                 max={todayIso()}

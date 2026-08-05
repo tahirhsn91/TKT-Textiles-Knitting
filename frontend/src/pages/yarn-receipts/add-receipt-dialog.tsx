@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import {
   Form,
   FormControl,
@@ -369,8 +370,7 @@ export function YarnReceiptDialog({
                     <FormItem className="flex flex-col">
                       <FormLabel>Date *</FormLabel>
                       <FormControl>
-                        <Input
-                          type="date"
+                        <DateInput
                           className="h-11 sm:h-9"
                           value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
                           max={maxDate ? format(maxDate, "yyyy-MM-dd") : undefined}
