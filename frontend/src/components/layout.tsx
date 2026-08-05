@@ -111,13 +111,24 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-[100dvh] w-full bg-background">
+      {/* Development-environment banner — a fixed red strip across the very
+          top so nobody mistakes the dev stack for production. Vite strips
+          this block out of production builds (import.meta.env.DEV is false
+          there), so it can never ship. */}
+      {import.meta.env.DEV && (
+        <div className="fixed inset-x-0 top-0 z-50 flex h-7 items-center justify-center gap-2 bg-red-600 px-4 text-center text-xs font-semibold uppercase tracking-[0.14em] text-white print:hidden">
+          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-white/90" />
+          Development environment
+        </div>
+      )}
       {/* ── Desktop fixed sidebar — a dark bezel, so the light work area
              reads unmistakably as the work area. ───────────────────────── */}
       <aside
         className={cn(
           "hidden md:flex fixed inset-y-0 left-0 z-30 flex-col border-r border-sidebar-border",
           "bg-sidebar text-sidebar-foreground transition-[width] duration-200 print:hidden",
-          collapsed ? "w-16" : "w-64"
+          collapsed ? "w-16" : "w-64",
+          import.meta.env.DEV && "top-7"
         )}
       >
         {/* Sidebar header: wordmark + collapse toggle */}
@@ -227,7 +238,10 @@ export function Layout({ children }: { children: ReactNode }) {
         collapsed ? "md:ml-16" : "md:ml-64"
       )}>
         {/* Top bar — mobile hamburger + wordmark (hidden on desktop) */}
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-sidebar-border bg-sidebar px-4 text-sidebar-foreground md:hidden print:hidden">
+        <header className={cn(
+          "sticky z-20 flex h-14 items-center gap-3 border-b border-sidebar-border bg-sidebar px-4 text-sidebar-foreground md:hidden print:hidden",
+          import.meta.env.DEV && "top-7"
+        )}>
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <button
@@ -240,7 +254,10 @@ export function Layout({ children }: { children: ReactNode }) {
             <SheetContent
               side="left"
               closeAriaLabel="Close menu"
-              className="w-[280px] max-w-[85vw] border-sidebar-border bg-sidebar p-0 text-sidebar-foreground"
+              className={cn(
+                "w-[280px] max-w-[85vw] border-sidebar-border bg-sidebar p-0 text-sidebar-foreground",
+                import.meta.env.DEV && "top-7"
+              )}
               // Backdrop click-to-dismiss: the Sheet is controlled by mobileOpen,
               // so an outside pointer-down must close it explicitly rather than
               // relying on the small menu toggle (issue #27).
@@ -379,7 +396,7 @@ function DesktopGroup({
   collapsed: boolean;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(active);
+  const [open, setOpen] = useState(true);
 
   // Auto-open when the section becomes active while expanded.
   useEffect(() => { if (active) setOpen(true); }, [active]);
@@ -438,7 +455,7 @@ function MobileGroup({
   active: boolean;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(active);
+  const [open, setOpen] = useState(true);
   return (
     <div className="flex flex-col">
       <button
