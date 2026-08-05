@@ -1339,13 +1339,15 @@ export default function TransactionForm() {
                             )}
                           />
 
-                          <div className="h-11 flex items-center px-3 rounded-md border border-input bg-muted text-sm sm:h-9">
+                          {/* One cell, two lines — the header shows a single
+                              "Run totals" column, so the row must too. Two
+                              separate cells here is what pushed the delete
+                              icon onto its own row. */}
+                          <div className="flex h-11 flex-col justify-center gap-0.5 rounded-md border border-input bg-muted px-3 text-sm sm:h-9">
                             <div className="flex w-full items-baseline justify-between gap-2">
                               <span className="text-muted-foreground">Run</span>
                               <span className="num font-medium">{(runTotals[index] ?? 0).toFixed(NUM_DECIMALS)}</span>
                             </div>
-                          </div>
-                          <div className="h-11 flex items-center px-3 rounded-md border border-input bg-muted text-sm sm:h-9">
                             <div className="flex w-full items-baseline justify-between gap-2">
                               <span className="text-muted-foreground">M/c</span>
                               <span className="num font-medium">{(mcRunTotals[index] ?? 0).toFixed(NUM_DECIMALS)}</span>
