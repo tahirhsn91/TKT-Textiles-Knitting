@@ -230,6 +230,14 @@ export function ProductionEntryDialog({
       return;
     }
 
+    // A list of rolls could still sum to zero (e.g. all weights entered as
+    // 0.00 before the per-roll guard tightened) — the total must be positive
+    // too, or the production entry is meaningless.
+    if (!(totalWeight > 0)) {
+      setRollError("Total weight must be greater than zero");
+      return;
+    }
+
     const values = form.getValues();
     try { localStorage.setItem(LS_ENTERED_BY, values.enteredBy); } catch {}
 
