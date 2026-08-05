@@ -33,6 +33,32 @@ over the internal Docker network regardless.
 
 The database is automatically seeded with the current production data on first startup.
 
+## Environments: Development vs Production
+
+Each environment uses its own git-ignored env file. `docker-compose.yml` reads
+variable values from whichever env file you point Compose at, so one compose file
+serves both environments.
+
+| Environment | Env file     | Command                                         |
+|-------------|--------------|-------------------------------------------------|
+| Development | `.env`       | `docker compose up -d`                          |
+| Production  | `.env.prod`  | `docker compose --env-file .env.prod up -d`     |
+
+- **Development (default):** Compose automatically loads `.env`. It sets the dev
+  `ALLOWED_ORIGINS` (localhost + dev ports).
+- **Production:** pass `--env-file .env.prod` to load the prod values instead:
+  production `ALLOWED_ORIGINS`, `NODE_ENV=production`, and `FRONTEND_PORT`.
+  `--env-file` replaces the default `.env`, so prod servers only need `.env.prod`.
+- Both files are git-ignored — never commit them. `.env.example` is the tracked
+  template; copy it to start a new environment.
+
+### ALLOWED_ORIGINS
+
+Comma-separated list of origins allowed to call the backend API directly
+(same-origin requests through the frontend's nginx proxy don't need this).
+Keep the dev and prod lists separate so dev never accidentally accepts
+production traffic and vice versa.
+
 ## Project Structure
 
 ```
