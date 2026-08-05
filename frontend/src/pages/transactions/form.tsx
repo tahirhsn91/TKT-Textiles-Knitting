@@ -4,7 +4,7 @@ import { useLocation, useParams } from "wouter";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Trash2, ArrowLeft, Lock, Loader2 } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Lock, Loader2, Copy } from "lucide-react";
 import { useUnreconciledProduction } from "@/hooks/use-daily-production";
 import { useUnreconciledYarnReceipts } from "@/hooks/use-yarn-receipts";
 import { useUnreconciledDailyDeliveries } from "@/hooks/use-daily-deliveries";
@@ -513,6 +513,30 @@ export default function TransactionForm() {
   // At least one line must remain — the last row can't be deleted (P9 follow-up).
   const canRemoveRow = fields.length > 1;
 
+  // Copy the dropdown selections from the row above (used by the copy button
+  // on every row from the 2nd one on — duplicate machine/employee/yarn lines
+  // are the common case when a transaction spans multiple rolls).
+  const copyFromAbove = useCallback(
+    (index: number) => {
+      if (index <= 0) return;
+      const details = form.getValues("details");
+      const above = details[index - 1];
+      if (!above) return;
+      const patch = {
+        machineId: above.machineId ?? null,
+        employeeId: above.employeeId ?? null,
+        yarnTypeId: above.yarnTypeId ?? null,
+        yarnCountId: above.yarnCountId ?? null,
+        yarnBrandId: above.yarnBrandId ?? null,
+        uomId: above.uomId ?? null,
+      };
+      (Object.keys(patch) as (keyof typeof patch)[]).forEach((key) => {
+        form.setValue(`details.${index}.${key}` as never, patch[key] as never, { shouldDirty: true });
+      });
+    },
+    [form],
+  );
+
   // P7: per-form line validation message, cleared on the next submit.
   const [lineError, setLineError] = useState<string | null>(null);
   useEffect(() => {
@@ -937,17 +961,32 @@ export default function TransactionForm() {
                         <span className="num inline-flex h-6 min-w-6 items-center justify-center rounded-sm border border-border bg-muted px-1.5 text-xs text-muted-foreground">
                           {index + 1}
                         </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-11 w-11 text-muted-foreground hover:text-destructive disabled:opacity-40"
-                          onClick={() => remove(index)}
-                          disabled={!canRemoveRow}
-                          aria-label={canRemoveRow ? `Remove line ${index + 1}` : "Cannot remove the last line"}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          {index > 0 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-11 w-11 text-muted-foreground hover:text-foreground"
+                              onClick={() => copyFromAbove(index)}
+                              aria-label={`Copy dropdowns from line ${index}`}
+                              title={`Copy dropdowns from line ${index}`}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-11 w-11 text-muted-foreground hover:text-destructive disabled:opacity-40"
+                            onClick={() => remove(index)}
+                            disabled={!canRemoveRow}
+                            aria-label={canRemoveRow ? `Remove line ${index + 1}` : "Cannot remove the last line"}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="mt-2 grid grid-cols-2 gap-2">
@@ -1374,17 +1413,32 @@ export default function TransactionForm() {
                           </div>
 
                           <div className="pl-2">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-11 w-11 text-muted-foreground hover:text-destructive disabled:opacity-40 shrink-0 sm:h-8 sm:w-8"
-                              onClick={() => remove(index)}
-                              disabled={!canRemoveRow}
-                              aria-label={canRemoveRow ? `Remove line ${index + 1}` : "Cannot remove the last line"}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center justify-end gap-1">
+                              {index > 0 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-11 w-11 text-muted-foreground hover:text-foreground shrink-0 sm:h-8 sm:w-8"
+                                  onClick={() => copyFromAbove(index)}
+                                  aria-label={`Copy dropdowns from line ${index}`}
+                                  title={`Copy dropdowns from line ${index}`}
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-11 w-11 text-muted-foreground hover:text-destructive disabled:opacity-40 shrink-0 sm:h-8 sm:w-8"
+                                onClick={() => remove(index)}
+                                disabled={!canRemoveRow}
+                                aria-label={canRemoveRow ? `Remove line ${index + 1}` : "Cannot remove the last line"}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       ))}
