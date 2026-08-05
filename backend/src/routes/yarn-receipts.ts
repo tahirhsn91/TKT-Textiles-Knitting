@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db } from "../db/index.js";
 import {
@@ -17,6 +17,7 @@ const router: IRouter = Router();
 // ─── Validation ────────────────────────────────────────────────────────────
 
 const headerSchema = insertYarnReceiptHeaderSchema.extend({
+  docNumber: z.string().min(1, "Document number is required"),
   partyId: z.coerce.number().int().positive("Party is required"),
   createdBy: z.string().min(1, "Enter your name"),
 });
@@ -29,6 +30,7 @@ const detailSchema = insertYarnReceiptDetailSchema.extend({
 });
 
 const receiptBodySchema = z.object({
+  docNumber: headerSchema.shape.docNumber,
   receiptDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Receipt date (YYYY-MM-DD) is required"),
   partyId: headerSchema.shape.partyId,
   createdBy: headerSchema.shape.createdBy,
@@ -73,6 +75,7 @@ router.get("/yarn-receipts", async (req, res): Promise<void> => {
   const rows = await db
     .select({
       id: yarnReceiptHeaderTable.id,
+      docNumber: yarnReceiptHeaderTable.docNumber,
       receiptDate: yarnReceiptHeaderTable.receiptDate,
       partyId: yarnReceiptHeaderTable.partyId,
       partyName: partyMasterTable.name,
@@ -229,6 +232,27 @@ router.get("/yarn-receipts/unreconciled", async (req, res): Promise<void> => {
   res.json({ receiptDate: date, partyId, rows, receiptIds });
 });
 
+// ─── Next document number suggestion ───────────────────────────────────────
+// Smallest unused integer-based doc number — same convention as
+// /transactions/suggestions, so receipt docs stay human-friendly (YR-1, YR-2…).
+
+router.get("/yarn-receipts/suggestions", async (_req, res): Promise<void> => {
+  const rows = await db
+    .select({ docNumber: yarnReceiptHeaderTable.docNumber })
+    .from(yarnReceiptHeaderTable)
+    .orderBy(desc(yarnReceiptHeaderTable.id));
+
+  // Doc numbers look like "YR-5"; extract the numeric tail so the next
+  // suggestion is YR-6, not a re-suggested 1.
+  let maxNumeric = 0;
+  for (const r of rows) {
+    const n = parseInt((r.docNumber ?? "").replace(/^YR-\s*/i, ""), 10);
+    if (!isNaN(n) && n > maxNumeric) maxNumeric = n;
+  }
+
+  res.json({ nextDocNumber: `YR-${maxNumeric + 1}` });
+});
+
 // ─── Receipt detail (header + lines) ───────────────────────────────────────
 
 router.get("/yarn-receipts/:id", async (req, res): Promise<void> => {
@@ -241,6 +265,7 @@ router.get("/yarn-receipts/:id", async (req, res): Promise<void> => {
   const [header] = await db
     .select({
       id: yarnReceiptHeaderTable.id,
+      docNumber: yarnReceiptHeaderTable.docNumber,
       receiptDate: yarnReceiptHeaderTable.receiptDate,
       partyId: yarnReceiptHeaderTable.partyId,
       partyName: partyMasterTable.name,
@@ -285,12 +310,12 @@ router.post("/yarn-receipts", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid receipt" });
     return;
   }
-  const { receiptDate, partyId, createdBy, lines } = parsed.data;
+  const { docNumber, receiptDate, partyId, createdBy, lines } = parsed.data;
 
   const result = await db.transaction(async (tx) => {
     const [header] = await tx
       .insert(yarnReceiptHeaderTable)
-      .values({ receiptDate, partyId, createdBy })
+      .values({ docNumber, receiptDate, partyId, createdBy })
       .returning({ id: yarnReceiptHeaderTable.id });
     await tx.insert(yarnReceiptDetailTable).values(
       lines.map((l) => ({
@@ -321,7 +346,7 @@ router.put("/yarn-receipts/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid receipt" });
     return;
   }
-  const { receiptDate, partyId, createdBy, updatedBy, lines } = parsed.data;
+  const { docNumber, receiptDate, partyId, createdBy, updatedBy, lines } = parsed.data;
 
   const [existing] = await db
     .select({ id: yarnReceiptHeaderTable.id })
@@ -338,7 +363,7 @@ router.put("/yarn-receipts/:id", async (req, res): Promise<void> => {
   await db.transaction(async (tx) => {
     await tx
       .update(yarnReceiptHeaderTable)
-      .set({ receiptDate, partyId, updatedBy: updatedBy ?? createdBy, updatedAt: new Date() })
+      .set({ docNumber, receiptDate, partyId, updatedBy: updatedBy ?? createdBy, updatedAt: new Date() })
       .where(eq(yarnReceiptHeaderTable.id, id));
     await tx.delete(yarnReceiptDetailTable).where(eq(yarnReceiptDetailTable.headerId, id));
     await tx.insert(yarnReceiptDetailTable).values(

@@ -26,6 +26,7 @@ import { transactionHeaderTable } from "./transactions.js";
 // though nothing downstream consumes receipts yet.
 export const yarnReceiptHeaderTable = pgTable("yarn_receipt_header", {
   id: serial("id").primaryKey(),
+  docNumber: text("doc_number").notNull(),
   receiptDate: date("receipt_date").notNull(),
   partyId: integer("party_id")
     .notNull()

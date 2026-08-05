@@ -39,7 +39,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Layout } from "@/components/layout";
 import { useToast } from "@/hooks/use-toast";
 
-const COLUMN_COUNT = 5;
+const COLUMN_COUNT = 6;
 
 function yesterdayIso() {
   const d = new Date();
@@ -203,7 +203,8 @@ export default function YarnReceiptList() {
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="eyebrow h-11 px-5">Party</TableHead>
+                  <TableHead className="eyebrow h-11 px-5">Doc #</TableHead>
+                  <TableHead className="eyebrow h-11">Party</TableHead>
                   <TableHead className="eyebrow h-11">Lots</TableHead>
                   <TableHead className="eyebrow h-11">Bags</TableHead>
                   <TableHead className="eyebrow h-11 text-right">Net weight</TableHead>
@@ -237,7 +238,10 @@ export default function YarnReceiptList() {
                           : undefined
                       }
                     >
-                      <TableCell className="whitespace-nowrap px-5 font-medium">
+                      <TableCell className="whitespace-nowrap px-5 font-medium text-muted-foreground">
+                        {r.docNumber}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap font-medium">
                         <span className="inline-flex items-center gap-2">
                           {r.partyName ?? "-"}
                           {r.reconciled && (
@@ -310,7 +314,7 @@ export default function YarnReceiptList() {
               {rows.length > 0 && (
                 <tfoot>
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={3} className="px-5 text-right text-sm text-muted-foreground">
+                    <TableCell colSpan={4} className="px-5 text-right text-sm text-muted-foreground">
                       Grand total
                     </TableCell>
                     <TableCell className="selvedge-top py-4 text-right">
