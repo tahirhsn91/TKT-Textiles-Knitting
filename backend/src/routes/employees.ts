@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { eq, and, gte, lte, like, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   employeeMasterTable,
@@ -29,11 +29,19 @@ function toNumStrict(val: unknown): number | null {
 // ─── Advances ────────────────────────────────────────────────────────────────
 
 router.get("/employees/advances", async (req, res): Promise<void> => {
-  const { employeeId, dateFrom, dateTo } = req.query as Record<string, string>;
+  const { employeeId, dateFrom, dateTo, month, year } = req.query as Record<string, string>;
   const conditions = [];
   if (employeeId) conditions.push(eq(employeeAdvancesTable.employeeId, Number(employeeId)));
   if (dateFrom) conditions.push(gte(employeeAdvancesTable.date, dateFrom));
   if (dateTo) conditions.push(lte(employeeAdvancesTable.date, dateTo));
+  // Month/year filter — dates are stored as YYYY-MM-DD, so a month match is
+  // a string prefix on the date column (e.g. year=2026&month=8 -> 2026-08%).
+  if (year && month) {
+    const ym = `${year}-${String(Number(month)).padStart(2, "0")}`;
+    conditions.push(like(employeeAdvancesTable.date, `${ym}%`));
+  } else if (year) {
+    conditions.push(like(employeeAdvancesTable.date, `${year}%`));
+  }
 
   const rows = await db
     .select({
