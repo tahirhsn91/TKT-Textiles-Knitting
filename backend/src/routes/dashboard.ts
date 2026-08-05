@@ -7,7 +7,7 @@ import {
   fabricTypeMasterTable,
   partyMasterTable,
   machineMasterTable,
-  machineOperatorMasterTable,
+  employeeMasterTable,
 } from "../db/index.js";
 
 const router: IRouter = Router();
@@ -177,22 +177,22 @@ async function getMachineUtilization() {
   return rows.map((r) => ({ name: r.machineName ?? "Unknown", lines: toNum(r.transactionLines) }));
 }
 
-async function getOperatorOutput() {
+async function getEmployeeOutput() {
   const { cmFrom, cmTo } = getWindow();
   const rows = await db
     .select({
-      operatorName: machineOperatorMasterTable.name,
+      employeeName: employeeMasterTable.name,
       totalNetWeight: sum(transactionDetailTable.netWt),
     })
     .from(transactionDetailTable)
     .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
-    .leftJoin(machineOperatorMasterTable, eq(transactionDetailTable.machineOperatorId, machineOperatorMasterTable.id))
+    .leftJoin(employeeMasterTable, eq(transactionDetailTable.machineEmployeeId, employeeMasterTable.id))
     .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo)))
-    .groupBy(machineOperatorMasterTable.name)
+    .groupBy(employeeMasterTable.name)
     .orderBy(sql`SUM(${transactionDetailTable.netWt}) DESC`)
     .limit(10);
 
-  return rows.map((r) => ({ name: r.operatorName ?? "Unknown", netWeight: toNum(r.totalNetWeight) }));
+  return rows.map((r) => ({ name: r.employeeName ?? "Unknown", netWeight: toNum(r.totalNetWeight) }));
 }
 
 // ── Per-widget endpoints ────────────────────────────────────────────────────
@@ -202,11 +202,11 @@ router.get("/dashboard/daily-production",    async (_req, res) => { res.json(awa
 router.get("/dashboard/fabric-breakdown",    async (_req, res) => { res.json(await getFabricBreakdown()); });
 router.get("/dashboard/top-parties",         async (_req, res) => { res.json(await getTopParties()); });
 router.get("/dashboard/machine-utilization", async (_req, res) => { res.json(await getMachineUtilization()); });
-router.get("/dashboard/operator-output",     async (_req, res) => { res.json(await getOperatorOutput()); });
+router.get("/dashboard/employee-output",     async (_req, res) => { res.json(await getEmployeeOutput()); });
 
 // ── Aggregated summary (kept for backward compatibility) ────────────────────
 router.get("/dashboard/summary", async (_req, res): Promise<void> => {
-  const [kpis, monthlyTrend, dailyProduction, fabricBreakdown, topParties, machineUtilization, operatorOutput] =
+  const [kpis, monthlyTrend, dailyProduction, fabricBreakdown, topParties, machineUtilization, employeeOutput] =
     await Promise.all([
       getKpis(),
       getMonthlyTrend(),
@@ -214,10 +214,10 @@ router.get("/dashboard/summary", async (_req, res): Promise<void> => {
       getFabricBreakdown(),
       getTopParties(),
       getMachineUtilization(),
-      getOperatorOutput(),
+      getEmployeeOutput(),
     ]);
 
-  res.json({ kpis, monthlyTrend, dailyProduction, fabricBreakdown, topParties, machineUtilization, operatorOutput });
+  res.json({ kpis, monthlyTrend, dailyProduction, fabricBreakdown, topParties, machineUtilization, employeeOutput });
 });
 
 export default router;

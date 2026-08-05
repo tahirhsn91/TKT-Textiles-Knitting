@@ -18,7 +18,7 @@ import {
   yarnBrandMasterTable,
   uomMasterTable,
   machineMasterTable,
-  machineOperatorMasterTable,
+  employeeMasterTable,
 } from "../db/index.js";
 import {
   ListTransactionsResponse,
@@ -79,7 +79,7 @@ interface ImportCsvRow {
   yarnBrandName?: string;
   uomName?: string;
   machineName?: string;
-  operatorName?: string;
+  employeeName?: string;
   quantity?: string;
   netWt?: string;
 }
@@ -114,7 +114,7 @@ function parseImportNumeric(s: string | undefined): string | null {
 }
 
 async function buildMasterMaps() {
-  const [transTypes, jobs, parties, locations, fabricTypes, yarnTypes, yarnCounts, yarnBrands, uoms, machines, operators] =
+  const [transTypes, jobs, parties, locations, fabricTypes, yarnTypes, yarnCounts, yarnBrands, uoms, machines, employees] =
     await Promise.all([
       db.select({ id: transactionTypeMasterTable.id, name: transactionTypeMasterTable.name }).from(transactionTypeMasterTable),
       db.select({ id: jobMasterTable.id, name: jobMasterTable.name }).from(jobMasterTable),
@@ -126,7 +126,7 @@ async function buildMasterMaps() {
       db.select({ id: yarnBrandMasterTable.id, name: yarnBrandMasterTable.name }).from(yarnBrandMasterTable),
       db.select({ id: uomMasterTable.id, name: uomMasterTable.name }).from(uomMasterTable),
       db.select({ id: machineMasterTable.id, name: machineMasterTable.name }).from(machineMasterTable),
-      db.select({ id: machineOperatorMasterTable.id, name: machineOperatorMasterTable.name }).from(machineOperatorMasterTable),
+      db.select({ id: employeeMasterTable.id, name: employeeMasterTable.name }).from(employeeMasterTable),
     ]);
 
   const toMap = (rows: { id: number; name: string }[]) =>
@@ -143,7 +143,7 @@ async function buildMasterMaps() {
     yarnBrands:  toMap(yarnBrands),
     uoms:        toMap(uoms),
     machines:    toMap(machines),
-    operators:   toMap(operators),
+    employees:   toMap(employees),
   };
 }
 
@@ -213,8 +213,8 @@ async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
       const yarnBrandR = resolveLookup(maps.yarnBrands, r.yarnBrandName, "Yarn Brand");
       const uomR       = resolveLookup(maps.uoms,       r.uomName,       "UOM");
       const machineR   = resolveLookup(maps.machines,   r.machineName,   "Machine");
-      const operatorR  = resolveLookup(maps.operators,  r.operatorName,  "Operator");
-      const rowErrors: ImportError[] = [yarnTypeR, yarnCountR, yarnBrandR, uomR, machineR, operatorR]
+      const employeeR  = resolveLookup(maps.employees,  r.employeeName,  "Employee");
+      const rowErrors: ImportError[] = [yarnTypeR, yarnCountR, yarnBrandR, uomR, machineR, employeeR]
         .filter((x) => x.field !== null)
         .map((x) => ({
           docNumber: docNum,
@@ -223,7 +223,7 @@ async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
           value: x.value as string,
           reason: "Not found in master list",
         }));
-      return { yarnTypeR, yarnCountR, yarnBrandR, uomR, machineR, operatorR, rowErrors };
+      return { yarnTypeR, yarnCountR, yarnBrandR, uomR, machineR, employeeR, rowErrors };
     });
 
     const headerErrors: ImportError[] = [
@@ -279,7 +279,7 @@ async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
                 yarnBrandId:       d.yarnBrandR.id,
                 uomId:             d.uomR.id,
                 machineId:         d.machineR.id,
-                machineOperatorId: d.operatorR.id,
+                machineEmployeeId: d.employeeR.id,
                 quantity:          parseImportNumeric(group.rows[i].quantity),
                 netWt:             parseImportNumeric(group.rows[i].netWt),
               }))

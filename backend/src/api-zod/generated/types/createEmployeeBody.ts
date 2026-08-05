@@ -6,8 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface MachineOperatorLookupItem {
-  id: number;
+export interface CreateEmployeeBody {
   name: string;
   code: string;
   /** @nullable */
@@ -20,5 +19,5 @@ export interface MachineOperatorLookupItem {
   attAllowance?: string | null;
   /** @nullable */
   othAllowance?: string | null;
-  active: boolean;
+  active?: boolean;
 }

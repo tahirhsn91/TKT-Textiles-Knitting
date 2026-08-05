@@ -38,7 +38,7 @@ const HEADER_MAP: Record<string, string> = {
   "yarn brand":    "yarnBrandName",
   "uom":           "uomName",
   "machine":       "machineName",
-  "operator":      "operatorName",
+  "employee":      "employeeName",
   "qty":           "quantity",
   "net wt":        "netWt",
 };
@@ -59,7 +59,7 @@ export interface CsvRow {
   yarnBrandName?: string;
   uomName?: string;
   machineName?: string;
-  operatorName?: string;
+  employeeName?: string;
   quantity?: string;
   netWt?: string;
 }

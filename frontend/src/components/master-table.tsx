@@ -191,7 +191,7 @@ export function MasterTable({
     ? `${filteredRows.length} of ${rows?.length ?? 0} record${rows?.length === 1 ? "" : "s"}`
     : `${rows?.length ?? 0} record${rows?.length === 1 ? "" : "s"}`;
 
-  // Only tables with an Active field (e.g. Operators) get inactive-row dimming.
+  // Only tables with an Active field (e.g. Employees) get inactive-row dimming.
   const hasActiveField = fields.some((f) => f.key === "active");
 
   // Inline validation: numeric fields must be a valid number (or empty when
@@ -417,7 +417,7 @@ export function MasterTable({
             )}
 
             {/* Data rows — rows with an Active field get dimmed when inactive,
-                so disabled operators stand out from the active ones at a glance. */}
+                so disabled employees stand out from the active ones at a glance. */}
             {filteredRows.map((row) => (
               <TableRow
                 key={row.id}

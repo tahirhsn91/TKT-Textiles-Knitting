@@ -19,7 +19,7 @@ import {
   yarnBrandMasterTable,
   uomMasterTable,
   fabricTypeMasterTable,
-  machineOperatorMasterTable,
+  employeeMasterTable,
 } from "./lookups.js";
 
 export const transactionHeaderTable = pgTable("transaction_header", {
@@ -48,7 +48,7 @@ export const transactionDetailTable = pgTable("transaction_detail", {
     .notNull()
     .references(() => transactionHeaderTable.id, { onDelete: "cascade" }),
   machineId: integer("machine_id").references(() => machineMasterTable.id),
-  machineOperatorId: integer("machine_operator_id").references(() => machineOperatorMasterTable.id),
+  machineEmployeeId: integer("machine_employee_id").references(() => employeeMasterTable.id),
   yarnTypeId: integer("yarn_type_id").references(() => yarnTypeMasterTable.id),
   yarnCountId: integer("yarn_count_id").references(() => yarnCountMasterTable.id),
   yarnBrandId: integer("yarn_brand_id").references(() => yarnBrandMasterTable.id),

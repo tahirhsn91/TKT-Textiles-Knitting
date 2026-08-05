@@ -1,6 +1,6 @@
 # TKT Textiles — Fabric Knitting Factory Management System
 
-A full-stack ERP for managing fabric knitting factory operations: transactions, master data, operator payroll, and production analytics.
+A full-stack ERP for managing fabric knitting factory operations: transactions, master data, employee payroll, and production analytics.
 
 ## Tech Stack
 | Layer | Technology |
@@ -87,8 +87,8 @@ production traffic and vice versa.
 ```
 
 ## Features
-- **Transactions** — Record knitting jobs with yarn, machine, and operator details
-- **Master Data** — Manage parties, machines, operators, yarn types, and more
+- **Transactions** — Record knitting jobs with yarn, machine, and employee details
+- **Master Data** — Manage parties, machines, employees, yarn types, and more
 - **Operators** — Salary settings, daily records, advances, and payroll summary
 - **Reports** — Transaction reports with filters and PDF export
 - **Dashboard** — Production KPIs, trends, machine utilization, and payroll charts

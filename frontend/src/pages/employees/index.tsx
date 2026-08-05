@@ -78,7 +78,7 @@ function todayStr() {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface OperatorLookup {
+interface EmployeeLookup {
   id: number;
   name: string;
   code: string;
@@ -87,7 +87,7 @@ interface OperatorLookup {
 
 interface SalaryRecord {
   id: number;
-  operatorId: number;
+  employeeId: number;
   date: string;
   baseWage: string | null;
   commission: string | null;
@@ -96,17 +96,17 @@ interface SalaryRecord {
 
 interface Advance {
   id: number;
-  operatorId: number;
-  operatorName: string;
+  employeeId: number;
+  employeeName: string;
   date: string;
   amount: string;
   notes: string | null;
 }
 
 interface PayrollSummaryItem {
-  operatorId: number;
-  operatorName: string;
-  operatorCode: string;
+  employeeId: number;
+  employeeName: string;
+  employeeCode: string;
   totalDaysWorked: number;
   totalSalary: number;
   totalAdvances: number;
@@ -136,29 +136,29 @@ function AdvancesTab() {
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  const [form, setForm] = useState({ operatorId: "", date: todayStr(), amount: "", notes: "" });
+  const [form, setForm] = useState({ employeeId: "", date: todayStr(), amount: "", notes: "" });
   const [filterOp, setFilterOp] = useState("__all__");
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
 
-  const { data: operators = [] } = useQuery<OperatorLookup[]>({
-    queryKey: ["operator-lookup"],
-    queryFn: () => apiFetch("/api/lookups/machine-operator-master"),
+  const { data: employees = [] } = useQuery<EmployeeLookup[]>({
+    queryKey: ["employee-lookup"],
+    queryFn: () => apiFetch("/api/lookups/employee-master"),
   });
 
   const advanceParams = new URLSearchParams();
-  if (filterOp !== "__all__") advanceParams.set("operatorId", filterOp);
+  if (filterOp !== "__all__") advanceParams.set("employeeId", filterOp);
   if (filterFrom) advanceParams.set("dateFrom", filterFrom);
   if (filterTo) advanceParams.set("dateTo", filterTo);
 
   const { data: advances = [], isLoading } = useQuery<Advance[]>({
-    queryKey: ["operator-advances", filterOp, filterFrom, filterTo],
-    queryFn: () => apiFetch(`/api/operators/advances?${advanceParams.toString()}`),
+    queryKey: ["employee-advances", filterOp, filterFrom, filterTo],
+    queryFn: () => apiFetch(`/api/employees/advances?${advanceParams.toString()}`),
   });
 
   const { sorted: sortedAdvances, sort, toggleSort } = useSort(advances, {
     date: (a: Advance) => a.date,
-    operatorName: (a: Advance) => a.operatorName,
+    employeeName: (a: Advance) => a.employeeName,
     // amount arrives from the API as a string; sorting it as text puts
     // 1000 before 900.
     amount: (a: Advance) => toNum(a.amount),
@@ -166,27 +166,27 @@ function AdvancesTab() {
   });
 
   const addMutation = useMutation({
-    mutationFn: (data: object) => apiFetch("/api/operators/advances", { method: "POST", body: JSON.stringify(data) }),
+    mutationFn: (data: object) => apiFetch("/api/employees/advances", { method: "POST", body: JSON.stringify(data) }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["operator-advances"] });
-      setForm({ operatorId: "", date: todayStr(), amount: "", notes: "" });
+      qc.invalidateQueries({ queryKey: ["employee-advances"] });
+      setForm({ employeeId: "", date: todayStr(), amount: "", notes: "" });
       toast({ title: "Advance recorded." });
     },
     onError: (e: Error) => toast({ variant: "destructive", title: "Error", description: e.message }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiFetch(`/api/operators/advances/${id}`, { method: "DELETE" }),
+    mutationFn: (id: number) => apiFetch(`/api/employees/advances/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["operator-advances"] });
+      qc.invalidateQueries({ queryKey: ["employee-advances"] });
       toast({ title: "Advance deleted." });
     },
     onError: (e: Error) => toast({ variant: "destructive", title: "Error", description: e.message }),
   });
 
   function handleAdd() {
-    if (!form.operatorId || !form.date || form.amount === "") {
-      toast({ variant: "destructive", title: "Validation", description: "Operator, date, and amount are required." });
+    if (!form.employeeId || !form.date || form.amount === "") {
+      toast({ variant: "destructive", title: "Validation", description: "Employee, date, and amount are required." });
       return;
     }
     const amt = parseFloat(form.amount);
@@ -194,7 +194,7 @@ function AdvancesTab() {
       toast({ variant: "destructive", title: "Validation", description: "Amount must be ≥ 0." });
       return;
     }
-    addMutation.mutate({ operatorId: parseInt(form.operatorId), date: form.date, amount: amt, notes: form.notes || null });
+    addMutation.mutate({ employeeId: parseInt(form.employeeId), date: form.date, amount: amt, notes: form.notes || null });
   }
 
   return (
@@ -204,13 +204,13 @@ function AdvancesTab() {
         <CardContent>
           <div className="flex flex-wrap gap-4 items-end">
             <div className="flex flex-col gap-1">
-              <Label>Operator</Label>
-              <Select value={form.operatorId} onValueChange={(v) => setForm((p) => ({ ...p, operatorId: v }))}>
+              <Label>Employee</Label>
+              <Select value={form.employeeId} onValueChange={(v) => setForm((p) => ({ ...p, employeeId: v }))}>
                 <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Select operator" />
+                  <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  {operators.filter((op) => op.active).map((op) => (
+                  {employees.filter((op) => op.active).map((op) => (
                     <SelectItem key={op.id} value={String(op.id)}>{op.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -243,11 +243,11 @@ function AdvancesTab() {
           <div className="flex flex-wrap gap-4 mt-2">
             <Select value={filterOp} onValueChange={setFilterOp}>
               <SelectTrigger className="w-48">
-                <SelectValue placeholder="All operators" />
+                <SelectValue placeholder="All employees" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__all__">All Operators</SelectItem>
-                {operators.map((op) => (
+                <SelectItem value="__all__">All Employees</SelectItem>
+                {employees.map((op) => (
                   <SelectItem key={op.id} value={String(op.id)}>{op.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -267,7 +267,7 @@ function AdvancesTab() {
             <TableHeader>
               <TableRow>
                 <SortableHead label="Date" sortKey="date" sort={sort} onSort={toggleSort} />
-                <SortableHead label="Operator" sortKey="operatorName" sort={sort} onSort={toggleSort} />
+                <SortableHead label="Employee" sortKey="employeeName" sort={sort} onSort={toggleSort} />
                 <SortableHead label="Amount" sortKey="amount" sort={sort} onSort={toggleSort} right />
                 <SortableHead label="Notes" sortKey="notes" sort={sort} onSort={toggleSort} />
                 <TableHead className="w-16"></TableHead>
@@ -287,7 +287,7 @@ function AdvancesTab() {
               {!isLoading && sortedAdvances.map((a) => (
                 <TableRow key={a.id}>
                   <TableCell className="font-mono text-sm">{formatDate(a.date)}</TableCell>
-                  <TableCell>{a.operatorName}</TableCell>
+                  <TableCell>{a.employeeName}</TableCell>
                   <TableCell className="text-right font-mono">{fmtMoney(toNum(a.amount))}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">{a.notes || "—"}</TableCell>
                   <TableCell>
@@ -301,7 +301,7 @@ function AdvancesTab() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete Advance</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Delete {fmtMoney(toNum(a.amount))} advance for {a.operatorName} on {formatDate(a.date)}? This cannot be undone.
+                            Delete {fmtMoney(toNum(a.amount))} advance for {a.employeeName} on {formatDate(a.date)}? This cannot be undone.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -329,25 +329,25 @@ function PayrollSummaryTab() {
   const { toast } = useToast();
   const [month, setMonth] = useState(String(new Date().getMonth() + 1));
   const [year, setYear] = useState(String(CURRENT_YEAR));
-  const [operatorId, setOperatorId] = useState("__all__");
+  const [employeeId, setEmployeeId] = useState("__all__");
   const [hasRun, setHasRun] = useState(false);
 
-  const { data: operators = [] } = useQuery<OperatorLookup[]>({
-    queryKey: ["operator-lookup"],
-    queryFn: () => apiFetch("/api/lookups/machine-operator-master"),
+  const { data: employees = [] } = useQuery<EmployeeLookup[]>({
+    queryKey: ["employee-lookup"],
+    queryFn: () => apiFetch("/api/lookups/employee-master"),
   });
 
   const params = new URLSearchParams({ month, year });
-  if (operatorId !== "__all__") params.set("operatorId", operatorId);
+  if (employeeId !== "__all__") params.set("employeeId", employeeId);
 
   const { data: summary = [], isLoading } = useQuery<PayrollSummaryItem[]>({
-    queryKey: ["payroll-summary", month, year, operatorId],
-    queryFn: () => apiFetch(`/api/operators/payroll-summary?${params.toString()}`),
+    queryKey: ["payroll-summary", month, year, employeeId],
+    queryFn: () => apiFetch(`/api/employees/payroll-summary?${params.toString()}`),
     enabled: hasRun,
   });
 
   const { sorted: sortedSummary, sort, toggleSort } = useSort(summary, {
-    operatorName: (s: PayrollSummaryItem) => s.operatorName,
+    employeeName: (s: PayrollSummaryItem) => s.employeeName,
     totalDaysWorked: (s: PayrollSummaryItem) => s.totalDaysWorked,
     totalSalary: (s: PayrollSummaryItem) => s.totalSalary,
     totalAdvances: (s: PayrollSummaryItem) => s.totalAdvances,
@@ -367,12 +367,12 @@ function PayrollSummaryTab() {
 
     autoTable(doc, {
       startY: 26,
-      head: [["Operator", "Days Worked", "Total Salary", "Total Advances", "Net Payable"]],
+      head: [["Employee", "Days Worked", "Total Salary", "Total Advances", "Net Payable"]],
       // Export follows the on-screen order. If the user sorted by Net Payable
       // to review the largest payouts, a PDF back in API order would not match
       // what they were looking at when they hit Export.
       body: sortedSummary.map((s) => [
-        s.operatorName,
+        s.employeeName,
         s.totalDaysWorked,
         fmtMoney(s.totalSalary),
         fmtMoney(s.totalAdvances),
@@ -387,7 +387,7 @@ function PayrollSummaryTab() {
     for (const s of sortedSummary) {
       if (yOffset > 250) { doc.addPage(); yOffset = 14; }
       doc.setFontSize(12);
-      doc.text(`${s.operatorName} (${s.operatorCode}) — Daily Breakdown`, 14, yOffset);
+      doc.text(`${s.employeeName} (${s.employeeCode}) — Daily Breakdown`, 14, yOffset);
       yOffset += 4;
 
       autoTable(doc, {
@@ -443,7 +443,7 @@ function PayrollSummaryTab() {
     <Card>
       <CardHeader>
         <CardTitle>Payroll Summary</CardTitle>
-        <p className="text-sm text-muted-foreground">View monthly payroll for all or individual operators.</p>
+        <p className="text-sm text-muted-foreground">View monthly payroll for all or individual employees.</p>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-4 items-end">
@@ -474,14 +474,14 @@ function PayrollSummaryTab() {
             </Select>
           </div>
           <div className="flex flex-col gap-1">
-            <Label>Operator (optional)</Label>
-            <Select value={operatorId} onValueChange={setOperatorId}>
+            <Label>Employee (optional)</Label>
+            <Select value={employeeId} onValueChange={setEmployeeId}>
               <SelectTrigger className="w-48">
-                <SelectValue placeholder="All Operators" />
+                <SelectValue placeholder="All Employees" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__all__">All Operators</SelectItem>
-                {operators.map((op) => (
+                <SelectItem value="__all__">All Employees</SelectItem>
+                {employees.map((op) => (
                   <SelectItem key={op.id} value={String(op.id)}>{op.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -504,7 +504,7 @@ function PayrollSummaryTab() {
           <Table>
             <TableHeader>
               <TableRow>
-                <SortableHead label="Operator" sortKey="operatorName" sort={sort} onSort={toggleSort} />
+                <SortableHead label="Employee" sortKey="employeeName" sort={sort} onSort={toggleSort} />
                 <SortableHead label="Days Worked" sortKey="totalDaysWorked" sort={sort} onSort={toggleSort} right />
                 <SortableHead label="Total Salary" sortKey="totalSalary" sort={sort} onSort={toggleSort} right />
                 <SortableHead label="Total Advances" sortKey="totalAdvances" sort={sort} onSort={toggleSort} right />
@@ -513,8 +513,8 @@ function PayrollSummaryTab() {
             </TableHeader>
             <TableBody>
               {sortedSummary.map((s) => (
-                <TableRow key={s.operatorId}>
-                  <TableCell className="font-medium">{s.operatorName} <span className="text-muted-foreground text-xs">({s.operatorCode})</span></TableCell>
+                <TableRow key={s.employeeId}>
+                  <TableCell className="font-medium">{s.employeeName} <span className="text-muted-foreground text-xs">({s.employeeCode})</span></TableCell>
                   <TableCell className="text-right">{s.totalDaysWorked}</TableCell>
                   <TableCell className="text-right">{fmtMoney(s.totalSalary)}</TableCell>
                   <TableCell className="text-right text-red-600">{fmtMoney(s.totalAdvances)}</TableCell>
@@ -549,13 +549,13 @@ function PayrollSummaryTab() {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function OperatorsPage() {
+export default function EmployeesPage() {
   return (
     <Layout>
       <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Operators</h1>
-          <p className="text-muted-foreground mt-1">Manage operator advances and payroll summary.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Employees</h1>
+          <p className="text-muted-foreground mt-1">Manage employee advances and payroll summary.</p>
         </div>
         <Tabs defaultValue="advances">
           <TabsList>

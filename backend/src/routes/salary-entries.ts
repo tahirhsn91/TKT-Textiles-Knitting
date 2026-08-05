@@ -4,7 +4,7 @@ import { db } from "../db/index.js";
 import {
   salaryHeaderTable,
   salaryDetailTable,
-  machineOperatorMasterTable,
+  employeeMasterTable,
   departmentMasterTable,
 } from "../db/index.js";
 
@@ -62,7 +62,7 @@ router.get("/salary-entries/:id", async (req, res): Promise<void> => {
     .select()
     .from(salaryDetailTable)
     .where(eq(salaryDetailTable.headerId, id))
-    .orderBy(salaryDetailTable.operatorName);
+    .orderBy(salaryDetailTable.employeeName);
 
   const depts = await db.select().from(departmentMasterTable);
   const deptMap = Object.fromEntries(depts.map((d) => [d.id, d.name]));
@@ -82,9 +82,9 @@ router.post("/salary-entries", async (req, res): Promise<void> => {
     year: number;
     departmentIds: number[];
     details: Array<{
-      operatorId: number;
+      employeeId: number;
       departmentId?: number | null;
-      operatorName: string;
+      employeeName: string;
       basicSalary: number;
       otRateHr: number;
       attAllowance: number;
@@ -112,25 +112,25 @@ router.post("/salary-entries", async (req, res): Promise<void> => {
     return;
   }
 
-  const operatorIds = details.map((d) => d.operatorId);
+  const employeeIds = details.map((d) => d.employeeId);
 
-  // Enforce DB-level uniqueness: check if any (operatorId, month, year) already exists
+  // Enforce DB-level uniqueness: check if any (employeeId, month, year) already exists
   const existingDetails = await db
-    .select({ operatorId: salaryDetailTable.operatorId })
+    .select({ employeeId: salaryDetailTable.employeeId })
     .from(salaryDetailTable)
     .where(
       and(
         eq(salaryDetailTable.month, month),
         eq(salaryDetailTable.year, year),
-        inArray(salaryDetailTable.operatorId, operatorIds)
+        inArray(salaryDetailTable.employeeId, employeeIds)
       )
     );
 
   if (existingDetails.length > 0) {
     const ops = await db
-      .select({ id: machineOperatorMasterTable.id, name: machineOperatorMasterTable.name })
-      .from(machineOperatorMasterTable)
-      .where(inArray(machineOperatorMasterTable.id, existingDetails.map((e) => e.operatorId)));
+      .select({ id: employeeMasterTable.id, name: employeeMasterTable.name })
+      .from(employeeMasterTable)
+      .where(inArray(employeeMasterTable.id, existingDetails.map((e) => e.employeeId)));
     const names = ops.map((o) => o.name).join(", ");
     res.status(409).json({ error: `Duplicate: salary already entered for ${names} in ${month}/${year}` });
     return;
@@ -143,11 +143,11 @@ router.post("/salary-entries", async (req, res): Promise<void> => {
 
   const detailRows = details.map((d) => ({
     headerId: header.id,
-    operatorId: d.operatorId,
+    employeeId: d.employeeId,
     month,
     year,
     departmentId: d.departmentId ?? null,
-    operatorName: d.operatorName,
+    employeeName: d.employeeName,
     basicSalary: String(toNum(d.basicSalary)),
     otRateHr: String(toNum(d.otRateHr)),
     attAllowance: String(toNum(d.attAllowance)),
@@ -184,9 +184,9 @@ router.put("/salary-entries/:id", async (req, res): Promise<void> => {
     year: number;
     departmentIds: number[];
     details: Array<{
-      operatorId: number;
+      employeeId: number;
       departmentId?: number | null;
-      operatorName: string;
+      employeeName: string;
       basicSalary: number;
       otRateHr: number;
       attAllowance: number;
@@ -210,26 +210,26 @@ router.put("/salary-entries/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  const operatorIds = details.map((d) => d.operatorId);
+  const employeeIds = details.map((d) => d.employeeId);
 
-  // Duplicate check: same (operatorId, month, year) on a DIFFERENT header's details
+  // Duplicate check: same (employeeId, month, year) on a DIFFERENT header's details
   const existingDetails = await db
-    .select({ operatorId: salaryDetailTable.operatorId, headerId: salaryDetailTable.headerId })
+    .select({ employeeId: salaryDetailTable.employeeId, headerId: salaryDetailTable.headerId })
     .from(salaryDetailTable)
     .where(
       and(
         eq(salaryDetailTable.month, month),
         eq(salaryDetailTable.year, year),
-        inArray(salaryDetailTable.operatorId, operatorIds)
+        inArray(salaryDetailTable.employeeId, employeeIds)
       )
     );
 
   const conflicts = existingDetails.filter((e) => e.headerId !== id);
   if (conflicts.length > 0) {
     const ops = await db
-      .select({ id: machineOperatorMasterTable.id, name: machineOperatorMasterTable.name })
-      .from(machineOperatorMasterTable)
-      .where(inArray(machineOperatorMasterTable.id, conflicts.map((e) => e.operatorId)));
+      .select({ id: employeeMasterTable.id, name: employeeMasterTable.name })
+      .from(employeeMasterTable)
+      .where(inArray(employeeMasterTable.id, conflicts.map((e) => e.employeeId)));
     const names = ops.map((o) => o.name).join(", ");
     res.status(409).json({ error: `Duplicate: salary already entered for ${names} in ${month}/${year}` });
     return;
@@ -246,11 +246,11 @@ router.put("/salary-entries/:id", async (req, res): Promise<void> => {
 
   const detailRows = details.map((d) => ({
     headerId: id,
-    operatorId: d.operatorId,
+    employeeId: d.employeeId,
     month,
     year,
     departmentId: d.departmentId ?? null,
-    operatorName: d.operatorName,
+    employeeName: d.employeeName,
     basicSalary: String(toNum(d.basicSalary)),
     otRateHr: String(toNum(d.otRateHr)),
     attAllowance: String(toNum(d.attAllowance)),

@@ -28,8 +28,8 @@ export interface DailyProductionSummaryRow {
   id: number;
   machineId: number;
   machineName: string | null;
-  operatorId: number;
-  operatorName: string | null;
+  employeeId: number;
+  employeeName: string | null;
   partyId: number;
   partyName: string | null;
   shift: Shift;
@@ -50,8 +50,8 @@ export interface UnreconciledProductionRow {
   productionDate: string;
   machineId: number;
   machineName: string | null;
-  operatorId: number;
-  operatorName: string | null;
+  employeeId: number;
+  employeeName: string | null;
   partyId: number;
   partyName: string | null;
   shift: Shift;
@@ -79,7 +79,7 @@ export interface DailyProductionDetailResponse {
   id: number;
   productionDate: string;
   machineId: number;
-  operatorId: number;
+  employeeId: number;
   partyId: number;
   shift: Shift;
   status: string;
@@ -94,7 +94,7 @@ export interface DailyProductionDetailResponse {
 export interface DailyProductionPayload {
   productionDate: string;
   machineId: number;
-  operatorId: number;
+  employeeId: number;
   partyId: number;
   shift: Shift;
   remarks?: string | null;
