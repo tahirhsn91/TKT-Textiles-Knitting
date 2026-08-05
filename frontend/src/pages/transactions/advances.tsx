@@ -61,11 +61,9 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function firstDayOfLastMonth() {
+function firstDayOfThisMonth() {
   const d = new Date();
-  // Month 0-based: going back one month and forcing day 1 handles January
-  // correctly (Dec of the previous year) via Date's overflow rollover.
-  return `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}-01`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
 interface EmployeeLookup {
@@ -201,9 +199,8 @@ export default function AdvancesPage() {
                   <DateInput
                     className="h-11 w-full sm:h-9 sm:w-40"
                     value={form.date}
-                    // Only the current month and the previous one are selectable
-                    // — advances older than last month are out of scope.
-                    min={firstDayOfLastMonth()}
+                    // Advances are recorded for the current month only.
+                    min={firstDayOfThisMonth()}
                     max={todayStr()}
                     onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
                   />
