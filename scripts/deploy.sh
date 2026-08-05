@@ -43,7 +43,7 @@ echo "ALLOWED_ORIGINS OK: $ACTUAL_ORIGINS"
 # Verify DB schema matches migrations — fail loudly instead of deploying broken features
 # (prevents the yarn-receipt incident: code deployed but tables missing in heliumdb_prod)
 echo "Verifying DB schema against migrations..."
-EXPECTED_TABLES=$(grep -hoP 'CREATE TABLE "\K[^"]+' "$PROJECT_DIR/database/migrations"/*.sql 2>/dev/null | sort -u)
+EXPECTED_TABLES=$(grep -hoP 'CREATE TABLE (?:IF NOT EXISTS )?"\K[^"]+' "$PROJECT_DIR/database/migrations"/*.sql 2>/dev/null | sort -u)
 MISSING=""
 for t in $EXPECTED_TABLES; do
   EXISTS=$(docker exec "${COMPOSE_PROJECT}-postgres-1" psql -U postgres -d heliumdb_prod -tAc "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='$t'" 2>/dev/null)
