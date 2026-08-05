@@ -135,21 +135,22 @@ export default function MastersPage() {
         <Tabs value={activeTab} onValueChange={handleTabChange} defaultValue="transaction-type">
           {/* -mx-* + px-* lets the tab strip bleed to the screen edge and scroll
               horizontally instead of wrapping twelve triggers into a multi-row
-              block that pushes the table off the fold. Scrolls at every screen
-              size — never wraps, so the strip stays one clean row. */}
-          <TabsList className="-mx-4 flex h-auto w-auto max-w-none justify-start gap-1 overflow-x-auto px-4 sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
-            <TabsTrigger value="transaction-type">Transaction Type</TabsTrigger>
-            <TabsTrigger value="job">Job Types</TabsTrigger>
-            <TabsTrigger value="party">Parties</TabsTrigger>
-            <TabsTrigger value="machine">Machines</TabsTrigger>
-            <TabsTrigger value="location">Locations</TabsTrigger>
-            <TabsTrigger value="yarn-type">Yarn Type</TabsTrigger>
-            <TabsTrigger value="yarn-count">Yarn Count</TabsTrigger>
-            <TabsTrigger value="yarn-brand">Yarn Brand</TabsTrigger>
-            <TabsTrigger value="uom">UOM</TabsTrigger>
-            <TabsTrigger value="fabric-type">Fabric Type</TabsTrigger>
-            <TabsTrigger value="department">Departments</TabsTrigger>
-            <TabsTrigger value="operator">Operators</TabsTrigger>
+              block that pushes the table off the fold. On desktop the triggers
+              grow equally (flex-1) so the strip spans the full width edge to
+              edge; on a phone it stays a scrollable single row. */}
+          <TabsList className="-mx-4 flex h-auto w-auto max-w-none justify-start gap-1 overflow-x-auto px-4 sm:mx-0 sm:w-full sm:px-2 [&::-webkit-scrollbar]:hidden">
+            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="transaction-type">Transaction Type</TabsTrigger>
+            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="job">Job Types</TabsTrigger>
+            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="party">Parties</TabsTrigger>
+            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="machine">Machines</TabsTrigger>
+            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="location">Locations</TabsTrigger>
+            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="yarn-type">Yarn Type</TabsTrigger>
+            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="yarn-count">Yarn Count</TabsTrigger>
+            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="yarn-brand">Yarn Brand</TabsTrigger>
+            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="uom">UOM</TabsTrigger>
+            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="fabric-type">Fabric Type</TabsTrigger>
+            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="department">Departments</TabsTrigger>
+            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="operator">Operators</TabsTrigger>
           </TabsList>
 
           <TabsContent value="transaction-type" className="mt-4"><TransactionTypeTab /></TabsContent>
