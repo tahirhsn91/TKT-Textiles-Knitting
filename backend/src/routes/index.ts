@@ -8,6 +8,7 @@ import operatorsRouter from "./operators.js";
 import salaryEntriesRouter from "./salary-entries.js";
 import dashboardRouter from "./dashboard.js";
 import dailyProductionRouter from "./daily-production.js";
+import yarnReceiptsRouter from "./yarn-receipts.js";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(operatorsRouter);
 router.use(salaryEntriesRouter);
 router.use(dashboardRouter);
 router.use(dailyProductionRouter);
+router.use(yarnReceiptsRouter);
 
 export default router;

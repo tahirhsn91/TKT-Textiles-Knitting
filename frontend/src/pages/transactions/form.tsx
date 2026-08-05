@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Plus, Trash2, ArrowLeft, Lock, Loader2 } from "lucide-react";
 import { useUnreconciledProduction } from "@/hooks/use-daily-production";
+import { useUnreconciledYarnReceipts } from "@/hooks/use-yarn-receipts";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 
@@ -38,14 +39,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { DatePicker } from "@/components/ui/date-picker";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -163,6 +156,8 @@ export default function TransactionForm() {
 
   const isFabricProduction =
     transactionTypeMaster?.find((t) => t.id === watchedTypeId)?.code === "Fabric_Production";
+  const isYarnReceipt =
+    transactionTypeMaster?.find((t) => t.id === watchedTypeId)?.code === "Yarn_Receipt";
 
   const productionDateIso = watchedDate ? format(watchedDate, "yyyy-MM-dd") : "";
 
@@ -174,6 +169,7 @@ export default function TransactionForm() {
   // Ids claimed on save. Cleared whenever the date/party combination changes so
   // a transaction can never carry ids from a combination the user moved away from.
   const [reconcileIds, setReconcileIds] = useState<number[]>([]);
+  const [reconcileReceiptIds, setReconcileReceiptIds] = useState<number[]>([]);
 
   // Auto-fill runs once per date+party pair. Without this guard every
   // background refetch would overwrite line items the user had already edited.
@@ -218,6 +214,52 @@ export default function TransactionForm() {
     setReconcileIds(unreconciled.rows.map((p) => p.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFabricProduction, isEditing, productionDateIso, watchedPartyId, unreconciled, loadingProduction]);
+
+  const { data: unreconciledReceipts, isFetching: loadingReceipts } = useUnreconciledYarnReceipts(
+    isYarnReceipt && !isEditing ? productionDateIso : "",
+    isYarnReceipt && !isEditing ? watchedPartyId : null,
+  );
+
+  const filledReceiptsFor = useRef<string | null>(null);
+
+  // Same auto-fill guard as the production flow, for Yarn Receipt types:
+  // one detail line per receipt line (yarn count, bags, net weight). The
+  // receipt header ids are stashed for the save-time claim.
+  useEffect(() => {
+    if (!isYarnReceipt || isEditing) {
+      filledReceiptsFor.current = null;
+      if (reconcileReceiptIds.length > 0) setReconcileReceiptIds([]);
+      return;
+    }
+
+    const key = `${productionDateIso}|${watchedPartyId ?? ""}`;
+    if (filledReceiptsFor.current === key) return;
+    if (!unreconciledReceipts || loadingReceipts) return;
+
+    filledReceiptsFor.current = key;
+
+    if (unreconciledReceipts.rows.length === 0) {
+      setReconcileReceiptIds([]);
+      return;
+    }
+
+    form.setValue(
+      "details",
+      unreconciledReceipts.rows.map((r) => ({
+        machineId: null,
+        machineOperatorId: null,
+        yarnTypeId: null,
+        yarnCountId: r.yarnCountId,
+        yarnBrandId: null,
+        uomId: null,
+        quantity: String(r.quantity),
+        netWt: r.netWeight,
+      })),
+      { shouldDirty: true },
+    );
+    setReconcileReceiptIds(unreconciledReceipts.receiptIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isYarnReceipt, isEditing, productionDateIso, watchedPartyId, unreconciledReceipts, loadingReceipts]);
 
   const runTotals = useMemo(() => {
     const result: number[] = [];
@@ -353,6 +395,7 @@ export default function TransactionForm() {
       const createPayload = {
         ...payload,
         ...(reconcileIds.length > 0 ? { reconcileProductionIds: reconcileIds } : {}),
+        ...(reconcileReceiptIds.length > 0 ? { reconcileReceiptIds } : {}),
       } as typeof payload;
 
       createTx.mutate(
@@ -363,10 +406,13 @@ export default function TransactionForm() {
               title: "Transaction created",
               description: reconcileIds.length > 0
                 ? `${reconcileIds.length} production ${reconcileIds.length === 1 ? "entry" : "entries"} reconciled and locked.`
-                : undefined,
+                : reconcileReceiptIds.length > 0
+                  ? `${reconcileReceiptIds.length} yarn receipt${reconcileReceiptIds.length === 1 ? "" : "s"} consumed and locked.`
+                  : undefined,
             });
             queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() });
             queryClient.invalidateQueries({ queryKey: ["/api/daily-production"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/yarn-receipts"] });
             setLocation("/transactions");
           },
           onError: (err) => {
@@ -375,7 +421,9 @@ export default function TransactionForm() {
             const status = (err as { status?: number })?.status;
             const detail = (err as { data?: { error?: string } })?.data?.error;
             toast({
-              title: status === 409 ? "Production already reconciled" : "Failed to create transaction",
+              title: status === 409
+                ? (isYarnReceipt ? "Receipts already booked" : "Production already reconciled")
+                : "Failed to create transaction",
               description: detail,
               variant: "destructive",
             });
@@ -458,22 +506,18 @@ export default function TransactionForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Transaction Type *</FormLabel>
-                        <Select
-                          key={field.value?.toString() || "unset"}
-                          onValueChange={(val) => field.onChange(parseInt(val))}
-                          value={field.value?.toString() || ""}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select transaction type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
+                        <FormControl>
+                          <select
+                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                            value={field.value?.toString() ?? ""}
+                            onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                          >
+                            <option value="" disabled>Select transaction type</option>
                             {transactionTypeMaster?.map(t => (
-                              <SelectItem key={`type-${t.id}`} value={t.id.toString()}>{t.name}</SelectItem>
+                              <option key={`type-${t.id}`} value={t.id.toString()}>{t.name}</option>
                             ))}
-                          </SelectContent>
-                        </Select>
+                          </select>
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -483,9 +527,20 @@ export default function TransactionForm() {
                     control={form.control}
                     name="date"
                     render={({ field }) => (
-                      <FormItem className="flex flex-col pt-2">
-                        <FormLabel className="mb-1.5">Date *</FormLabel>
-                        <DatePicker date={field.value} setDate={field.onChange} />
+                      <FormItem>
+                        <FormLabel>Date *</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            className="h-9"
+                            value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
+                            onChange={(e) =>
+                              field.onChange(
+                                e.target.value ? new Date(e.target.value + "T00:00:00") : undefined,
+                              )
+                            }
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -511,23 +566,18 @@ export default function TransactionForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Party</FormLabel>
-                        <Select
-                          key={field.value?.toString() || "none"}
-                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
-                          value={field.value?.toString() || "none"}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select party" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
+                        <FormControl>
+                          <select
+                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                            value={field.value?.toString() ?? "none"}
+                            onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
+                          >
+                            <option value="none">None</option>
                             {partyMaster?.map(p => (
-                              <SelectItem key={`party-${p.id}`} value={p.id.toString()}>{p.name}</SelectItem>
+                              <option key={`party-${p.id}`} value={p.id.toString()}>{p.name}</option>
                             ))}
-                          </SelectContent>
-                        </Select>
+                          </select>
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -542,23 +592,18 @@ export default function TransactionForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Job Type</FormLabel>
-                        <Select
-                          key={`${watchedPartyId}-${field.value?.toString() || "none"}`}
-                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
-                          value={field.value?.toString() || "none"}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder={watchedPartyId ? "Select job" : "Select party first"} />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
+                        <FormControl>
+                          <select
+                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                            value={field.value?.toString() ?? "none"}
+                            onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
+                          >
+                            <option value="none">None</option>
                             {filteredJobMaster?.map(j => (
-                              <SelectItem key={`job-${j.id}`} value={j.id.toString()}>{j.name}</SelectItem>
+                              <option key={`job-${j.id}`} value={j.id.toString()}>{j.name}</option>
                             ))}
-                          </SelectContent>
-                        </Select>
+                          </select>
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -570,23 +615,18 @@ export default function TransactionForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Location</FormLabel>
-                        <Select
-                          key={field.value?.toString() || "none"}
-                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
-                          value={field.value?.toString() || "none"}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select location" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
+                        <FormControl>
+                          <select
+                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                            value={field.value?.toString() ?? "none"}
+                            onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
+                          >
+                            <option value="none">None</option>
                             {locationMaster?.map(l => (
-                              <SelectItem key={`loc-${l.id}`} value={l.id.toString()}>{l.name}</SelectItem>
+                              <option key={`loc-${l.id}`} value={l.id.toString()}>{l.name}</option>
                             ))}
-                          </SelectContent>
-                        </Select>
+                          </select>
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -620,23 +660,18 @@ export default function TransactionForm() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Fabric Type</FormLabel>
-                        <Select
-                          key={field.value?.toString() || "none"}
-                          onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
-                          value={field.value?.toString() || "none"}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select fabric type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
+                        <FormControl>
+                          <select
+                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                            value={field.value?.toString() ?? "none"}
+                            onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
+                          >
+                            <option value="none">None</option>
                             {fabricTypeMaster?.map(f => (
-                              <SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>
+                              <option key={f.id} value={f.id.toString()}>{f.name}</option>
                             ))}
-                          </SelectContent>
-                        </Select>
+                          </select>
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -728,6 +763,34 @@ export default function TransactionForm() {
                   </div>
                 )}
 
+                {/* Yarn Receipt reconciliation status — same honest warning
+                    as production: saving consumes (locks) these receipts. */}
+                {isYarnReceipt && !isEditing && (
+                  <div className="mt-2 rounded-md border border-yellow-300 bg-yellow-100 px-3 py-2 text-sm text-yellow-900 dark:border-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-200">
+                    {loadingReceipts ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Loading yarn receipts for this date and party…
+                      </span>
+                    ) : !watchedPartyId ? (
+                      "Choose a party to load that day's yarn receipts."
+                    ) : reconcileReceiptIds.length > 0 ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Lock className="h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          Loaded <span className="num font-medium">{reconcileReceiptIds.length}</span>{" "}
+                          yarn receipt{reconcileReceiptIds.length === 1 ? "" : "s"} into the lines
+                          below. Saving consumes {reconcileReceiptIds.length === 1 ? "it" : "them"} permanently
+                          — {reconcileReceiptIds.length === 1 ? "it" : "they"} can't be booked into another
+                          transaction afterwards.
+                        </span>
+                      </span>
+                    ) : (
+                      "No unreconciled yarn receipts for this date and party. Anything recorded has already been booked into another transaction."
+                    )}
+                  </div>
+                )}
+
                 <div className="text-sm font-bold text-foreground mt-1">
                   Total_Net Wt.:&nbsp;
                   {(watchedDetails?.reduce((s, d) => s + (parseFloat(d?.netWt?.toString() ?? "0") || 0), 0) ?? 0).toFixed(3)}
@@ -763,22 +826,18 @@ export default function TransactionForm() {
                             name={`details.${index}.yarnTypeId`}
                             render={({ field }) => (
                               <FormItem>
-                                <Select
-                                  onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
-                                  value={field.value?.toString() || "none"}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger className="h-9">
-                                      <SelectValue placeholder="Type" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
+                                <FormControl>
+                                  <select
+                                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={field.value?.toString() ?? "none"}
+                                    onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
+                                  >
+                                    <option value="none">None</option>
                                     {yarnTypeMaster?.map(y => (
-                                      <SelectItem key={y.id} value={y.id.toString()}>{y.name}</SelectItem>
+                                      <option key={y.id} value={y.id.toString()}>{y.name}</option>
                                     ))}
-                                  </SelectContent>
-                                </Select>
+                                  </select>
+                                </FormControl>
                               </FormItem>
                             )}
                           />
@@ -788,24 +847,20 @@ export default function TransactionForm() {
                             name={`details.${index}.yarnCountId`}
                             render={({ field }) => (
                               <FormItem>
-                                <Select
-                                  onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
-                                  value={field.value?.toString() || "none"}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger className="h-9">
-                                      <SelectValue placeholder="Count" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
+                                <FormControl>
+                                  <select
+                                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={field.value?.toString() ?? "none"}
+                                    onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
+                                  >
+                                    <option value="none">None</option>
                                     {yarnCountMaster?.map(y => (
-                                      <SelectItem key={y.id} value={y.id.toString()}>
+                                      <option key={y.id} value={y.id.toString()}>
                                         {y.name === y.count ? y.name : `${y.name} (${y.count})`}
-                                      </SelectItem>
+                                      </option>
                                     ))}
-                                  </SelectContent>
-                                </Select>
+                                  </select>
+                                </FormControl>
                               </FormItem>
                             )}
                           />
@@ -815,22 +870,18 @@ export default function TransactionForm() {
                             name={`details.${index}.yarnBrandId`}
                             render={({ field }) => (
                               <FormItem>
-                                <Select
-                                  onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
-                                  value={field.value?.toString() || "none"}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger className="h-9">
-                                      <SelectValue placeholder="Brand" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
+                                <FormControl>
+                                  <select
+                                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={field.value?.toString() ?? "none"}
+                                    onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
+                                  >
+                                    <option value="none">None</option>
                                     {yarnBrandMaster?.map(y => (
-                                      <SelectItem key={y.id} value={y.id.toString()}>{y.name}</SelectItem>
+                                      <option key={y.id} value={y.id.toString()}>{y.name}</option>
                                     ))}
-                                  </SelectContent>
-                                </Select>
+                                  </select>
+                                </FormControl>
                               </FormItem>
                             )}
                           />
@@ -840,22 +891,18 @@ export default function TransactionForm() {
                             name={`details.${index}.uomId`}
                             render={({ field }) => (
                               <FormItem>
-                                <Select
-                                  onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
-                                  value={field.value?.toString() || "none"}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger className="h-9">
-                                      <SelectValue placeholder="UOM" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
+                                <FormControl>
+                                  <select
+                                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={field.value?.toString() ?? "none"}
+                                    onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
+                                  >
+                                    <option value="none">None</option>
                                     {uomMaster?.map(u => (
-                                      <SelectItem key={u.id} value={u.id.toString()}>{u.abbreviation}</SelectItem>
+                                      <option key={u.id} value={u.id.toString()}>{u.abbreviation}</option>
                                     ))}
-                                  </SelectContent>
-                                </Select>
+                                  </select>
+                                </FormControl>
                               </FormItem>
                             )}
                           />
@@ -865,24 +912,20 @@ export default function TransactionForm() {
                             name={`details.${index}.machineId`}
                             render={({ field }) => (
                               <FormItem>
-                                <Select
-                                  onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
-                                  value={field.value?.toString() || "none"}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger className="h-9">
-                                      <SelectValue placeholder="Select machine" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
+                                <FormControl>
+                                  <select
+                                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={field.value?.toString() ?? "none"}
+                                    onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
+                                  >
+                                    <option value="none">None</option>
                                     {machineMaster?.map(m => (
-                                      <SelectItem key={m.id} value={m.id.toString()}>
+                                      <option key={m.id} value={m.id.toString()}>
                                         {m.name}
-                                      </SelectItem>
+                                      </option>
                                     ))}
-                                  </SelectContent>
-                                </Select>
+                                  </select>
+                                </FormControl>
                               </FormItem>
                             )}
                           />
@@ -892,26 +935,22 @@ export default function TransactionForm() {
                             name={`details.${index}.machineOperatorId`}
                             render={({ field }) => (
                               <FormItem>
-                                <Select
-                                  onValueChange={(val) => field.onChange(val === "none" ? null : parseInt(val))}
-                                  value={field.value?.toString() || "none"}
-                                >
-                                  <FormControl>
-                                    <SelectTrigger className="h-9">
-                                      <SelectValue placeholder="Select operator" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
+                                <FormControl>
+                                  <select
+                                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={field.value?.toString() ?? "none"}
+                                    onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
+                                  >
+                                    <option value="none">None</option>
                                     {machineOperatorMaster
                                       ?.filter(op => (op as { active?: boolean }).active !== false || op.id === field.value)
                                       .map(op => (
-                                        <SelectItem key={op.id} value={op.id.toString()}>
+                                        <option key={op.id} value={op.id.toString()}>
                                           {op.name}
-                                        </SelectItem>
+                                        </option>
                                       ))}
-                                  </SelectContent>
-                                </Select>
+                                  </select>
+                                </FormControl>
                               </FormItem>
                             )}
                           />

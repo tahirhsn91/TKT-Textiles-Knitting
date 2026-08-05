@@ -105,6 +105,8 @@ export function Layout({ children }: { children: ReactNode }) {
 
   const transactionsActive = location.startsWith("/transactions");
   const reportsActive = location.startsWith("/reports");
+  const dailyProductionActive = location.startsWith("/daily-production");
+  const yarnReceiptsActive = location.startsWith("/yarn-receipts");
 
   return (
     <div className="min-h-[100dvh] w-full bg-background">
@@ -155,13 +157,24 @@ export function Layout({ children }: { children: ReactNode }) {
 
           {!collapsed && <NavSection label="Daily Work" />}
           <div className={cn("flex flex-col gap-0.5", collapsed && "pt-1")}>
-            <DesktopItem
-              href="/daily-production"
-              label="Daily Production"
+            <DesktopGroup
+              label="Daily Operations"
               icon={ClipboardList}
-              active={isItemActive(location, "/daily-production")}
+              primary="/daily-production"
+              active={dailyProductionActive || yarnReceiptsActive}
               collapsed={collapsed}
-            />
+            >
+              <SubItem
+                href="/daily-production"
+                label="Daily Production"
+                active={isSubItemActive(location, "/daily-production")}
+              />
+              <SubItem
+                href="/yarn-receipts"
+                label="Yarn Receipts"
+                active={isSubItemActive(location, "/yarn-receipts")}
+              />
+            </DesktopGroup>
             <DesktopGroup
               label="Transactions"
               icon={FileText}
@@ -249,17 +262,14 @@ export function Layout({ children }: { children: ReactNode }) {
                 ))}
 
                 <NavSection label="Daily Work" />
-                <Link href="/daily-production" onClick={() => setMobileOpen(false)}>
-                  <span className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-                    isItemActive(location, "/daily-production")
-                      ? "selvedge bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
-                  )}>
-                    <ClipboardList className="h-4 w-4" />
-                    Daily Production
-                  </span>
-                </Link>
+                <MobileGroup label="Daily Operations" icon={ClipboardList} active={dailyProductionActive || yarnReceiptsActive}>
+                  <Link href="/daily-production" onClick={() => setMobileOpen(false)}>
+                    <SubLabel label="Daily Production" active={isSubItemActive(location, "/daily-production")} />
+                  </Link>
+                  <Link href="/yarn-receipts" onClick={() => setMobileOpen(false)}>
+                    <SubLabel label="Yarn Receipts" active={isSubItemActive(location, "/yarn-receipts")} />
+                  </Link>
+                </MobileGroup>
                 <MobileGroup label="Transactions" icon={FileText} active={transactionsActive}>
                   {transactionItems.map((item) => (
                     <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}>
