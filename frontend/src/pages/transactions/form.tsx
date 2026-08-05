@@ -962,19 +962,18 @@ export default function TransactionForm() {
                           {index + 1}
                         </span>
                         <div className="flex items-center gap-1">
-                          {index > 0 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-11 w-11 text-muted-foreground hover:text-foreground"
-                              onClick={() => copyFromAbove(index)}
-                              aria-label={`Copy dropdowns from line ${index}`}
-                              title={`Copy dropdowns from line ${index}`}
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-11 w-11 text-muted-foreground hover:text-foreground disabled:opacity-30"
+                            onClick={() => copyFromAbove(index)}
+                            disabled={index === 0}
+                            aria-label={index > 0 ? `Copy dropdowns from line ${index}` : "No row above to copy from"}
+                            title={index > 0 ? `Copy dropdowns from line ${index}` : "No row above to copy from"}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
                           <Button
                             type="button"
                             variant="ghost"
@@ -1414,19 +1413,18 @@ export default function TransactionForm() {
 
                           <div className="pl-2">
                             <div className="flex items-center justify-end gap-1">
-                              {index > 0 && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-11 w-11 text-muted-foreground hover:text-foreground shrink-0 sm:h-8 sm:w-8"
-                                  onClick={() => copyFromAbove(index)}
-                                  aria-label={`Copy dropdowns from line ${index}`}
-                                  title={`Copy dropdowns from line ${index}`}
-                                >
-                                  <Copy className="h-4 w-4" />
-                                </Button>
-                              )}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-11 w-11 text-muted-foreground hover:text-foreground disabled:opacity-30 shrink-0 sm:h-8 sm:w-8"
+                                onClick={() => copyFromAbove(index)}
+                                disabled={index === 0}
+                                aria-label={index > 0 ? `Copy dropdowns from line ${index}` : "No row above to copy from"}
+                                title={index > 0 ? `Copy dropdowns from line ${index}` : "No row above to copy from"}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
                               <Button
                                 type="button"
                                 variant="ghost"
