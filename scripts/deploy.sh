@@ -40,6 +40,26 @@ if ! echo "$ACTUAL_ORIGINS" | grep -q "$REQUIRED_ORIGIN"; then
 fi
 echo "ALLOWED_ORIGINS OK: $ACTUAL_ORIGINS"
 
+# Verify DB schema matches migrations — fail loudly instead of deploying broken features
+# (prevents the yarn-receipt incident: code deployed but tables missing in heliumdb_prod)
+echo "Verifying DB schema against migrations..."
+EXPECTED_TABLES=$(grep -hoP 'CREATE TABLE "\K[^"]+' "$PROJECT_DIR/database/migrations"/*.sql 2>/dev/null | sort -u)
+MISSING=""
+for t in $EXPECTED_TABLES; do
+  EXISTS=$(docker exec "${COMPOSE_PROJECT}-postgres-1" psql -U postgres -d heliumdb_prod -tAc "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='$t'" 2>/dev/null)
+  if [ "$EXISTS" != "1" ]; then
+    MISSING="$MISSING $t"
+  fi
+done
+if [ -n "$MISSING" ]; then
+  echo "ERROR: tables missing in heliumdb_prod:$MISSING"
+  echo "Apply the pending migration first, e.g.:"
+  echo "  docker compose --env-file .env.prod -p ${COMPOSE_PROJECT} exec -T backend npx drizzle-kit push"
+  echo "(or apply the SQL in database/migrations manually to heliumdb_prod)"
+  exit 1
+fi
+echo "DB schema OK: all $(echo $EXPECTED_TABLES | wc -w) migration tables present"
+
 # Quick frontend check
 sleep 2
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:1001)
