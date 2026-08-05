@@ -414,6 +414,25 @@ export default function TransactionForm() {
   }, [transaction, isEditing, lookupsReady, form]);
 
   const onSubmit = (values: FormValues) => {
+    // P7: block save when any line has a non-positive quantity or net weight.
+    // Blank is allowed ("None" rows), but a typed zero/negative is a typo the
+    // floor should catch before it hits the books.
+    const badLines: number[] = [];
+    values.details.forEach((d, i) => {
+      const qty = d.quantity;
+      const wt = d.netWt;
+      if (qty !== null && qty !== undefined && qty !== "" && !(Number(qty) > 0)) badLines.push(i);
+      if (wt !== null && wt !== undefined && wt !== "" && !(Number(wt) > 0)) badLines.push(i);
+    });
+    if (badLines.length > 0) {
+      const shown = [...new Set(badLines)].slice(0, 3);
+      setLineError(
+        `Line ${shown.map((i) => i + 1).join(", ")}${badLines.length > 3 ? "…" : ""} ${badLines.length === 1 ? "has" : "have"} a quantity or net weight that must be greater than zero.`,
+      );
+      return;
+    }
+    setLineError(null);
+
     const payload = {
       ...values,
       date: format(values.date, "yyyy-MM-dd"),
@@ -490,6 +509,13 @@ export default function TransactionForm() {
   };
 
   const isPending = createTx.isPending || updateTx.isPending;
+
+  // P7: per-form line validation message, cleared on the next submit.
+  const [lineError, setLineError] = useState<string | null>(null);
+  useEffect(() => {
+    if (lineError) setLineError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedDetails]);
 
   const lineItemsRef = useRef<HTMLDivElement>(null);
 
@@ -880,7 +906,239 @@ export default function TransactionForm() {
                 </div>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
+                {/* Mobile: one stacked card per line — the 11-column
+                    spreadsheet is unusable on a phone. Desktop (sm+) keeps
+                    the frozen-header grid below. */}
+                <div className="space-y-3 p-4 sm:hidden">
+                  {fields.length === 0 && (
+                    <p className="rounded-md border py-6 text-center text-sm text-muted-foreground">
+                      No line items yet. Add a row to get started.
+                    </p>
+                  )}
+                  {fields.map((field, index) => (
+                    <div key={field.id} className="rounded-md border p-3">
+                      <div className="flex items-center justify-between">
+                        <span className="num inline-flex h-6 min-w-6 items-center justify-center rounded-sm border border-border bg-muted px-1.5 text-xs text-muted-foreground">
+                          {index + 1}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-11 w-11 text-muted-foreground hover:text-destructive"
+                          onClick={() => remove(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <FormField
+                          control={form.control}
+                          name={`details.${index}.yarnTypeId`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <label className="mb-1 block text-xs font-medium text-muted-foreground">Yarn Type</label>
+                              <FormControl>
+                                <select
+                                  className="h-11 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                  value={field.value?.toString() ?? "none"}
+                                  onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
+                                >
+                                  <option value="none">None</option>
+                                  {yarnTypeMaster?.map(y => (
+                                    <option key={y.id} value={y.id.toString()}>{y.name}</option>
+                                  ))}
+                                </select>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name={`details.${index}.yarnCountId`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <label className="mb-1 block text-xs font-medium text-muted-foreground">Yarn Count</label>
+                              <FormControl>
+                                <select
+                                  className="h-11 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                  value={field.value?.toString() ?? "none"}
+                                  onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
+                                >
+                                  <option value="none">None</option>
+                                  {yarnCountMaster?.map(y => (
+                                    <option key={y.id} value={y.id.toString()}>
+                                      {y.name === y.count ? y.name : `${y.name} (${y.count})`}
+                                    </option>
+                                  ))}
+                                </select>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name={`details.${index}.yarnBrandId`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <label className="mb-1 block text-xs font-medium text-muted-foreground">Yarn Brand</label>
+                              <FormControl>
+                                <select
+                                  className="h-11 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                  value={field.value?.toString() ?? "none"}
+                                  onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
+                                >
+                                  <option value="none">None</option>
+                                  {yarnBrandMaster?.map(y => (
+                                    <option key={y.id} value={y.id.toString()}>{y.name}</option>
+                                  ))}
+                                </select>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name={`details.${index}.uomId`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <label className="mb-1 block text-xs font-medium text-muted-foreground">UOM</label>
+                              <FormControl>
+                                <select
+                                  className="h-11 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                  value={field.value?.toString() ?? "none"}
+                                  onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
+                                >
+                                  <option value="none">None</option>
+                                  {uomMaster?.map(u => (
+                                    <option key={u.id} value={u.id.toString()}>{u.abbreviation}</option>
+                                  ))}
+                                </select>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name={`details.${index}.machineId`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <label className="mb-1 block text-xs font-medium text-muted-foreground">Machine</label>
+                              <FormControl>
+                                <select
+                                  className="h-11 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                  value={field.value?.toString() ?? "none"}
+                                  onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
+                                >
+                                  <option value="none">None</option>
+                                  {machineMaster?.map(m => (
+                                    <option key={m.id} value={m.id.toString()}>{m.name}</option>
+                                  ))}
+                                </select>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name={`details.${index}.employeeId`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <label className="mb-1 block text-xs font-medium text-muted-foreground">Machine Employee</label>
+                              <FormControl>
+                                <select
+                                  className="h-11 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                                  value={field.value?.toString() ?? "none"}
+                                  onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
+                                >
+                                  <option value="none">None</option>
+                                  {employeeMaster
+                                    ?.filter(op => (op as { active?: boolean }).active !== false || op.id === field.value)
+                                    .map(op => (
+                                      <option key={op.id} value={op.id.toString()}>{op.name}</option>
+                                    ))}
+                                </select>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <FormField
+                          control={form.control}
+                          name={`details.${index}.quantity`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <label className="mb-1 block text-xs font-medium text-muted-foreground">Qty</label>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="any"
+                                  inputMode="decimal"
+                                  className="num h-11"
+                                  placeholder="Qty"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name={`details.${index}.netWt`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <label className="mb-1 block text-xs font-medium text-muted-foreground">Net Wt</label>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="any"
+                                  inputMode="decimal"
+                                  className="num h-11"
+                                  placeholder="Net Wt"
+                                  {...field}
+                                  value={field.value || ""}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <div className="rounded-md border border-input bg-muted px-3 py-2.5">
+                          <p className="text-xs text-muted-foreground">Run total</p>
+                          <p className="num text-sm font-medium">{(runTotals[index] ?? 0).toFixed(NUM_DECIMALS)}</p>
+                        </div>
+                        <div className="rounded-md border border-input bg-muted px-3 py-2.5">
+                          <p className="text-xs text-muted-foreground">M/c run total</p>
+                          <p className="num text-sm font-medium">{(mcRunTotals[index] ?? 0).toFixed(NUM_DECIMALS)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleAddRow}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Row
+                  </Button>
+                </div>
+
+                {/* Desktop spreadsheet — hidden on mobile */}
+                <div className="hidden overflow-x-auto sm:block">
                   <div className="min-w-[1560px]">
                     {/* Frozen column headers */}
                     <div className="px-4 pt-4 pb-2 border-b bg-card">
@@ -911,7 +1169,7 @@ export default function TransactionForm() {
                               <FormItem>
                                 <FormControl>
                                   <select
-                                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="h-11 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
                                     value={field.value?.toString() ?? "none"}
                                     onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
                                   >
@@ -932,7 +1190,7 @@ export default function TransactionForm() {
                               <FormItem>
                                 <FormControl>
                                   <select
-                                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="h-11 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
                                     value={field.value?.toString() ?? "none"}
                                     onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
                                   >
@@ -955,7 +1213,7 @@ export default function TransactionForm() {
                               <FormItem>
                                 <FormControl>
                                   <select
-                                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="h-11 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
                                     value={field.value?.toString() ?? "none"}
                                     onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
                                   >
@@ -976,7 +1234,7 @@ export default function TransactionForm() {
                               <FormItem>
                                 <FormControl>
                                   <select
-                                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="h-11 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
                                     value={field.value?.toString() ?? "none"}
                                     onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
                                   >
@@ -997,7 +1255,7 @@ export default function TransactionForm() {
                               <FormItem>
                                 <FormControl>
                                   <select
-                                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="h-11 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
                                     value={field.value?.toString() ?? "none"}
                                     onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
                                   >
@@ -1020,7 +1278,7 @@ export default function TransactionForm() {
                               <FormItem>
                                 <FormControl>
                                   <select
-                                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="h-11 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 sm:h-9"
                                     value={field.value?.toString() ?? "none"}
                                     onChange={(e) => field.onChange(e.target.value === "none" ? null : parseInt(e.target.value))}
                                   >
@@ -1047,7 +1305,8 @@ export default function TransactionForm() {
                                   <Input
                                     type="number"
                                     step="any"
-                                    className="h-9"
+                                    inputMode="decimal"
+                                    className="num h-11 sm:h-9"
                                     placeholder="Qty"
                                     data-qty-input="true"
                                     {...field}
@@ -1068,7 +1327,8 @@ export default function TransactionForm() {
                                   <Input
                                     type="number"
                                     step="any"
-                                    className="h-9"
+                                    inputMode="decimal"
+                                    className="num h-11 sm:h-9"
                                     placeholder="Net Wt"
                                     {...field}
                                     value={field.value || ""}
@@ -1078,11 +1338,11 @@ export default function TransactionForm() {
                             )}
                           />
 
-                          <div className="h-9 flex items-center px-3 rounded-md border border-input bg-muted text-sm font-medium text-muted-foreground">
+                          <div className="h-11 flex items-center px-3 rounded-md border border-input bg-muted text-sm font-medium text-muted-foreground sm:h-9">
                             {(runTotals[index] ?? 0).toFixed(NUM_DECIMALS)}
                           </div>
 
-                          <div className="h-9 flex items-center px-3 rounded-md border border-input bg-muted text-sm font-medium text-muted-foreground">
+                          <div className="h-11 flex items-center px-3 rounded-md border border-input bg-muted text-sm font-medium text-muted-foreground sm:h-9">
                             {(mcRunTotals[index] ?? 0).toFixed(NUM_DECIMALS)}
                           </div>
 
@@ -1090,7 +1350,7 @@ export default function TransactionForm() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9 text-muted-foreground hover:text-destructive shrink-0"
+                            className="h-11 w-11 text-muted-foreground hover:text-destructive shrink-0 sm:h-8 sm:w-8"
                             onClick={() => remove(index)}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -1104,13 +1364,20 @@ export default function TransactionForm() {
               </CardContent>
             </Card>
 
-            <div className="flex justify-end gap-4 pt-4 border-t">
-              <Button type="button" variant="outline" onClick={() => setLocation("/transactions")}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending ? "Saving..." : isEditing ? "Save Changes" : "Create Transaction"}
-              </Button>
+            {/* P8: sticky action bar — Save stays reachable on a phone even
+                with the header + line cards scrolled past. */}
+            <div className="sticky bottom-0 z-10 -mx-1 border-t bg-background/95 px-1 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+              {lineError && (
+                <p className="mb-2 text-sm font-medium text-destructive">{lineError}</p>
+              )}
+              <div className="flex justify-end gap-4">
+                <Button type="button" variant="outline" onClick={() => setLocation("/transactions")}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isPending}>
+                  {isPending ? "Saving..." : isEditing ? "Save Changes" : "Create Transaction"}
+                </Button>
+              </div>
             </div>
           </form>
         </Form>

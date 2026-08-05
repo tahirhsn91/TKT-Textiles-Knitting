@@ -593,7 +593,7 @@ function AdvancesTab() {
             <div className="flex flex-col gap-1">
               <Label>Employee</Label>
               <Select value={form.employeeId} onValueChange={(v) => setForm((p) => ({ ...p, employeeId: v }))}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="h-11 w-full sm:h-9 sm:w-48">
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
@@ -605,16 +605,16 @@ function AdvancesTab() {
             </div>
             <div className="flex flex-col gap-1">
               <Label>Date</Label>
-              <DateInput className="w-40" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
+              <DateInput className="h-11 w-full sm:h-9 sm:w-40" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
             </div>
             <div className="flex flex-col gap-1">
               <Label>Amount</Label>
-              <Input type="number" min="0" step="0.01" className="w-32" placeholder="0.00"
+              <Input type="number" min="0" step="0.01" inputMode="decimal" className="h-11 w-full sm:h-9 sm:w-32" placeholder="0.00"
                 value={form.amount} onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))} />
             </div>
             <div className="flex flex-col gap-1 flex-1 min-w-40">
               <Label>Notes (optional)</Label>
-              <Input placeholder="e.g. Festival advance" value={form.notes}
+              <Input className="h-11 sm:h-9" placeholder="e.g. Festival advance" value={form.notes}
                 onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
             </div>
             <Button onClick={handleAdd} disabled={addMutation.isPending}>
@@ -629,7 +629,7 @@ function AdvancesTab() {
           <CardTitle>Advance History</CardTitle>
           <div className="flex flex-wrap gap-4 mt-2">
             <Select value={filterOp} onValueChange={setFilterOp}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="h-11 w-full sm:h-9 sm:w-48">
                 <SelectValue placeholder="All employees" />
               </SelectTrigger>
               <SelectContent>
@@ -641,11 +641,11 @@ function AdvancesTab() {
             </Select>
             <div className="flex items-center gap-2">
               <Label className="text-xs">From</Label>
-              <DateInput className="w-36 h-8" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} />
+              <DateInput className="h-11 w-36 sm:h-8" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} />
             </div>
             <div className="flex items-center gap-2">
               <Label className="text-xs">To</Label>
-              <DateInput className="w-36 h-8" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
+              <DateInput className="h-11 w-36 sm:h-8" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
             </div>
           </div>
         </CardHeader>
@@ -860,7 +860,7 @@ function PayrollSummaryTab() {
           <div className="flex flex-col gap-1">
             <Label>Employee (optional)</Label>
             <Select value={employeeId} onValueChange={setEmployeeId}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="h-11 w-full sm:h-9 sm:w-48">
                 <SelectValue placeholder="All Employees" />
               </SelectTrigger>
               <SelectContent>
