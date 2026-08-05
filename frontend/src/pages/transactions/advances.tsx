@@ -37,6 +37,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AdvancesAnalytics } from "./advances-analytics";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -268,8 +270,16 @@ export default function AdvancesPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <Table>
+            <CardContent className="p-0">
+              <Tabs defaultValue="history">
+                <div className="border-b px-4 pt-3">
+                  <TabsList>
+                    <TabsTrigger value="history">History</TabsTrigger>
+                    <TabsTrigger value="analytics">Analytics</TabsTrigger>
+                  </TabsList>
+                </div>
+                <TabsContent value="history" className="mt-0">
+                  <Table>
                 <TableHeader>
                   <TableRow>
                     <SortableHead label="Date" sortKey="date" sort={advSort} onSort={toggleAdvSort} />
@@ -322,7 +332,17 @@ export default function AdvancesPage() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+                </Table>
+                </TabsContent>
+                <TabsContent value="analytics" className="mt-0 p-4">
+                  <AdvancesAnalytics
+                    advances={advances}
+                    month={filterMonth}
+                    year={filterYear}
+                    isLoading={isLoading}
+                  />
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </div>
