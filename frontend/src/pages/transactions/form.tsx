@@ -6,6 +6,7 @@ import * as z from "zod";
 import { Plus, Trash2, ArrowLeft, Lock, Loader2 } from "lucide-react";
 import { useUnreconciledProduction } from "@/hooks/use-daily-production";
 import { useUnreconciledYarnReceipts } from "@/hooks/use-yarn-receipts";
+import { useUnreconciledDailyDeliveries } from "@/hooks/use-daily-deliveries";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 
@@ -158,6 +159,8 @@ export default function TransactionForm() {
     transactionTypeMaster?.find((t) => t.id === watchedTypeId)?.code === "Fabric_Production";
   const isYarnReceipt =
     transactionTypeMaster?.find((t) => t.id === watchedTypeId)?.code === "Yarn_Receipt";
+  const isFabricDelivery =
+    transactionTypeMaster?.find((t) => t.id === watchedTypeId)?.code === "Fabric_Dispatch";
 
   const productionDateIso = watchedDate ? format(watchedDate, "yyyy-MM-dd") : "";
 
@@ -170,6 +173,7 @@ export default function TransactionForm() {
   // a transaction can never carry ids from a combination the user moved away from.
   const [reconcileIds, setReconcileIds] = useState<number[]>([]);
   const [reconcileReceiptIds, setReconcileReceiptIds] = useState<number[]>([]);
+  const [reconcileDeliveryIds, setReconcileDeliveryIds] = useState<number[]>([]);
 
   // Auto-fill runs once per date+party pair. Without this guard every
   // background refetch would overwrite line items the user had already edited.
@@ -260,6 +264,52 @@ export default function TransactionForm() {
     setReconcileReceiptIds(unreconciledReceipts.receiptIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isYarnReceipt, isEditing, productionDateIso, watchedPartyId, unreconciledReceipts, loadingReceipts]);
+
+  const { data: unreconciledDeliveries, isFetching: loadingDeliveries } = useUnreconciledDailyDeliveries(
+    isFabricDelivery && !isEditing ? productionDateIso : "",
+    isFabricDelivery && !isEditing ? watchedPartyId : null,
+  );
+
+  const filledDeliveriesFor = useRef<string | null>(null);
+
+  // Same auto-fill guard as the production/receipt flows, for Fabric Delivery
+  // types: one detail line per delivery (quantity = rolls, netWt = kg). The
+  // delivery ids are stashed for the save-time claim.
+  useEffect(() => {
+    if (!isFabricDelivery || isEditing) {
+      filledDeliveriesFor.current = null;
+      if (reconcileDeliveryIds.length > 0) setReconcileDeliveryIds([]);
+      return;
+    }
+
+    const key = `${productionDateIso}|${watchedPartyId ?? ""}`;
+    if (filledDeliveriesFor.current === key) return;
+    if (!unreconciledDeliveries || loadingDeliveries) return;
+
+    filledDeliveriesFor.current = key;
+
+    if (unreconciledDeliveries.rows.length === 0) {
+      setReconcileDeliveryIds([]);
+      return;
+    }
+
+    form.setValue(
+      "details",
+      unreconciledDeliveries.rows.map((d) => ({
+        machineId: null,
+        machineOperatorId: null,
+        yarnTypeId: null,
+        yarnCountId: null,
+        yarnBrandId: null,
+        uomId: null,
+        quantity: String(d.quantity),
+        netWt: d.netWeight,
+      })),
+      { shouldDirty: true },
+    );
+    setReconcileDeliveryIds(unreconciledDeliveries.rows.map((d) => d.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFabricDelivery, isEditing, productionDateIso, watchedPartyId, unreconciledDeliveries, loadingDeliveries]);
 
   const runTotals = useMemo(() => {
     const result: number[] = [];
@@ -396,6 +446,7 @@ export default function TransactionForm() {
         ...payload,
         ...(reconcileIds.length > 0 ? { reconcileProductionIds: reconcileIds } : {}),
         ...(reconcileReceiptIds.length > 0 ? { reconcileReceiptIds } : {}),
+        ...(reconcileDeliveryIds.length > 0 ? { reconcileDeliveryIds } : {}),
       } as typeof payload;
 
       createTx.mutate(
@@ -408,11 +459,14 @@ export default function TransactionForm() {
                 ? `${reconcileIds.length} production ${reconcileIds.length === 1 ? "entry" : "entries"} reconciled and locked.`
                 : reconcileReceiptIds.length > 0
                   ? `${reconcileReceiptIds.length} yarn receipt${reconcileReceiptIds.length === 1 ? "" : "s"} consumed and locked.`
-                  : undefined,
+                  : reconcileDeliveryIds.length > 0
+                    ? `${reconcileDeliveryIds.length} delivery${reconcileDeliveryIds.length === 1 ? "" : "ies"} consumed and locked.`
+                    : undefined,
             });
             queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() });
             queryClient.invalidateQueries({ queryKey: ["/api/daily-production"] });
             queryClient.invalidateQueries({ queryKey: ["/api/yarn-receipts"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/daily-deliveries"] });
             setLocation("/transactions");
           },
           onError: (err) => {
@@ -422,7 +476,7 @@ export default function TransactionForm() {
             const detail = (err as { data?: { error?: string } })?.data?.error;
             toast({
               title: status === 409
-                ? (isYarnReceipt ? "Receipts already booked" : "Production already reconciled")
+                ? (isYarnReceipt ? "Receipts already booked" : isFabricDelivery ? "Deliveries already booked" : "Production already reconciled")
                 : "Failed to create transaction",
               description: detail,
               variant: "destructive",
@@ -787,6 +841,34 @@ export default function TransactionForm() {
                       </span>
                     ) : (
                       "No unreconciled yarn receipts for this date and party. Anything recorded has already been booked into another transaction."
+                    )}
+                  </div>
+                )}
+
+                {/* Fabric Delivery status — same honest warning as the others:
+                    saving consumes (locks) these deliveries. */}
+                {isFabricDelivery && !isEditing && (
+                  <div className="mt-2 rounded-md border border-yellow-300 bg-yellow-100 px-3 py-2 text-sm text-yellow-900 dark:border-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-200">
+                    {loadingDeliveries ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Loading daily deliveries for this date and party…
+                      </span>
+                    ) : !watchedPartyId ? (
+                      "Choose a party to load that day's deliveries."
+                    ) : reconcileDeliveryIds.length > 0 ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Lock className="h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          Loaded <span className="num font-medium">{reconcileDeliveryIds.length}</span>{" "}
+                          delivery{reconcileDeliveryIds.length === 1 ? "" : "ies"} into the lines
+                          below. Saving consumes {reconcileDeliveryIds.length === 1 ? "it" : "them"} permanently
+                          — {reconcileDeliveryIds.length === 1 ? "it" : "they"} can't be booked into another
+                          transaction afterwards.
+                        </span>
+                      </span>
+                    ) : (
+                      "No unreconciled daily deliveries for this date and party. Anything recorded has already been booked into another transaction."
                     )}
                   </div>
                 )}

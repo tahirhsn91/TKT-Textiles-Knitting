@@ -5,6 +5,7 @@ import { db } from "../db/index.js";
 import {
   dailyProductionHeaderTable,
   yarnReceiptHeaderTable,
+  dailyDeliveryTable,
   transactionHeaderTable,
   transactionDetailTable,
   transactionTypeMasterTable,
@@ -37,6 +38,8 @@ const reconcileIdsSchema = z.object({
   reconcileProductionIds: z.array(z.number().int().positive()).optional(),
   /** Yarn receipts a Yarn Receipt transaction is claiming. */
   reconcileReceiptIds: z.array(z.number().int().positive()).optional(),
+  /** Daily deliveries a Fabric Delivery transaction is claiming. */
+  reconcileDeliveryIds: z.array(z.number().int().positive()).optional(),
 });
 
 function normalizeNumericString(v: string | null | undefined): string | null {
@@ -343,6 +346,7 @@ router.post("/transactions", async (req, res): Promise<void> => {
   }
   const reconcileIds = reconcile.data.reconcileProductionIds ?? [];
   const reconcileReceiptIds = reconcile.data.reconcileReceiptIds ?? [];
+  const reconcileDeliveryIds = reconcile.data.reconcileDeliveryIds ?? [];
 
   let conflict: { error: string } | null = null;
 
@@ -408,6 +412,31 @@ router.post("/transactions", async (req, res): Promise<void> => {
         conflict = {
           error:
             "Some of the selected yarn receipts were already booked into another transaction. Reload the receipts and try again.",
+        };
+        tx.rollback();
+      }
+    }
+
+    if (reconcileDeliveryIds.length > 0) {
+      // Same concurrency guard: claim only deliveries still free, roll back
+      // everything if any were already consumed.
+      const claimed = await tx
+        .update(dailyDeliveryTable)
+        .set({
+          reconciled: true,
+          reconciledTransactionId: header.id,
+          reconciledAt: new Date(),
+        })
+        .where(and(
+          inArray(dailyDeliveryTable.id, reconcileDeliveryIds),
+          eq(dailyDeliveryTable.reconciled, false),
+        ))
+        .returning({ id: dailyDeliveryTable.id });
+
+      if (claimed.length !== reconcileDeliveryIds.length) {
+        conflict = {
+          error:
+            "Some of the selected daily deliveries were already booked into another transaction. Reload the deliveries and try again.",
         };
         tx.rollback();
       }
