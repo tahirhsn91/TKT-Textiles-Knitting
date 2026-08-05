@@ -9,6 +9,7 @@ import salaryEntriesRouter from "./salary-entries.js";
 import dashboardRouter from "./dashboard.js";
 import dailyProductionRouter from "./daily-production.js";
 import yarnReceiptsRouter from "./yarn-receipts.js";
+import dailyDeliveriesRouter from "./daily-deliveries.js";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(salaryEntriesRouter);
 router.use(dashboardRouter);
 router.use(dailyProductionRouter);
 router.use(yarnReceiptsRouter);
+router.use(dailyDeliveriesRouter);
 
 export default router;
