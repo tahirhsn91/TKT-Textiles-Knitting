@@ -1137,12 +1137,13 @@ export default function TransactionForm() {
                   </Button>
                 </div>
 
-                {/* Desktop spreadsheet — hidden on mobile */}
-                <div className="hidden overflow-x-auto sm:block">
-                  <div className="min-w-[1560px]">
-                    {/* Frozen column headers */}
-                    <div className="px-4 pt-4 pb-2 border-b bg-card">
-                      <div className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_1.5fr_1.5fr_auto] gap-2 font-medium text-sm text-muted-foreground">
+                {/* Desktop spreadsheet — hidden on mobile. No min-width and no
+                    horizontal scroll: the grid fits the card. The two running
+                    totals share one stacked column so the selects keep usable
+                    width (11 columns were forcing a 1560px scroll). */}
+                <div className="hidden sm:block">
+                  <div className="px-4 pt-4 pb-2 border-b bg-card">
+                    <div className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1fr_1fr_1.5fr_auto] gap-2 font-medium text-sm text-muted-foreground">
                         <div>Yarn Type</div>
                         <div>Yarn Count</div>
                         <div>Yarn Brand</div>
@@ -1151,20 +1152,17 @@ export default function TransactionForm() {
                         <div>Machine Employee</div>
                         <div>Qty</div>
                         <div>Net Wt</div>
-                        <div>Run_Total</div>
-                        <div>M/c_Run_Total</div>
+                        <div>Run totals</div>
                         <div className="pl-2 text-right">Action</div>
                       </div>
                     </div>
 
-                    {/* Scrollable rows — 5 rows visible. overflow-x-clip keeps
-                        this a vertical-only scrollport so the sticky Action
-                        column pins to the outer horizontal scroller instead of
-                        being trapped here (same pattern as the list screens). */}
-                    <div className="overflow-y-auto overflow-x-clip max-h-[212px] px-4 py-2">
+                    {/* Scrollable rows — 5 rows visible. Vertical-only scroll;
+                        no horizontal scrollport exists anymore. */}
+                    <div className="overflow-y-auto max-h-[212px] px-4 py-2">
                     <div className="space-y-2" ref={lineItemsRef}>
                       {fields.map((field, index) => (
-                        <div key={field.id} className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_1.5fr_1.5fr_auto] gap-2 items-start">
+                        <div key={field.id} className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1fr_1fr_1.5fr_auto] gap-2 items-start">
                           <FormField
                             control={form.control}
                             name={`details.${index}.yarnTypeId`}
@@ -1341,12 +1339,17 @@ export default function TransactionForm() {
                             )}
                           />
 
-                          <div className="h-11 flex items-center px-3 rounded-md border border-input bg-muted text-sm font-medium text-muted-foreground sm:h-9">
-                            {(runTotals[index] ?? 0).toFixed(NUM_DECIMALS)}
+                          <div className="h-11 flex items-center px-3 rounded-md border border-input bg-muted text-sm sm:h-9">
+                            <div className="flex w-full items-baseline justify-between gap-2">
+                              <span className="text-muted-foreground">Run</span>
+                              <span className="num font-medium">{(runTotals[index] ?? 0).toFixed(NUM_DECIMALS)}</span>
+                            </div>
                           </div>
-
-                          <div className="h-11 flex items-center px-3 rounded-md border border-input bg-muted text-sm font-medium text-muted-foreground sm:h-9">
-                            {(mcRunTotals[index] ?? 0).toFixed(NUM_DECIMALS)}
+                          <div className="h-11 flex items-center px-3 rounded-md border border-input bg-muted text-sm sm:h-9">
+                            <div className="flex w-full items-baseline justify-between gap-2">
+                              <span className="text-muted-foreground">M/c</span>
+                              <span className="num font-medium">{(mcRunTotals[index] ?? 0).toFixed(NUM_DECIMALS)}</span>
+                            </div>
                           </div>
 
                           <div className="pl-2">
@@ -1365,7 +1368,6 @@ export default function TransactionForm() {
                     </div>
                     </div>
                   </div>
-                </div>
               </CardContent>
             </Card>
 
