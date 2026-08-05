@@ -482,7 +482,7 @@ export function DailyDeliveryDialog({
                   disabled={isBusy}
                 >
                   {pendingAction === "saveAndAdd" && <Spinner className="mr-2" />}
-                  Save & Add
+                  Save & Add More
                 </Button>
               )}
               <Button

@@ -659,7 +659,7 @@ export function YarnReceiptDialog({
                   disabled={isBusy}
                 >
                   {pendingAction === "saveAndAdd" && <Spinner className="mr-2" />}
-                  Save & Add
+                  Save & Add More
                 </Button>
               )}
               <Button
