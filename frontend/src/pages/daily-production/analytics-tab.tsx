@@ -162,7 +162,7 @@ export function ProductionAnalytics({
       {/* Production by machine — which machines carried the load */}
       <ChartCard title="Production by machine" dateLabel={dateLabel}>
         {isLoading ? skeleton : (
-          <ChartContainer config={productionConfig} style={{ height: CHART_HEIGHT }}>
+          <ChartContainer className="w-full aspect-auto" config={productionConfig} style={{ height: CHART_HEIGHT }}>
             <BarChart data={byMachine} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid stroke={AXIS_RULE} vertical={false} />
               <XAxis dataKey="name" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: AXIS_RULE }} />
@@ -177,7 +177,7 @@ export function ProductionAnalytics({
       {/* Shift split — Morning vs Night balance */}
       <ChartCard title="Production by shift" dateLabel={dateLabel}>
         {isLoading ? skeleton : (
-          <ChartContainer config={shiftConfig} style={{ height: CHART_HEIGHT }}>
+          <ChartContainer className="w-full aspect-auto" config={shiftConfig} style={{ height: CHART_HEIGHT }}>
             <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
               <Pie
                 data={byShift}
@@ -206,7 +206,7 @@ export function ProductionAnalytics({
       {/* Party split — who we produced for */}
       <ChartCard title="Production by party" dateLabel={dateLabel}>
         {isLoading ? skeleton : (
-          <ChartContainer config={productionConfig} style={{ height: CHART_HEIGHT }}>
+          <ChartContainer className="w-full aspect-auto" config={productionConfig} style={{ height: CHART_HEIGHT }}>
             <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
               <Pie
                 data={byParty}
@@ -237,7 +237,7 @@ export function ProductionAnalytics({
       {/* Operator ranking — top operators by kg */}
       <ChartCard title="Operator ranking" dateLabel={dateLabel}>
         {isLoading ? skeleton : (
-          <ChartContainer config={operatorConfig} style={{ height: CHART_HEIGHT }}>
+          <ChartContainer className="w-full aspect-auto" config={operatorConfig} style={{ height: CHART_HEIGHT }}>
             <BarChart data={byOperator} layout="vertical" margin={{ top: 4, right: 32, left: 8, bottom: 4 }}>
               <CartesianGrid stroke={AXIS_RULE} horizontal={false} />
               <XAxis type="number" tick={AXIS_TICK} tickLine={false} axisLine={false} />
@@ -259,7 +259,7 @@ export function ProductionAnalytics({
       {/* Machine output by shift — grouped comparison */}
       <ChartCard title="Machine output by shift" dateLabel={dateLabel}>
         {isLoading ? skeleton : (
-          <ChartContainer config={shiftConfig} style={{ height: CHART_HEIGHT }}>
+          <ChartContainer className="w-full aspect-auto" config={shiftConfig} style={{ height: CHART_HEIGHT }}>
             <BarChart data={machineShift} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid stroke={AXIS_RULE} vertical={false} />
               <XAxis dataKey="machine" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: AXIS_RULE }} />
@@ -276,7 +276,7 @@ export function ProductionAnalytics({
       {/* Rolls by machine — roll count, the other side of the weight picture */}
       <ChartCard title="Rolls by machine" dateLabel={dateLabel}>
         {isLoading ? skeleton : (
-          <ChartContainer config={rollsConfig} style={{ height: CHART_HEIGHT }}>
+          <ChartContainer className="w-full aspect-auto" config={rollsConfig} style={{ height: CHART_HEIGHT }}>
             <BarChart data={byRolls} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
               <CartesianGrid stroke={AXIS_RULE} vertical={false} />
               <XAxis dataKey="name" tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: AXIS_RULE }} />
