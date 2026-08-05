@@ -5,7 +5,7 @@
 --         operator_salary_settings -> employee_salary_settings
 -- Columns: operator_id -> employee_id (all referencing tables)
 --          operator_name -> employee_name (salary_detail)
---          machine_operator_id -> machine_employee_id (transaction_detail)
+--          machine_operator_id -> employee_id (transaction_detail)
 --> statement-breakpoint
 ALTER TABLE "machine_operator_master" RENAME TO "employee_master";--> statement-breakpoint
 ALTER TABLE "operator_advances" RENAME TO "employee_advances";--> statement-breakpoint
@@ -17,7 +17,7 @@ ALTER TABLE "employee_salary_settings" RENAME COLUMN "operator_id" TO "employee_
 ALTER TABLE "salary_detail" RENAME COLUMN "operator_id" TO "employee_id";--> statement-breakpoint
 ALTER TABLE "salary_detail" RENAME COLUMN "operator_name" TO "employee_name";--> statement-breakpoint
 ALTER TABLE "daily_production_header" RENAME COLUMN "operator_id" TO "employee_id";--> statement-breakpoint
-ALTER TABLE "transaction_detail" RENAME COLUMN "machine_operator_id" TO "machine_employee_id";--> statement-breakpoint
+ALTER TABLE "transaction_detail" RENAME COLUMN "machine_operator_id" TO "employee_id";--> statement-breakpoint
 ALTER TABLE "employee_master" RENAME CONSTRAINT "machine_operator_master_code_unique" TO "employee_master_code_unique";--> statement-breakpoint
 ALTER TABLE "employee_advances" RENAME CONSTRAINT "operator_advances_operator_id_machine_operator_master_id_fk" TO "employee_advances_employee_id_employee_master_id_fk";--> statement-breakpoint
 ALTER TABLE "employee_salary_records" RENAME CONSTRAINT "operator_salary_records_operator_id_machine_operator_master_id_fk" TO "employee_salary_records_employee_id_employee_master_id_fk";--> statement-breakpoint
@@ -28,7 +28,7 @@ ALTER TABLE "salary_detail" RENAME CONSTRAINT "salary_detail_operator_id_machine
 ALTER TABLE "salary_detail" RENAME CONSTRAINT "salary_detail_header_operator_unique" TO "salary_detail_header_employee_unique";--> statement-breakpoint
 ALTER TABLE "salary_detail" RENAME CONSTRAINT "salary_detail_op_month_year_unique" TO "salary_detail_emp_month_year_unique";--> statement-breakpoint
 ALTER TABLE "daily_production_header" RENAME CONSTRAINT "daily_production_header_operator_id_machine_operator_master_id_fk" TO "daily_production_header_employee_id_employee_master_id_fk";--> statement-breakpoint
-ALTER TABLE "transaction_detail" RENAME CONSTRAINT "transaction_detail_machine_operator_id_machine_operator_master_id_fk" TO "transaction_detail_machine_employee_id_employee_master_id_fk";
+ALTER TABLE "transaction_detail" RENAME CONSTRAINT "transaction_detail_machine_operator_id_machine_operator_master_id_fk" TO "transaction_detail_employee_id_employee_master_id_fk";
 --> statement-breakpoint
 ALTER TABLE "employee_master" RENAME CONSTRAINT "machine_operator_master_pkey" TO "employee_master_pkey";--> statement-breakpoint
 ALTER TABLE "employee_advances" RENAME CONSTRAINT "operator_advances_pkey" TO "employee_advances_pkey";--> statement-breakpoint

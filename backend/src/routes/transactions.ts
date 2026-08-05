@@ -279,7 +279,7 @@ async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
                 yarnBrandId:       d.yarnBrandR.id,
                 uomId:             d.uomR.id,
                 machineId:         d.machineR.id,
-                machineEmployeeId: d.employeeR.id,
+                employeeId: d.employeeR.id,
                 quantity:          parseImportNumeric(group.rows[i].quantity),
                 netWt:             parseImportNumeric(group.rows[i].netWt),
               }))

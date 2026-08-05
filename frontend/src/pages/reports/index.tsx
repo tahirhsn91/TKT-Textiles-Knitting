@@ -83,7 +83,7 @@ interface ReportRow {
   yarnBrandName: string | null;
   uomName: string | null;
   machineName: string | null;
-  machineEmployeeName: string | null;
+  employeeName: string | null;
   partyWastePercent: string | null;
 }
 
@@ -104,7 +104,7 @@ interface Filters {
   yarnBrandId: string[];
   uomId: string[];
   machineId: string[];
-  machineEmployeeId: string[];
+  employeeId: string[];
 }
 
 type GroupByKey =
@@ -118,7 +118,7 @@ type GroupByKey =
   | "locationName"
   | "fabricTypeName"
   | "machineName"
-  | "machineEmployeeName"
+  | "employeeName"
   | "yarnTypeName"
   | "yarnCountName"
   | "yarnBrandName"
@@ -139,7 +139,7 @@ function defaultFilters(): Filters {
     dateFrom: "", dateTo: "", year: "", month: "", docNumber: "", reference: "",
     transactionTypeId: [], jobId: [], partyId: [], locationId: [], fabricTypeId: [],
     yarnTypeId: [], yarnCountId: [], yarnBrandId: [], uomId: [],
-    machineId: [], machineEmployeeId: [],
+    machineId: [], employeeId: [],
   };
 }
 
@@ -165,7 +165,7 @@ const EMPTY_FILTERS: Filters = {
   dateFrom: "", dateTo: "", year: "", month: "", docNumber: "", reference: "",
   transactionTypeId: [], jobId: [], partyId: [], locationId: [], fabricTypeId: [],
   yarnTypeId: [], yarnCountId: [], yarnBrandId: [], uomId: [],
-  machineId: [], machineEmployeeId: [],
+  machineId: [], employeeId: [],
 };
 
 const GROUP_BY_OPTIONS: { value: GroupByKey; label: string }[] = [
@@ -179,7 +179,7 @@ const GROUP_BY_OPTIONS: { value: GroupByKey; label: string }[] = [
   { value: "locationName",        label: "Location" },
   { value: "fabricTypeName",      label: "Fabric Type" },
   { value: "machineName",         label: "Machine" },
-  { value: "machineEmployeeName", label: "Employee" },
+  { value: "employeeName", label: "Employee" },
   { value: "yarnTypeName",        label: "Yarn Type" },
   { value: "yarnCountName",       label: "Yarn Count" },
   { value: "yarnBrandName",       label: "Yarn Brand" },
@@ -345,7 +345,7 @@ type DetailColKey =
   | "date" | "docNumber" | "reference" | "sl" | "gsm" | "transactionTypeName"
   | "jobName" | "partyName" | "locationName" | "fabricTypeName"
   | "yarnTypeName" | "yarnCountName" | "yarnBrandName" | "uomName"
-  | "machineName" | "machineEmployeeName" | "quantity" | "netWt"
+  | "machineName" | "employeeName" | "quantity" | "netWt"
   | "wastagePercent" | "wastageWt" | "runningBalance";
 
 const DETAIL_COLUMNS: { key: DetailColKey; label: string }[] = [
@@ -364,7 +364,7 @@ const DETAIL_COLUMNS: { key: DetailColKey; label: string }[] = [
   { key: "yarnBrandName",         label: "Yarn Brand" },
   { key: "uomName",               label: "UOM" },
   { key: "machineName",           label: "Machine" },
-  { key: "machineEmployeeName",   label: "Employee" },
+  { key: "employeeName",   label: "Employee" },
   { key: "quantity",              label: "Qty" },
   { key: "netWt",                 label: "Net Wt" },
   { key: "wastagePercent",        label: "Wastage%" },
@@ -547,7 +547,7 @@ export default function ReportsPage() {
           case "yarnBrandName":         return r.yarnBrandName ?? "";
           case "uomName":               return r.uomName ?? "";
           case "machineName":           return r.machineName ?? "";
-          case "machineEmployeeName":   return r.machineEmployeeName ?? "";
+          case "employeeName":   return r.employeeName ?? "";
           case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "";
           case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "";
           case "wastagePercent":        return wWt !== 0 ? (r.partyWastePercent ?? "") : "";
@@ -631,7 +631,7 @@ export default function ReportsPage() {
           case "yarnBrandName":         return r.yarnBrandName ?? "—";
           case "uomName":               return r.uomName ?? "—";
           case "machineName":           return r.machineName ?? "—";
-          case "machineEmployeeName":   return r.machineEmployeeName ?? "—";
+          case "employeeName":   return r.employeeName ?? "—";
           case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "—";
           case "netWt":                 return r.netWt    != null ? fmt(signedNetWt(r)) : "—";
           case "wastagePercent":        return wWt !== 0 ? (r.partyWastePercent ?? "—") : "—";
@@ -722,7 +722,7 @@ export default function ReportsPage() {
   const { data: yarnBrands }          = useListYarnBrandMaster();
   const { data: uoms }                = useListUomMaster();
   const { data: machines }            = useListMachineMaster();
-  const { data: machineEmployees }    = useListEmployeeMaster();
+  const { data: employees }    = useListEmployeeMaster();
 
   const qs = useMemo(() => buildQueryString(applied), [applied]);
 
@@ -987,7 +987,7 @@ export default function ReportsPage() {
               <FilterMulti label="Yarn Brand"        values={filters.yarnBrandId}        onChange={(v) => set("yarnBrandId", v)}        options={yarnBrands} />
               <FilterMulti label="UOM"               values={filters.uomId}              onChange={(v) => set("uomId", v)}              options={uomOptions} />
               <FilterMulti label="Machine"           values={filters.machineId}          onChange={(v) => set("machineId", v)}          options={machines} />
-              <FilterMulti label="Employee"  values={filters.machineEmployeeId}  onChange={(v) => set("machineEmployeeId", v)}  options={machineEmployees} />
+              <FilterMulti label="Employee"  values={filters.employeeId}  onChange={(v) => set("employeeId", v)}  options={employees} />
             </div>
 
             <div className="flex items-center gap-2 pt-1">
@@ -1337,8 +1337,8 @@ export default function ReportsPage() {
                                     return <TableCell key={c.key}>{r.uomName ?? "—"}</TableCell>;
                                   case "machineName":
                                     return <TableCell key={c.key} className="whitespace-nowrap">{r.machineName ?? "—"}</TableCell>;
-                                  case "machineEmployeeName":
-                                    return <TableCell key={c.key} className="whitespace-nowrap">{r.machineEmployeeName ?? "—"}</TableCell>;
+                                  case "employeeName":
+                                    return <TableCell key={c.key} className="whitespace-nowrap">{r.employeeName ?? "—"}</TableCell>;
                                   case "quantity":
                                     return (
                                       <TableCell key={c.key} className={`text-right whitespace-nowrap${neg ? " text-red-600" : ""}`}>
