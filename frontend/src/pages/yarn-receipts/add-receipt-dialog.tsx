@@ -35,7 +35,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
 
@@ -372,9 +372,23 @@ export function YarnReceiptDialog({
 
                 <FormField
                   control={form.control}
+                  name="enteredBy"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{isEdit ? "Updated By *" : "Entered By *"}</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Your name" disabled={readOnly} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="partyId"
                   render={({ field }) => (
-                    <FormItem className="sm:col-span-2">
+                    <FormItem className="sm:col-span-3">
                       <FormLabel>Party *</FormLabel>
                       <FormControl>
                         <select
@@ -395,26 +409,22 @@ export function YarnReceiptDialog({
                     </FormItem>
                   )}
                 />
-
-                <FormField
-                  control={form.control}
-                  name="enteredBy"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isEdit ? "Updated By *" : "Entered By *"}</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Your name" disabled={readOnly} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
 
               <div className="border-t pt-4">
                 <p className="eyebrow">Yarn lots</p>
                 <div className="mt-2 rounded-md border">
                   <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="w-10" />
+                        <TableHead className="w-[7.5rem] text-xs font-medium text-muted-foreground">Count</TableHead>
+                        <TableHead className="w-[9rem] text-xs font-medium text-muted-foreground">Brand</TableHead>
+                        <TableHead className="w-28 text-xs font-medium text-muted-foreground">Bags</TableHead>
+                        <TableHead className="w-32 text-xs font-medium text-muted-foreground">Net kg</TableHead>
+                        <TableHead className="w-10" />
+                      </TableRow>
+                    </TableHeader>
                     <TableBody>
                       {lines.length === 0 ? (
                         <TableRow>
@@ -430,7 +440,7 @@ export function YarnReceiptDialog({
                                 {i + 1}
                               </span>
                             </TableCell>
-                            <TableCell className="py-1.5">
+                            <TableCell className="w-[7.5rem] py-1.5">
                               <select
                                 className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                 value={l.yarnCountId}
@@ -443,7 +453,7 @@ export function YarnReceiptDialog({
                                 ))}
                               </select>
                             </TableCell>
-                            <TableCell className="py-1.5">
+                            <TableCell className="w-[9rem] py-1.5">
                               <select
                                 className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                 value={l.yarnBrandId}
@@ -456,7 +466,7 @@ export function YarnReceiptDialog({
                                 ))}
                               </select>
                             </TableCell>
-                            <TableCell className="py-1.5">
+                            <TableCell className="w-28 py-1.5">
                               <Input
                                 type="number"
                                 min="1"
@@ -469,7 +479,7 @@ export function YarnReceiptDialog({
                                 onChange={(e) => updateLine(l.key, { quantity: e.target.value })}
                               />
                             </TableCell>
-                            <TableCell className="py-1.5">
+                            <TableCell className="w-32 py-1.5">
                               <Input
                                 type="number"
                                 min="0"
