@@ -15,14 +15,17 @@ A full-stack ERP for managing fabric knitting factory operations: transactions, 
 ### Prerequisites
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (includes Docker Compose)
 
-### Run locally
+### Run locally (with hot reload)
 ```bash
 git clone https://github.com/tahirhsn91/TKT-Textiles-Knitting.git
 cd TKT-Textiles-Knitting
-docker compose up --build
+# Development: source is volume-mounted and watched — backend restarts on save
+# (tsx watch) and the frontend hot-reloads in the browser (Vite HMR).
+# No rebuild/restart needed for code changes.
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-- **Frontend** → http://localhost:3001
+- **Frontend** → http://localhost:3001 (Vite dev server + HMR)
 - **Backend API** → http://localhost:8081/api
 - **PostgreSQL** → localhost:5433 (user: `postgres`, password: `password`, db: `heliumdb`)
 
@@ -32,6 +35,11 @@ inside the containers never change, so the frontend always reaches the backend
 over the internal Docker network regardless.
 
 The database is automatically seeded with the current production data on first startup.
+
+### Production (static build, no hot reload)
+```bash
+docker compose --env-file .env.prod up -d
+```
 
 ## Environments: Development vs Production
 
