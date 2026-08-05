@@ -1153,7 +1153,7 @@ export default function TransactionForm() {
                         <div>Net Wt</div>
                         <div>Run_Total</div>
                         <div>M/c_Run_Total</div>
-                        <div className="w-10"></div>
+                        <div className="text-right">Action</div>
                       </div>
                     </div>
 
