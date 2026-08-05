@@ -41,5 +41,6 @@ services:
     command: sh -c "npm run dev -- --host"
     # Vite listens on 3000 inside the container; keep the same published port
     # as production (FRONTEND_PORT, default 3001) so origins don't change.
-    ports:
+    # !override replaces the base file's port mapping instead of merging with it.
+    ports: !override
       - "${FRONTEND_PORT:-3001}:3000"
