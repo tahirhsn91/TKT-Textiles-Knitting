@@ -510,6 +510,9 @@ export default function TransactionForm() {
 
   const isPending = createTx.isPending || updateTx.isPending;
 
+  // At least one line must remain — the last row can't be deleted (P9 follow-up).
+  const canRemoveRow = fields.length > 1;
+
   // P7: per-form line validation message, cleared on the next submit.
   const [lineError, setLineError] = useState<string | null>(null);
   useEffect(() => {
@@ -938,8 +941,10 @@ export default function TransactionForm() {
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-11 w-11 text-muted-foreground hover:text-destructive"
+                          className="h-11 w-11 text-muted-foreground hover:text-destructive disabled:opacity-40"
                           onClick={() => remove(index)}
+                          disabled={!canRemoveRow}
+                          aria-label={canRemoveRow ? `Remove line ${index + 1}` : "Cannot remove the last line"}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -1373,8 +1378,10 @@ export default function TransactionForm() {
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-11 w-11 text-muted-foreground hover:text-destructive shrink-0 sm:h-8 sm:w-8"
+                              className="h-11 w-11 text-muted-foreground hover:text-destructive disabled:opacity-40 shrink-0 sm:h-8 sm:w-8"
                               onClick={() => remove(index)}
+                              disabled={!canRemoveRow}
+                              aria-label={canRemoveRow ? `Remove line ${index + 1}` : "Cannot remove the last line"}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
