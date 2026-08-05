@@ -53,7 +53,7 @@ const nullableInt = z.preprocess(
 const detailSchema = z.object({
   id: z.number().optional(),
   machineId: z.number().nullable(),
-  machineEmployeeId: z.number().nullable(),
+  employeeId: z.number().nullable(),
   yarnTypeId: z.number().nullable(),
   yarnCountId: z.number().nullable(),
   yarnBrandId: z.number().nullable(),
@@ -80,7 +80,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 const emptyDetail = (): z.infer<typeof detailSchema> => ({
   machineId: null,
-  machineEmployeeId: null,
+  employeeId: null,
   yarnTypeId: null,
   yarnCountId: null,
   yarnBrandId: null,
@@ -206,7 +206,7 @@ export default function TransactionForm() {
       "details",
       unreconciled.rows.map((p) => ({
         machineId: p.machineId,
-        machineEmployeeId: p.employeeId,
+        employeeId: p.employeeId,
         yarnTypeId: null,
         yarnCountId: null,
         yarnBrandId: null,
@@ -252,7 +252,7 @@ export default function TransactionForm() {
       "details",
       unreconciledReceipts.rows.map((r) => ({
         machineId: null,
-        machineEmployeeId: null,
+        employeeId: null,
         yarnTypeId: null,
         yarnCountId: r.yarnCountId,
         yarnBrandId: r.yarnBrandId,
@@ -298,7 +298,7 @@ export default function TransactionForm() {
       "details",
       unreconciledDeliveries.rows.map((d) => ({
         machineId: null,
-        machineEmployeeId: null,
+        employeeId: null,
         yarnTypeId: null,
         yarnCountId: null,
         yarnBrandId: null,
@@ -320,7 +320,7 @@ export default function TransactionForm() {
     for (let i = 0; i < (watchedDetails?.length ?? 0); i++) {
       const d = watchedDetails[i];
       const machineId = d?.machineId ?? null;
-      const employeeId = d?.machineEmployeeId ?? null;
+      const employeeId = d?.employeeId ?? null;
       const netWt = parseFloat(d?.netWt?.toString() ?? "0") || 0;
       if (i === 0 || machineId !== prevMachineId || employeeId !== prevEmployeeId) {
         running = netWt;
@@ -399,7 +399,7 @@ export default function TransactionForm() {
           ? transaction.details.map(d => ({
               id: d.id,
               machineId: d.machineId ?? null,
-              machineEmployeeId: d.machineEmployeeId ?? null,
+              employeeId: d.employeeId ?? null,
               yarnTypeId: d.yarnTypeId ?? null,
               yarnCountId: d.yarnCountId ?? null,
               yarnBrandId: d.yarnBrandId ?? null,
@@ -1015,7 +1015,7 @@ export default function TransactionForm() {
 
                           <FormField
                             control={form.control}
-                            name={`details.${index}.machineEmployeeId`}
+                            name={`details.${index}.employeeId`}
                             render={({ field }) => (
                               <FormItem>
                                 <FormControl>

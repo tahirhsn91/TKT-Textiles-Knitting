@@ -48,7 +48,7 @@ export const transactionDetailTable = pgTable("transaction_detail", {
     .notNull()
     .references(() => transactionHeaderTable.id, { onDelete: "cascade" }),
   machineId: integer("machine_id").references(() => machineMasterTable.id),
-  machineEmployeeId: integer("machine_employee_id").references(() => employeeMasterTable.id),
+  employeeId: integer("employee_id").references(() => employeeMasterTable.id),
   yarnTypeId: integer("yarn_type_id").references(() => yarnTypeMasterTable.id),
   yarnCountId: integer("yarn_count_id").references(() => yarnCountMasterTable.id),
   yarnBrandId: integer("yarn_brand_id").references(() => yarnBrandMasterTable.id),

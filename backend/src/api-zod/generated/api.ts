@@ -780,7 +780,7 @@ export const CreateTransactionBody = zod.object({
   details: zod.array(
     zod.object({
       machineId: zod.number().nullish(),
-      machineEmployeeId: zod.number().nullish(),
+      employeeId: zod.number().nullish(),
       yarnTypeId: zod.number().nullish(),
       yarnCountId: zod.number().nullish(),
       yarnBrandId: zod.number().nullish(),
@@ -815,7 +815,7 @@ export const GetTransactionResponse = zod.object({
       id: zod.number(),
       headerId: zod.number(),
       machineId: zod.number().nullish(),
-      machineEmployeeId: zod.number().nullish(),
+      employeeId: zod.number().nullish(),
       yarnTypeId: zod.number().nullish(),
       yarnCountId: zod.number().nullish(),
       yarnBrandId: zod.number().nullish(),
@@ -847,7 +847,7 @@ export const UpdateTransactionBody = zod.object({
   details: zod.array(
     zod.object({
       machineId: zod.number().nullish(),
-      machineEmployeeId: zod.number().nullish(),
+      employeeId: zod.number().nullish(),
       yarnTypeId: zod.number().nullish(),
       yarnCountId: zod.number().nullish(),
       yarnBrandId: zod.number().nullish(),
@@ -875,7 +875,7 @@ export const UpdateTransactionResponse = zod.object({
       id: zod.number(),
       headerId: zod.number(),
       machineId: zod.number().nullish(),
-      machineEmployeeId: zod.number().nullish(),
+      employeeId: zod.number().nullish(),
       yarnTypeId: zod.number().nullish(),
       yarnCountId: zod.number().nullish(),
       yarnBrandId: zod.number().nullish(),
