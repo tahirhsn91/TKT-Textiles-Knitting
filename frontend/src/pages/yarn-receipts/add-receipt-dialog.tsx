@@ -223,6 +223,11 @@ export function YarnReceiptDialog({
         return;
       }
     }
+    // Totals must be positive too (same rule as production / deliveries).
+    if (!(totalQty > 0) || !(totalNetWeight > 0)) {
+      setLineError("Total bags and net weight must both be greater than zero");
+      return;
+    }
     setLineError(null);
 
     const values = form.getValues();
