@@ -1,0 +1,45 @@
+# ═══════════════════════════════════════════════════════════════
+# DEVELOPMENT override — hot reload for backend & frontend.
+#
+# Load together with the base file (NOT auto-loaded, so prod stays safe):
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# - backend  → source mounted, runs `tsx watch` (auto-restart on save)
+# - frontend → source mounted, runs Vite dev server with HMR (instant refresh)
+#
+# Production is unaffected: `docker compose --env-file .env.prod up -d`
+# still builds the static images and never sees this file.
+# ═══════════════════════════════════════════════════════════════
+
+services:
+  backend:
+    build:
+      context: ./backend
+      # Use the builder stage so dev tooling (tsx) is present; the production
+      # stage strips devDependencies.
+      target: builder
+    environment:
+      NODE_ENV: development
+    # Mount source so edits are picked up instantly, keep the image's
+    # node_modules (anonymous volume) so host deps never shadow it.
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: sh -c "npm run dev"
+    # tsx watch restarts on save; no restart/build needed.
+
+  frontend:
+    build:
+      context: ./frontend
+      target: builder
+    environment:
+      # Vite dev server proxies /api to the backend over the internal network.
+      VITE_API_TARGET: http://backend:8080
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: sh -c "npm run dev -- --host"
+    # Vite listens on 3000 inside the container; keep the same published port
+    # as production (FRONTEND_PORT, default 3001) so origins don't change.
+    ports:
+      - "${FRONTEND_PORT:-3001}:3000"
