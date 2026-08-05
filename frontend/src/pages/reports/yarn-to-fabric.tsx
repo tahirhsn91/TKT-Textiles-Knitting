@@ -248,7 +248,7 @@ function getMonthLabel(dateStr: string): string {
 
 function getGroupLabel(row: ReportRow, key: GroupByKey): string {
   if (key === "month") return getMonthLabel(row.date);
-  return String((row as Record<string, unknown>)[key] ?? "—");
+  return String((row as unknown as Record<string, unknown>)[key] ?? "—");
 }
 
 function abbrev(arr: string[], max = 3): string {
@@ -934,7 +934,7 @@ export default function YarnToFabricPage() {
       headStyles: { fillColor: [37, 99, 235] },
       columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } },
       didParseCell: (data) => {
-        if (data.section === "body" && data.row.raw[0] === "Total") {
+        if (data.section === "body" && Array.isArray(data.row.raw) && data.row.raw[0] === "Total") {
           data.cell.styles.fontStyle = "bold";
           data.cell.styles.fillColor = [220, 230, 255];
         }
@@ -1003,7 +1003,8 @@ export default function YarnToFabricPage() {
       styles: { fontSize: 7 },
       headStyles: { fillColor: [37, 99, 235] },
       didParseCell: (data) => {
-        const label = data.row.raw[0]?.toString() ?? "";
+        const label =
+          Array.isArray(data.row.raw) ? data.row.raw[0]?.toString() ?? "" : "";
         if (data.section === "body" && label === "Grand Total") {
           data.cell.styles.fontStyle = "bold";
           data.cell.styles.fillColor = [220, 230, 255];

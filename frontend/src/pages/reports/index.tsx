@@ -242,7 +242,7 @@ function getMonthLabel(dateStr: string): string {
 /** Extracts the group-by label for a single row. */
 function getGroupLabel(row: ReportRow, key: GroupByKey): string {
   if (key === "month") return getMonthLabel(row.date);
-  return String((row as Record<string, unknown>)[key] ?? "—");
+  return String((row as unknown as Record<string, unknown>)[key] ?? "—");
 }
 
 type DetailRenderItem =
@@ -653,7 +653,8 @@ export default function ReportsPage() {
       styles: { fontSize: 7 },
       headStyles: { fillColor: [37, 99, 235] },
       didParseCell: (data) => {
-        const label = data.row.raw[0]?.toString() ?? "";
+        const label =
+          Array.isArray(data.row.raw) ? data.row.raw[0]?.toString() ?? "" : "";
         if (data.section === "body" && label === "Grand Total") {
           data.cell.styles.fontStyle = "bold";
           data.cell.styles.fillColor = [220, 230, 255];
