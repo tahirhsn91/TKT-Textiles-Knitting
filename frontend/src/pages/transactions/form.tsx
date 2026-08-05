@@ -415,19 +415,21 @@ export default function TransactionForm() {
 
   const onSubmit = (values: FormValues) => {
     // P7: block save when any line has a non-positive quantity or net weight.
-    // Blank is allowed ("None" rows), but a typed zero/negative is a typo the
-    // floor should catch before it hits the books.
+    // Every line needs a quantity and net weight, both greater than zero —
+    // a blank or zero line is a half-finished row the floor should catch
+    // before it hits the books.
     const badLines: number[] = [];
     values.details.forEach((d, i) => {
       const qty = d.quantity;
       const wt = d.netWt;
-      if (qty !== null && qty !== undefined && qty !== "" && !(Number(qty) > 0)) badLines.push(i);
-      if (wt !== null && wt !== undefined && wt !== "" && !(Number(wt) > 0)) badLines.push(i);
+      const qtyOk = qty !== null && qty !== undefined && qty !== "" && Number(qty) > 0;
+      const wtOk = wt !== null && wt !== undefined && wt !== "" && Number(wt) > 0;
+      if (!qtyOk || !wtOk) badLines.push(i);
     });
     if (badLines.length > 0) {
       const shown = [...new Set(badLines)].slice(0, 3);
       setLineError(
-        `Line ${shown.map((i) => i + 1).join(", ")}${badLines.length > 3 ? "…" : ""} ${badLines.length === 1 ? "has" : "have"} a quantity or net weight that must be greater than zero.`,
+        `Line ${shown.map((i) => i + 1).join(", ")}${badLines.length > 3 ? "…" : ""} ${badLines.length === 1 ? "needs" : "need"} a quantity and net weight, both greater than zero.`,
       );
       return;
     }
