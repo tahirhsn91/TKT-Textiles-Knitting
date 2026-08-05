@@ -522,8 +522,21 @@ export default function TransactionForm() {
   const handleAddRow = useCallback(() => {
     const details = form.getValues("details");
     const last = details[details.length - 1];
+    // Copy the dropdown selections from the last row — adding a line for the
+    // same machine/employee/yarn is the common case, so the new row starts
+    // pre-filled instead of empty. Only the id and numeric entries reset.
     const newRow = last
-      ? { ...last, id: undefined, quantity: "0", netWt: "0" }
+      ? {
+          id: undefined,
+          machineId: last.machineId ?? null,
+          employeeId: last.employeeId ?? null,
+          yarnTypeId: last.yarnTypeId ?? null,
+          yarnCountId: last.yarnCountId ?? null,
+          yarnBrandId: last.yarnBrandId ?? null,
+          uomId: last.uomId ?? null,
+          quantity: "0",
+          netWt: "0",
+        }
       : { ...emptyDetail(), quantity: "0", netWt: "0" };
     append(newRow);
     setTimeout(() => {
