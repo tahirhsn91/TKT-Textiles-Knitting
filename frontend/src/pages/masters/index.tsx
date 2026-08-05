@@ -102,6 +102,19 @@ function useInvalidateBoth() {
 // unmounts inactive TabsContent, a tab's list/CRUD queries only fire once the
 // user actually navigates to that tab — not all at once on page load.
 export default function MastersPage() {
+  // Active tab lives in the URL hash (#machines) so a refresh lands back on
+  // the same tab and a tab is shareable/deep-linkable. Falls back to the
+  // first tab when the hash is empty or unknown.
+  const [activeTab, setActiveTab] = useState(() => {
+    const fromHash = window.location.hash.replace(/^#\/?/, "");
+    return TAB_IDS.includes(fromHash) ? fromHash : "transaction-type";
+  });
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    window.location.hash = tab;
+  };
+
   return (
     <Layout>
       <div className="flex flex-col gap-6">
@@ -119,7 +132,7 @@ export default function MastersPage() {
           </p>
         </header>
 
-        <Tabs defaultValue="transaction-type">
+        <Tabs value={activeTab} onValueChange={handleTabChange} defaultValue="transaction-type">
           {/* -mx-* + px-* lets the tab strip bleed to the screen edge and scroll
               horizontally instead of wrapping twelve triggers into a multi-row
               block that pushes the table off the fold. Scrolls at every screen
@@ -156,6 +169,22 @@ export default function MastersPage() {
     </Layout>
   );
 }
+
+// Every tab id, for validating the URL hash on load.
+const TAB_IDS = [
+  "transaction-type",
+  "job",
+  "party",
+  "machine",
+  "location",
+  "yarn-type",
+  "yarn-count",
+  "yarn-brand",
+  "uom",
+  "fabric-type",
+  "department",
+  "operator",
+];
 
 // ─── Transaction Type ───────────────────────────────────────────────────────
 function TransactionTypeTab() {
