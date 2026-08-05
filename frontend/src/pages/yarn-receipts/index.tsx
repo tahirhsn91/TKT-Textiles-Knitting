@@ -47,6 +47,10 @@ function yesterdayIso() {
   return format(d, "yyyy-MM-dd");
 }
 
+function todayIso() {
+  return format(new Date(), "yyyy-MM-dd");
+}
+
 export default function YarnReceiptList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -146,7 +150,7 @@ export default function YarnReceiptList() {
                 type="date"
                 className="h-9"
                 value={date}
-                max={yesterdayIso()}
+                max={todayIso()}
                 onChange={(e) => setDate(e.target.value || yesterdayIso())}
               />
             </div>
@@ -341,7 +345,7 @@ export default function YarnReceiptList() {
         receiptId={editingId ?? viewingId}
         readOnly={viewingId != null}
         defaultDate={date ? new Date(date + "T00:00:00") : undefined}
-        maxDate={new Date(yesterdayIso() + "T00:00:00")}
+        maxDate={new Date(todayIso() + "T00:00:00")}
       />
 
       <AlertDialog
