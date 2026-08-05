@@ -7,6 +7,7 @@ import { Trash2, Download, PlusCircle, Pencil, Lock, Unlock } from "lucide-react
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -604,7 +605,7 @@ function AdvancesTab() {
             </div>
             <div className="flex flex-col gap-1">
               <Label>Date</Label>
-              <Input type="date" className="w-40" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
+              <DateInput className="w-40" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
             </div>
             <div className="flex flex-col gap-1">
               <Label>Amount</Label>
@@ -640,11 +641,11 @@ function AdvancesTab() {
             </Select>
             <div className="flex items-center gap-2">
               <Label className="text-xs">From</Label>
-              <Input type="date" className="w-36 h-8" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} />
+              <DateInput className="w-36 h-8" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} />
             </div>
             <div className="flex items-center gap-2">
               <Label className="text-xs">To</Label>
-              <Input type="date" className="w-36 h-8" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
+              <DateInput className="w-36 h-8" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
             </div>
           </div>
         </CardHeader>

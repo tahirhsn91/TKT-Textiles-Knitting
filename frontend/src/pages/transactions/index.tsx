@@ -17,6 +17,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -291,8 +292,7 @@ export default function TransactionList() {
 
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs text-muted-foreground">Date From</Label>
-              <Input
-                type="date"
+              <DateInput
                 className="h-9"
                 value={filters.dateFrom}
                 onChange={(e) => setFilter("dateFrom", e.target.value)}
@@ -301,8 +301,7 @@ export default function TransactionList() {
 
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs text-muted-foreground">Date To</Label>
-              <Input
-                type="date"
+              <DateInput
                 className="h-9"
                 value={filters.dateTo}
                 onChange={(e) => setFilter("dateTo", e.target.value)}
