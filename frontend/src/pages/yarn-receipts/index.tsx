@@ -213,7 +213,7 @@ export default function YarnReceiptList() {
                   <SortableHead className="eyebrow h-11" label="Lots" sortKey="lineCount" sort={sort} onSort={toggleSort} />
                   <SortableHead className="eyebrow h-11" label="Bags" sortKey="totalQty" sort={sort} onSort={toggleSort} />
                   <SortableHead className="eyebrow h-11" label="Net weight" sortKey="totalNetWeight" sort={sort} onSort={toggleSort} right />
-                  <TableHead className="sticky right-0 bg-background eyebrow h-11 px-5 text-right">Action</TableHead>
+                  <TableHead className="sticky right-0 bg-background eyebrow h-11 px-2 text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -262,7 +262,7 @@ export default function YarnReceiptList() {
                       <TableCell className="num text-right font-medium">
                         {Number(r.totalNetWeight).toFixed(NUM_DECIMALS)}
                       </TableCell>
-                      <TableCell className={`sticky right-0 ${stickyBg} px-5 text-right`}>
+                      <TableCell className={`sticky right-0 ${stickyBg} px-2 text-right`}>
                         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                         {r.reconciled ? (
                           <>
@@ -328,7 +328,7 @@ export default function YarnReceiptList() {
                     <TableCell className="selvedge-top py-4 text-right">
                       <span className="num text-lg font-semibold text-foreground">{dayKg.toFixed(NUM_DECIMALS)}</span>
                     </TableCell>
-                    <TableCell className="sticky right-0 bg-background px-5" />
+                    <TableCell className="sticky right-0 bg-background px-2" />
                   </TableRow>
                 </tfoot>
               )}
