@@ -250,7 +250,7 @@ export default function TransactionForm() {
         machineOperatorId: null,
         yarnTypeId: null,
         yarnCountId: r.yarnCountId,
-        yarnBrandId: null,
+        yarnBrandId: r.yarnBrandId,
         uomId: null,
         quantity: String(r.quantity),
         netWt: r.netWeight,
