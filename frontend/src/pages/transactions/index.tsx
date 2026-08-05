@@ -392,8 +392,10 @@ export default function TransactionList() {
           </div>
         </div>
 
-        {/* Table */}
-        <div className="rounded-md border bg-card overflow-auto">
+        {/* Table — single scroll container: the Table component already wraps
+            itself in overflow-auto, so an outer overflow-auto would create a
+            second scrollport that clips the sticky Actions column (P1). */}
+        <div className="rounded-md border bg-card overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
@@ -412,7 +414,7 @@ export default function TransactionList() {
                     onDragEnd={handleDragEnd}
                   />
                 ))}
-                <TableHead className="sticky right-0 bg-card px-2 text-right">Actions</TableHead>
+                <TableHead className="sticky right-0 z-10 bg-background px-1.5 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -453,7 +455,7 @@ export default function TransactionList() {
                           default:                return <TableCell key={c.key} />;
                         }
                       })}
-                      <TableCell className="sticky right-0 bg-card px-2 text-right">
+                      <TableCell className="sticky right-0 z-10 bg-background px-1.5 text-right">
                         <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                           <Link href={`/transactions/${t.id}/edit`}>
                             <Button variant="ghost" size="icon" className="h-11 w-11 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8">
