@@ -121,9 +121,10 @@ export default function MastersPage() {
 
         <Tabs defaultValue="transaction-type">
           {/* -mx-* + px-* lets the tab strip bleed to the screen edge and scroll
-              horizontally on a phone, instead of wrapping twelve triggers into
-              a four-row block that pushes the table off the fold. */}
-          <TabsList className="-mx-4 flex h-auto w-auto max-w-none justify-start gap-1 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+              horizontally instead of wrapping twelve triggers into a multi-row
+              block that pushes the table off the fold. Scrolls at every screen
+              size — never wraps, so the strip stays one clean row. */}
+          <TabsList className="-mx-4 flex h-auto w-auto max-w-none justify-start gap-1 overflow-x-auto px-4 sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
             <TabsTrigger value="transaction-type">Transaction Type</TabsTrigger>
             <TabsTrigger value="job">Job Types</TabsTrigger>
             <TabsTrigger value="party">Parties</TabsTrigger>
