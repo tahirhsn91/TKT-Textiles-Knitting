@@ -104,6 +104,7 @@ export function DailyDeliveryDialog({
   });
 
   const [pendingAction, setPendingAction] = useState<"save" | "saveAndAdd" | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const prefilledFor = useRef<number | null | undefined>(undefined);
 
@@ -159,6 +160,16 @@ export function DailyDeliveryDialog({
     if (!valid) return;
 
     const values = form.getValues();
+
+    // Rolls and net weight must be positive — a zero/negative delivery is a
+    // half-finished row (same rule as the production and receipt popups).
+    const qty = Number(values.quantity);
+    const wt = Number(values.netWeight);
+    if (!(qty > 0) || !(wt > 0)) {
+      setFormError("Quantity (rolls) and net weight must both be greater than zero");
+      return;
+    }
+
     try { localStorage.setItem(LS_ENTERED_BY, values.enteredBy); } catch {}
 
     setPendingAction(keepOpen ? "saveAndAdd" : "save");
@@ -260,6 +271,9 @@ export function DailyDeliveryDialog({
           <Form {...form}>
             <div className="space-y-4 pt-5">
               <p className="eyebrow">Delivery details</p>
+              {formError && (
+                <p className="mt-1 text-sm font-medium text-destructive">{formError}</p>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
