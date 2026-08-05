@@ -1157,9 +1157,10 @@ export default function TransactionForm() {
                       </div>
                     </div>
 
-                    {/* Scrollable rows — 5 rows visible. Vertical-only scroll;
-                        no horizontal scrollport exists anymore. */}
-                    <div className="overflow-y-auto max-h-[212px] px-4 py-2">
+                    {/* Rows flow at natural height — no inner scrollport. The
+                        page scrolls as a whole, so there's no scroll-within-
+                        scroll trap for mouse wheel or touch. */}
+                    <div className="px-4 py-2">
                     <div className="space-y-2" ref={lineItemsRef}>
                       {fields.map((field, index) => (
                         <div key={field.id} className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1fr_1fr_1.5fr_auto] gap-2 items-start">
