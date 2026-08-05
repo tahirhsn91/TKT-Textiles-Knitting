@@ -13,7 +13,7 @@ import {
   yarnBrandMasterTable,
   uomMasterTable,
   fabricTypeMasterTable,
-  machineOperatorMasterTable,
+  employeeMasterTable,
   departmentMasterTable,
   insertTransactionTypeMasterSchema,
   insertJobMasterSchema,
@@ -26,7 +26,7 @@ import {
   insertUomMasterSchema,
   insertFabricTypeMasterSchema,
   insertDepartmentMasterSchema,
-  insertMachineOperatorMasterSchema,
+  insertEmployeeMasterSchema,
 } from "../db/index.js";
 
 const router: IRouter = Router();
@@ -613,24 +613,24 @@ router.delete("/masters/department/:id", async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
-// ─── Machine Operator Master ──────────────────────────────────────────────────
+// ─── Machine Employee Master ──────────────────────────────────────────────────
 
 function numOrNull(v: unknown): string | null {
   return v != null && v !== "" ? String(v) : null;
 }
 
-router.get("/masters/machine-operator", async (_req, res): Promise<void> => {
-  const rows = await db.select().from(machineOperatorMasterTable).orderBy(machineOperatorMasterTable.name);
+router.get("/masters/employee", async (_req, res): Promise<void> => {
+  const rows = await db.select().from(employeeMasterTable).orderBy(employeeMasterTable.name);
   res.json(rows);
 });
 
-router.post("/masters/machine-operator", async (req, res): Promise<void> => {
-  const parsed = requireFields(insertMachineOperatorMasterSchema, ["name", "code"], req.body, res);
+router.post("/masters/employee", async (req, res): Promise<void> => {
+  const parsed = requireFields(insertEmployeeMasterSchema, ["name", "code"], req.body, res);
   if (!parsed) return;
   const { name, code } = parsed;
   const { departmentId, baseSalary, overtimeRateHr, attAllowance, othAllowance, active } = req.body;
   try {
-    const [row] = await db.insert(machineOperatorMasterTable).values({
+    const [row] = await db.insert(employeeMasterTable).values({
       name,
       code,
       departmentId: departmentId ?? null,
@@ -647,15 +647,15 @@ router.post("/masters/machine-operator", async (req, res): Promise<void> => {
   }
 });
 
-router.put("/masters/machine-operator/:id", async (req, res): Promise<void> => {
+router.put("/masters/employee/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const parsed = requireFields(insertMachineOperatorMasterSchema, ["name", "code"], req.body, res);
+  const parsed = requireFields(insertEmployeeMasterSchema, ["name", "code"], req.body, res);
   if (!parsed) return;
   const { name, code } = parsed;
   const { departmentId, baseSalary, overtimeRateHr, attAllowance, othAllowance, active } = req.body;
   try {
-    const [row] = await db.update(machineOperatorMasterTable).set({
+    const [row] = await db.update(employeeMasterTable).set({
       name,
       code,
       departmentId: departmentId ?? null,
@@ -664,7 +664,7 @@ router.put("/masters/machine-operator/:id", async (req, res): Promise<void> => {
       attAllowance: numOrNull(attAllowance),
       othAllowance: numOrNull(othAllowance),
       active: active ?? true,
-    }).where(eq(machineOperatorMasterTable.id, id)).returning();
+    }).where(eq(employeeMasterTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
     res.json(row);
   } catch (err) {
@@ -673,10 +673,10 @@ router.put("/masters/machine-operator/:id", async (req, res): Promise<void> => {
   }
 });
 
-router.delete("/masters/machine-operator/:id", async (req, res): Promise<void> => {
+router.delete("/masters/employee/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const [row] = await db.delete(machineOperatorMasterTable).where(eq(machineOperatorMasterTable.id, id)).returning();
+  const [row] = await db.delete(employeeMasterTable).where(eq(employeeMasterTable.id, id)).returning();
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   res.sendStatus(204);
 });

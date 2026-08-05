@@ -403,11 +403,11 @@ function MachineUtilizationWidget() {
   );
 }
 
-function OperatorOutputWidget() {
-  const { data, isLoading, isError } = useWidget<NameNetWeight[]>("operator-output");
+function EmployeeOutputWidget() {
+  const { data, isLoading, isError } = useWidget<NameNetWeight[]>("employee-output");
   return (
     <RankedBars
-      title="Top operators"
+      title="Top employees"
       scope="By net weight, this month"
       data={data}
       isLoading={isLoading}
@@ -453,7 +453,7 @@ export default function DashboardPage() {
           <MachineUtilizationWidget />
         </div>
 
-        <OperatorOutputWidget />
+        <EmployeeOutputWidget />
       </div>
     </Layout>
   );

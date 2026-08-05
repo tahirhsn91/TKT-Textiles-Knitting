@@ -112,7 +112,7 @@ export const insertDepartmentMasterSchema = createInsertSchema(departmentMasterT
 export type InsertDepartmentMaster = z.infer<typeof insertDepartmentMasterSchema>;
 export type DepartmentMaster = typeof departmentMasterTable.$inferSelect;
 
-export const machineOperatorMasterTable = pgTable("machine_operator_master", {
+export const employeeMasterTable = pgTable("employee_master", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
@@ -123,46 +123,46 @@ export const machineOperatorMasterTable = pgTable("machine_operator_master", {
   othAllowance: numeric("oth_allowance", { precision: 10, scale: 2 }),
   active: boolean("active").notNull().default(true),
 });
-export const insertMachineOperatorMasterSchema = createInsertSchema(machineOperatorMasterTable).omit({ id: true });
-export type InsertMachineOperatorMaster = z.infer<typeof insertMachineOperatorMasterSchema>;
-export type MachineOperatorMaster = typeof machineOperatorMasterTable.$inferSelect;
+export const insertEmployeeMasterSchema = createInsertSchema(employeeMasterTable).omit({ id: true });
+export type InsertEmployeeMaster = z.infer<typeof insertEmployeeMasterSchema>;
+export type EmployeeMaster = typeof employeeMasterTable.$inferSelect;
 
-// ─── Operator Salary Settings ──────────────────────────────────────────────
-export const operatorSalarySettingsTable = pgTable("operator_salary_settings", {
+// ─── Employee Salary Settings ──────────────────────────────────────────────
+export const employeeSalarySettingsTable = pgTable("employee_salary_settings", {
   id: serial("id").primaryKey(),
-  operatorId: integer("operator_id").notNull().unique().references(() => machineOperatorMasterTable.id),
+  employeeId: integer("employee_id").notNull().unique().references(() => employeeMasterTable.id),
   baseDailyWage: numeric("base_daily_wage").notNull().default("0"),
 });
-export const insertOperatorSalarySettingsSchema = createInsertSchema(operatorSalarySettingsTable).omit({ id: true });
-export type InsertOperatorSalarySettings = z.infer<typeof insertOperatorSalarySettingsSchema>;
-export type OperatorSalarySettings = typeof operatorSalarySettingsTable.$inferSelect;
+export const insertEmployeeSalarySettingsSchema = createInsertSchema(employeeSalarySettingsTable).omit({ id: true });
+export type InsertEmployeeSalarySettings = z.infer<typeof insertEmployeeSalarySettingsSchema>;
+export type EmployeeSalarySettings = typeof employeeSalarySettingsTable.$inferSelect;
 
-// ─── Operator Salary Records ───────────────────────────────────────────────
-export const operatorSalaryRecordsTable = pgTable("operator_salary_records", {
+// ─── Employee Salary Records ───────────────────────────────────────────────
+export const employeeSalaryRecordsTable = pgTable("employee_salary_records", {
   id: serial("id").primaryKey(),
-  operatorId: integer("operator_id").notNull().references(() => machineOperatorMasterTable.id),
+  employeeId: integer("employee_id").notNull().references(() => employeeMasterTable.id),
   date: text("date").notNull(),
   baseWage: numeric("base_wage").notNull(),
   commission: numeric("commission").notNull().default("0"),
   finalSalary: numeric("final_salary").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-}, (t) => ({ uniq: unique().on(t.operatorId, t.date) }));
-export const insertOperatorSalaryRecordsSchema = createInsertSchema(operatorSalaryRecordsTable).omit({ id: true, createdAt: true });
-export type InsertOperatorSalaryRecord = z.infer<typeof insertOperatorSalaryRecordsSchema>;
-export type OperatorSalaryRecord = typeof operatorSalaryRecordsTable.$inferSelect;
+}, (t) => ({ uniq: unique().on(t.employeeId, t.date) }));
+export const insertEmployeeSalaryRecordsSchema = createInsertSchema(employeeSalaryRecordsTable).omit({ id: true, createdAt: true });
+export type InsertEmployeeSalaryRecord = z.infer<typeof insertEmployeeSalaryRecordsSchema>;
+export type EmployeeSalaryRecord = typeof employeeSalaryRecordsTable.$inferSelect;
 
-// ─── Operator Advances ─────────────────────────────────────────────────────
-export const operatorAdvancesTable = pgTable("operator_advances", {
+// ─── Employee Advances ─────────────────────────────────────────────────────
+export const employeeAdvancesTable = pgTable("employee_advances", {
   id: serial("id").primaryKey(),
-  operatorId: integer("operator_id").notNull().references(() => machineOperatorMasterTable.id),
+  employeeId: integer("employee_id").notNull().references(() => employeeMasterTable.id),
   date: text("date").notNull(),
   amount: numeric("amount").notNull(),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
-export const insertOperatorAdvancesSchema = createInsertSchema(operatorAdvancesTable).omit({ id: true, createdAt: true });
-export type InsertOperatorAdvance = z.infer<typeof insertOperatorAdvancesSchema>;
-export type OperatorAdvance = typeof operatorAdvancesTable.$inferSelect;
+export const insertEmployeeAdvancesSchema = createInsertSchema(employeeAdvancesTable).omit({ id: true, createdAt: true });
+export type InsertEmployeeAdvance = z.infer<typeof insertEmployeeAdvancesSchema>;
+export type EmployeeAdvance = typeof employeeAdvancesTable.$inferSelect;
 
 // ─── Salary Header ─────────────────────────────────────────────────────────
 export const salaryHeaderTable = pgTable("salary_header", {
@@ -180,11 +180,11 @@ export type SalaryHeader = typeof salaryHeaderTable.$inferSelect;
 export const salaryDetailTable = pgTable("salary_detail", {
   id: serial("id").primaryKey(),
   headerId: integer("header_id").notNull().references(() => salaryHeaderTable.id, { onDelete: "cascade" }),
-  operatorId: integer("operator_id").notNull().references(() => machineOperatorMasterTable.id),
+  employeeId: integer("employee_id").notNull().references(() => employeeMasterTable.id),
   month: integer("month"),
   year: integer("year"),
   departmentId: integer("department_id"),
-  operatorName: text("operator_name").notNull(),
+  employeeName: text("employee_name").notNull(),
   basicSalary: numeric("basic_salary", { precision: 10, scale: 2 }).notNull().default("0"),
   otRateHr: numeric("ot_rate_hr", { precision: 10, scale: 2 }).notNull().default("0"),
   attAllowance: numeric("att_allowance", { precision: 10, scale: 2 }).notNull().default("0"),
@@ -201,7 +201,7 @@ export const salaryDetailTable = pgTable("salary_detail", {
   otherDeduction: numeric("other_deduction", { precision: 10, scale: 2 }).notNull().default("0"),
   payableSalary: numeric("payable_salary", { precision: 10, scale: 2 }).notNull().default("0"),
 }, (t) => [
-  unique("salary_detail_header_operator_unique").on(t.headerId, t.operatorId),
-  unique("salary_detail_op_month_year_unique").on(t.operatorId, t.month, t.year),
+  unique("salary_detail_header_employee_unique").on(t.headerId, t.employeeId),
+  unique("salary_detail_emp_month_year_unique").on(t.employeeId, t.month, t.year),
 ]);
 export type SalaryDetail = typeof salaryDetailTable.$inferSelect;

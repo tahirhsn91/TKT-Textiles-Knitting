@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useListMachineMaster,
   useListPartyMaster,
-  useListMachineOperatorMaster,
+  useListEmployeeMaster,
   useListDepartmentMaster,
 } from "@workspace/api-client-react";
 import {
@@ -48,7 +48,7 @@ const LS_ENTERED_BY = "daily-production-entered-by";
 const headerSchema = z.object({
   productionDate: z.date({ required_error: "Production date is required" }),
   machineId: z.number({ required_error: "Machine is required" }),
-  operatorId: z.number({ required_error: "Operator is required" }),
+  employeeId: z.number({ required_error: "Employee is required" }),
   partyId: z.number({ required_error: "Party is required" }),
   shift: z.enum(["Morning", "Night"], { required_error: "Shift is required" }),
   enteredBy: z.string().min(1, "Enter your name"),
@@ -66,7 +66,7 @@ function defaultHeaderValues(enteredBy: string, defaultDate: Date = new Date()):
   return {
     productionDate: defaultDate,
     machineId: undefined as unknown as number,
-    operatorId: undefined as unknown as number,
+    employeeId: undefined as unknown as number,
     partyId: undefined as unknown as number,
     shift: undefined as unknown as Shift,
     enteredBy,
@@ -104,17 +104,17 @@ export function ProductionEntryDialog({
 
   const { data: machineMaster } = useListMachineMaster();
   const { data: partyMaster } = useListPartyMaster();
-  const { data: machineOperatorMaster } = useListMachineOperatorMaster();
+  const { data: employeeMaster } = useListEmployeeMaster();
   const { data: departments } = useListDepartmentMaster();
 
-  // Only operators belonging to the Production department appear here — the
-  // dropdown feeds a knitting production form, so operators from other
+  // Only employees belonging to the Production department appear here — the
+  // dropdown feeds a knitting production form, so employees from other
   // departments (e.g. Administration) would be noise. Matched by name rather
   // than a hardcoded id, so it keeps working if the seed data changes.
   const productionDepartmentId = departments?.find(
     (d) => d.name.toLowerCase() === "production",
   )?.id;
-  const productionOperators = machineOperatorMaster?.filter(
+  const productionEmployees = employeeMaster?.filter(
     (op) =>
       (op as { active?: boolean }).active !== false &&
       op.departmentId != null &&
@@ -176,7 +176,7 @@ export function ProductionEntryDialog({
     form.reset({
       productionDate: new Date(`${entry.productionDate}T00:00:00`),
       machineId: entry.machineId,
-      operatorId: entry.operatorId,
+      employeeId: entry.employeeId,
       partyId: entry.partyId,
       shift: entry.shift,
       enteredBy: savedEnteredBy || entry.createdBy,
@@ -236,7 +236,7 @@ export function ProductionEntryDialog({
     const payload = {
       productionDate: format(values.productionDate, "yyyy-MM-dd"),
       machineId: values.machineId,
-      operatorId: values.operatorId,
+      employeeId: values.employeeId,
       partyId: values.partyId,
       shift: values.shift,
       remarks: null,
@@ -434,10 +434,10 @@ export function ProductionEntryDialog({
 
               <FormField
                 control={form.control}
-                name="operatorId"
+                name="employeeId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Operator *</FormLabel>
+                    <FormLabel>Employee *</FormLabel>
                     <FormControl>
                       <select
                         className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
@@ -445,8 +445,8 @@ export function ProductionEntryDialog({
                         disabled={readOnly}
                         onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
                       >
-                        <option value="" disabled>Select operator</option>
-                        {productionOperators?.map((op) => (
+                        <option value="" disabled>Select employee</option>
+                        {productionEmployees?.map((op) => (
                           <option key={op.id} value={op.id.toString()}>{op.name}</option>
                         ))}
                       </select>
@@ -517,7 +517,7 @@ export function ProductionEntryDialog({
                     onKeyDown={handleRollKeyDown}
                     // Autofocusing on a phone throws the keyboard up over the
                     // form the moment the dialog opens, hiding the fields the
-                    // operator has to fill in first.
+                    // employee has to fill in first.
                     autoFocus={!isMobile}
                   />
                 </div>

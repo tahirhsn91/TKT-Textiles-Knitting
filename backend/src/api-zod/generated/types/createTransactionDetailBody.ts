@@ -10,7 +10,7 @@ export interface CreateTransactionDetailBody {
   /** @nullable */
   machineId?: number | null;
   /** @nullable */
-  machineOperatorId?: number | null;
+  machineEmployeeId?: number | null;
   /** @nullable */
   yarnTypeId?: number | null;
   /** @nullable */

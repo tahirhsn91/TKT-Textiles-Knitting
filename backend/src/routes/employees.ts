@@ -2,9 +2,9 @@ import { Router, type IRouter } from "express";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
-  machineOperatorMasterTable,
-  operatorSalaryRecordsTable,
-  operatorAdvancesTable,
+  employeeMasterTable,
+  employeeSalaryRecordsTable,
+  employeeAdvancesTable,
 } from "../db/index.js";
 
 const router: IRouter = Router();
@@ -28,34 +28,34 @@ function toNumStrict(val: unknown): number | null {
 
 // ─── Advances ────────────────────────────────────────────────────────────────
 
-router.get("/operators/advances", async (req, res): Promise<void> => {
-  const { operatorId, dateFrom, dateTo } = req.query as Record<string, string>;
+router.get("/employees/advances", async (req, res): Promise<void> => {
+  const { employeeId, dateFrom, dateTo } = req.query as Record<string, string>;
   const conditions = [];
-  if (operatorId) conditions.push(eq(operatorAdvancesTable.operatorId, Number(operatorId)));
-  if (dateFrom) conditions.push(gte(operatorAdvancesTable.date, dateFrom));
-  if (dateTo) conditions.push(lte(operatorAdvancesTable.date, dateTo));
+  if (employeeId) conditions.push(eq(employeeAdvancesTable.employeeId, Number(employeeId)));
+  if (dateFrom) conditions.push(gte(employeeAdvancesTable.date, dateFrom));
+  if (dateTo) conditions.push(lte(employeeAdvancesTable.date, dateTo));
 
   const rows = await db
     .select({
-      id: operatorAdvancesTable.id,
-      operatorId: operatorAdvancesTable.operatorId,
-      operatorName: machineOperatorMasterTable.name,
-      date: operatorAdvancesTable.date,
-      amount: operatorAdvancesTable.amount,
-      notes: operatorAdvancesTable.notes,
-      createdAt: operatorAdvancesTable.createdAt,
+      id: employeeAdvancesTable.id,
+      employeeId: employeeAdvancesTable.employeeId,
+      employeeName: employeeMasterTable.name,
+      date: employeeAdvancesTable.date,
+      amount: employeeAdvancesTable.amount,
+      notes: employeeAdvancesTable.notes,
+      createdAt: employeeAdvancesTable.createdAt,
     })
-    .from(operatorAdvancesTable)
-    .leftJoin(machineOperatorMasterTable, eq(operatorAdvancesTable.operatorId, machineOperatorMasterTable.id))
+    .from(employeeAdvancesTable)
+    .leftJoin(employeeMasterTable, eq(employeeAdvancesTable.employeeId, employeeMasterTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(operatorAdvancesTable.date);
+    .orderBy(employeeAdvancesTable.date);
   res.json(rows);
 });
 
-router.post("/operators/advances", async (req, res): Promise<void> => {
-  const { operatorId, date, amount, notes } = req.body;
-  if (!operatorId || !date || amount === undefined) {
-    res.status(400).json({ error: "operatorId, date, and amount are required" });
+router.post("/employees/advances", async (req, res): Promise<void> => {
+  const { employeeId, date, amount, notes } = req.body;
+  if (!employeeId || !date || amount === undefined) {
+    res.status(400).json({ error: "employeeId, date, and amount are required" });
     return;
   }
   const amt = toNumStrict(amount);
@@ -65,18 +65,18 @@ router.post("/operators/advances", async (req, res): Promise<void> => {
   }
   if (amt < 0) { res.status(400).json({ error: "amount must be >= 0" }); return; }
   const [row] = await db
-    .insert(operatorAdvancesTable)
-    .values({ operatorId: Number(operatorId), date, amount: String(amt), notes: notes || null })
+    .insert(employeeAdvancesTable)
+    .values({ employeeId: Number(employeeId), date, amount: String(amt), notes: notes || null })
     .returning();
   res.status(201).json(row);
 });
 
-router.delete("/operators/advances/:id", async (req, res): Promise<void> => {
+router.delete("/employees/advances/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
   const [row] = await db
-    .delete(operatorAdvancesTable)
-    .where(eq(operatorAdvancesTable.id, id))
+    .delete(employeeAdvancesTable)
+    .where(eq(employeeAdvancesTable.id, id))
     .returning();
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   res.sendStatus(204);
@@ -84,8 +84,8 @@ router.delete("/operators/advances/:id", async (req, res): Promise<void> => {
 
 // ─── Payroll Summary ─────────────────────────────────────────────────────────
 
-router.get("/operators/payroll-summary", async (req, res): Promise<void> => {
-  const { month, year, operatorId } = req.query as Record<string, string>;
+router.get("/employees/payroll-summary", async (req, res): Promise<void> => {
+  const { month, year, employeeId } = req.query as Record<string, string>;
   if (!month || !year) {
     res.status(400).json({ error: "month and year are required" });
     return;
@@ -97,29 +97,29 @@ router.get("/operators/payroll-summary", async (req, res): Promise<void> => {
   const dateTo = `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
   const opConditions = [];
-  const advConditions = [gte(operatorAdvancesTable.date, dateFrom), lte(operatorAdvancesTable.date, dateTo)];
-  const recConditions = [gte(operatorSalaryRecordsTable.date, dateFrom), lte(operatorSalaryRecordsTable.date, dateTo)];
+  const advConditions = [gte(employeeAdvancesTable.date, dateFrom), lte(employeeAdvancesTable.date, dateTo)];
+  const recConditions = [gte(employeeSalaryRecordsTable.date, dateFrom), lte(employeeSalaryRecordsTable.date, dateTo)];
 
-  if (operatorId) {
-    opConditions.push(eq(machineOperatorMasterTable.id, Number(operatorId)));
-    advConditions.push(eq(operatorAdvancesTable.operatorId, Number(operatorId)));
-    recConditions.push(eq(operatorSalaryRecordsTable.operatorId, Number(operatorId)));
+  if (employeeId) {
+    opConditions.push(eq(employeeMasterTable.id, Number(employeeId)));
+    advConditions.push(eq(employeeAdvancesTable.employeeId, Number(employeeId)));
+    recConditions.push(eq(employeeSalaryRecordsTable.employeeId, Number(employeeId)));
   }
 
-  const operators = await db
-    .select({ id: machineOperatorMasterTable.id, name: machineOperatorMasterTable.name, code: machineOperatorMasterTable.code })
-    .from(machineOperatorMasterTable)
+  const employees = await db
+    .select({ id: employeeMasterTable.id, name: employeeMasterTable.name, code: employeeMasterTable.code })
+    .from(employeeMasterTable)
     .where(opConditions.length > 0 ? and(...opConditions) : undefined)
-    .orderBy(machineOperatorMasterTable.name);
+    .orderBy(employeeMasterTable.name);
 
   const records = await db
     .select()
-    .from(operatorSalaryRecordsTable)
+    .from(employeeSalaryRecordsTable)
     .where(and(...recConditions));
 
   const advances = await db
     .select()
-    .from(operatorAdvancesTable)
+    .from(employeeAdvancesTable)
     .where(and(...advConditions));
 
   // Totals are aggregated in SQL with COALESCE so a NULL column value
@@ -128,39 +128,39 @@ router.get("/operators/payroll-summary", async (req, res): Promise<void> => {
   // daily breakdown; the frontend formats them for display.
   const salaryTotals = await db
     .select({
-      operatorId: operatorSalaryRecordsTable.operatorId,
+      employeeId: employeeSalaryRecordsTable.employeeId,
       totalDaysWorked: sql<number>`count(*)::int`,
-      totalSalary: sql<string>`coalesce(sum(${operatorSalaryRecordsTable.finalSalary}), 0)`,
+      totalSalary: sql<string>`coalesce(sum(${employeeSalaryRecordsTable.finalSalary}), 0)`,
     })
-    .from(operatorSalaryRecordsTable)
+    .from(employeeSalaryRecordsTable)
     .where(and(...recConditions))
-    .groupBy(operatorSalaryRecordsTable.operatorId);
+    .groupBy(employeeSalaryRecordsTable.employeeId);
 
   const advanceTotals = await db
     .select({
-      operatorId: operatorAdvancesTable.operatorId,
-      totalAdvances: sql<string>`coalesce(sum(${operatorAdvancesTable.amount}), 0)`,
+      employeeId: employeeAdvancesTable.employeeId,
+      totalAdvances: sql<string>`coalesce(sum(${employeeAdvancesTable.amount}), 0)`,
     })
-    .from(operatorAdvancesTable)
+    .from(employeeAdvancesTable)
     .where(and(...advConditions))
-    .groupBy(operatorAdvancesTable.operatorId);
+    .groupBy(employeeAdvancesTable.employeeId);
 
-  const salaryByOperator = new Map(salaryTotals.map((t) => [t.operatorId, t]));
-  const advanceByOperator = new Map(advanceTotals.map((t) => [t.operatorId, t]));
+  const salaryByEmployee = new Map(salaryTotals.map((t) => [t.employeeId, t]));
+  const advanceByEmployee = new Map(advanceTotals.map((t) => [t.employeeId, t]));
 
-  const summary = operators.map((op) => {
-    const opRecords = records.filter((r) => r.operatorId === op.id);
-    const opAdvances = advances.filter((a) => a.operatorId === op.id);
-    const salaryTotal = salaryByOperator.get(op.id);
-    const advanceTotal = advanceByOperator.get(op.id);
+  const summary = employees.map((op) => {
+    const opRecords = records.filter((r) => r.employeeId === op.id);
+    const opAdvances = advances.filter((a) => a.employeeId === op.id);
+    const salaryTotal = salaryByEmployee.get(op.id);
+    const advanceTotal = advanceByEmployee.get(op.id);
     const totalSalary = Number(salaryTotal?.totalSalary ?? 0);
     const totalAdvances = Number(advanceTotal?.totalAdvances ?? 0);
     const totalDaysWorked = salaryTotal?.totalDaysWorked ?? 0;
     const netPayable = totalSalary - totalAdvances;
     return {
-      operatorId: op.id,
-      operatorName: op.name,
-      operatorCode: op.code,
+      employeeId: op.id,
+      employeeName: op.name,
+      employeeCode: op.code,
       totalDaysWorked,
       totalSalary,
       totalAdvances,

@@ -119,11 +119,11 @@ export const ListFabricTypeMasterResponse = zod.array(
 );
 
 /**
- * @summary List machine operator master entries
+ * @summary List machine employee master entries
  */
-export const listMachineOperatorMasterResponseActiveDefault = true;
+export const listEmployeeMasterResponseActiveDefault = true;
 
-export const ListMachineOperatorMasterResponseItem = zod.object({
+export const ListEmployeeMasterResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
   code: zod.string(),
@@ -132,10 +132,10 @@ export const ListMachineOperatorMasterResponseItem = zod.object({
   overtimeRateHr: zod.string().nullish(),
   attAllowance: zod.string().nullish(),
   othAllowance: zod.string().nullish(),
-  active: zod.boolean().default(listMachineOperatorMasterResponseActiveDefault),
+  active: zod.boolean().default(listEmployeeMasterResponseActiveDefault),
 });
-export const ListMachineOperatorMasterResponse = zod.array(
-  ListMachineOperatorMasterResponseItem,
+export const ListEmployeeMasterResponse = zod.array(
+  ListEmployeeMasterResponseItem,
 );
 
 /**
@@ -664,11 +664,11 @@ export const DeleteDepartmentMasterParams = zod.object({
 });
 
 /**
- * @summary List machine operator master entries (CRUD)
+ * @summary List machine employee master entries (CRUD)
  */
-export const listMachineOperatorMasterCrudResponseActiveDefault = true;
+export const listEmployeeMasterCrudResponseActiveDefault = true;
 
-export const ListMachineOperatorMasterCrudResponseItem = zod.object({
+export const ListEmployeeMasterCrudResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
   code: zod.string(),
@@ -679,18 +679,18 @@ export const ListMachineOperatorMasterCrudResponseItem = zod.object({
   othAllowance: zod.string().nullish(),
   active: zod
     .boolean()
-    .default(listMachineOperatorMasterCrudResponseActiveDefault),
+    .default(listEmployeeMasterCrudResponseActiveDefault),
 });
-export const ListMachineOperatorMasterCrudResponse = zod.array(
-  ListMachineOperatorMasterCrudResponseItem,
+export const ListEmployeeMasterCrudResponse = zod.array(
+  ListEmployeeMasterCrudResponseItem,
 );
 
 /**
- * @summary Create machine operator master entry
+ * @summary Create machine employee master entry
  */
-export const createMachineOperatorMasterBodyActiveDefault = true;
+export const createEmployeeMasterBodyActiveDefault = true;
 
-export const CreateMachineOperatorMasterBody = zod.object({
+export const CreateEmployeeMasterBody = zod.object({
   name: zod.string(),
   code: zod.string(),
   departmentId: zod.number().nullish(),
@@ -698,19 +698,19 @@ export const CreateMachineOperatorMasterBody = zod.object({
   overtimeRateHr: zod.string().nullish(),
   attAllowance: zod.string().nullish(),
   othAllowance: zod.string().nullish(),
-  active: zod.boolean().default(createMachineOperatorMasterBodyActiveDefault),
+  active: zod.boolean().default(createEmployeeMasterBodyActiveDefault),
 });
 
 /**
- * @summary Update machine operator master entry
+ * @summary Update machine employee master entry
  */
-export const UpdateMachineOperatorMasterParams = zod.object({
+export const UpdateEmployeeMasterParams = zod.object({
   id: zod.coerce.number(),
 });
 
-export const updateMachineOperatorMasterBodyActiveDefault = true;
+export const updateEmployeeMasterBodyActiveDefault = true;
 
-export const UpdateMachineOperatorMasterBody = zod.object({
+export const UpdateEmployeeMasterBody = zod.object({
   name: zod.string(),
   code: zod.string(),
   departmentId: zod.number().nullish(),
@@ -718,12 +718,12 @@ export const UpdateMachineOperatorMasterBody = zod.object({
   overtimeRateHr: zod.string().nullish(),
   attAllowance: zod.string().nullish(),
   othAllowance: zod.string().nullish(),
-  active: zod.boolean().default(updateMachineOperatorMasterBodyActiveDefault),
+  active: zod.boolean().default(updateEmployeeMasterBodyActiveDefault),
 });
 
-export const updateMachineOperatorMasterResponseActiveDefault = true;
+export const updateEmployeeMasterResponseActiveDefault = true;
 
-export const UpdateMachineOperatorMasterResponse = zod.object({
+export const UpdateEmployeeMasterResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
   code: zod.string(),
@@ -734,13 +734,13 @@ export const UpdateMachineOperatorMasterResponse = zod.object({
   othAllowance: zod.string().nullish(),
   active: zod
     .boolean()
-    .default(updateMachineOperatorMasterResponseActiveDefault),
+    .default(updateEmployeeMasterResponseActiveDefault),
 });
 
 /**
- * @summary Delete machine operator master entry
+ * @summary Delete machine employee master entry
  */
-export const DeleteMachineOperatorMasterParams = zod.object({
+export const DeleteEmployeeMasterParams = zod.object({
   id: zod.coerce.number(),
 });
 
@@ -780,7 +780,7 @@ export const CreateTransactionBody = zod.object({
   details: zod.array(
     zod.object({
       machineId: zod.number().nullish(),
-      machineOperatorId: zod.number().nullish(),
+      machineEmployeeId: zod.number().nullish(),
       yarnTypeId: zod.number().nullish(),
       yarnCountId: zod.number().nullish(),
       yarnBrandId: zod.number().nullish(),
@@ -815,7 +815,7 @@ export const GetTransactionResponse = zod.object({
       id: zod.number(),
       headerId: zod.number(),
       machineId: zod.number().nullish(),
-      machineOperatorId: zod.number().nullish(),
+      machineEmployeeId: zod.number().nullish(),
       yarnTypeId: zod.number().nullish(),
       yarnCountId: zod.number().nullish(),
       yarnBrandId: zod.number().nullish(),
@@ -847,7 +847,7 @@ export const UpdateTransactionBody = zod.object({
   details: zod.array(
     zod.object({
       machineId: zod.number().nullish(),
-      machineOperatorId: zod.number().nullish(),
+      machineEmployeeId: zod.number().nullish(),
       yarnTypeId: zod.number().nullish(),
       yarnCountId: zod.number().nullish(),
       yarnBrandId: zod.number().nullish(),
@@ -875,7 +875,7 @@ export const UpdateTransactionResponse = zod.object({
       id: zod.number(),
       headerId: zod.number(),
       machineId: zod.number().nullish(),
-      machineOperatorId: zod.number().nullish(),
+      machineEmployeeId: zod.number().nullish(),
       yarnTypeId: zod.number().nullish(),
       yarnCountId: zod.number().nullish(),
       yarnBrandId: zod.number().nullish(),

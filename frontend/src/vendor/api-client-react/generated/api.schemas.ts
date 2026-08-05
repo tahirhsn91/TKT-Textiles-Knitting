@@ -33,7 +33,7 @@ export interface UomLookupItem {
   abbreviation: string;
 }
 
-export interface MachineOperatorLookupItem {
+export interface EmployeeLookupItem {
   id: number;
   name: string;
   code: string;
@@ -50,7 +50,7 @@ export interface MachineOperatorLookupItem {
   active: boolean;
 }
 
-export interface CreateMachineOperatorBody {
+export interface CreateEmployeeBody {
   name: string;
   code: string;
   /** @nullable */
@@ -125,7 +125,7 @@ export interface TransactionDetailItem {
   /** @nullable */
   machineId?: number | null;
   /** @nullable */
-  machineOperatorId?: number | null;
+  machineEmployeeId?: number | null;
   /** @nullable */
   yarnTypeId?: number | null;
   /** @nullable */
@@ -188,7 +188,7 @@ export interface CreateTransactionDetailBody {
   /** @nullable */
   machineId?: number | null;
   /** @nullable */
-  machineOperatorId?: number | null;
+  machineEmployeeId?: number | null;
   /** @nullable */
   yarnTypeId?: number | null;
   /** @nullable */

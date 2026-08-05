@@ -71,7 +71,7 @@ async function apiFetch(path: string, opts?: RequestInit) {
 }
 
 interface Department { id: number; name: string; code: string; }
-interface Operator {
+interface Employee {
   id: number; name: string; code: string; active: boolean;
   departmentId: number | null;
   baseSalary: string | null;
@@ -81,9 +81,9 @@ interface Operator {
 }
 
 interface DetailRow {
-  operatorId: number;
+  employeeId: number;
   departmentId: number | null;
-  operatorName: string;
+  employeeName: string;
   basicSalary: string;
   otRateHr: string;
   attAllowance: string;
@@ -127,11 +127,11 @@ function recomputeAll(row: DetailRow, totalDays: number): DetailRow {
   });
 }
 
-function rowFromOperator(op: Operator, totalDays: number): DetailRow {
+function rowFromEmployee(op: Employee, totalDays: number): DetailRow {
   const base: DetailRow = {
-    operatorId: op.id,
+    employeeId: op.id,
     departmentId: op.departmentId,
-    operatorName: op.name,
+    employeeName: op.name,
     basicSalary: toNum(op.baseSalary).toFixed(NUM_DECIMALS),
     otRateHr: toNum(op.overtimeRateHr).toFixed(NUM_DECIMALS),
     attAllowance: toNum(op.attAllowance).toFixed(NUM_DECIMALS),
@@ -175,9 +175,9 @@ export default function PayrollEntryPage() {
     queryFn: () => apiFetch("/api/lookups/department-master"),
   });
 
-  const { data: allOperators = [] } = useQuery<Operator[]>({
-    queryKey: ["operator-full-lookup"],
-    queryFn: () => apiFetch("/api/lookups/machine-operator-master"),
+  const { data: allEmployees = [] } = useQuery<Employee[]>({
+    queryKey: ["employee-full-lookup"],
+    queryFn: () => apiFetch("/api/lookups/employee-master"),
   });
 
   const { data: existingEntry, isLoading: loadingEntry } = useQuery<{
@@ -199,7 +199,7 @@ export default function PayrollEntryPage() {
     setInitialized(true);
   }, [isEdit, existingEntry, initialized]);
 
-  // For new mode: rebuild rows when dept selection or operator list changes
+  // For new mode: rebuild rows when dept selection or employee list changes
   const deptKey = useMemo(
     () => selectedDeptIds.slice().sort().join(","),
     [selectedDeptIds]
@@ -209,16 +209,16 @@ export default function PayrollEntryPage() {
 
   useEffect(() => {
     if (isEdit) return;
-    if (deptKey === builtForKey && allOperators.length === builtForOpCount) return;
+    if (deptKey === builtForKey && allEmployees.length === builtForOpCount) return;
     setBuiltForKey(deptKey);
-    setBuiltForOpCount(allOperators.length);
+    setBuiltForOpCount(allEmployees.length);
     if (selectedDeptIds.length === 0) { setRows([]); return; }
     const td = daysInMonthFn(parseInt(month) || 1, parseInt(year) || CURRENT_YEAR);
-    const filtered = allOperators.filter(
+    const filtered = allEmployees.filter(
       (op) => op.active && op.departmentId !== null && selectedDeptIds.includes(op.departmentId!)
     );
-    setRows(filtered.map((op) => rowFromOperator(op, td)));
-  }, [isEdit, deptKey, allOperators.length]); // eslint-disable-line react-hooks/exhaustive-deps
+    setRows(filtered.map((op) => rowFromEmployee(op, td)));
+  }, [isEdit, deptKey, allEmployees.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Row update with field-aware formula logic ──
   const updateRow = useCallback(
@@ -454,8 +454,8 @@ export default function PayrollEntryPage() {
                     const inp = "h-7 text-right font-mono text-xs p-1 w-full";
                     const ro = "h-7 text-right font-mono text-xs p-1 w-full bg-muted/40 cursor-not-allowed";
                     return (
-                      <TableRow key={row.operatorId} className={i % 2 === 0 ? "bg-muted/10" : ""}>
-                        <TableCell className="font-medium text-sm py-1">{row.operatorName}</TableCell>
+                      <TableRow key={row.employeeId} className={i % 2 === 0 ? "bg-muted/10" : ""}>
+                        <TableCell className="font-medium text-sm py-1">{row.employeeName}</TableCell>
                         {/* Master snapshot — display only */}
                         <TableCell className="py-1"><Input disabled className={ro} value={row.basicSalary} /></TableCell>
                         <TableCell className="py-1"><Input disabled className={ro} value={row.otRateHr} /></TableCell>
