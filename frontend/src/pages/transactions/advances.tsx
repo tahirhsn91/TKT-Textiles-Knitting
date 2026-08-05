@@ -189,11 +189,13 @@ export default function AdvancesPage() {
           <Card>
             <CardHeader><CardTitle>Add Advance</CardTitle></CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-4 items-end">
-                <div className="flex flex-col gap-1">
+              {/* Grid on mobile so every field has a consistent width;
+                  inline flex row on sm+ (fixed widths there). */}
+              <div className="grid grid-cols-2 items-end gap-4 sm:flex sm:flex-wrap">
+                <div className="col-span-2 flex flex-col gap-1 sm:col-auto sm:w-48">
                   <Label>Employee</Label>
                   <Select value={form.employeeId} onValueChange={(v) => setForm((p) => ({ ...p, employeeId: v }))}>
-                    <SelectTrigger className="h-11 w-full sm:h-9 sm:w-48">
+                    <SelectTrigger className="h-11 w-full sm:h-9">
                       <SelectValue placeholder="Select employee" />
                     </SelectTrigger>
                     <SelectContent>
@@ -203,10 +205,10 @@ export default function AdvancesPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1 sm:w-40">
                   <Label>Date</Label>
                   <DateInput
-                    className="h-11 w-full sm:h-9 sm:w-40"
+                    className="h-11 w-full sm:h-9"
                     value={form.date}
                     // Advances are recorded for the current month only.
                     min={firstDayOfThisMonth()}
@@ -214,7 +216,7 @@ export default function AdvancesPage() {
                     onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
                   />
                 </div>
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1 sm:w-32">
                   <Label>Amount</Label>
                   <Input
                     ref={amountRef}
@@ -222,7 +224,7 @@ export default function AdvancesPage() {
                     min="0"
                     step="0.01"
                     inputMode="decimal"
-                    className="h-11 w-full sm:h-9 sm:w-32"
+                    className="h-11 w-full sm:h-9"
                     placeholder="0.00"
                     value={form.amount}
                     onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
@@ -236,12 +238,12 @@ export default function AdvancesPage() {
                     }}
                   />
                 </div>
-                <div className="flex flex-col gap-1 flex-1 min-w-40">
+                <div className="col-span-2 flex flex-col gap-1 sm:col-auto sm:min-w-40 sm:flex-1">
                   <Label>Notes (optional)</Label>
-                  <Input className="h-11 sm:h-9" placeholder="e.g. Festival advance" value={form.notes}
+                  <Input className="h-11 w-full sm:h-9" placeholder="e.g. Festival advance" value={form.notes}
                     onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
                 </div>
-                <Button onClick={handleAdd} disabled={addMutation.isPending}>
+                <Button onClick={handleAdd} disabled={addMutation.isPending} className="col-span-2 sm:col-auto">
                   {addMutation.isPending ? "Adding…" : "Add Advance"}
                 </Button>
               </div>
