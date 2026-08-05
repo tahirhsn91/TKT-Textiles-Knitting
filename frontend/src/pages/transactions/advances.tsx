@@ -209,8 +209,24 @@ export default function AdvancesPage() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <Label>Amount</Label>
-                  <Input type="number" min="0" step="0.01" inputMode="decimal" className="h-11 w-full sm:h-9 sm:w-32" placeholder="0.00"
-                    value={form.amount} onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))} />
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    inputMode="decimal"
+                    className="h-11 w-full sm:h-9 sm:w-32"
+                    placeholder="0.00"
+                    value={form.amount}
+                    onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
+                    onKeyDown={(e) => {
+                      // Enter in the amount box records the advance — the
+                      // common flow is employee → date → amount → done.
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAdd();
+                      }
+                    }}
+                  />
                 </div>
                 <div className="flex flex-col gap-1 flex-1 min-w-40">
                   <Label>Notes (optional)</Label>
