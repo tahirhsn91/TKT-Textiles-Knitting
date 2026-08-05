@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db } from "../db/index.js";
 import {
@@ -118,6 +118,7 @@ router.get("/daily-production", async (req, res): Promise<void> => {
       reconciledTransactionId: dailyProductionHeaderTable.reconciledTransactionId,
       rollCount: sql<number>`count(${dailyProductionDetailTable.id})::int`,
       totalProduction: sql<string>`coalesce(sum(${dailyProductionDetailTable.rollWeight}), 0)`,
+      hasHeavyRoll: sql<boolean>`coalesce(max(${dailyProductionDetailTable.rollWeight}) > 30, false)`,
     })
     .from(dailyProductionHeaderTable)
     // leftJoin, not innerJoin: a header that has lost all of its rolls should
@@ -139,7 +140,32 @@ router.get("/daily-production", async (req, res): Promise<void> => {
     )
     .orderBy(machineMasterTable.name, dailyProductionHeaderTable.shift, dailyProductionHeaderTable.id);
 
-  res.json({ productionDate: date, rows });
+  // Month-to-date totals: every submitted entry from the 1st of the month
+  // through the selected date (inclusive). One aggregate per day view, so the
+  // header can show both "today's total" and "where the month stands"
+  // without a second round-trip.
+  const monthStart = `${date.slice(0, 7)}-01`;
+  const [monthToDate] = await db
+    .select({
+      rollCount: sql<number>`count(${dailyProductionDetailTable.id})::int`,
+      totalProduction: sql<string>`coalesce(sum(${dailyProductionDetailTable.rollWeight}), 0)`,
+    })
+    .from(dailyProductionHeaderTable)
+    .leftJoin(dailyProductionDetailTable, eq(dailyProductionDetailTable.headerId, dailyProductionHeaderTable.id))
+    .where(and(
+      gte(dailyProductionHeaderTable.productionDate, monthStart),
+      lte(dailyProductionHeaderTable.productionDate, date),
+      eq(dailyProductionHeaderTable.status, "submitted"),
+    ));
+
+  res.json({
+    productionDate: date,
+    rows,
+    monthToDate: {
+      rollCount: monthToDate?.rollCount ?? 0,
+      totalProduction: monthToDate?.totalProduction ?? "0",
+    },
+  });
 });
 
 // ─── Unreconciled production for a date + party ────────────────────────────

@@ -16,16 +16,22 @@ export function DatePicker({
   date,
   setDate,
   className,
+  disabled = false,
+  maxDate,
 }: {
   date: Date | undefined;
   setDate: (date: Date | undefined) => void;
   className?: string;
+  disabled?: boolean;
+  /** Latest selectable date; later days are greyed out. */
+  maxDate?: Date;
 }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button
           variant={"outline"}
+          disabled={disabled}
           className={cn(
             "w-full justify-start text-left font-normal",
             !date && "text-muted-foreground",
@@ -36,12 +42,18 @@ export function DatePicker({
           {date ? format(date, "PPP") : <span>Pick a date</span>}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      {/* min-w matches the trigger so the calendar never pops out narrower
+          than the field that opened it. */}
+      <PopoverContent
+        className="min-w-[var(--radix-popover-trigger-width)] p-0"
+        align="start"
+      >
         <Calendar
           mode="single"
           selected={date}
           onSelect={setDate}
           initialFocus
+          disabled={maxDate ? { after: maxDate } : undefined}
         />
       </PopoverContent>
     </Popover>
