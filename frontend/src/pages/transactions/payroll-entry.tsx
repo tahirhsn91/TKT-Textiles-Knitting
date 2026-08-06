@@ -170,6 +170,11 @@ interface DetailRow {
   isOperator?: boolean;
   // Per-day production breakdown for the operator salary popup.
   operatorDays?: OperatorDay[];
+  // Operator salary baseline (production-derived total) and the transaction
+  // present-day floor; used to compute the present-day adjustment.
+  operatorBaseTotal?: number;
+  operatorTransactionPresent?: number;
+  operatorDailyBasic?: number;
 }
 
 // Fields that, when changed, trigger auto-recalculation of totalSalary
@@ -211,17 +216,35 @@ function recomputeAll(row: DetailRow, totalDays: number): DetailRow {
   // OT rate is set for the employee (rate ≤ 0), OT Amount is zero.
   const otRate = toNum(row.otRateHr);
   const otAmount = otRate > 0 ? toNum(row.otHours) * otRate : 0;
-  // Operators (dept 0002) are paid on production: Total Salary is derived from
-  // transactions, so it is preserved (not recomputed from attendance).
-  let totalSalary: number;
-  if (row.isOperator) {
-    totalSalary = toNum(row.totalSalary);
-  } else {
-    // Total Salary = prorated basic for attendance PLUS the OT amount.
-    const baseSalary =
-      totalDays > 0 ? (toNum(row.basicSalary) / totalDays) * totalAttendance : 0;
-    totalSalary = baseSalary + otAmount;
-  }
+  // Total Salary = prorated basic for attendance PLUS the OT amount.
+  const baseSalary =
+    totalDays > 0 ? (toNum(row.basicSalary) / totalDays) * totalAttendance : 0;
+  const totalSalary = baseSalary + otAmount;
+  return recomputePayable(
+    {
+      ...row,
+      totalAttendance: totalAttendance.toFixed(TOTAL_ATTENDANCE_DECIMALS),
+      totalSalary: totalSalary.toFixed(NUM_DECIMALS),
+      otAmount: otAmount.toFixed(NUM_DECIMALS),
+    },
+    totalDays
+  );
+}
+
+// Operator (dept 0002) recompute: Total Salary is the production-derived
+// baseline plus a present-day adjustment (each present day above the
+// transaction-present floor adds one daily basic). OT, allowances, and
+// deductions behave as usual.
+function recomputeOperatorAll(row: DetailRow, totalDays: number): DetailRow {
+  const totalAttendance = roundToWhole(toNum(row.presentDays) + toNum(row.holidays));
+  const otRate = toNum(row.otRateHr);
+  const otAmount = otRate > 0 ? toNum(row.otHours) * otRate : 0;
+  // Present-day adjustment relative to the transaction-present floor.
+  const base = toNum(row.operatorBaseTotal);
+  const floor = toNum(row.operatorTransactionPresent);
+  const dailyBasic = toNum(row.operatorDailyBasic);
+  const present = Math.max(toNum(row.presentDays), floor); // never below the floor
+  const totalSalary = base + (present - floor) * dailyBasic + otAmount;
   return recomputePayable(
     {
       ...row,
@@ -261,19 +284,24 @@ function rowFromEmployee(op: Employee, totalDays: number, advanceSum = 0): Detai
 // from production: Present days and Total Salary come from the transactions
 // (read-only), while Absent / Holidays / OT / Deductions stay user-entered.
 function rowFromOperator(op: Employee, totalDays: number, prod: OperatorProduction, advanceSum = 0): DetailRow {
+  const dailyBasic = toNum(op.baseSalary);
+  const transactionPresent = prod.presentDays;
+  // Base total = production-derived salary. Present-day adjustment adds one
+  // daily basic for each present day above the transaction-present floor.
+  const baseTotal = prod.totalSalary;
   const base: DetailRow = {
     employeeId: op.id,
     departmentId: op.departmentId,
     employeeName: op.name,
-    basicSalary: toNum(op.baseSalary).toFixed(NUM_DECIMALS),
+    basicSalary: dailyBasic.toFixed(NUM_DECIMALS),
     otRateHr: toNum(op.overtimeRateHr).toFixed(NUM_DECIMALS),
     attAllowance: toNum(op.attAllowance).toFixed(NUM_DECIMALS),
     othAllowance: toNum(op.othAllowance).toFixed(NUM_DECIMALS),
-    presentDays: String(prod.presentDays),
+    presentDays: String(transactionPresent),
     absentDays: "0",
     holidays: "0",
     totalAttendance: "0",
-    totalSalary: prod.totalSalary.toFixed(NUM_DECIMALS),
+    totalSalary: baseTotal.toFixed(NUM_DECIMALS),
     otHours: "0",
     otAmount: "0.00",
     advanceDeduction: advanceSum.toFixed(NUM_DECIMALS),
@@ -282,8 +310,12 @@ function rowFromOperator(op: Employee, totalDays: number, prod: OperatorProducti
     payableSalary: "0.00",
     isOperator: true,
     operatorDays: prod.days,
+    operatorBaseTotal: baseTotal,
+    operatorTransactionPresent: transactionPresent,
+    operatorDailyBasic: dailyBasic,
   };
-  return recomputeAll(base, totalDays);
+  // Apply the present-day adjustment (default present = floor → no change).
+  return recomputeOperatorAll(base, totalDays);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -403,6 +435,31 @@ export default function PayrollEntryPage() {
     );
   }, [isEdit, initialized, advanceByEmployee, rowAdvanceSum]);
 
+  // In edit mode, once the operator-production data has loaded, refresh the
+  // operator baseline (transaction-present floor, production base total, daily
+  // basic) and recompute total salary so the present-day adjustment is correct.
+  useEffect(() => {
+    if (!isEdit || !initialized || operatorByEmployee.size === 0) return;
+    setRows((prev) =>
+      prev.map((r) => {
+        if (!r.isOperator) return r;
+        const op = operatorByEmployee.get(r.employeeId);
+        if (!op) return r;
+        const base: DetailRow = {
+          ...r,
+          presentDays: String(op.presentDays),
+          totalSalary: op.totalSalary.toFixed(NUM_DECIMALS),
+          operatorBaseTotal: op.totalSalary,
+          operatorTransactionPresent: op.presentDays,
+          operatorDailyBasic: toNum(r.basicSalary),
+          operatorDays: op.days,
+        };
+        return recomputeOperatorAll(base, daysInMonthFn(parseInt(month) || 1, parseInt(year) || CURRENT_YEAR));
+      })
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, initialized, operatorByEmployee, month, year]);
+
   // For new mode: rebuild rows when dept selection, employee list, or the
   // loaded advance totals change (advances fetch async, so they may arrive
   // after rows are first built).
@@ -449,8 +506,9 @@ export default function PayrollEntryPage() {
 
         // Present and Absent are linked so they always sum to the days in the
         // month: editing one keeps the other at totalDays - the edited value.
-        // Operators skip the linkage: their Present is production-derived and
-        // read-only, so editing Absent must not rewrite it.
+        // Operators skip the linkage: their Present is a standalone adjustment
+        // (floored at the transaction-present count), so editing Absent or
+        // Present must not rewrite the other.
         if (!next[idx].isOperator) {
           if (field === "presentDays") {
             const abs = clampNum(td - toNum(value), 0, td);
@@ -459,6 +517,14 @@ export default function PayrollEntryPage() {
             const pre = clampNum(td - toNum(value), 0, td);
             updated = { ...updated, presentDays: String(pre) };
           }
+        }
+
+        // Operator Present is a manual adjustment: floor = transaction-present
+        // days, ceiling = days in the month.
+        if (next[idx].isOperator && field === "presentDays") {
+          const floor = toNum(next[idx].operatorTransactionPresent);
+          const clamped = clampNum(toNum(value), floor, td);
+          updated = { ...updated, presentDays: String(clamped) };
         }
 
         // Holidays are capped at MAX_HOLIDAYS (5) per month regardless of input.
@@ -473,12 +539,13 @@ export default function PayrollEntryPage() {
         }
 
         if (SALARY_SOURCE_FIELDS.has(field) || OT_SOURCE_FIELDS.has(field)) {
-          // Source field changed → recompute both derived salary/OT fields and payable
-          next[idx] = recomputeAll(updated, td);
+          // Source or OT field changed → recompute salary/OT fields and payable.
+          // Operator rows use their own formula (production + present adjustment).
+          next[idx] = updated.isOperator ? recomputeOperatorAll(updated, td) : recomputeAll(updated, td);
         } else {
           // User is editing a directly-entered value (holidays, loan/other
-          // deductions) → only recompute payableSalary
-          next[idx] = recomputePayable(updated, td);
+          // deductions) → only recompute payableSalary (operator-aware)
+          next[idx] = updated.isOperator ? recomputeOperatorAll(updated, td) : recomputePayable(updated, td);
         }
         return next;
       });
@@ -492,7 +559,10 @@ export default function PayrollEntryPage() {
       setMonth(m);
       const td = daysInMonthFn(parseInt(m) || 1, parseInt(year) || CURRENT_YEAR);
       setRows((prev) =>
-        prev.map((r, i) => recomputeAll({ ...r, advanceDeduction: rowAdvanceSum(r.employeeId).toFixed(NUM_DECIMALS) }, td))
+        prev.map((r) => {
+          const rr = { ...r, advanceDeduction: rowAdvanceSum(r.employeeId).toFixed(NUM_DECIMALS) };
+          return rr.isOperator ? recomputeOperatorAll(rr, td) : recomputeAll(rr, td);
+        })
       );
     },
     [year, advanceByEmployee]
@@ -504,7 +574,10 @@ export default function PayrollEntryPage() {
       setYear(y);
       const td = daysInMonthFn(parseInt(month) || 1, parseInt(y) || CURRENT_YEAR);
       setRows((prev) =>
-        prev.map((r, i) => recomputeAll({ ...r, advanceDeduction: rowAdvanceSum(r.employeeId).toFixed(NUM_DECIMALS) }, td))
+        prev.map((r) => {
+          const rr = { ...r, advanceDeduction: rowAdvanceSum(r.employeeId).toFixed(NUM_DECIMALS) };
+          return rr.isOperator ? recomputeOperatorAll(rr, td) : recomputeAll(rr, td);
+        })
       );
     },
     [month, advanceByEmployee]
@@ -802,11 +875,14 @@ export default function PayrollEntryPage() {
                         <TableCell className="py-1"><Input disabled className={ro} value={row.attAllowance} /></TableCell>
                         <TableCell className="py-1"><Input disabled className={ro} value={row.othAllowance} /></TableCell>
                         {/* Attendance inputs — trigger salary formula. Operator
-                            Present is production-derived and read-only. */}
+                            Present is editable from the transaction-present floor
+                            up to the days in the month; each day above the floor
+                            adds one daily basic to their salary. */}
                         <TableCell className="py-1">
                           {row.isOperator ? (
-                            <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={ro}
-                              value={row.presentDays} disabled readOnly />
+                            <Input type="number" min={row.operatorTransactionPresent ?? 0} max={totalDays} step={STEP_ATTENDANCE} className={inp}
+                              value={row.presentDays} disabled={isPosted}
+                              onChange={(e) => updateRow(i, "presentDays", e.target.value)} />
                           ) : (
                             <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
                               value={row.presentDays} disabled={isPosted}
