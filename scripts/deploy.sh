@@ -8,10 +8,16 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting deploy..."
 
 cd "$PROJECT_DIR"
 
-# Pull latest code
-echo "Pulling latest from main..."
-git checkout main
-git pull origin main
+# Hard-sync the working tree to origin/main so deploys are deterministic.
+# (git pull can silently no-op or fail if the local clone drifts — e.g. a
+# stray local commit/reset. reset --hard makes the tree exactly match the
+# pushed commit. Untracked files like .env.prod are preserved.)
+echo "Syncing to origin/main..."
+git fetch origin main
+git checkout -B main origin/main
+git reset --hard origin/main
+DEPLOYED_COMMIT=$(git rev-parse --short HEAD)
+echo "Deploying commit: $DEPLOYED_COMMIT"
 
 # Rebuild and restart containers
 echo "Rebuilding containers..."
