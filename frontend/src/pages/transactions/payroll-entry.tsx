@@ -264,7 +264,7 @@ function recomputeOperatorAll(row: DetailRow, totalDays: number): DetailRow {
   );
 }
 
-function rowFromEmployee(op: Employee, totalDays: number, advanceSum = 0): DetailRow {
+function rowFromEmployee(op: Employee, totalDays: number, advanceSum = 0, defaultPresent?: number): DetailRow {
   const base: DetailRow = {
     employeeId: op.id,
     departmentId: op.departmentId,
@@ -273,7 +273,7 @@ function rowFromEmployee(op: Employee, totalDays: number, advanceSum = 0): Detai
     otRateHr: toNum(op.overtimeRateHr).toFixed(NUM_DECIMALS),
     attAllowance: toNum(op.attAllowance).toFixed(NUM_DECIMALS),
     othAllowance: toNum(op.othAllowance).toFixed(NUM_DECIMALS),
-    presentDays: String(totalDays),
+    presentDays: String(defaultPresent ?? totalDays),
     absentDays: "0",
     holidays: "0",
     totalAttendance: "0",
@@ -499,7 +499,13 @@ export default function PayrollEntryPage() {
           const prod = operatorByEmployee.get(op.id);
           if (prod) return rowFromOperator(op, td, prod, rowAdvanceSum(op.id));
         }
-        return rowFromEmployee(op, td, rowAdvanceSum(op.id));
+        // For non-operators on the current month, default Present to the number
+        // of days elapsed so far this month; otherwise the full days in month.
+        const isCurrentMonth =
+          parseInt(month) === new Date().getMonth() + 1 &&
+          parseInt(year) === new Date().getFullYear();
+        const defaultPresent = isCurrentMonth ? new Date().getDate() : td;
+        return rowFromEmployee(op, td, rowAdvanceSum(op.id), defaultPresent);
       })
     );
   }, [isEdit, deptKey, allEmployees.length, advanceLoadToken, advanceByEmployee, operatorDeptId, operatorByEmployee, month, year]); // eslint-disable-line react-hooks/exhaustive-deps
