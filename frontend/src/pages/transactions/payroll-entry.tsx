@@ -922,11 +922,18 @@ export default function PayrollEntryPage() {
                           <Input type="number" min="0" step={STEP_ATTENDANCE} className={ro}
                             value={row.totalAttendance} disabled readOnly />
                         </TableCell>
-                        {/* otHours — triggers otAmount recalculation */}
+                        {/* otHours — triggers otAmount recalculation. Disabled when
+                            the employee has no OT rate (rate zero), since OT
+                            Amount = OT Hrs × rate is then always 0. */}
                         <TableCell className="py-1">
-                          <Input type="number" min="0" step={STEP_ATTENDANCE} className={inp}
-                            value={row.otHours} disabled={isPosted}
-                            onChange={(e) => updateRow(i, "otHours", e.target.value)} />
+                          {toNum(row.otRateHr) > 0 ? (
+                            <Input type="number" min="0" step={STEP_ATTENDANCE} className={inp}
+                              value={row.otHours} disabled={isPosted}
+                              onChange={(e) => updateRow(i, "otHours", e.target.value)} />
+                          ) : (
+                            <Input type="number" min="0" step={STEP_ATTENDANCE} className={ro}
+                              value={row.otHours} disabled readOnly />
+                          )}
                         </TableCell>
                         {/* otAmount — auto-computed; display only (no manual override) */}
                         <TableCell className="py-1">
