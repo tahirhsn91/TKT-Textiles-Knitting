@@ -1054,70 +1054,122 @@ function OperatorDetailDialog({
 
   return (
     <Dialog open={!!row} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Salary Calculation — {row?.employeeName ?? ""}</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogHeader className="pr-6">
+          <DialogTitle className="text-base sm:text-lg">Salary Calculation — {row?.employeeName ?? ""}</DialogTitle>
+          <DialogDescription className="text-xs sm:text-sm">
             Production-based salary for {monthName} {year} (Operator, dept code 0002).
             Daily basic salary: <span className="font-medium">{fmtMoney(toNum(row?.basicSalary ?? 0))}</span>.
           </DialogDescription>
         </DialogHeader>
 
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="text-xs">
-                <TableHead className="min-w-[130px]">Date / Machine</TableHead>
-                <TableHead className="text-right">Net Wt</TableHead>
-                <TableHead className="text-right">Rate</TableHead>
-                <TableHead className="text-right">Production (netWt × rate)</TableHead>
-                <TableHead className="text-right">Daily Basic / Credited</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {days.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
-                    No production days in this month.
-                  </TableCell>
+          {/* Desktop: full-width table */}
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow className="text-xs">
+                  <TableHead className="min-w-[130px]">Date / Machine</TableHead>
+                  <TableHead className="text-right">Net Wt</TableHead>
+                  <TableHead className="text-right">Rate</TableHead>
+                  <TableHead className="text-right">Production (netWt × rate)</TableHead>
+                  <TableHead className="text-right">Daily Basic / Credited</TableHead>
                 </TableRow>
-              )}
-              {days.map((d) => (
-                <Fragment key={d.date}>
-                  {/* Day summary row */}
-                  <TableRow className="bg-muted/30">
-                    <TableCell className="py-1 font-medium">{formatDate(d.date)}</TableCell>
-                    <TableCell className="py-1 text-right font-mono">—</TableCell>
-                    <TableCell className="py-1 text-right font-mono">—</TableCell>
-                    <TableCell className="py-1 text-right font-mono font-semibold">{fmtMoney(d.dailyProductionSum)}</TableCell>
-                    <TableCell className="py-1 text-right font-mono font-semibold">{fmtMoney(d.credited)}</TableCell>
+              </TableHeader>
+              <TableBody>
+                {days.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
+                      No production days in this month.
+                    </TableCell>
                   </TableRow>
-                  {/* Machine-level sub-rows */}
-                  {(d.machines ?? []).map((m, mi) => (
-                    <TableRow key={`${d.date}-${m.machineId}-${mi}`}>
-                      <TableCell className="py-1 pl-9 text-muted-foreground">↳ {m.machineName}</TableCell>
-                      <TableCell className="py-1 text-right font-mono">{m.netWt}</TableCell>
-                      <TableCell className="py-1 text-right font-mono">× {m.rate}</TableCell>
-                      <TableCell className="py-1 text-right font-mono">{fmtMoney(m.amount)}</TableCell>
-                      <TableCell className="py-1 text-right font-mono text-muted-foreground">—</TableCell>
+                )}
+                {days.map((d) => (
+                  <Fragment key={d.date}>
+                    {/* Day summary row */}
+                    <TableRow className="bg-muted/30">
+                      <TableCell className="py-1 font-medium">{formatDate(d.date)}</TableCell>
+                      <TableCell className="py-1 text-right font-mono">—</TableCell>
+                      <TableCell className="py-1 text-right font-mono">—</TableCell>
+                      <TableCell className="py-1 text-right font-mono font-semibold">{fmtMoney(d.dailyProductionSum)}</TableCell>
+                      <TableCell className="py-1 text-right font-mono font-semibold">{fmtMoney(d.credited)}</TableCell>
                     </TableRow>
-                  ))}
-                </Fragment>
-              ))}
-            </TableBody>
-            {days.length > 0 && (
-              <TableFooter>
-                <TableRow>
-                  <TableCell colSpan={4} className="py-1 font-semibold">Total (present days: {days.length})</TableCell>
-                  <TableCell className="py-1 text-right font-mono font-bold">{fmtMoney(totalCredited)}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell colSpan={4} className="py-1 text-muted-foreground">Total production (gross, before basic floor)</TableCell>
-                  <TableCell className="py-1 text-right font-mono text-muted-foreground">{fmtMoney(totalProduction)}</TableCell>
-                </TableRow>
-              </TableFooter>
+                    {/* Machine-level sub-rows */}
+                    {(d.machines ?? []).map((m, mi) => (
+                      <TableRow key={`${d.date}-${m.machineId}-${mi}`}>
+                        <TableCell className="py-1 pl-9 text-muted-foreground">↳ {m.machineName}</TableCell>
+                        <TableCell className="py-1 text-right font-mono">{m.netWt}</TableCell>
+                        <TableCell className="py-1 text-right font-mono">× {m.rate}</TableCell>
+                        <TableCell className="py-1 text-right font-mono">{fmtMoney(m.amount)}</TableCell>
+                        <TableCell className="py-1 text-right font-mono text-muted-foreground">—</TableCell>
+                      </TableRow>
+                    ))}
+                  </Fragment>
+                ))}
+              </TableBody>
+              {days.length > 0 && (
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-1 font-semibold">Total (present days: {days.length})</TableCell>
+                    <TableCell className="py-1 text-right font-mono font-bold">{fmtMoney(totalCredited)}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-1 text-muted-foreground">Total production (gross, before basic floor)</TableCell>
+                    <TableCell className="py-1 text-right font-mono text-muted-foreground">{fmtMoney(totalProduction)}</TableCell>
+                  </TableRow>
+                </TableFooter>
+              )}
+            </Table>
+          </div>
+
+          {/* Mobile: stacked day cards — no horizontal scroll */}
+          <div className="space-y-3 md:hidden">
+            {days.length === 0 && (
+              <p className="text-center text-muted-foreground text-sm py-6">
+                No production days in this month.
+              </p>
             )}
-          </Table>
+            {days.map((d) => (
+              <div key={d.date} className="rounded-lg border bg-card">
+                {/* Day header */}
+                <div className="flex items-center justify-between gap-2 border-b bg-muted/30 px-3 py-2">
+                  <span className="font-medium text-sm">{formatDate(d.date)}</span>
+                  <span className="text-xs text-muted-foreground">{d.machines?.length ?? 0} machine{(d.machines?.length ?? 0) === 1 ? "" : "s"}</span>
+                </div>
+                {/* Machine lines */}
+                <div className="divide-y divide-border/60">
+                  {(d.machines ?? []).map((m, mi) => (
+                    <div key={mi} className="flex items-center gap-2 px-3 py-2">
+                      <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{m.machineName}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{m.netWt} × {m.rate}</span>
+                      <span className="shrink-0 text-sm font-mono font-semibold">{fmtMoney(m.amount)}</span>
+                    </div>
+                  ))}
+                  {/* Day totals row */}
+                  <div className="flex items-center justify-between gap-2 bg-muted/20 px-3 py-2">
+                    <span className="text-xs text-muted-foreground">Daily production</span>
+                    <span className="text-sm font-mono font-semibold">{fmtMoney(d.dailyProductionSum)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 px-3 py-2">
+                    <span className="text-xs text-muted-foreground">Credited</span>
+                    <span className="text-sm font-mono font-bold">{fmtMoney(d.credited)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {days.length > 0 && (
+              <div className="rounded-lg border bg-card px-3 py-2 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">Total (present days: {days.length})</span>
+                  <span className="text-sm font-mono font-bold">{fmtMoney(totalCredited)}</span>
+                </div>
+                <div className="flex items-center justify-between text-muted-foreground text-xs">
+                  <span>Total production (gross)</span>
+                  <span className="font-mono">{fmtMoney(totalProduction)}</span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <p className="text-xs text-muted-foreground">
