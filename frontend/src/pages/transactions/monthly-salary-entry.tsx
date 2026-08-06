@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Trash2, Download, PlusCircle, Pencil, Lock, Unlock } from "lucide-react";
@@ -204,11 +204,27 @@ function SalaryEntryTab() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [, navigate] = useLocation();
+  const search = useSearch();
 
-  // Filter state
-  const [filterMonth, setFilterMonth] = useState("__all__");
-  const [filterYear, setFilterYear] = useState("__all__");
-  const [filterDept, setFilterDept] = useState("__all__");
+  // Filter state, sourced from the URL so a filter is deep-linkable and
+  // survives a refresh. Read the query params once via a lazy initialiser.
+  const initialParams = useMemo(() => new URLSearchParams(search), [search]);
+  const [filterMonth, setFilterMonth] = useState(() => initialParams.get("month") ?? "__all__");
+  const [filterYear, setFilterYear] = useState(() => initialParams.get("year") ?? "__all__");
+  const [filterDept, setFilterDept] = useState(() => initialParams.get("departmentId") ?? "__all__");
+
+  // Keep filter state in sync with the URL (deep-linking + shareable filters).
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filterMonth !== "__all__") params.set("month", filterMonth);
+    if (filterYear !== "__all__") params.set("year", filterYear);
+    if (filterDept !== "__all__") params.set("departmentId", filterDept);
+    const qs = params.toString();
+    const target = qs ? `/transactions/monthly-salary-entry?${qs}` : "/transactions/monthly-salary-entry";
+    if (search !== (qs ? `?${qs}` : "")) {
+      navigate(target, { replace: true });
+    }
+  }, [filterMonth, filterYear, filterDept, navigate, search]);
 
   const { data: departments = [] } = useQuery<Department[]>({
     queryKey: ["department-lookup"],
@@ -237,22 +253,30 @@ function SalaryEntryTab() {
     posted: (h: SalaryHeader) => h.posted,
   });
 
+  // Which header row currently has a post/unpost/delete in flight, so we can
+  // disable that row's actions and avoid double-clicks on it.
+  const [pendingId, setPendingId] = useState<number | null>(null);
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiFetch(`/api/salary-entries/${id}`, { method: "DELETE" }),
+    onMutate: (id) => setPendingId(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["salary-headers"] });
       toast({ title: "Record deleted." });
     },
+    onSettled: () => setPendingId(null),
     onError: (e: Error) => toast({ variant: "destructive", title: "Error", description: e.message }),
   });
 
   const postMutation = useMutation({
     mutationFn: ({ id, action }: { id: number; action: "post" | "unpost" }) =>
       apiFetch(`/api/salary-entries/${id}/${action}`, { method: "POST" }),
+    onMutate: ({ id }) => setPendingId(id),
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ["salary-headers"] });
       toast({ title: vars.action === "post" ? "Record posted." : "Record un-posted." });
     },
+    onSettled: () => setPendingId(null),
     onError: (e: Error) => toast({ variant: "destructive", title: "Error", description: e.message }),
   });
 
@@ -353,23 +377,35 @@ function SalaryEntryTab() {
           </div>
           {hasFilter && (
             <Button
-              variant="ghost" size="sm" className="h-8 text-xs"
+              variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-foreground"
               onClick={() => { setFilterMonth("__all__"); setFilterYear("__all__"); setFilterDept("__all__"); }}
             >
-              Clear
+              Clear filters
             </Button>
           )}
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExportCSV}>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExportCSV} aria-label="Export salary entries to CSV">
             <Download className="h-4 w-4" />
             Export CSV
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={() => navigate("/transactions/monthly-salary-entry/new")}>
+          <Button size="sm" className="gap-1.5" onClick={() => navigate("/transactions/monthly-salary-entry/new")} aria-label="Add new salary entry">
             <PlusCircle className="h-4 w-4" />
             Add New Salary
           </Button>
         </div>
+      </div>
+
+      {/* Result summary line when filters are active */}
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <span aria-live="polite">
+          {isLoading ? "Loading…" : `${headers.length} salary entr${headers.length === 1 ? "y" : "ies"}${hasFilter ? " (filtered)" : ""}`}
+        </span>
+        {hasFilter && !isLoading && headers.length > 0 && (
+          <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={() => { setFilterMonth("__all__"); setFilterYear("__all__"); setFilterDept("__all__"); }}>
+            Clear filters
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -399,8 +435,10 @@ function SalaryEntryTab() {
                   </TableCell>
                 </TableRow>
               )}
-              {!isLoading && sortedHeaders.map((h) => (
-                <TableRow key={h.id}>
+              {!isLoading && sortedHeaders.map((h) => {
+                const busy = pendingId === h.id;
+                return (
+                <TableRow key={h.id} aria-busy={busy || undefined}>
                   <TableCell className="font-medium">
                     {MONTHS[h.month - 1]} {h.year}
                   </TableCell>
@@ -421,7 +459,8 @@ function SalaryEntryTab() {
                         <>
                           <Button
                             size="icon" variant="ghost" className="h-8 w-8"
-                            title="Edit"
+                            title="Edit" aria-label="Edit salary entry"
+                            disabled={busy}
                             onClick={() => navigate(`/transactions/monthly-salary-entry/${h.id}/edit`)}
                           >
                             <Pencil className="h-4 w-4" />
@@ -431,7 +470,7 @@ function SalaryEntryTab() {
                             <AlertDialogTrigger asChild>
                               <Button
                                 size="icon" variant="ghost" className="h-8 w-8 text-green-700"
-                                title="Post" disabled={postMutation.isPending}
+                                title="Post" aria-label="Post salary entry" disabled={busy || postMutation.isPending}
                               >
                                 <Lock className="h-4 w-4" />
                               </Button>
@@ -459,7 +498,7 @@ function SalaryEntryTab() {
                           <AlertDialogTrigger asChild>
                             <Button
                               size="icon" variant="ghost" className="h-8 w-8 text-amber-600"
-                              title="Un-Post" disabled={postMutation.isPending}
+                              title="Un-Post" aria-label="Un-post salary entry" disabled={busy || postMutation.isPending}
                             >
                               <Unlock className="h-4 w-4" />
                             </Button>
@@ -484,7 +523,7 @@ function SalaryEntryTab() {
                         /* Delete — requires confirmation */
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" title="Delete">
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" title="Delete" aria-label="Delete salary entry" disabled={busy}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>
@@ -510,7 +549,8 @@ function SalaryEntryTab() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
@@ -526,7 +566,6 @@ function PayrollSummaryTab() {
   const [month, setMonth] = useState(String(new Date().getMonth() + 1));
   const [year, setYear] = useState(String(CURRENT_YEAR));
   const [employeeId, setEmployeeId] = useState("__all__");
-  const [hasRun, setHasRun] = useState(false);
 
   const { data: employees = [] } = useQuery<EmployeeLookup[]>({
     queryKey: ["employee-lookup"],
@@ -539,7 +578,6 @@ function PayrollSummaryTab() {
   const { data: summary = [], isLoading } = useQuery<PayrollSummaryItem[]>({
     queryKey: ["payroll-summary", month, year, employeeId],
     queryFn: () => apiFetch(`/api/employees/payroll-summary?${params.toString()}`),
-    enabled: hasRun,
   });
 
   const { sorted: sortedSummary, sort: sumSort, toggleSort: toggleSumSort } = useSort(summary, {
@@ -680,20 +718,19 @@ function PayrollSummaryTab() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={() => { setHasRun(true); }} variant="outline">Run Summary</Button>
           <Button onClick={exportPDF} className="gap-2">
             <Download className="h-4 w-4" />
             Download PDF
           </Button>
         </div>
 
-        {hasRun && isLoading && (
+        {isLoading && (
           <div className="space-y-2">
             {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
           </div>
         )}
 
-        {hasRun && !isLoading && (
+        {!isLoading && (
           <Table>
             <TableHeader>
               <TableRow>
