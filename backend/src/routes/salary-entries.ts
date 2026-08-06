@@ -1,11 +1,15 @@
 import { Router, type IRouter } from "express";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, gte, lte } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   salaryHeaderTable,
   salaryDetailTable,
   employeeMasterTable,
   departmentMasterTable,
+  transactionHeaderTable,
+  transactionDetailTable,
+  transactionTypeMasterTable,
+  machineMasterTable,
 } from "../db/index.js";
 
 const router: IRouter = Router();
@@ -45,6 +49,129 @@ router.get("/salary-entries", async (req, res): Promise<void> => {
     ...h,
     departmentNames: (h.departmentIds ?? []).map((id) => deptMap[id] ?? String(id)),
   }));
+
+  res.json(result);
+});
+
+// ─── Operator production-based salary ──────────────────────────────────────────
+// Employees in department code "0002" (Operator) are paid on production rather
+// than attendance: for each Fabric Production transaction in the selected
+// month, a row's value = netWt × machine.makingRate. Per (employee, day) the
+// credited amount is max(daily production sum, the operator's daily basic
+// salary). Present days = number of distinct days with production. Total salary
+// = sum of per-day credited. Returns both the per-employee aggregate and the
+// per-day breakdown.
+// NOTE: declared before /:id so Express routes this specific path correctly.
+router.get("/salary-entries/operator-production", async (req, res): Promise<void> => {
+  const { month, year } = req.query as Record<string, string>;
+  if (!month || !year) {
+    res.status(400).json({ error: "month and year are required" });
+    return;
+  }
+  const m = parseInt(month);
+  const y = parseInt(year);
+  const dateFrom = `${y}-${String(m).padStart(2, "0")}-01`;
+  const lastDay = new Date(y, m, 0).getDate();
+  const dateTo = `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
+  // Resolve the Fabric Production transaction type and the Operator department.
+  const [fabricProd] = await db
+    .select()
+    .from(transactionTypeMasterTable)
+    .where(eq(transactionTypeMasterTable.code, "Fabric_Production"));
+  const [operatorDept] = await db
+    .select()
+    .from(departmentMasterTable)
+    .where(eq(departmentMasterTable.code, "0002"));
+  if (!fabricProd || !operatorDept) {
+    res.status(500).json({ error: "Fabric Production type or Operator department is not configured" });
+    return;
+  }
+
+  // Operators (employees in the Operator department).
+  const operators = await db
+    .select({ id: employeeMasterTable.id, name: employeeMasterTable.name, baseSalary: employeeMasterTable.baseSalary })
+    .from(employeeMasterTable)
+    .where(eq(employeeMasterTable.departmentId, operatorDept.id));
+
+  // Fabric Production headers within the selected month.
+  const headers = await db
+    .select()
+    .from(transactionHeaderTable)
+    .where(
+      and(
+        eq(transactionHeaderTable.transactionTypeId, fabricProd.id),
+        gte(transactionHeaderTable.date, dateFrom),
+        lte(transactionHeaderTable.date, dateTo)
+      )
+    );
+  const headerIds = headers.map((h) => h.id);
+  const headerDateById = new Map(headers.map((h) => [h.id, h.date]));
+
+  // Machine making rates (netWt × makingRate per row).
+  const machines = await db
+    .select()
+    .from(machineMasterTable);
+  const rateByMachineId = new Map(machines.map((mc) => [mc.id, toNum(mc.makingRate)]));
+  const nameByMachineId = new Map(machines.map((mc) => [mc.id, mc.name ?? mc.machineNumber]));
+
+  // Detail rows for those headers.
+  const details = headerIds.length
+    ? await db
+        .select()
+        .from(transactionDetailTable)
+        .where(inArray(transactionDetailTable.headerId, headerIds))
+    : [];
+
+  // Daily breakdown keyed by employeeId -> date -> { sum, machines[] }.
+  const dailyByEmployee = new Map<number, Map<string, { sum: number; machines: Array<{ machineId: number; machineName: string; netWt: number; rate: number; amount: number }> }>>();
+  for (const d of details) {
+    if (!d.employeeId) continue;
+    const netWt = toNum(d.netWt);
+    if (netWt <= 0) continue; // skip null/zero net weight rows
+    const rate = rateByMachineId.get(d.machineId ?? -1) ?? 0;
+    const date = headerDateById.get(d.headerId) ?? "";
+    if (!date) continue;
+    let emp = dailyByEmployee.get(d.employeeId);
+    if (!emp) { emp = new Map(); dailyByEmployee.set(d.employeeId, emp); }
+    const day = emp.get(date) ?? { sum: 0, machines: [] };
+    const machineId = d.machineId ?? -1;
+    const amount = netWt * rate;
+    day.sum += amount;
+    day.machines.push({
+      machineId,
+      machineName: nameByMachineId.get(machineId) ?? String(machineId),
+      netWt: Number(netWt.toFixed(3)),
+      rate: Number(rate.toFixed(2)),
+      amount: Number(amount.toFixed(2)),
+    });
+    emp.set(date, day);
+  }
+
+  const result = operators.map((op) => {
+    const daily = dailyByEmployee.get(op.id) ?? new Map<string, { sum: number; machines: Array<{ machineId: number; machineName: string; netWt: number; rate: number; amount: number }> }>();
+    const baseSalary = toNum(op.baseSalary); // operator baseSalary is a daily wage
+    const days = [...daily.entries()]
+      .map(([date, d]) => {
+        const credited = Math.max(d.sum, baseSalary);
+        return {
+          date,
+          dailyProductionSum: Number(d.sum.toFixed(2)),
+          dailyBasic: baseSalary,
+          credited: Number(credited.toFixed(2)),
+          machines: d.machines,
+        };
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const totalSalary = days.reduce((acc, d) => acc + d.credited, 0);
+    return {
+      employeeId: op.id,
+      employeeName: op.name,
+      presentDays: days.length,
+      totalSalary: Number(totalSalary.toFixed(2)),
+      days,
+    };
+  });
 
   res.json(result);
 });

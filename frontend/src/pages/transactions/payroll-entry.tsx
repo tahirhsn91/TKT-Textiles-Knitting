@@ -1,8 +1,8 @@
 import { NUM_DECIMALS } from "@/lib/format";
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Save, Check, ChevronsUpDown } from "lucide-react";
+import { ArrowLeft, Save, Check, ChevronsUpDown, Eye } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -53,7 +60,7 @@ const MAX_HOLIDAYS = "5";
 // Total Attendance is a whole number (0 decimals).
 const TOTAL_ATTENDANCE_DECIMALS = 0;
 
-function toNum(v: string | number | null | undefined): number {
+function toNum(v: unknown): number {
   const n = parseFloat(String(v ?? ""));
   return isNaN(n) ? 0 : n;
 }
@@ -64,6 +71,20 @@ function clampNum(v: number, min: number, max: number): number {
 
 function roundToWhole(v: number): number {
   return Math.round(v);
+}
+
+// Indian-locale money formatting (2 decimals).
+function fmtMoney(v: number): string {
+  return v.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// YYYY-MM-DD -> DD Mon YYYY (e.g. 2026-08-01 -> 01 Aug 2026).
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  if (isNaN(d.getTime())) return dateStr;
+  const day = String(d.getDate()).padStart(2, "0");
+  const mon = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
+  return `${day} ${mon} ${d.getFullYear()}`;
 }
 
 function daysInMonthFn(month: number, year: number): number {
@@ -95,6 +116,27 @@ interface Advance {
   employeeId: number;
   amount: string;
 }
+interface OperatorMachine {
+  machineId: number;
+  machineName: string;
+  netWt: number;
+  rate: number;
+  amount: number;
+}
+interface OperatorDay {
+  date: string;
+  dailyProductionSum: number;
+  dailyBasic: number;
+  credited: number;
+  machines?: OperatorMachine[];
+}
+interface OperatorProduction {
+  employeeId: number;
+  employeeName: string;
+  presentDays: number;
+  totalSalary: number;
+  days: OperatorDay[];
+}
 interface Employee {
   id: number; name: string; code: string; active: boolean;
   departmentId: number | null;
@@ -123,6 +165,16 @@ interface DetailRow {
   loanDeduction: string;
   otherDeduction: string;
   payableSalary: string;
+  // Operator rows (dept 0002) are paid on production: Present + Total Salary
+  // come from transactions and are read-only.
+  isOperator?: boolean;
+  // Per-day production breakdown for the operator salary popup.
+  operatorDays?: OperatorDay[];
+  // Operator salary baseline (production-derived total) and the transaction
+  // present-day floor; used to compute the present-day adjustment.
+  operatorBaseTotal?: number;
+  operatorTransactionPresent?: number;
+  operatorDailyBasic?: number;
 }
 
 // Fields that, when changed, trigger auto-recalculation of totalSalary
@@ -138,12 +190,16 @@ const OT_SOURCE_FIELDS = new Set<keyof DetailRow>(["otHours", "otRateHr"]);
 function recomputePayable(row: DetailRow, totalDays: number): DetailRow {
   // Total Salary already includes OT (see recomputeAll), so payable is
   // total salary, plus a 100%-attendance bonus (Att. Allowance) when the
-  // employee worked the full month, minus the deductions.
+  // employee worked the full month, minus the deductions. For operators each
+  // holiday day adds one daily basic to payable (increase adds, decrease
+  // deducts relative to the entered count).
   const fullAttendance = totalDays > 0 && toNum(row.presentDays) >= totalDays;
   const attAllowance = fullAttendance ? toNum(row.attAllowance) : 0;
+  const holidaysBonus = row.isOperator ? toNum(row.holidays) * toNum(row.operatorDailyBasic) : 0;
   const payable =
     toNum(row.totalSalary) +
-    attAllowance -
+    attAllowance +
+    holidaysBonus -
     toNum(row.advanceDeduction) -
     toNum(row.loanDeduction) -
     toNum(row.otherDeduction);
@@ -179,6 +235,35 @@ function recomputeAll(row: DetailRow, totalDays: number): DetailRow {
   );
 }
 
+// Operator (dept 0002) recompute: Total Salary is the production-derived
+// baseline plus a present-day adjustment (each present day above the
+// transaction-present floor adds one daily basic). OT, allowances, and
+// deductions behave as usual.
+function recomputeOperatorAll(row: DetailRow, totalDays: number): DetailRow {
+  const totalAttendance = roundToWhole(toNum(row.presentDays) + toNum(row.holidays));
+  const otRate = toNum(row.otRateHr);
+  const otAmount = otRate > 0 ? toNum(row.otHours) * otRate : 0;
+  // Present-day adjustment relative to the transaction-present floor.
+  const base = toNum(row.operatorBaseTotal);
+  const floor = toNum(row.operatorTransactionPresent);
+  const dailyBasic = toNum(row.operatorDailyBasic);
+  const present = Math.max(toNum(row.presentDays), floor); // never below the floor
+  const totalSalary = base + (present - floor) * dailyBasic + otAmount;
+  // Absent is derived for operators: days in the month minus present.
+  const absentDays = Math.max(totalDays - present, 0);
+  return recomputePayable(
+    {
+      ...row,
+      presentDays: String(present),
+      absentDays: String(absentDays),
+      totalAttendance: totalAttendance.toFixed(TOTAL_ATTENDANCE_DECIMALS),
+      totalSalary: totalSalary.toFixed(NUM_DECIMALS),
+      otAmount: otAmount.toFixed(NUM_DECIMALS),
+    },
+    totalDays
+  );
+}
+
 function rowFromEmployee(op: Employee, totalDays: number, advanceSum = 0): DetailRow {
   const base: DetailRow = {
     employeeId: op.id,
@@ -203,6 +288,44 @@ function rowFromEmployee(op: Employee, totalDays: number, advanceSum = 0): Detai
   return recomputeAll(base, totalDays);
 }
 
+// Builds a row for an Operator (dept 0002) employee whose salary is derived
+// from production: Present days and Total Salary come from the transactions
+// (read-only), while Absent / Holidays / OT / Deductions stay user-entered.
+function rowFromOperator(op: Employee, totalDays: number, prod: OperatorProduction, advanceSum = 0): DetailRow {
+  const dailyBasic = toNum(op.baseSalary);
+  const transactionPresent = prod.presentDays;
+  // Base total = production-derived salary. Present-day adjustment adds one
+  // daily basic for each present day above the transaction-present floor.
+  const baseTotal = prod.totalSalary;
+  const base: DetailRow = {
+    employeeId: op.id,
+    departmentId: op.departmentId,
+    employeeName: op.name,
+    basicSalary: dailyBasic.toFixed(NUM_DECIMALS),
+    otRateHr: toNum(op.overtimeRateHr).toFixed(NUM_DECIMALS),
+    attAllowance: toNum(op.attAllowance).toFixed(NUM_DECIMALS),
+    othAllowance: toNum(op.othAllowance).toFixed(NUM_DECIMALS),
+    presentDays: String(transactionPresent),
+    absentDays: "0",
+    holidays: "0",
+    totalAttendance: "0",
+    totalSalary: baseTotal.toFixed(NUM_DECIMALS),
+    otHours: "0",
+    otAmount: "0.00",
+    advanceDeduction: advanceSum.toFixed(NUM_DECIMALS),
+    loanDeduction: "0.00",
+    otherDeduction: "0.00",
+    payableSalary: "0.00",
+    isOperator: true,
+    operatorDays: prod.days,
+    operatorBaseTotal: baseTotal,
+    operatorTransactionPresent: transactionPresent,
+    operatorDailyBasic: dailyBasic,
+  };
+  // Apply the present-day adjustment (default present = floor → no change).
+  return recomputeOperatorAll(base, totalDays);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function PayrollEntryPage() {
@@ -219,6 +342,8 @@ export default function PayrollEntryPage() {
   const [rows, setRows] = useState<DetailRow[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [deptPopoverOpen, setDeptPopoverOpen] = useState(false);
+  // Operator row whose salary detail popup is open (employeeId), or null.
+  const [operatorDetail, setOperatorDetail] = useState<number | null>(null);
 
   const totalDays = daysInMonthFn(parseInt(month) || 1, parseInt(year) || CURRENT_YEAR);
 
@@ -226,6 +351,12 @@ export default function PayrollEntryPage() {
     queryKey: ["dept-lookup"],
     queryFn: () => apiFetch("/api/lookups/department-master"),
   });
+
+  // The Operator department (code 0002) uses production-based salary.
+  const operatorDeptId = useMemo(
+    () => departments.find((d) => d.code === "0002")?.id ?? null,
+    [departments]
+  );
 
   const { data: allEmployees = [] } = useQuery<Employee[]>({
     queryKey: ["employee-full-lookup"],
@@ -252,6 +383,18 @@ export default function PayrollEntryPage() {
     [advanceByEmployee]
   );
 
+  // Operator (dept 0002) production-based salary for the selected month.
+  const opParams = new URLSearchParams({ month, year });
+  const { data: operatorProductions = [] } = useQuery<OperatorProduction[]>({
+    queryKey: ["salary-entry-operator-production", month, year],
+    queryFn: () => apiFetch(`/api/salary-entries/operator-production?${opParams.toString()}`),
+    enabled: !isEdit || initialized,
+  });
+  const operatorByEmployee = useMemo(() => {
+    if (operatorDeptId === null || operatorProductions.length === 0) return new Map<number, OperatorProduction>();
+    return new Map(operatorProductions.map((p) => [p.employeeId, p]));
+  }, [operatorDeptId, operatorProductions]);
+
   const { data: existingEntry, isLoading: loadingEntry } = useQuery<{
     id: number; month: number; year: number; departmentIds: number[]; posted: boolean;
     details: DetailRow[];
@@ -275,16 +418,21 @@ export default function PayrollEntryPage() {
     setMonth(String(existingEntry.month));
     setYear(String(existingEntry.year));
     setSelectedDeptIds(existingEntry.departmentIds ?? []);
-    setRows(existingEntry.details.map((d) => ({
-      ...d,
-      presentDays: String(roundToWhole(toNum(d.presentDays))),
-      absentDays: String(roundToWhole(toNum(d.absentDays))),
-      holidays: String(roundToWhole(toNum(d.holidays))),
-      totalAttendance: String(roundToWhole(toNum(d.totalAttendance))),
-      otHours: String(roundToWhole(toNum(d.otHours))),
-    })));
+    setRows(existingEntry.details.map((d) => {
+      const isOperator = operatorDeptId !== null && d.departmentId === operatorDeptId;
+      return {
+        ...d,
+        // Operator present/total come from transactions (read-only).
+        ...(isOperator ? { isOperator: true } : {}),
+        presentDays: String(roundToWhole(toNum(d.presentDays))),
+        absentDays: String(roundToWhole(toNum(d.absentDays))),
+        holidays: String(roundToWhole(toNum(d.holidays))),
+        totalAttendance: String(roundToWhole(toNum(d.totalAttendance))),
+        otHours: String(roundToWhole(toNum(d.otHours))),
+      };
+    }));
     setInitialized(true);
-  }, [isEdit, existingEntry, initialized]);
+  }, [isEdit, existingEntry, initialized, operatorDeptId]);
 
   // In edit mode, once the period's advance totals have loaded, sync the
   // Advance Deduction column to the sum of each employee's advances.
@@ -294,6 +442,31 @@ export default function PayrollEntryPage() {
       prev.map((r) => ({ ...r, advanceDeduction: rowAdvanceSum(r.employeeId).toFixed(NUM_DECIMALS) }))
     );
   }, [isEdit, initialized, advanceByEmployee, rowAdvanceSum]);
+
+  // In edit mode, once the operator-production data has loaded, refresh the
+  // operator baseline (transaction-present floor, production base total, daily
+  // basic) and recompute total salary so the present-day adjustment is correct.
+  useEffect(() => {
+    if (!isEdit || !initialized || operatorByEmployee.size === 0) return;
+    setRows((prev) =>
+      prev.map((r) => {
+        if (!r.isOperator) return r;
+        const op = operatorByEmployee.get(r.employeeId);
+        if (!op) return r;
+        const base: DetailRow = {
+          ...r,
+          presentDays: String(op.presentDays),
+          totalSalary: op.totalSalary.toFixed(NUM_DECIMALS),
+          operatorBaseTotal: op.totalSalary,
+          operatorTransactionPresent: op.presentDays,
+          operatorDailyBasic: toNum(r.basicSalary),
+          operatorDays: op.days,
+        };
+        return recomputeOperatorAll(base, daysInMonthFn(parseInt(month) || 1, parseInt(year) || CURRENT_YEAR));
+      })
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, initialized, operatorByEmployee, month, year]);
 
   // For new mode: rebuild rows when dept selection, employee list, or the
   // loaded advance totals change (advances fetch async, so they may arrive
@@ -305,8 +478,9 @@ export default function PayrollEntryPage() {
   const [builtForKey, setBuiltForKey] = useState<string | null>(null);
   const [builtForOpCount, setBuiltForOpCount] = useState(-1);
   const [builtForLoadState, setBuiltForLoadState] = useState<string>("");
-  // Rebuild when the selected dept or the loaded advance batch changes.
-  const advanceLoadToken = `${deptKey}:${advances.length}:${month}:${year}`;
+  // Rebuild when the selected dept, the loaded advance batch, or the loaded
+  // operator-production batch changes (all fetch async).
+  const advanceLoadToken = `${deptKey}:${advances.length}:${operatorByEmployee.size}:${month}:${year}`;
 
   useEffect(() => {
     if (isEdit) return;
@@ -319,8 +493,16 @@ export default function PayrollEntryPage() {
     const filtered = allEmployees.filter(
       (op) => op.active && op.departmentId !== null && selectedDeptIds.includes(op.departmentId!)
     );
-    setRows(filtered.map((op) => rowFromEmployee(op, td, rowAdvanceSum(op.id))));
-  }, [isEdit, deptKey, allEmployees.length, advanceLoadToken, advanceByEmployee, month, year]); // eslint-disable-line react-hooks/exhaustive-deps
+    setRows(
+      filtered.map((op) => {
+        if (operatorDeptId !== null && op.departmentId === operatorDeptId) {
+          const prod = operatorByEmployee.get(op.id);
+          if (prod) return rowFromOperator(op, td, prod, rowAdvanceSum(op.id));
+        }
+        return rowFromEmployee(op, td, rowAdvanceSum(op.id));
+      })
+    );
+  }, [isEdit, deptKey, allEmployees.length, advanceLoadToken, advanceByEmployee, operatorDeptId, operatorByEmployee, month, year]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Row update with field-aware formula logic ──
   const updateRow = useCallback(
@@ -332,12 +514,25 @@ export default function PayrollEntryPage() {
 
         // Present and Absent are linked so they always sum to the days in the
         // month: editing one keeps the other at totalDays - the edited value.
-        if (field === "presentDays") {
-          const abs = clampNum(td - toNum(value), 0, td);
-          updated = { ...updated, absentDays: String(abs) };
-        } else if (field === "absentDays") {
-          const pre = clampNum(td - toNum(value), 0, td);
-          updated = { ...updated, presentDays: String(pre) };
+        // Operators skip the linkage: their Present is a standalone adjustment
+        // (floored at the transaction-present count), so editing Absent or
+        // Present must not rewrite the other.
+        if (!next[idx].isOperator) {
+          if (field === "presentDays") {
+            const abs = clampNum(td - toNum(value), 0, td);
+            updated = { ...updated, absentDays: String(abs) };
+          } else if (field === "absentDays") {
+            const pre = clampNum(td - toNum(value), 0, td);
+            updated = { ...updated, presentDays: String(pre) };
+          }
+        }
+
+        // Operator Present is a manual adjustment: floor = transaction-present
+        // days, ceiling = days in the month.
+        if (next[idx].isOperator && field === "presentDays") {
+          const floor = toNum(next[idx].operatorTransactionPresent);
+          const clamped = clampNum(toNum(value), floor, td);
+          updated = { ...updated, presentDays: String(clamped) };
         }
 
         // Holidays are capped at MAX_HOLIDAYS (5) per month regardless of input.
@@ -352,12 +547,13 @@ export default function PayrollEntryPage() {
         }
 
         if (SALARY_SOURCE_FIELDS.has(field) || OT_SOURCE_FIELDS.has(field)) {
-          // Source field changed → recompute both derived salary/OT fields and payable
-          next[idx] = recomputeAll(updated, td);
+          // Source or OT field changed → recompute salary/OT fields and payable.
+          // Operator rows use their own formula (production + present adjustment).
+          next[idx] = updated.isOperator ? recomputeOperatorAll(updated, td) : recomputeAll(updated, td);
         } else {
           // User is editing a directly-entered value (holidays, loan/other
-          // deductions) → only recompute payableSalary
-          next[idx] = recomputePayable(updated, td);
+          // deductions) → only recompute payableSalary (operator-aware)
+          next[idx] = updated.isOperator ? recomputeOperatorAll(updated, td) : recomputePayable(updated, td);
         }
         return next;
       });
@@ -371,7 +567,10 @@ export default function PayrollEntryPage() {
       setMonth(m);
       const td = daysInMonthFn(parseInt(m) || 1, parseInt(year) || CURRENT_YEAR);
       setRows((prev) =>
-        prev.map((r, i) => recomputeAll({ ...r, advanceDeduction: rowAdvanceSum(r.employeeId).toFixed(NUM_DECIMALS) }, td))
+        prev.map((r) => {
+          const rr = { ...r, advanceDeduction: rowAdvanceSum(r.employeeId).toFixed(NUM_DECIMALS) };
+          return rr.isOperator ? recomputeOperatorAll(rr, td) : recomputeAll(rr, td);
+        })
       );
     },
     [year, advanceByEmployee]
@@ -383,7 +582,10 @@ export default function PayrollEntryPage() {
       setYear(y);
       const td = daysInMonthFn(parseInt(month) || 1, parseInt(y) || CURRENT_YEAR);
       setRows((prev) =>
-        prev.map((r, i) => recomputeAll({ ...r, advanceDeduction: rowAdvanceSum(r.employeeId).toFixed(NUM_DECIMALS) }, td))
+        prev.map((r) => {
+          const rr = { ...r, advanceDeduction: rowAdvanceSum(r.employeeId).toFixed(NUM_DECIMALS) };
+          return rr.isOperator ? recomputeOperatorAll(rr, td) : recomputeAll(rr, td);
+        })
       );
     },
     [month, advanceByEmployee]
@@ -652,9 +854,23 @@ export default function PayrollEntryPage() {
                     return (
                       <TableRow key={row.employeeId} className={rowBg}>
                         {/* Sticky-left employee name so the numbers never
-                            scroll away from whose row they belong to (P9). */}
+                            scroll away from whose row they belong to (P9).
+                            Operator rows get an eye icon that opens the
+                            transaction/salary breakdown popup. */}
                         <TableCell className={`sticky left-0 z-10 ${stickyBg} border-r border-border/60 font-medium text-sm py-1`}>
-                          <div>{row.employeeName}</div>
+                          <div className="flex items-center gap-1">
+                            {row.isOperator && (
+                              <button
+                                type="button"
+                                title="View salary calculation"
+                                onClick={() => setOperatorDetail(row.employeeId)}
+                                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </button>
+                            )}
+                            <span className="truncate">{row.employeeName}</span>
+                          </div>
                           {attExceeded && (
                             <p className="mt-0.5 max-w-[180px] text-[10px] leading-tight text-red-600">
                               Present + Absent ({toNum(row.presentDays) + toNum(row.absentDays)}) exceeds {totalDays} days
@@ -666,32 +882,58 @@ export default function PayrollEntryPage() {
                         <TableCell className="py-1"><Input disabled className={ro} value={row.otRateHr} /></TableCell>
                         <TableCell className="py-1"><Input disabled className={ro} value={row.attAllowance} /></TableCell>
                         <TableCell className="py-1"><Input disabled className={ro} value={row.othAllowance} /></TableCell>
-                        {/* Attendance inputs — trigger salary formula */}
+                        {/* Attendance inputs — trigger salary formula. Operator
+                            Present is editable from the transaction-present floor
+                            up to the days in the month; each day above the floor
+                            adds one daily basic to their salary. */}
                         <TableCell className="py-1">
-                          <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
-                            value={row.presentDays} disabled={isPosted}
-                            onChange={(e) => updateRow(i, "presentDays", e.target.value)} />
+                          {row.isOperator ? (
+                            <Input type="number" min={row.operatorTransactionPresent ?? 0} max={totalDays} step={STEP_ATTENDANCE} className={inp}
+                              value={row.presentDays} disabled={isPosted}
+                              onChange={(e) => updateRow(i, "presentDays", e.target.value)} />
+                          ) : (
+                            <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
+                              value={row.presentDays} disabled={isPosted}
+                              onChange={(e) => updateRow(i, "presentDays", e.target.value)} />
+                          )}
                         </TableCell>
                         <TableCell className="py-1">
-                          <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
-                            value={row.absentDays} disabled={isPosted}
-                            onChange={(e) => updateRow(i, "absentDays", e.target.value)} />
+                          {row.isOperator ? (
+                            <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={ro}
+                              value={row.absentDays} disabled readOnly />
+                          ) : (
+                            <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
+                              value={row.absentDays} disabled={isPosted}
+                              onChange={(e) => updateRow(i, "absentDays", e.target.value)} />
+                          )}
                         </TableCell>
                         <TableCell className="py-1">
-                          <Input type="number" min="0" max={MAX_HOLIDAYS} step={STEP_ATTENDANCE} className={inp}
-                            value={row.holidays} disabled={isPosted}
-                            onChange={(e) => updateRow(i, "holidays", e.target.value)} />
+                          {row.isOperator ? (
+                            <Input type="number" min="0" max={MAX_HOLIDAYS} step={STEP_ATTENDANCE} className={inp}
+                              value={row.holidays} disabled={isPosted}
+                              onChange={(e) => updateRow(i, "holidays", e.target.value)} />
+                          ) : (
+                            <Input type="number" min="0" max={MAX_HOLIDAYS} step={STEP_ATTENDANCE} className={ro}
+                              value={row.holidays} disabled readOnly />
+                          )}
                         </TableCell>
                         {/* totalAttendance = Present + Holidays (derived, read-only) */}
                         <TableCell className="py-1">
                           <Input type="number" min="0" step={STEP_ATTENDANCE} className={ro}
                             value={row.totalAttendance} disabled readOnly />
                         </TableCell>
-                        {/* otHours — triggers otAmount recalculation */}
+                        {/* otHours — triggers otAmount recalculation. Disabled when
+                            the employee has no OT rate (rate zero), since OT
+                            Amount = OT Hrs × rate is then always 0. */}
                         <TableCell className="py-1">
-                          <Input type="number" min="0" step={STEP_ATTENDANCE} className={inp}
-                            value={row.otHours} disabled={isPosted}
-                            onChange={(e) => updateRow(i, "otHours", e.target.value)} />
+                          {toNum(row.otRateHr) > 0 ? (
+                            <Input type="number" min="0" step={STEP_ATTENDANCE} className={inp}
+                              value={row.otHours} disabled={isPosted}
+                              onChange={(e) => updateRow(i, "otHours", e.target.value)} />
+                          ) : (
+                            <Input type="number" min="0" step={STEP_ATTENDANCE} className={ro}
+                              value={row.otHours} disabled readOnly />
+                          )}
                         </TableCell>
                         {/* otAmount — auto-computed; display only (no manual override) */}
                         <TableCell className="py-1">
@@ -778,6 +1020,112 @@ export default function PayrollEntryPage() {
           )}
         </div>
       </div>
+
+      {/* Operator salary calculation popup */}
+      <OperatorDetailDialog
+        row={rows.find((r) => r.employeeId === operatorDetail)}
+        month={(parseInt(month) || 0).toString()}
+        year={(parseInt(year) || 0).toString()}
+        onClose={() => setOperatorDetail(null)}
+      />
     </Layout>
+  );
+}
+
+// ─── Operator salary detail popup ─────────────────────────────────────────────
+// Shows the per-day transaction production and how the operator's salary was
+// derived (max of daily production sum vs daily basic), plus the rolled-up
+// present days and total salary.
+function OperatorDetailDialog({
+  row,
+  month,
+  year,
+  onClose,
+}: {
+  row: DetailRow | undefined;
+  month: string;
+  year: string;
+  onClose: () => void;
+}) {
+  const monthName = MONTHS[parseInt(month) - 1] || month;
+  const days = row?.operatorDays ?? [];
+  const totalProduction = days.reduce((acc, d) => acc + d.dailyProductionSum, 0);
+  const totalCredited = days.reduce((acc, d) => acc + d.credited, 0);
+
+  return (
+    <Dialog open={!!row} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Salary Calculation — {row?.employeeName ?? ""}</DialogTitle>
+          <DialogDescription>
+            Production-based salary for {monthName} {year} (Operator, dept code 0002).
+            Daily basic salary: <span className="font-medium">{fmtMoney(toNum(row?.basicSalary ?? 0))}</span>.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="text-xs">
+                <TableHead className="min-w-[130px]">Date / Machine</TableHead>
+                <TableHead className="text-right">Net Wt</TableHead>
+                <TableHead className="text-right">Rate</TableHead>
+                <TableHead className="text-right">Production (netWt × rate)</TableHead>
+                <TableHead className="text-right">Daily Basic / Credited</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {days.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
+                    No production days in this month.
+                  </TableCell>
+                </TableRow>
+              )}
+              {days.map((d) => (
+                <Fragment key={d.date}>
+                  {/* Day summary row */}
+                  <TableRow className="bg-muted/30">
+                    <TableCell className="py-1 font-medium">{formatDate(d.date)}</TableCell>
+                    <TableCell className="py-1 text-right font-mono">—</TableCell>
+                    <TableCell className="py-1 text-right font-mono">—</TableCell>
+                    <TableCell className="py-1 text-right font-mono font-semibold">{fmtMoney(d.dailyProductionSum)}</TableCell>
+                    <TableCell className="py-1 text-right font-mono font-semibold">{fmtMoney(d.credited)}</TableCell>
+                  </TableRow>
+                  {/* Machine-level sub-rows */}
+                  {(d.machines ?? []).map((m, mi) => (
+                    <TableRow key={`${d.date}-${m.machineId}-${mi}`}>
+                      <TableCell className="py-1 pl-9 text-muted-foreground">↳ {m.machineName}</TableCell>
+                      <TableCell className="py-1 text-right font-mono">{m.netWt}</TableCell>
+                      <TableCell className="py-1 text-right font-mono">× {m.rate}</TableCell>
+                      <TableCell className="py-1 text-right font-mono">{fmtMoney(m.amount)}</TableCell>
+                      <TableCell className="py-1 text-right font-mono text-muted-foreground">—</TableCell>
+                    </TableRow>
+                  ))}
+                </Fragment>
+              ))}
+            </TableBody>
+            {days.length > 0 && (
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={4} className="py-1 font-semibold">Total (present days: {days.length})</TableCell>
+                  <TableCell className="py-1 text-right font-mono font-bold">{fmtMoney(totalCredited)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell colSpan={4} className="py-1 text-muted-foreground">Total production (gross, before basic floor)</TableCell>
+                  <TableCell className="py-1 text-right font-mono text-muted-foreground">{fmtMoney(totalProduction)}</TableCell>
+                </TableRow>
+              </TableFooter>
+            )}
+          </Table>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Per machine: production = net weight × machine making rate. Credited per day =
+          max(daily production sum, daily basic salary). Total salary = sum of credited
+          days. Daily basic salary: <span className="font-medium">{fmtMoney(toNum(row?.basicSalary ?? 0))}</span>.
+        </p>
+      </DialogContent>
+    </Dialog>
   );
 }
