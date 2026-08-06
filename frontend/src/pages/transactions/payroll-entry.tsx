@@ -24,6 +24,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -431,6 +432,34 @@ export default function PayrollEntryPage() {
 
   const isPosted = existingEntry?.posted ?? false;
 
+  // Column totals for the grid footer (matching the numeric column order).
+  // Whole-number columns (attendance) sum to 0 decimals; money columns to 2.
+  const numericColumns: Array<{ key: keyof DetailRow; decimals: number }> = [
+    { key: "basicSalary", decimals: 2 },
+    { key: "otRateHr", decimals: 2 },
+    { key: "attAllowance", decimals: 2 },
+    { key: "othAllowance", decimals: 2 },
+    { key: "presentDays", decimals: 0 },
+    { key: "absentDays", decimals: 0 },
+    { key: "holidays", decimals: 0 },
+    { key: "totalAttendance", decimals: 0 },
+    { key: "otHours", decimals: 0 },
+    { key: "otAmount", decimals: 2 },
+    { key: "totalSalary", decimals: 2 },
+    { key: "advanceDeduction", decimals: 2 },
+    { key: "loanDeduction", decimals: 2 },
+    { key: "otherDeduction", decimals: 2 },
+    { key: "payableSalary", decimals: 2 },
+  ];
+  const columnTotals = numericColumns.map((col) =>
+    rows.reduce((acc, row) => acc + toNum(row[col.key]), 0)
+  );
+  const fmtTotal = (v: number, decimals: number) =>
+    v.toLocaleString("en-IN", {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+
   if (isEdit && loadingEntry) {
     return (
       <Layout>
@@ -545,38 +574,42 @@ export default function PayrollEntryPage() {
           <Card>
             <CardHeader>
               <CardTitle>Employee Detail</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Auto-formula: Total Attendance = Present + Holidays &nbsp;|&nbsp;
-                OT Amount = OT Hours × OT Rate &nbsp;|&nbsp;
-                Total Salary = (Basic ÷ {totalDays}) × Attendance + OT &nbsp;|&nbsp;
-                Att. Allowance added when Present = {totalDays} (full month) &nbsp;|&nbsp;
-                Payable = Total Salary + Att. Allowance − Deductions.
-                <span className="ml-1 italic">
-                  Present, Absent, Holidays, OT Hours, Basic, and deduction
-                  fields are user-entered; the rest are computed.
+              {/* Compact legend: editable vs computed, plus the key formulas. */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block h-3 w-3 rounded border border-input"></span>
+                  Editable
                 </span>
-              </p>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block h-3 w-3 rounded bg-muted/40"></span>
+                  Computed / read-only
+                </span>
+                <span className="text-muted-foreground/70">
+                  Total Att. = Present + Holidays · Total Salary = (Basic ÷ {totalDays}) × Att. + OT ·
+                  Payable = Total Salary + Att. Allow. (when Present = {totalDays}) − Deductions
+                </span>
+              </div>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="text-xs">
-                    <TableHead className="sticky left-0 bg-card min-w-[140px]">Employee</TableHead>
-                    <TableHead className="text-right min-w-[90px]">Basic Salary</TableHead>
-                    <TableHead className="text-right min-w-[80px]">OT Rate/Hr</TableHead>
-                    <TableHead className="text-right min-w-[80px]">Att. Allow.</TableHead>
-                    <TableHead className="text-right min-w-[80px]">Oth. Allow.</TableHead>
+                    <TableHead className="sticky left-0 z-10 bg-card min-w-[140px] border-r border-border/60">Employee</TableHead>
+                    <TableHead className="text-right min-w-[90px]" title="Base salary from the employee master">Basic Salary</TableHead>
+                    <TableHead className="text-right min-w-[80px]" title="Overtime rate per hour (employee master)">OT Rate/Hr</TableHead>
+                    <TableHead className="text-right min-w-[80px]" title="Attendance allowance — added on full attendance">Att. Allow.</TableHead>
+                    <TableHead className="text-right min-w-[80px]" title="Other allowance">Oth. Allow.</TableHead>
                     <TableHead className="text-right min-w-[75px]">Present</TableHead>
                     <TableHead className="text-right min-w-[75px]">Absent</TableHead>
                     <TableHead className="text-right min-w-[70px]">Holidays</TableHead>
-                    <TableHead className="text-right min-w-[80px]">Total Att.</TableHead>
+                    <TableHead className="text-right min-w-[80px]" title="Present + Holidays (computed)">Total Att.</TableHead>
                     <TableHead className="text-right min-w-[70px]">OT Hrs</TableHead>
-                    <TableHead className="text-right min-w-[90px]">OT Amount ✎</TableHead>
-                    <TableHead className="text-right min-w-[100px]">Total Salary ✎</TableHead>
-                    <TableHead className="text-right min-w-[90px]">Adv. Deduction</TableHead>
+                    <TableHead className="text-right min-w-[90px]" title="OT Hours × OT Rate (computed)">OT Amount</TableHead>
+                    <TableHead className="text-right min-w-[100px]" title="(Basic ÷ days) × Attendance + OT (computed)">Total Salary</TableHead>
+                    <TableHead className="text-right min-w-[90px]" title="Advances for the month (auto-loaded)">Adv. Deduction</TableHead>
                     <TableHead className="text-right min-w-[90px]">Loan Deduction</TableHead>
                     <TableHead className="text-right min-w-[90px]">Other Deduction</TableHead>
-                    <TableHead className="text-right min-w-[110px] font-bold">Payable Salary</TableHead>
+                    <TableHead className="sticky right-0 z-10 bg-card min-w-[110px] font-bold border-l border-border/60" title="Total Salary + Att. Allowance − Deductions">Payable Salary</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -585,11 +618,16 @@ export default function PayrollEntryPage() {
                     const ro = "h-7 text-right font-mono text-xs p-1 w-full bg-muted/40 cursor-not-allowed";
                     const attExceeded = attendanceExceedsMonth(row, totalDays);
                     const attErrCls = attExceeded ? "border-destructive focus-visible:ring-destructive" : "";
+                    const striped = i % 2 === 0;
+                    // Solid backgrounds for row striping and the frozen columns
+                    // (Employee, Payable) so nothing is transparent.
+                    const rowBg = striped ? "bg-[hsl(var(--muted))]" : "bg-card";
+                    const stickyBg = rowBg;
                     return (
-                      <TableRow key={row.employeeId} className={i % 2 === 0 ? "bg-muted/10" : ""}>
+                      <TableRow key={row.employeeId} className={rowBg}>
                         {/* Sticky-left employee name so the numbers never
                             scroll away from whose row they belong to (P9). */}
-                        <TableCell className="sticky left-0 bg-card font-medium text-sm py-1">
+                        <TableCell className={`sticky left-0 z-10 ${stickyBg} border-r border-border/60 font-medium text-sm py-1`}>
                           <div>{row.employeeName}</div>
                           {attExceeded && (
                             <p className="mt-0.5 max-w-[180px] text-[10px] leading-tight text-red-600">
@@ -604,12 +642,12 @@ export default function PayrollEntryPage() {
                         <TableCell className="py-1"><Input disabled className={ro} value={row.othAllowance} /></TableCell>
                         {/* Attendance inputs — trigger salary formula */}
                         <TableCell className="py-1">
-                          <Input type="number" min="0" step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
+                          <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
                             value={row.presentDays} disabled={isPosted}
                             onChange={(e) => updateRow(i, "presentDays", e.target.value)} />
                         </TableCell>
                         <TableCell className="py-1">
-                          <Input type="number" min="0" step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
+                          <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
                             value={row.absentDays} disabled={isPosted}
                             onChange={(e) => updateRow(i, "absentDays", e.target.value)} />
                         </TableCell>
@@ -655,9 +693,11 @@ export default function PayrollEntryPage() {
                             value={row.otherDeduction} disabled={isPosted}
                             onChange={(e) => updateRow(i, "otherDeduction", e.target.value)} />
                         </TableCell>
-                        {/* Payable — live computed, read-only display */}
+                        {/* Payable — live computed, read-only display. Sticky on
+                            the right so the final total stays visible while the
+                            grid scrolls; solid bg so nothing shows through. */}
                         <TableCell
-                          className={`py-1 pr-2 text-right font-mono text-sm font-semibold ${
+                          className={`sticky right-0 z-10 py-1 pr-2 text-right font-mono text-sm font-semibold ${stickyBg} border-l border-border/60 ${
                             toNum(row.payableSalary) < 0 ? "text-red-600" : "text-green-700"
                           }`}
                         >
@@ -667,6 +707,28 @@ export default function PayrollEntryPage() {
                     );
                   })}
                 </TableBody>
+                {rows.length > 1 && (
+                  <TableFooter>
+                    <TableRow className="bg-[hsl(var(--muted))]">
+                      <TableCell className="sticky left-0 z-10 bg-[hsl(var(--muted))] border-r border-border/60 font-semibold text-sm">
+                        Total ({rows.length})
+                      </TableCell>
+                      {columnTotals.map((t, idx) => {
+                        const isPayable = idx === numericColumns.length - 1;
+                        return (
+                          <TableCell
+                            key={idx}
+                            className={`py-1 px-2 text-right font-mono text-xs font-semibold ${
+                              isPayable ? "sticky right-0 z-10 bg-[hsl(var(--muted))] border-l border-border/60" : ""
+                            }`}
+                          >
+                            {fmtTotal(t, numericColumns[idx]?.decimals ?? 2)}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  </TableFooter>
+                )}
               </Table>
             </CardContent>
           </Card>
