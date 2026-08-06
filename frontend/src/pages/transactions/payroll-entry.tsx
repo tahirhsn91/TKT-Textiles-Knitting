@@ -1,5 +1,5 @@
 import { NUM_DECIMALS } from "@/lib/format";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Save, Check, ChevronsUpDown } from "lucide-react";
@@ -41,7 +41,10 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 2 + i);
+const CURRENT_MONTH = new Date().getMonth() + 1; // 1-12
+// Years offered in the dropdown: a few past years up to the current year
+// (future years are excluded).
+const SELECTABLE_YEARS = Array.from({ length: 4 }, (_, i) => CURRENT_YEAR - 3 + i);
 // Input step increments for the salary-entry grid.
 const STEP_ATTENDANCE = "1";   // Present, Absent, Holidays, Total Att., OT Hours
 const STEP_MONEY = "0.01";     // salary, OT amount, and deduction fields
@@ -258,6 +261,14 @@ export default function PayrollEntryPage() {
     enabled: isEdit,
   });
 
+  // In new mode, select all departments by default once they load.
+  const defaultedDepts = useRef(false);
+  useEffect(() => {
+    if (isEdit || departments.length === 0 || defaultedDepts.current) return;
+    defaultedDepts.current = true;
+    setSelectedDeptIds(departments.map((d) => d.id));
+  }, [isEdit, departments]);
+
   // Populate form once when loading an existing entry
   useEffect(() => {
     if (!isEdit || !existingEntry || initialized) return;
@@ -396,6 +407,14 @@ export default function PayrollEntryPage() {
       toast({ variant: "destructive", title: "Validation", description: "Month and year are required." });
       return;
     }
+    // Don't allow saving a future period (belt-and-braces guard alongside the
+    // disabled dropdown options).
+    const selY = parseInt(year);
+    const selM = parseInt(month);
+    if (selY > CURRENT_YEAR || (selY === CURRENT_YEAR && selM > CURRENT_MONTH)) {
+      toast({ variant: "destructive", title: "Validation", description: "Future month/year cannot be selected." });
+      return;
+    }
     if (selectedDeptIds.length === 0) {
       toast({ variant: "destructive", title: "Validation", description: "Select at least one department." });
       return;
@@ -500,9 +519,16 @@ export default function PayrollEntryPage() {
                 <Select value={month} onValueChange={handleMonthChange} disabled={isPosted}>
                   <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {MONTHS.map((name, i) => (
-                      <SelectItem key={i + 1} value={String(i + 1)}>{name}</SelectItem>
-                    ))}
+                    {MONTHS.map((name, i) => {
+                      const m = i + 1;
+                      // No future months when the current year is selected.
+                      const isFutureMon = parseInt(year) === CURRENT_YEAR && m > CURRENT_MONTH;
+                      return (
+                        <SelectItem key={m} value={String(m)} disabled={isFutureMon}>
+                          {name}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -512,7 +538,7 @@ export default function PayrollEntryPage() {
                 <Select value={year} onValueChange={handleYearChange} disabled={isPosted}>
                   <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {YEARS.map((y) => (
+                    {SELECTABLE_YEARS.map((y) => (
                       <SelectItem key={y} value={String(y)}>{y}</SelectItem>
                     ))}
                   </SelectContent>
