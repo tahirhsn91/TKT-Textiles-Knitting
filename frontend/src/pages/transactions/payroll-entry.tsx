@@ -41,10 +41,25 @@ const MONTHS = [
 ];
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 2 + i);
+// Input step increments for the salary-entry grid.
+const STEP_ATTENDANCE = "1";   // Present, Absent, Holidays, Total Att., OT Hours
+const STEP_MONEY = "0.01";     // salary, OT amount, and deduction fields
+// Maximum allowed holidays per employee per month.
+const MAX_HOLIDAYS = "5";
+// Total Attendance is a whole number (0 decimals).
+const TOTAL_ATTENDANCE_DECIMALS = 0;
 
 function toNum(v: string | number | null | undefined): number {
   const n = parseFloat(String(v ?? ""));
   return isNaN(n) ? 0 : n;
+}
+
+function clampNum(v: number, min: number, max: number): number {
+  return Math.min(Math.max(v, min), max);
+}
+
+function roundToWhole(v: number): number {
+  return Math.round(v);
 }
 
 function daysInMonthFn(month: number, year: number): number {
@@ -71,6 +86,11 @@ async function apiFetch(path: string, opts?: RequestInit) {
 }
 
 interface Department { id: number; name: string; code: string; }
+interface Advance {
+  id: number;
+  employeeId: number;
+  amount: string;
+}
 interface Employee {
   id: number; name: string; code: string; active: boolean;
   departmentId: number | null;
@@ -102,32 +122,60 @@ interface DetailRow {
 }
 
 // Fields that, when changed, trigger auto-recalculation of totalSalary
-const SALARY_SOURCE_FIELDS = new Set<keyof DetailRow>(["basicSalary", "totalAttendance"]);
+const SALARY_SOURCE_FIELDS = new Set<keyof DetailRow>([
+  "basicSalary",
+  "presentDays",
+  "absentDays",
+  "holidays",
+]);
 // Fields that, when changed, trigger auto-recalculation of otAmount
 const OT_SOURCE_FIELDS = new Set<keyof DetailRow>(["otHours", "otRateHr"]);
 
-function recomputePayable(row: DetailRow): DetailRow {
+function recomputePayable(row: DetailRow, totalDays: number): DetailRow {
+  // Total Salary already includes OT (see recomputeAll), so payable is
+  // total salary, plus a 100%-attendance bonus (Att. Allowance) when the
+  // employee worked the full month, minus the deductions.
+  const fullAttendance = totalDays > 0 && toNum(row.presentDays) >= totalDays;
+  const attAllowance = fullAttendance ? toNum(row.attAllowance) : 0;
   const payable =
     toNum(row.totalSalary) +
-    toNum(row.otAmount) -
+    attAllowance -
     toNum(row.advanceDeduction) -
     toNum(row.loanDeduction) -
     toNum(row.otherDeduction);
   return { ...row, payableSalary: payable.toFixed(NUM_DECIMALS) };
 }
 
-function recomputeAll(row: DetailRow, totalDays: number): DetailRow {
-  const totalSalary =
-    totalDays > 0 ? (toNum(row.basicSalary) / totalDays) * toNum(row.totalAttendance) : 0;
-  const otAmount = toNum(row.otHours) * toNum(row.otRateHr);
-  return recomputePayable({
-    ...row,
-    totalSalary: totalSalary.toFixed(NUM_DECIMALS),
-    otAmount: otAmount.toFixed(NUM_DECIMALS),
-  });
+// Present + Absent must not exceed the actual number of days in the month.
+// Returns true when the row violates the rule.
+function attendanceExceedsMonth(row: DetailRow, totalDays: number): boolean {
+  return toNum(row.presentDays) + toNum(row.absentDays) > totalDays;
 }
 
-function rowFromEmployee(op: Employee, totalDays: number): DetailRow {
+function recomputeAll(row: DetailRow, totalDays: number): DetailRow {
+  // Total Attendance = Present + Holidays (derived, not hand-entered), kept
+  // as a whole number to match the other attendance fields.
+  const totalAttendance = roundToWhole(toNum(row.presentDays) + toNum(row.holidays));
+  // OT Amount = OT Hrs × the employee's OT rate (from the master table). If no
+  // OT rate is set for the employee (rate ≤ 0), OT Amount is zero.
+  const otRate = toNum(row.otRateHr);
+  const otAmount = otRate > 0 ? toNum(row.otHours) * otRate : 0;
+  // Total Salary = prorated basic for attendance PLUS the OT amount.
+  const baseSalary =
+    totalDays > 0 ? (toNum(row.basicSalary) / totalDays) * totalAttendance : 0;
+  const totalSalary = baseSalary + otAmount;
+  return recomputePayable(
+    {
+      ...row,
+      totalAttendance: totalAttendance.toFixed(TOTAL_ATTENDANCE_DECIMALS),
+      totalSalary: totalSalary.toFixed(NUM_DECIMALS),
+      otAmount: otAmount.toFixed(NUM_DECIMALS),
+    },
+    totalDays
+  );
+}
+
+function rowFromEmployee(op: Employee, totalDays: number, advanceSum = 0): DetailRow {
   const base: DetailRow = {
     employeeId: op.id,
     departmentId: op.departmentId,
@@ -136,14 +184,14 @@ function rowFromEmployee(op: Employee, totalDays: number): DetailRow {
     otRateHr: toNum(op.overtimeRateHr).toFixed(NUM_DECIMALS),
     attAllowance: toNum(op.attAllowance).toFixed(NUM_DECIMALS),
     othAllowance: toNum(op.othAllowance).toFixed(NUM_DECIMALS),
-    presentDays: "0",
+    presentDays: String(totalDays),
     absentDays: "0",
     holidays: "0",
     totalAttendance: "0",
     totalSalary: "0.00",
     otHours: "0",
     otAmount: "0.00",
-    advanceDeduction: "0.00",
+    advanceDeduction: advanceSum.toFixed(NUM_DECIMALS),
     loanDeduction: "0.00",
     otherDeduction: "0.00",
     payableSalary: "0.00",
@@ -180,6 +228,26 @@ export default function PayrollEntryPage() {
     queryFn: () => apiFetch("/api/lookups/employee-master"),
   });
 
+  // Sum of each employee's advances for the selected month/year, keyed by
+  // employeeId. Used to auto-fill the Advance Deduction column.
+  const advanceParams = new URLSearchParams({ month, year });
+  const { data: advances = [] } = useQuery<Advance[]>({
+    queryKey: ["salary-entry-advances", month, year],
+    queryFn: () => apiFetch(`/api/employees/advances?${advanceParams.toString()}`),
+    enabled: !isEdit || initialized,
+  });
+  const advanceByEmployee = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const a of advances) {
+      map.set(a.employeeId, toNum(map.get(a.employeeId)) + toNum(a.amount));
+    }
+    return map;
+  }, [advances]);
+  const rowAdvanceSum = useCallback(
+    (employeeId: number) => advanceByEmployee.get(employeeId) ?? 0,
+    [advanceByEmployee]
+  );
+
   const { data: existingEntry, isLoading: loadingEntry } = useQuery<{
     id: number; month: number; year: number; departmentIds: number[]; posted: boolean;
     details: DetailRow[];
@@ -195,30 +263,52 @@ export default function PayrollEntryPage() {
     setMonth(String(existingEntry.month));
     setYear(String(existingEntry.year));
     setSelectedDeptIds(existingEntry.departmentIds ?? []);
-    setRows(existingEntry.details.map((d) => ({ ...d })));
+    setRows(existingEntry.details.map((d) => ({
+      ...d,
+      presentDays: String(roundToWhole(toNum(d.presentDays))),
+      absentDays: String(roundToWhole(toNum(d.absentDays))),
+      holidays: String(roundToWhole(toNum(d.holidays))),
+      totalAttendance: String(roundToWhole(toNum(d.totalAttendance))),
+      otHours: String(roundToWhole(toNum(d.otHours))),
+    })));
     setInitialized(true);
   }, [isEdit, existingEntry, initialized]);
 
-  // For new mode: rebuild rows when dept selection or employee list changes
+  // In edit mode, once the period's advance totals have loaded, sync the
+  // Advance Deduction column to the sum of each employee's advances.
+  useEffect(() => {
+    if (!isEdit || !initialized || advanceByEmployee.size === 0) return;
+    setRows((prev) =>
+      prev.map((r) => ({ ...r, advanceDeduction: rowAdvanceSum(r.employeeId).toFixed(NUM_DECIMALS) }))
+    );
+  }, [isEdit, initialized, advanceByEmployee, rowAdvanceSum]);
+
+  // For new mode: rebuild rows when dept selection, employee list, or the
+  // loaded advance totals change (advances fetch async, so they may arrive
+  // after rows are first built).
   const deptKey = useMemo(
     () => selectedDeptIds.slice().sort().join(","),
     [selectedDeptIds]
   );
   const [builtForKey, setBuiltForKey] = useState<string | null>(null);
   const [builtForOpCount, setBuiltForOpCount] = useState(-1);
+  const [builtForLoadState, setBuiltForLoadState] = useState<string>("");
+  // Rebuild when the selected dept or the loaded advance batch changes.
+  const advanceLoadToken = `${deptKey}:${advances.length}:${month}:${year}`;
 
   useEffect(() => {
     if (isEdit) return;
-    if (deptKey === builtForKey && allEmployees.length === builtForOpCount) return;
+    if (deptKey === builtForKey && allEmployees.length === builtForOpCount && advanceLoadToken === builtForLoadState) return;
     setBuiltForKey(deptKey);
     setBuiltForOpCount(allEmployees.length);
+    setBuiltForLoadState(advanceLoadToken);
     if (selectedDeptIds.length === 0) { setRows([]); return; }
     const td = daysInMonthFn(parseInt(month) || 1, parseInt(year) || CURRENT_YEAR);
     const filtered = allEmployees.filter(
       (op) => op.active && op.departmentId !== null && selectedDeptIds.includes(op.departmentId!)
     );
-    setRows(filtered.map((op) => rowFromEmployee(op, td)));
-  }, [isEdit, deptKey, allEmployees.length]); // eslint-disable-line react-hooks/exhaustive-deps
+    setRows(filtered.map((op) => rowFromEmployee(op, td, rowAdvanceSum(op.id))));
+  }, [isEdit, deptKey, allEmployees.length, advanceLoadToken, advanceByEmployee, month, year]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Row update with field-aware formula logic ──
   const updateRow = useCallback(
@@ -226,15 +316,36 @@ export default function PayrollEntryPage() {
       setRows((prev) => {
         const next = [...prev];
         const td = daysInMonthFn(parseInt(month) || 1, parseInt(year) || CURRENT_YEAR);
-        const updated = { ...next[idx], [field]: value };
+        let updated = { ...next[idx], [field]: value };
+
+        // Present and Absent are linked so they always sum to the days in the
+        // month: editing one keeps the other at totalDays - the edited value.
+        if (field === "presentDays") {
+          const abs = clampNum(td - toNum(value), 0, td);
+          updated = { ...updated, absentDays: String(abs) };
+        } else if (field === "absentDays") {
+          const pre = clampNum(td - toNum(value), 0, td);
+          updated = { ...updated, presentDays: String(pre) };
+        }
+
+        // Holidays are capped at MAX_HOLIDAYS (5) per month regardless of input.
+        if (field === "holidays") {
+          const clamped = clampNum(toNum(value), 0, toNum(MAX_HOLIDAYS));
+          updated = { ...updated, holidays: String(clamped) };
+        }
+
+        // Attendance-style fields are whole numbers (0 decimals).
+        if (field === "presentDays" || field === "absentDays" || field === "holidays" || field === "otHours") {
+          updated = { ...updated, [field]: String(roundToWhole(toNum(updated[field]))) };
+        }
 
         if (SALARY_SOURCE_FIELDS.has(field) || OT_SOURCE_FIELDS.has(field)) {
           // Source field changed → recompute both derived salary/OT fields and payable
           next[idx] = recomputeAll(updated, td);
         } else {
-          // User is directly editing totalSalary, otAmount, or a deduction →
-          // honour their override, only recompute payableSalary
-          next[idx] = recomputePayable(updated);
+          // User is editing a directly-entered value (holidays, loan/other
+          // deductions) → only recompute payableSalary
+          next[idx] = recomputePayable(updated, td);
         }
         return next;
       });
@@ -247,9 +358,11 @@ export default function PayrollEntryPage() {
     (m: string) => {
       setMonth(m);
       const td = daysInMonthFn(parseInt(m) || 1, parseInt(year) || CURRENT_YEAR);
-      setRows((prev) => prev.map((r) => recomputeAll(r, td)));
+      setRows((prev) =>
+        prev.map((r, i) => recomputeAll({ ...r, advanceDeduction: rowAdvanceSum(r.employeeId).toFixed(NUM_DECIMALS) }, td))
+      );
     },
-    [year]
+    [year, advanceByEmployee]
   );
 
   // When year changes: update state and recompute formula fields
@@ -257,9 +370,11 @@ export default function PayrollEntryPage() {
     (y: string) => {
       setYear(y);
       const td = daysInMonthFn(parseInt(month) || 1, parseInt(y) || CURRENT_YEAR);
-      setRows((prev) => prev.map((r) => recomputeAll(r, td)));
+      setRows((prev) =>
+        prev.map((r, i) => recomputeAll({ ...r, advanceDeduction: rowAdvanceSum(r.employeeId).toFixed(NUM_DECIMALS) }, td))
+      );
     },
-    [month]
+    [month, advanceByEmployee]
   );
 
   const saveMutation = useMutation({
@@ -286,6 +401,18 @@ export default function PayrollEntryPage() {
     }
     if (rows.length === 0) {
       toast({ variant: "destructive", title: "Validation", description: "No employees for selected department(s)." });
+      return;
+    }
+    // Present + Absent can't exceed the days in the selected month.
+    const invalid = rows.filter((r) => attendanceExceedsMonth(r, totalDays));
+    if (invalid.length > 0) {
+      const names = invalid.slice(0, 3).map((r) => r.employeeName).join(", ");
+      const suffix = invalid.length > 3 ? ` (+${invalid.length - 3} more)` : "";
+      toast({
+        variant: "destructive",
+        title: "Validation",
+        description: `Present + Absent exceeds ${totalDays} days for: ${names}${suffix}.`,
+      });
       return;
     }
     saveMutation.mutate({
@@ -419,11 +546,14 @@ export default function PayrollEntryPage() {
             <CardHeader>
               <CardTitle>Employee Detail</CardTitle>
               <p className="text-xs text-muted-foreground">
-                Auto-formula: Total Salary = (Basic ÷ {totalDays}) × Attendance &nbsp;|&nbsp;
+                Auto-formula: Total Attendance = Present + Holidays &nbsp;|&nbsp;
                 OT Amount = OT Hours × OT Rate &nbsp;|&nbsp;
-                Payable = (Total Salary + OT) − Deductions.
+                Total Salary = (Basic ÷ {totalDays}) × Attendance + OT &nbsp;|&nbsp;
+                Att. Allowance added when Present = {totalDays} (full month) &nbsp;|&nbsp;
+                Payable = Total Salary + Att. Allowance − Deductions.
                 <span className="ml-1 italic">
-                  Total Salary, OT Amount, and deduction fields are directly editable to override.
+                  Present, Absent, Holidays, OT Hours, Basic, and deduction
+                  fields are user-entered; the rest are computed.
                 </span>
               </p>
             </CardHeader>
@@ -440,9 +570,9 @@ export default function PayrollEntryPage() {
                     <TableHead className="text-right min-w-[75px]">Absent</TableHead>
                     <TableHead className="text-right min-w-[70px]">Holidays</TableHead>
                     <TableHead className="text-right min-w-[80px]">Total Att.</TableHead>
-                    <TableHead className="text-right min-w-[100px]">Total Salary ✎</TableHead>
                     <TableHead className="text-right min-w-[70px]">OT Hrs</TableHead>
                     <TableHead className="text-right min-w-[90px]">OT Amount ✎</TableHead>
+                    <TableHead className="text-right min-w-[100px]">Total Salary ✎</TableHead>
                     <TableHead className="text-right min-w-[90px]">Adv. Deduction</TableHead>
                     <TableHead className="text-right min-w-[90px]">Loan Deduction</TableHead>
                     <TableHead className="text-right min-w-[90px]">Other Deduction</TableHead>
@@ -453,11 +583,20 @@ export default function PayrollEntryPage() {
                   {rows.map((row, i) => {
                     const inp = "h-7 text-right font-mono text-xs p-1 w-full";
                     const ro = "h-7 text-right font-mono text-xs p-1 w-full bg-muted/40 cursor-not-allowed";
+                    const attExceeded = attendanceExceedsMonth(row, totalDays);
+                    const attErrCls = attExceeded ? "border-destructive focus-visible:ring-destructive" : "";
                     return (
                       <TableRow key={row.employeeId} className={i % 2 === 0 ? "bg-muted/10" : ""}>
                         {/* Sticky-left employee name so the numbers never
                             scroll away from whose row they belong to (P9). */}
-                        <TableCell className="sticky left-0 bg-card font-medium text-sm py-1">{row.employeeName}</TableCell>
+                        <TableCell className="sticky left-0 bg-card font-medium text-sm py-1">
+                          <div>{row.employeeName}</div>
+                          {attExceeded && (
+                            <p className="mt-0.5 max-w-[180px] text-[10px] leading-tight text-red-600">
+                              Present + Absent ({toNum(row.presentDays) + toNum(row.absentDays)}) exceeds {totalDays} days
+                            </p>
+                          )}
+                        </TableCell>
                         {/* Master snapshot — display only */}
                         <TableCell className="py-1"><Input disabled className={ro} value={row.basicSalary} /></TableCell>
                         <TableCell className="py-1"><Input disabled className={ro} value={row.otRateHr} /></TableCell>
@@ -465,57 +604,54 @@ export default function PayrollEntryPage() {
                         <TableCell className="py-1"><Input disabled className={ro} value={row.othAllowance} /></TableCell>
                         {/* Attendance inputs — trigger salary formula */}
                         <TableCell className="py-1">
-                          <Input type="number" min="0" step="0.5" className={inp}
+                          <Input type="number" min="0" step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
                             value={row.presentDays} disabled={isPosted}
                             onChange={(e) => updateRow(i, "presentDays", e.target.value)} />
                         </TableCell>
                         <TableCell className="py-1">
-                          <Input type="number" min="0" step="0.5" className={inp}
+                          <Input type="number" min="0" step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
                             value={row.absentDays} disabled={isPosted}
                             onChange={(e) => updateRow(i, "absentDays", e.target.value)} />
                         </TableCell>
                         <TableCell className="py-1">
-                          <Input type="number" min="0" step="0.5" className={inp}
+                          <Input type="number" min="0" max={MAX_HOLIDAYS} step={STEP_ATTENDANCE} className={inp}
                             value={row.holidays} disabled={isPosted}
                             onChange={(e) => updateRow(i, "holidays", e.target.value)} />
                         </TableCell>
-                        {/* totalAttendance — triggers totalSalary recalculation */}
+                        {/* totalAttendance = Present + Holidays (derived, read-only) */}
                         <TableCell className="py-1">
-                          <Input type="number" min="0" step="0.5" className={inp}
-                            value={row.totalAttendance} disabled={isPosted}
-                            onChange={(e) => updateRow(i, "totalAttendance", e.target.value)} />
-                        </TableCell>
-                        {/* totalSalary — auto-computed but directly editable */}
-                        <TableCell className="py-1">
-                          <Input type="number" min="0" step="0.01" className={`${inp} bg-amber-50`}
-                            value={row.totalSalary} disabled={isPosted}
-                            onChange={(e) => updateRow(i, "totalSalary", e.target.value)} />
+                          <Input type="number" min="0" step={STEP_ATTENDANCE} className={ro}
+                            value={row.totalAttendance} disabled readOnly />
                         </TableCell>
                         {/* otHours — triggers otAmount recalculation */}
                         <TableCell className="py-1">
-                          <Input type="number" min="0" step="0.5" className={inp}
+                          <Input type="number" min="0" step={STEP_ATTENDANCE} className={inp}
                             value={row.otHours} disabled={isPosted}
                             onChange={(e) => updateRow(i, "otHours", e.target.value)} />
                         </TableCell>
-                        {/* otAmount — auto-computed but directly editable */}
+                        {/* otAmount — auto-computed; display only (no manual override) */}
                         <TableCell className="py-1">
-                          <Input type="number" min="0" step="0.01" className={`${inp} bg-amber-50`}
-                            value={row.otAmount} disabled={isPosted}
-                            onChange={(e) => updateRow(i, "otAmount", e.target.value)} />
+                          <Input type="number" min="0" step={STEP_MONEY} className={ro}
+                            value={row.otAmount} disabled readOnly />
                         </TableCell>
-                        {/* Deductions */}
+                        {/* totalSalary — auto-computed; display only (no manual override) */}
                         <TableCell className="py-1">
-                          <Input type="number" min="0" step="0.01" className={inp}
-                            value={row.advanceDeduction} disabled={isPosted}
-                            onChange={(e) => updateRow(i, "advanceDeduction", e.target.value)} />
+                          <Input type="number" min="0" step={STEP_MONEY} className={ro}
+                            value={row.totalSalary} disabled readOnly />
+                        </TableCell>
+                        {/* Deductions — Advance Deduction is auto-loaded from the
+                            advances table for the selected month, so it's read-only. */}
+                        <TableCell className="py-1">
+                          <Input type="number" min="0" step={STEP_MONEY} className={ro}
+                            value={row.advanceDeduction} disabled readOnly />
                         </TableCell>
                         <TableCell className="py-1">
-                          <Input type="number" min="0" step="0.01" className={inp}
+                          <Input type="number" min="0" step={STEP_MONEY} className={inp}
                             value={row.loanDeduction} disabled={isPosted}
                             onChange={(e) => updateRow(i, "loanDeduction", e.target.value)} />
                         </TableCell>
                         <TableCell className="py-1">
-                          <Input type="number" min="0" step="0.01" className={inp}
+                          <Input type="number" min="0" step={STEP_MONEY} className={inp}
                             value={row.otherDeduction} disabled={isPosted}
                             onChange={(e) => updateRow(i, "otherDeduction", e.target.value)} />
                         </TableCell>
