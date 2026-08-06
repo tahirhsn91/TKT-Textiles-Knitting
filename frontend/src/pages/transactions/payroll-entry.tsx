@@ -91,12 +91,6 @@ function daysInMonthFn(month: number, year: number): number {
   return new Date(year, month, 0).getDate();
 }
 
-function getPrevMonth(): { month: number; year: number } {
-  const d = new Date();
-  d.setMonth(d.getMonth() - 1);
-  return { month: d.getMonth() + 1, year: d.getFullYear() };
-}
-
 async function apiFetch(path: string, opts?: RequestInit) {
   const res = await fetch(`${BASE}${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -335,9 +329,8 @@ export default function PayrollEntryPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
-  const pm = useMemo(() => getPrevMonth(), []);
-  const [month, setMonth] = useState(String(pm.month));
-  const [year, setYear] = useState(String(pm.year));
+  const [month, setMonth] = useState(String(CURRENT_MONTH));
+  const [year, setYear] = useState(String(CURRENT_YEAR));
   const [selectedDeptIds, setSelectedDeptIds] = useState<number[]>([]);
   const [rows, setRows] = useState<DetailRow[]>([]);
   const [initialized, setInitialized] = useState(false);
