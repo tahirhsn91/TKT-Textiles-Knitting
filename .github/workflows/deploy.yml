@@ -4,11 +4,17 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
+    timeout-minutes: 40
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.2
@@ -16,5 +22,7 @@ jobs:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
+          timeout: 30s
+          command_timeout: 30m
           script: |
-            bash /home/deploy/project/TKT-Textiles-Knitting/scripts/deploy.sh
+            bash /home/deploy/project/tkt-textiles-prod/app/scripts/deploy.sh
