@@ -245,9 +245,13 @@ function recomputeOperatorAll(row: DetailRow, totalDays: number): DetailRow {
   const dailyBasic = toNum(row.operatorDailyBasic);
   const present = Math.max(toNum(row.presentDays), floor); // never below the floor
   const totalSalary = base + (present - floor) * dailyBasic + otAmount;
+  // Absent is derived for operators: days in the month minus present.
+  const absentDays = Math.max(totalDays - present, 0);
   return recomputePayable(
     {
       ...row,
+      presentDays: String(present),
+      absentDays: String(absentDays),
       totalAttendance: totalAttendance.toFixed(TOTAL_ATTENDANCE_DECIMALS),
       totalSalary: totalSalary.toFixed(NUM_DECIMALS),
       otAmount: otAmount.toFixed(NUM_DECIMALS),
@@ -890,9 +894,14 @@ export default function PayrollEntryPage() {
                           )}
                         </TableCell>
                         <TableCell className="py-1">
-                          <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
-                            value={row.absentDays} disabled={isPosted}
-                            onChange={(e) => updateRow(i, "absentDays", e.target.value)} />
+                          {row.isOperator ? (
+                            <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={ro}
+                              value={row.absentDays} disabled readOnly />
+                          ) : (
+                            <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
+                              value={row.absentDays} disabled={isPosted}
+                              onChange={(e) => updateRow(i, "absentDays", e.target.value)} />
+                          )}
                         </TableCell>
                         <TableCell className="py-1">
                           <Input type="number" min="0" max={MAX_HOLIDAYS} step={STEP_ATTENDANCE} className={inp}
