@@ -190,12 +190,16 @@ const OT_SOURCE_FIELDS = new Set<keyof DetailRow>(["otHours", "otRateHr"]);
 function recomputePayable(row: DetailRow, totalDays: number): DetailRow {
   // Total Salary already includes OT (see recomputeAll), so payable is
   // total salary, plus a 100%-attendance bonus (Att. Allowance) when the
-  // employee worked the full month, minus the deductions.
+  // employee worked the full month, minus the deductions. For operators each
+  // holiday day adds one daily basic to payable (increase adds, decrease
+  // deducts relative to the entered count).
   const fullAttendance = totalDays > 0 && toNum(row.presentDays) >= totalDays;
   const attAllowance = fullAttendance ? toNum(row.attAllowance) : 0;
+  const holidaysBonus = row.isOperator ? toNum(row.holidays) * toNum(row.operatorDailyBasic) : 0;
   const payable =
     toNum(row.totalSalary) +
-    attAllowance -
+    attAllowance +
+    holidaysBonus -
     toNum(row.advanceDeduction) -
     toNum(row.loanDeduction) -
     toNum(row.otherDeduction);
