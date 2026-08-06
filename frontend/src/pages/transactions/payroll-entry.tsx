@@ -2,7 +2,7 @@ import { NUM_DECIMALS } from "@/lib/format";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Save, Check, ChevronsUpDown } from "lucide-react";
+import { ArrowLeft, Save, Check, ChevronsUpDown, Eye } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -64,6 +71,20 @@ function clampNum(v: number, min: number, max: number): number {
 
 function roundToWhole(v: number): number {
   return Math.round(v);
+}
+
+// Indian-locale money formatting (2 decimals).
+function fmtMoney(v: number): string {
+  return v.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// YYYY-MM-DD -> DD Mon YYYY (e.g. 2026-08-01 -> 01 Aug 2026).
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  if (isNaN(d.getTime())) return dateStr;
+  const day = String(d.getDate()).padStart(2, "0");
+  const mon = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()];
+  return `${day} ${mon} ${d.getFullYear()}`;
 }
 
 function daysInMonthFn(month: number, year: number): number {
@@ -139,6 +160,8 @@ interface DetailRow {
   // Operator rows (dept 0002) are paid on production: Present + Total Salary
   // come from transactions and are read-only.
   isOperator?: boolean;
+  // Per-day production breakdown for the operator salary popup.
+  operatorDays?: OperatorDay[];
 }
 
 // Fields that, when changed, trigger auto-recalculation of totalSalary
@@ -250,6 +273,7 @@ function rowFromOperator(op: Employee, totalDays: number, prod: OperatorProducti
     otherDeduction: "0.00",
     payableSalary: "0.00",
     isOperator: true,
+    operatorDays: prod.days,
   };
   return recomputeAll(base, totalDays);
 }
@@ -270,6 +294,8 @@ export default function PayrollEntryPage() {
   const [rows, setRows] = useState<DetailRow[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [deptPopoverOpen, setDeptPopoverOpen] = useState(false);
+  // Operator row whose salary detail popup is open (employeeId), or null.
+  const [operatorDetail, setOperatorDetail] = useState<number | null>(null);
 
   const totalDays = daysInMonthFn(parseInt(month) || 1, parseInt(year) || CURRENT_YEAR);
 
@@ -739,9 +765,23 @@ export default function PayrollEntryPage() {
                     return (
                       <TableRow key={row.employeeId} className={rowBg}>
                         {/* Sticky-left employee name so the numbers never
-                            scroll away from whose row they belong to (P9). */}
+                            scroll away from whose row they belong to (P9).
+                            Operator rows get an eye icon that opens the
+                            transaction/salary breakdown popup. */}
                         <TableCell className={`sticky left-0 z-10 ${stickyBg} border-r border-border/60 font-medium text-sm py-1`}>
-                          <div>{row.employeeName}</div>
+                          <div className="flex items-center gap-1">
+                            {row.isOperator && (
+                              <button
+                                type="button"
+                                title="View salary calculation"
+                                onClick={() => setOperatorDetail(row.employeeId)}
+                                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </button>
+                            )}
+                            <span className="truncate">{row.employeeName}</span>
+                          </div>
                           {attExceeded && (
                             <p className="mt-0.5 max-w-[180px] text-[10px] leading-tight text-red-600">
                               Present + Absent ({toNum(row.presentDays) + toNum(row.absentDays)}) exceeds {totalDays} days
@@ -871,6 +911,96 @@ export default function PayrollEntryPage() {
           )}
         </div>
       </div>
+
+      {/* Operator salary calculation popup */}
+      <OperatorDetailDialog
+        row={rows.find((r) => r.employeeId === operatorDetail)}
+        month={(parseInt(month) || 0).toString()}
+        year={(parseInt(year) || 0).toString()}
+        onClose={() => setOperatorDetail(null)}
+      />
     </Layout>
+  );
+}
+
+// ─── Operator salary detail popup ─────────────────────────────────────────────
+// Shows the per-day transaction production and how the operator's salary was
+// derived (max of daily production sum vs daily basic), plus the rolled-up
+// present days and total salary.
+function OperatorDetailDialog({
+  row,
+  month,
+  year,
+  onClose,
+}: {
+  row: DetailRow | undefined;
+  month: string;
+  year: string;
+  onClose: () => void;
+}) {
+  const monthName = MONTHS[parseInt(month) - 1] || month;
+  const days = row?.operatorDays ?? [];
+  const totalProduction = days.reduce((acc, d) => acc + d.dailyProductionSum, 0);
+  const totalCredited = days.reduce((acc, d) => acc + d.credited, 0);
+
+  return (
+    <Dialog open={!!row} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Salary Calculation — {row?.employeeName ?? ""}</DialogTitle>
+          <DialogDescription>
+            Production-based salary for {monthName} {year} (Operator, dept code 0002).
+            Daily basic salary: <span className="font-medium">{fmtMoney(toNum(row?.basicSalary ?? 0))}</span>.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="text-xs">
+                <TableHead className="min-w-[120px]">Date</TableHead>
+                <TableHead className="text-right">Production (netWt × rate)</TableHead>
+                <TableHead className="text-right">Daily Basic</TableHead>
+                <TableHead className="text-right">Credited</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {days.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                    No production days in this month.
+                  </TableCell>
+                </TableRow>
+              )}
+              {days.map((d) => (
+                <TableRow key={d.date}>
+                  <TableCell className="py-1">{formatDate(d.date)}</TableCell>
+                  <TableCell className="py-1 text-right font-mono">{fmtMoney(d.dailyProductionSum)}</TableCell>
+                  <TableCell className="py-1 text-right font-mono">{fmtMoney(d.dailyBasic)}</TableCell>
+                  <TableCell className="py-1 text-right font-mono font-semibold">{fmtMoney(d.credited)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+            {days.length > 0 && (
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={3} className="py-1 font-semibold">Total (present days: {days.length})</TableCell>
+                  <TableCell className="py-1 text-right font-mono font-bold">{fmtMoney(totalCredited)}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell colSpan={3} className="py-1 text-muted-foreground">Total production (gross, before basic floor)</TableCell>
+                  <TableCell className="py-1 text-right font-mono text-muted-foreground">{fmtMoney(totalProduction)}</TableCell>
+                </TableRow>
+              </TableFooter>
+            )}
+          </Table>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Credited per day = max(daily production sum, daily basic). Total salary =
+          sum of credited days. Production total shown above is for reference only.
+        </p>
+      </DialogContent>
+    </Dialog>
   );
 }
