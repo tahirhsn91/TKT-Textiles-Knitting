@@ -516,8 +516,9 @@ export default function TransactionForm() {
   const canRemoveRow = fields.length > 1;
 
   // Copy the dropdown selections from the row above (used by the copy button
-  // on every row from the 2nd one on — duplicate machine/employee/yarn lines
-  // are the common case when a transaction spans multiple rolls).
+  // on every row from the 2nd one on) — only the yarn fields and UOM, not the
+  // machine/employee, so a new line can reuse the yarn spec while being
+  // assigned to a different machine/operator.
   const copyFromAbove = useCallback(
     (index: number) => {
       if (index <= 0) return;
@@ -525,8 +526,6 @@ export default function TransactionForm() {
       const above = details[index - 1];
       if (!above) return;
       const patch = {
-        machineId: above.machineId ?? null,
-        employeeId: above.employeeId ?? null,
         yarnTypeId: above.yarnTypeId ?? null,
         yarnCountId: above.yarnCountId ?? null,
         yarnBrandId: above.yarnBrandId ?? null,
@@ -971,8 +970,8 @@ export default function TransactionForm() {
                             className="h-11 w-11 text-muted-foreground hover:text-foreground disabled:opacity-30"
                             onClick={() => copyFromAbove(index)}
                             disabled={index === 0}
-                            aria-label={index > 0 ? `Copy dropdowns from line ${index}` : "No row above to copy from"}
-                            title={index > 0 ? `Copy dropdowns from line ${index}` : "No row above to copy from"}
+                            aria-label={index > 0 ? `Copy yarn + UOM from line ${index}` : "No row above to copy from"}
+                            title={index > 0 ? `Copy yarn + UOM from line ${index}` : "No row above to copy from"}
                           >
                             <Copy className="h-4 w-4" />
                           </Button>
@@ -1422,8 +1421,8 @@ export default function TransactionForm() {
                                 className="h-11 w-11 text-muted-foreground hover:text-foreground disabled:opacity-30 shrink-0 sm:h-8 sm:w-8"
                                 onClick={() => copyFromAbove(index)}
                                 disabled={index === 0}
-                                aria-label={index > 0 ? `Copy dropdowns from line ${index}` : "No row above to copy from"}
-                                title={index > 0 ? `Copy dropdowns from line ${index}` : "No row above to copy from"}
+                                aria-label={index > 0 ? `Copy yarn + UOM from line ${index}` : "No row above to copy from"}
+                                title={index > 0 ? `Copy yarn + UOM from line ${index}` : "No row above to copy from"}
                               >
                                 <Copy className="h-4 w-4" />
                               </Button>
