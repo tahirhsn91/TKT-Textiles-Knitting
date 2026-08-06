@@ -53,7 +53,7 @@ const MAX_HOLIDAYS = "5";
 // Total Attendance is a whole number (0 decimals).
 const TOTAL_ATTENDANCE_DECIMALS = 0;
 
-function toNum(v: string | number | null | undefined): number {
+function toNum(v: unknown): number {
   const n = parseFloat(String(v ?? ""));
   return isNaN(n) ? 0 : n;
 }
@@ -95,6 +95,19 @@ interface Advance {
   employeeId: number;
   amount: string;
 }
+interface OperatorDay {
+  date: string;
+  dailyProductionSum: number;
+  dailyBasic: number;
+  credited: number;
+}
+interface OperatorProduction {
+  employeeId: number;
+  employeeName: string;
+  presentDays: number;
+  totalSalary: number;
+  days: OperatorDay[];
+}
 interface Employee {
   id: number; name: string; code: string; active: boolean;
   departmentId: number | null;
@@ -123,6 +136,9 @@ interface DetailRow {
   loanDeduction: string;
   otherDeduction: string;
   payableSalary: string;
+  // Operator rows (dept 0002) are paid on production: Present + Total Salary
+  // come from transactions and are read-only.
+  isOperator?: boolean;
 }
 
 // Fields that, when changed, trigger auto-recalculation of totalSalary
@@ -164,10 +180,17 @@ function recomputeAll(row: DetailRow, totalDays: number): DetailRow {
   // OT rate is set for the employee (rate ≤ 0), OT Amount is zero.
   const otRate = toNum(row.otRateHr);
   const otAmount = otRate > 0 ? toNum(row.otHours) * otRate : 0;
-  // Total Salary = prorated basic for attendance PLUS the OT amount.
-  const baseSalary =
-    totalDays > 0 ? (toNum(row.basicSalary) / totalDays) * totalAttendance : 0;
-  const totalSalary = baseSalary + otAmount;
+  // Operators (dept 0002) are paid on production: Total Salary is derived from
+  // transactions, so it is preserved (not recomputed from attendance).
+  let totalSalary: number;
+  if (row.isOperator) {
+    totalSalary = toNum(row.totalSalary);
+  } else {
+    // Total Salary = prorated basic for attendance PLUS the OT amount.
+    const baseSalary =
+      totalDays > 0 ? (toNum(row.basicSalary) / totalDays) * totalAttendance : 0;
+    totalSalary = baseSalary + otAmount;
+  }
   return recomputePayable(
     {
       ...row,
@@ -203,6 +226,34 @@ function rowFromEmployee(op: Employee, totalDays: number, advanceSum = 0): Detai
   return recomputeAll(base, totalDays);
 }
 
+// Builds a row for an Operator (dept 0002) employee whose salary is derived
+// from production: Present days and Total Salary come from the transactions
+// (read-only), while Absent / Holidays / OT / Deductions stay user-entered.
+function rowFromOperator(op: Employee, totalDays: number, prod: OperatorProduction, advanceSum = 0): DetailRow {
+  const base: DetailRow = {
+    employeeId: op.id,
+    departmentId: op.departmentId,
+    employeeName: op.name,
+    basicSalary: toNum(op.baseSalary).toFixed(NUM_DECIMALS),
+    otRateHr: toNum(op.overtimeRateHr).toFixed(NUM_DECIMALS),
+    attAllowance: toNum(op.attAllowance).toFixed(NUM_DECIMALS),
+    othAllowance: toNum(op.othAllowance).toFixed(NUM_DECIMALS),
+    presentDays: String(prod.presentDays),
+    absentDays: "0",
+    holidays: "0",
+    totalAttendance: "0",
+    totalSalary: prod.totalSalary.toFixed(NUM_DECIMALS),
+    otHours: "0",
+    otAmount: "0.00",
+    advanceDeduction: advanceSum.toFixed(NUM_DECIMALS),
+    loanDeduction: "0.00",
+    otherDeduction: "0.00",
+    payableSalary: "0.00",
+    isOperator: true,
+  };
+  return recomputeAll(base, totalDays);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function PayrollEntryPage() {
@@ -226,6 +277,12 @@ export default function PayrollEntryPage() {
     queryKey: ["dept-lookup"],
     queryFn: () => apiFetch("/api/lookups/department-master"),
   });
+
+  // The Operator department (code 0002) uses production-based salary.
+  const operatorDeptId = useMemo(
+    () => departments.find((d) => d.code === "0002")?.id ?? null,
+    [departments]
+  );
 
   const { data: allEmployees = [] } = useQuery<Employee[]>({
     queryKey: ["employee-full-lookup"],
@@ -252,6 +309,18 @@ export default function PayrollEntryPage() {
     [advanceByEmployee]
   );
 
+  // Operator (dept 0002) production-based salary for the selected month.
+  const opParams = new URLSearchParams({ month, year });
+  const { data: operatorProductions = [] } = useQuery<OperatorProduction[]>({
+    queryKey: ["salary-entry-operator-production", month, year],
+    queryFn: () => apiFetch(`/api/salary-entries/operator-production?${opParams.toString()}`),
+    enabled: !isEdit || initialized,
+  });
+  const operatorByEmployee = useMemo(() => {
+    if (operatorDeptId === null || operatorProductions.length === 0) return new Map<number, OperatorProduction>();
+    return new Map(operatorProductions.map((p) => [p.employeeId, p]));
+  }, [operatorDeptId, operatorProductions]);
+
   const { data: existingEntry, isLoading: loadingEntry } = useQuery<{
     id: number; month: number; year: number; departmentIds: number[]; posted: boolean;
     details: DetailRow[];
@@ -275,16 +344,21 @@ export default function PayrollEntryPage() {
     setMonth(String(existingEntry.month));
     setYear(String(existingEntry.year));
     setSelectedDeptIds(existingEntry.departmentIds ?? []);
-    setRows(existingEntry.details.map((d) => ({
-      ...d,
-      presentDays: String(roundToWhole(toNum(d.presentDays))),
-      absentDays: String(roundToWhole(toNum(d.absentDays))),
-      holidays: String(roundToWhole(toNum(d.holidays))),
-      totalAttendance: String(roundToWhole(toNum(d.totalAttendance))),
-      otHours: String(roundToWhole(toNum(d.otHours))),
-    })));
+    setRows(existingEntry.details.map((d) => {
+      const isOperator = operatorDeptId !== null && d.departmentId === operatorDeptId;
+      return {
+        ...d,
+        // Operator present/total come from transactions (read-only).
+        ...(isOperator ? { isOperator: true } : {}),
+        presentDays: String(roundToWhole(toNum(d.presentDays))),
+        absentDays: String(roundToWhole(toNum(d.absentDays))),
+        holidays: String(roundToWhole(toNum(d.holidays))),
+        totalAttendance: String(roundToWhole(toNum(d.totalAttendance))),
+        otHours: String(roundToWhole(toNum(d.otHours))),
+      };
+    }));
     setInitialized(true);
-  }, [isEdit, existingEntry, initialized]);
+  }, [isEdit, existingEntry, initialized, operatorDeptId]);
 
   // In edit mode, once the period's advance totals have loaded, sync the
   // Advance Deduction column to the sum of each employee's advances.
@@ -305,8 +379,9 @@ export default function PayrollEntryPage() {
   const [builtForKey, setBuiltForKey] = useState<string | null>(null);
   const [builtForOpCount, setBuiltForOpCount] = useState(-1);
   const [builtForLoadState, setBuiltForLoadState] = useState<string>("");
-  // Rebuild when the selected dept or the loaded advance batch changes.
-  const advanceLoadToken = `${deptKey}:${advances.length}:${month}:${year}`;
+  // Rebuild when the selected dept, the loaded advance batch, or the loaded
+  // operator-production batch changes (all fetch async).
+  const advanceLoadToken = `${deptKey}:${advances.length}:${operatorByEmployee.size}:${month}:${year}`;
 
   useEffect(() => {
     if (isEdit) return;
@@ -319,8 +394,16 @@ export default function PayrollEntryPage() {
     const filtered = allEmployees.filter(
       (op) => op.active && op.departmentId !== null && selectedDeptIds.includes(op.departmentId!)
     );
-    setRows(filtered.map((op) => rowFromEmployee(op, td, rowAdvanceSum(op.id))));
-  }, [isEdit, deptKey, allEmployees.length, advanceLoadToken, advanceByEmployee, month, year]); // eslint-disable-line react-hooks/exhaustive-deps
+    setRows(
+      filtered.map((op) => {
+        if (operatorDeptId !== null && op.departmentId === operatorDeptId) {
+          const prod = operatorByEmployee.get(op.id);
+          if (prod) return rowFromOperator(op, td, prod, rowAdvanceSum(op.id));
+        }
+        return rowFromEmployee(op, td, rowAdvanceSum(op.id));
+      })
+    );
+  }, [isEdit, deptKey, allEmployees.length, advanceLoadToken, advanceByEmployee, operatorDeptId, operatorByEmployee, month, year]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Row update with field-aware formula logic ──
   const updateRow = useCallback(
@@ -332,12 +415,16 @@ export default function PayrollEntryPage() {
 
         // Present and Absent are linked so they always sum to the days in the
         // month: editing one keeps the other at totalDays - the edited value.
-        if (field === "presentDays") {
-          const abs = clampNum(td - toNum(value), 0, td);
-          updated = { ...updated, absentDays: String(abs) };
-        } else if (field === "absentDays") {
-          const pre = clampNum(td - toNum(value), 0, td);
-          updated = { ...updated, presentDays: String(pre) };
+        // Operators skip the linkage: their Present is production-derived and
+        // read-only, so editing Absent must not rewrite it.
+        if (!next[idx].isOperator) {
+          if (field === "presentDays") {
+            const abs = clampNum(td - toNum(value), 0, td);
+            updated = { ...updated, absentDays: String(abs) };
+          } else if (field === "absentDays") {
+            const pre = clampNum(td - toNum(value), 0, td);
+            updated = { ...updated, presentDays: String(pre) };
+          }
         }
 
         // Holidays are capped at MAX_HOLIDAYS (5) per month regardless of input.
@@ -666,11 +753,17 @@ export default function PayrollEntryPage() {
                         <TableCell className="py-1"><Input disabled className={ro} value={row.otRateHr} /></TableCell>
                         <TableCell className="py-1"><Input disabled className={ro} value={row.attAllowance} /></TableCell>
                         <TableCell className="py-1"><Input disabled className={ro} value={row.othAllowance} /></TableCell>
-                        {/* Attendance inputs — trigger salary formula */}
+                        {/* Attendance inputs — trigger salary formula. Operator
+                            Present is production-derived and read-only. */}
                         <TableCell className="py-1">
-                          <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
-                            value={row.presentDays} disabled={isPosted}
-                            onChange={(e) => updateRow(i, "presentDays", e.target.value)} />
+                          {row.isOperator ? (
+                            <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={ro}
+                              value={row.presentDays} disabled readOnly />
+                          ) : (
+                            <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
+                              value={row.presentDays} disabled={isPosted}
+                              onChange={(e) => updateRow(i, "presentDays", e.target.value)} />
+                          )}
                         </TableCell>
                         <TableCell className="py-1">
                           <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
