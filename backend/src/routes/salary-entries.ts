@@ -113,6 +113,7 @@ router.get("/salary-entries/operator-production", async (req, res): Promise<void
     .select()
     .from(machineMasterTable);
   const rateByMachineId = new Map(machines.map((mc) => [mc.id, toNum(mc.makingRate)]));
+  const nameByMachineId = new Map(machines.map((mc) => [mc.id, mc.name ?? mc.machineNumber]));
 
   // Detail rows for those headers.
   const details = headerIds.length
@@ -122,8 +123,8 @@ router.get("/salary-entries/operator-production", async (req, res): Promise<void
         .where(inArray(transactionDetailTable.headerId, headerIds))
     : [];
 
-  // Daily breakdowns keyed by employeeId -> date -> { sum, count }.
-  const dailyByEmployee = new Map<number, Map<string, { sum: number }>>();
+  // Daily breakdown keyed by employeeId -> date -> { sum, machines[] }.
+  const dailyByEmployee = new Map<number, Map<string, { sum: number; machines: Array<{ machineId: number; machineName: string; netWt: number; rate: number; amount: number }> }>>();
   for (const d of details) {
     if (!d.employeeId) continue;
     const netWt = toNum(d.netWt);
@@ -133,18 +134,33 @@ router.get("/salary-entries/operator-production", async (req, res): Promise<void
     if (!date) continue;
     let emp = dailyByEmployee.get(d.employeeId);
     if (!emp) { emp = new Map(); dailyByEmployee.set(d.employeeId, emp); }
-    const day = emp.get(date) ?? { sum: 0 };
-    day.sum += netWt * rate;
+    const day = emp.get(date) ?? { sum: 0, machines: [] };
+    const machineId = d.machineId ?? -1;
+    const amount = netWt * rate;
+    day.sum += amount;
+    day.machines.push({
+      machineId,
+      machineName: nameByMachineId.get(machineId) ?? String(machineId),
+      netWt: Number(netWt.toFixed(3)),
+      rate: Number(rate.toFixed(2)),
+      amount: Number(amount.toFixed(2)),
+    });
     emp.set(date, day);
   }
 
   const result = operators.map((op) => {
-    const daily = dailyByEmployee.get(op.id) ?? new Map<string, { sum: number }>();
+    const daily = dailyByEmployee.get(op.id) ?? new Map<string, { sum: number; machines: Array<{ machineId: number; machineName: string; netWt: number; rate: number; amount: number }> }>();
     const baseSalary = toNum(op.baseSalary); // operator baseSalary is a daily wage
     const days = [...daily.entries()]
       .map(([date, d]) => {
         const credited = Math.max(d.sum, baseSalary);
-        return { date, dailyProductionSum: Number(d.sum.toFixed(2)), dailyBasic: baseSalary, credited: Number(credited.toFixed(2)) };
+        return {
+          date,
+          dailyProductionSum: Number(d.sum.toFixed(2)),
+          dailyBasic: baseSalary,
+          credited: Number(credited.toFixed(2)),
+          machines: d.machines,
+        };
       })
       .sort((a, b) => a.date.localeCompare(b.date));
     const totalSalary = days.reduce((acc, d) => acc + d.credited, 0);
