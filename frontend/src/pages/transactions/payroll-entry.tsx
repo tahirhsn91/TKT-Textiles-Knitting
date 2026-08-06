@@ -1,5 +1,5 @@
 import { NUM_DECIMALS } from "@/lib/format";
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Save, Check, ChevronsUpDown, Eye } from "lucide-react";
@@ -116,11 +116,19 @@ interface Advance {
   employeeId: number;
   amount: string;
 }
+interface OperatorMachine {
+  machineId: number;
+  machineName: string;
+  netWt: number;
+  rate: number;
+  amount: number;
+}
 interface OperatorDay {
   date: string;
   dailyProductionSum: number;
   dailyBasic: number;
   credited: number;
+  machines?: OperatorMachine[];
 }
 interface OperatorProduction {
   employeeId: number;
@@ -958,37 +966,52 @@ function OperatorDetailDialog({
           <Table>
             <TableHeader>
               <TableRow className="text-xs">
-                <TableHead className="min-w-[120px]">Date</TableHead>
+                <TableHead className="min-w-[130px]">Date / Machine</TableHead>
+                <TableHead className="text-right">Net Wt</TableHead>
+                <TableHead className="text-right">Rate</TableHead>
                 <TableHead className="text-right">Production (netWt × rate)</TableHead>
-                <TableHead className="text-right">Daily Basic</TableHead>
-                <TableHead className="text-right">Credited</TableHead>
+                <TableHead className="text-right">Daily Basic / Credited</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {days.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
                     No production days in this month.
                   </TableCell>
                 </TableRow>
               )}
               {days.map((d) => (
-                <TableRow key={d.date}>
-                  <TableCell className="py-1">{formatDate(d.date)}</TableCell>
-                  <TableCell className="py-1 text-right font-mono">{fmtMoney(d.dailyProductionSum)}</TableCell>
-                  <TableCell className="py-1 text-right font-mono">{fmtMoney(d.dailyBasic)}</TableCell>
-                  <TableCell className="py-1 text-right font-mono font-semibold">{fmtMoney(d.credited)}</TableCell>
-                </TableRow>
+                <Fragment key={d.date}>
+                  {/* Day summary row */}
+                  <TableRow className="bg-muted/30">
+                    <TableCell className="py-1 font-medium">{formatDate(d.date)}</TableCell>
+                    <TableCell className="py-1 text-right font-mono">—</TableCell>
+                    <TableCell className="py-1 text-right font-mono">—</TableCell>
+                    <TableCell className="py-1 text-right font-mono font-semibold">{fmtMoney(d.dailyProductionSum)}</TableCell>
+                    <TableCell className="py-1 text-right font-mono font-semibold">{fmtMoney(d.credited)}</TableCell>
+                  </TableRow>
+                  {/* Machine-level sub-rows */}
+                  {(d.machines ?? []).map((m, mi) => (
+                    <TableRow key={`${d.date}-${m.machineId}-${mi}`}>
+                      <TableCell className="py-1 pl-9 text-muted-foreground">↳ {m.machineName}</TableCell>
+                      <TableCell className="py-1 text-right font-mono">{m.netWt}</TableCell>
+                      <TableCell className="py-1 text-right font-mono">× {m.rate}</TableCell>
+                      <TableCell className="py-1 text-right font-mono">{fmtMoney(m.amount)}</TableCell>
+                      <TableCell className="py-1 text-right font-mono text-muted-foreground">—</TableCell>
+                    </TableRow>
+                  ))}
+                </Fragment>
               ))}
             </TableBody>
             {days.length > 0 && (
               <TableFooter>
                 <TableRow>
-                  <TableCell colSpan={3} className="py-1 font-semibold">Total (present days: {days.length})</TableCell>
+                  <TableCell colSpan={4} className="py-1 font-semibold">Total (present days: {days.length})</TableCell>
                   <TableCell className="py-1 text-right font-mono font-bold">{fmtMoney(totalCredited)}</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell colSpan={3} className="py-1 text-muted-foreground">Total production (gross, before basic floor)</TableCell>
+                  <TableCell colSpan={4} className="py-1 text-muted-foreground">Total production (gross, before basic floor)</TableCell>
                   <TableCell className="py-1 text-right font-mono text-muted-foreground">{fmtMoney(totalProduction)}</TableCell>
                 </TableRow>
               </TableFooter>
@@ -997,8 +1020,9 @@ function OperatorDetailDialog({
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Credited per day = max(daily production sum, daily basic). Total salary =
-          sum of credited days. Production total shown above is for reference only.
+          Per machine: production = net weight × machine making rate. Credited per day =
+          max(daily production sum, daily basic salary). Total salary = sum of credited
+          days. Daily basic salary: <span className="font-medium">{fmtMoney(toNum(row?.basicSalary ?? 0))}</span>.
         </p>
       </DialogContent>
     </Dialog>
