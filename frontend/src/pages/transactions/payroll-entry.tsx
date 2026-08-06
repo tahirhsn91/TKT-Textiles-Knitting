@@ -908,9 +908,14 @@ export default function PayrollEntryPage() {
                           )}
                         </TableCell>
                         <TableCell className="py-1">
-                          <Input type="number" min="0" max={MAX_HOLIDAYS} step={STEP_ATTENDANCE} className={inp}
-                            value={row.holidays} disabled={isPosted}
-                            onChange={(e) => updateRow(i, "holidays", e.target.value)} />
+                          {row.isOperator ? (
+                            <Input type="number" min="0" max={MAX_HOLIDAYS} step={STEP_ATTENDANCE} className={inp}
+                              value={row.holidays} disabled={isPosted}
+                              onChange={(e) => updateRow(i, "holidays", e.target.value)} />
+                          ) : (
+                            <Input type="number" min="0" max={MAX_HOLIDAYS} step={STEP_ATTENDANCE} className={ro}
+                              value={row.holidays} disabled readOnly />
+                          )}
                         </TableCell>
                         {/* totalAttendance = Present + Holidays (derived, read-only) */}
                         <TableCell className="py-1">
