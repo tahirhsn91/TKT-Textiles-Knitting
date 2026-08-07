@@ -14,6 +14,7 @@ import { DailyDeliveryAnalytics } from "./analytics-tab";
 import { useSort } from "@/hooks/use-sort";
 import { SortableHead } from "@/components/sortable-head";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useReconciledLock } from "@/context/config-context";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -53,6 +54,9 @@ export default function DailyDeliveryList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  // When the "Reconciled lock" configuration (code 0001) is disabled, booked
+  // deliveries stay editable instead of being locked.
+  const reconciledLockEnabled = useReconciledLock();
 
   const [date, setDate] = useState(todayIso());
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -235,15 +239,18 @@ export default function DailyDeliveryList() {
                   </TableRow>
                 ) : (
                   rows.map((r) => {
-                    const stickyBg = r.reconciled ? "bg-yellow-100 dark:bg-yellow-950/40" : "bg-background";
+                    // When the Reconciled lock (code 0001) is enabled, a booked
+                    // row is locked; when it's disabled it stays editable.
+                    const locked = r.reconciled && reconciledLockEnabled;
+                    const stickyBg = locked ? "bg-yellow-100 dark:bg-yellow-950/40" : "bg-background";
                     return (
                     // Booked deliveries are tinted yellow and locked — same
                     // convention as reconciled production / yarn receipts.
                     <TableRow
                       key={r.id}
-                      className={`${r.reconciled ? "bg-yellow-100 hover:bg-yellow-100 dark:bg-yellow-950/40 dark:hover:bg-yellow-950/40" : ""} ${isMobile ? "cursor-pointer" : ""}`.trim() || undefined}
+                      className={`${locked ? "bg-yellow-100 hover:bg-yellow-100 dark:bg-yellow-950/40 dark:hover:bg-yellow-950/40" : ""} ${isMobile ? "cursor-pointer" : ""}`.trim() || undefined}
                       // Whole-row tap opens the delivery on mobile.
-                      onClick={isMobile ? () => (r.reconciled ? openView(r.id) : openEdit(r.id)) : undefined}
+                      onClick={isMobile ? () => (locked ? openView(r.id) : openEdit(r.id)) : undefined}
                     >
                       <TableCell className="whitespace-nowrap px-5 font-medium text-muted-foreground">
                         {r.challanNo}
@@ -251,7 +258,7 @@ export default function DailyDeliveryList() {
                       <TableCell className="whitespace-nowrap font-medium">
                         <span className="inline-flex items-center gap-2">
                           {r.partyName ?? "-"}
-                          {r.reconciled && (
+                          {locked && (
                             <span className="inline-flex items-center gap-1 rounded-sm border border-yellow-300 bg-yellow-50 px-1.5 py-0.5 text-[0.6875rem] font-medium uppercase tracking-wide text-yellow-900 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-200">
                               <Lock className="h-3 w-3" />
                               Reconciled
@@ -268,7 +275,7 @@ export default function DailyDeliveryList() {
                       </TableCell>
                       <TableCell className={`sticky right-0 ${stickyBg} px-1.5 text-right`}>
                         <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
-                        {r.reconciled ? (
+                        {locked ? (
                           <>
                             <Button
                               type="button"
