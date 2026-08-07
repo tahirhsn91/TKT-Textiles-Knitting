@@ -8,6 +8,7 @@ import {
   yarnTypeMasterTable,
   insertDailyDeliverySchema,
 } from "../db/index.js";
+import { isReconciliationLockEnabled } from "../lib/reconciliation-lock.js";
 
 const router: IRouter = Router();
 
@@ -33,11 +34,15 @@ function todayIso(): string {
 /**
  * Guard for deliveries already booked into a Fabric Delivery transaction.
  * Returns a 409 payload when locked, or null when free. Mirrors the
- * reconciliationBlock in daily-production / yarn-receipts.
+ * reconciliationBlock in daily-production / yarn-receipts, gated on the
+ * Reconciliation lock config (0001): when it's disabled, booked deliveries
+ * stay editable.
  */
 async function reconciliationBlock(
   id: number,
 ): Promise<{ error: string; reconciledTransactionId: number | null } | null> {
+  if (!(await isReconciliationLockEnabled())) return null;
+
   const [row] = await db
     .select({
       reconciled: dailyDeliveryTable.reconciled,

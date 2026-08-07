@@ -11,6 +11,7 @@ import {
   insertYarnReceiptHeaderSchema,
   insertYarnReceiptDetailSchema,
 } from "../db/index.js";
+import { isReconciliationLockEnabled } from "../lib/reconciliation-lock.js";
 
 const router: IRouter = Router();
 
@@ -45,11 +46,14 @@ function todayIso(): string {
 /**
  * Guard for receipts already consumed by a Yarn Receipt transaction.
  * Returns a 409 payload when the receipt is locked, or null when free.
- * Mirrors daily-production's reconciliationBlock.
+ * Mirrors daily-production's reconciliationBlock, gated on the Reconciliation
+ * lock config (0001): when it's disabled, booked receipts stay editable.
  */
 async function reconciliationBlock(
   id: number,
 ): Promise<{ error: string; reconciledTransactionId: number | null } | null> {
+  if (!(await isReconciliationLockEnabled())) return null;
+
   const [row] = await db
     .select({
       reconciled: yarnReceiptHeaderTable.reconciled,
