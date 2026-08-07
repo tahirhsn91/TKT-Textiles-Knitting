@@ -1,4 +1,4 @@
-import { NUM_DECIMALS } from "@/lib/format";
+import { NUM_DECIMALS, roundInput } from "@/lib/format";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useLocation, useParams } from "wouter";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
@@ -1137,12 +1137,13 @@ export default function TransactionForm() {
                               <FormControl>
                                 <Input
                                   type="number"
-                                  step="any"
-                                  inputMode="decimal"
+                                  step="1"
+                                  inputMode="numeric"
                                   className="num h-11"
                                   placeholder="Qty"
                                   {...field}
                                   value={field.value ?? ""}
+                                  onBlur={() => field.onChange(roundInput(field.value, 0))}
                                 />
                               </FormControl>
                             </FormItem>
@@ -1158,12 +1159,13 @@ export default function TransactionForm() {
                               <FormControl>
                                 <Input
                                   type="number"
-                                  step="any"
+                                  step="0.01"
                                   inputMode="decimal"
                                   className="num h-11"
                                   placeholder="Net Wt"
                                   {...field}
                                   value={field.value || ""}
+                                  onBlur={() => field.onChange(roundInput(field.value, 2))}
                                 />
                               </FormControl>
                             </FormItem>
@@ -1363,14 +1365,15 @@ export default function TransactionForm() {
                                 <FormControl>
                                   <Input
                                     type="number"
-                                    step="any"
-                                    inputMode="decimal"
+                                    step="1"
+                                    inputMode="numeric"
                                     className="num h-11 sm:h-9"
                                     placeholder="Qty"
                                     data-qty-input="true"
                                     {...field}
                                     value={field.value ?? ""}
                                     onFocus={(e) => e.target.select()}
+                                    onBlur={() => field.onChange(roundInput(field.value, 0))}
                                   />
                                 </FormControl>
                               </FormItem>
@@ -1385,12 +1388,13 @@ export default function TransactionForm() {
                                 <FormControl>
                                   <Input
                                     type="number"
-                                    step="any"
+                                    step="0.01"
                                     inputMode="decimal"
                                     className="num h-11 sm:h-9"
                                     placeholder="Net Wt"
                                     {...field}
                                     value={field.value || ""}
+                                    onBlur={() => field.onChange(roundInput(field.value, 2))}
                                   />
                                 </FormControl>
                               </FormItem>
