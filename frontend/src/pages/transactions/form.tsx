@@ -1202,7 +1202,7 @@ export default function TransactionForm() {
                     width (11 columns were forcing a 1560px scroll). */}
                 <div className="hidden sm:block">
                   <div className="px-4 pt-4 pb-2 border-b bg-card">
-                    <div className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_1.5fr_auto] gap-2 font-medium text-sm text-muted-foreground">
+                    <div className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1fr_2fr_1.5fr_auto] gap-2 font-medium text-sm text-muted-foreground">
                         <div>Yarn Type</div>
                         <div>Yarn Count</div>
                         <div>Yarn Brand</div>
@@ -1222,7 +1222,7 @@ export default function TransactionForm() {
                     <div className="px-4 py-2">
                     <div className="space-y-2" ref={lineItemsRef}>
                       {fields.map((field, index) => (
-                        <div key={field.id} className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1.5fr_1.5fr_1.5fr_auto] gap-2 items-start">
+                        <div key={field.id} className="grid grid-cols-[2fr_2fr_2fr_2fr_2fr_2fr_1fr_2fr_1.5fr_auto] gap-2 items-start">
                           <FormField
                             control={form.control}
                             name={`details.${index}.yarnTypeId`}
