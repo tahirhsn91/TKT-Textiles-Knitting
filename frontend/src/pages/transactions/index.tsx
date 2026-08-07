@@ -12,6 +12,7 @@ import {
   useListLocationMaster,
   useListJobMaster,
   useListYarnBrandMaster,
+  useListFabricTypeMaster,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -47,6 +48,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TransactionAnalytics } from "./analytics-tab";
 import { useToast } from "@/hooks/use-toast";
 import { Layout } from "@/components/layout";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -88,6 +91,7 @@ export default function TransactionList() {
   const { data: locationMaster } = useListLocationMaster();
   const { data: jobMaster } = useListJobMaster();
   const { data: yarnBrandMaster } = useListYarnBrandMaster();
+  const { data: fabricTypeMaster } = useListFabricTypeMaster();
   const deleteTransaction = useDeleteTransaction();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -392,6 +396,15 @@ export default function TransactionList() {
           </div>
         </div>
 
+        {/* Table + analytics — tabs. The table is wrapped in its own border
+            card; the analytics tab aggregates client-side from the same
+            filtered rows so charts always match the active filters. */}
+        <Tabs defaultValue="entries">
+          <TabsList>
+            <TabsTrigger value="entries">Entries</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          </TabsList>
+          <TabsContent value="entries" className="mt-4">
         {/* Table — single scroll container: the Table component already wraps
             itself in overflow-auto, so an outer overflow-auto would create a
             second scrollport that clips the sticky Actions column (P1). */}
@@ -506,6 +519,20 @@ export default function TransactionList() {
             </TableBody>
           </Table>
         </div>
+          </TabsContent>
+          <TabsContent value="analytics" className="mt-4">
+            <TransactionAnalytics
+              rows={filtered}
+              isLoading={isLoading}
+              countLabel={`${filtered.length} of ${transactions?.length ?? 0} transactions`}
+              transactionTypeMaster={transactionTypeMaster}
+              partyMaster={partyMaster}
+              locationMaster={locationMaster}
+              fabricTypeMaster={fabricTypeMaster}
+              jobMaster={jobMaster}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );
