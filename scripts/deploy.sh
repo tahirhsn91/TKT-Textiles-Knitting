@@ -46,8 +46,33 @@ if ! echo "$ACTUAL_ORIGINS" | grep -q "$REQUIRED_ORIGIN"; then
 fi
 echo "ALLOWED_ORIGINS OK: $ACTUAL_ORIGINS"
 
+# Apply pending migrations to heliumdb_prod BEFORE verifying schema.
+# (prevents the yarn-receipt/configuration incidents: code deployed but tables missing)
+# Tracked in the _applied_migrations table; already-applied files are skipped.
+echo "Applying pending migrations..."
+MIGRATIONS_DIR="$PROJECT_DIR/database/migrations"
+docker exec "${COMPOSE_PROJECT}-postgres-1" psql -U postgres -d heliumdb_prod -v ON_ERROR_STOP=1 \
+  -c "CREATE TABLE IF NOT EXISTS _applied_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())" \
+  >/dev/null
+for f in "$MIGRATIONS_DIR"/*.sql; do
+  MIG_NAME=$(basename "$f")
+  APPLIED=$(docker exec "${COMPOSE_PROJECT}-postgres-1" psql -U postgres -d heliumdb_prod -tAc \
+    "SELECT 1 FROM _applied_migrations WHERE name='$MIG_NAME'" 2>/dev/null)
+  if [ "$APPLIED" = "1" ]; then
+    echo "  $MIG_NAME: already applied, skipping"
+    continue
+  fi
+  echo "  $MIG_NAME: applying..."
+  if ! docker exec -i "${COMPOSE_PROJECT}-postgres-1" psql -U postgres -d heliumdb_prod -v ON_ERROR_STOP=1 < "$f" >/dev/null 2>&1; then
+    echo "ERROR: migration $MIG_NAME failed to apply. Fix it and redeploy."
+    exit 1
+  fi
+  docker exec "${COMPOSE_PROJECT}-postgres-1" psql -U postgres -d heliumdb_prod \
+    -c "INSERT INTO _applied_migrations(name) VALUES ('$MIG_NAME') ON CONFLICT DO NOTHING" >/dev/null
+  echo "  $MIG_NAME: applied OK"
+done
+
 # Verify DB schema matches migrations — fail loudly instead of deploying broken features
-# (prevents the yarn-receipt incident: code deployed but tables missing in heliumdb_prod)
 echo "Verifying DB schema against migrations..."
 EXPECTED_TABLES=$(grep -hoP 'CREATE TABLE (?:IF NOT EXISTS )?"\K[^"]+' "$PROJECT_DIR/database/migrations"/*.sql 2>/dev/null | sort -u)
 # Tables renamed by later migrations (e.g. machine_operator_master -> employee_master)
