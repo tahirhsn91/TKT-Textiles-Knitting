@@ -41,6 +41,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Layout } from "@/components/layout";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useReconciledLock } from "@/context/config-context";
 import { ProductionAnalytics } from "./analytics-tab";
 
 const COLUMN_COUNT = 7;
@@ -72,6 +73,9 @@ export default function DailyProductionList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  // When the "Reconciled lock" configuration (code 0001) is disabled, resolved
+  // entries stay editable instead of being locked.
+  const reconciledLockEnabled = useReconciledLock();
 
   const [date, setDate] = useState(yesterdayIso());
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -269,6 +273,10 @@ export default function DailyProductionList() {
                   </TableRow>
                 ) : (
                   rows.map((r, i) => {
+                    // When the Reconciled lock (code 0001) is enabled, a
+                    // reconciled row is locked; when it's disabled, reconciled
+                    // rows stay editable — same as unreconciled ones.
+                    const locked = r.reconciled && reconciledLockEnabled;
                     // A row with any roll over 30 kg is flagged red (heavy
                     // takes precedence over the reconciled yellow — the
                     // warning matters more than the lock tint). The dark
@@ -276,14 +284,14 @@ export default function DailyProductionList() {
                     // block; the light ones are the exact Tailwind shades.
                     const rowBg = r.hasHeavyRoll
                       ? "bg-red-300 hover:bg-red-300 dark:bg-red-900/80 dark:hover:bg-red-900/80"
-                      : r.reconciled
+                      : locked
                         ? "bg-yellow-100 hover:bg-yellow-100 dark:bg-yellow-950/40 dark:hover:bg-yellow-950/40"
                         : undefined;
                     // The sticky action cell sits over the scrolled cells, so
                     // it needs the same tint as the row it belongs to.
                     const stickyBg = r.hasHeavyRoll
                       ? "bg-red-300 dark:bg-red-900/80"
-                      : r.reconciled
+                      : locked
                         ? "bg-yellow-100 dark:bg-yellow-950/40"
                         : "bg-background";
                     return (
@@ -291,8 +299,8 @@ export default function DailyProductionList() {
                       key={r.id}
                       className={`${rowBg ?? ""} ${isMobile ? "cursor-pointer" : ""}`.trim() || undefined}
                       // On a phone the row itself is the edit target — no
-                      // hunting for the pencil. Reconciled rows open view.
-                      onClick={isMobile ? () => (r.reconciled ? openView(r.id) : openEdit(r.id)) : undefined}
+                      // hunting for the pencil. Locked rows open view.
+                      onClick={isMobile ? () => (locked ? openView(r.id) : openEdit(r.id)) : undefined}
                     >
                       <TableCell className={`whitespace-nowrap px-5 font-medium ${machineRepeats[i] ? "text-muted-foreground/50" : ""}`}>
                         {machineRepeats[i] ? "—" : (r.machineName ?? "-")}
@@ -304,7 +312,7 @@ export default function DailyProductionList() {
                           {r.shift}
                           {/* Colour alone can't carry this: it fails for
                               colour-blind users and disappears in print. */}
-                          {r.reconciled && (
+                          {locked && (
                             <span className="inline-flex items-center gap-1 rounded-sm border border-yellow-300 bg-yellow-50 px-1.5 py-0.5 text-[0.6875rem] font-medium uppercase tracking-wide text-yellow-900 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-200">
                               <Lock className="h-3 w-3" />
                               Reconciled
@@ -316,8 +324,8 @@ export default function DailyProductionList() {
                       <TableCell className="num text-right font-medium">{Number(r.totalProduction).toFixed(NUM_DECIMALS)}</TableCell>
                       <TableCell className={`sticky right-0 ${stickyBg} px-1.5 text-right`}>
                         <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
-                          {r.reconciled ? (
-                            // A reconciled entry is locked, but it should still
+                          {locked ? (
+                            // A locked entry is read-only, but it should still
                             // be inspectable: the eye opens the same dialog in
                             // read-only mode — same data, no way to write.
                             <>
