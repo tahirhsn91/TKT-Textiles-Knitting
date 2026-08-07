@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 
 export type FieldOption = { value: string; label: string };
@@ -55,6 +56,9 @@ type Props = {
   fields: Field[];
   rows: Row[] | undefined;
   isLoading: boolean;
+  /** When true the table is display-only: no Add new button and no edit/delete
+   *  actions. Used for system configuration, which is managed via migration. */
+  readonly?: boolean;
   onAdd: (data: Record<string, string>) => Promise<void>;
   onUpdate: (id: number, data: Record<string, string>) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
@@ -134,6 +138,9 @@ function displayValue(field: Field, row: Row): string {
   if (field.type === "checkbox") {
     return String(row[field.key]) === "true" ? "Yes" : "No";
   }
+  if (field.type === "toggle") {
+    return String(row[field.key]) === "true" ? "Yes" : "No";
+  }
   return raw != null ? String(raw) : "";
 }
 
@@ -143,6 +150,7 @@ export function MasterTable({
   fields,
   rows,
   isLoading,
+  readonly = false,
   onAdd,
   onUpdate,
   onDelete,
@@ -307,14 +315,20 @@ export function MasterTable({
             <p className="mt-2 max-w-prose text-sm text-muted-foreground sm:max-w-md">{description}</p>
           )}
         </div>
-        <Button
-          className="w-full shrink-0 sm:w-auto"
-          onClick={() => { setShowAddRow(true); setAddValues(emptyAdd()); setEditingId(null); setFieldErrors({}); }}
-          disabled={showAddRow}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add new
-        </Button>
+        {readonly ? (
+          <span className="shrink-0 rounded-full border px-3 py-1 text-xs text-muted-foreground">
+            Read-only · managed via migration
+          </span>
+        ) : (
+          <Button
+            className="w-full shrink-0 sm:w-auto"
+            onClick={() => { setShowAddRow(true); setAddValues(emptyAdd()); setEditingId(null); setFieldErrors({}); }}
+            disabled={showAddRow}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add new
+          </Button>
+        )}
       </div>
 
       {/* Search — filters the table client-side as you type. */}
@@ -359,7 +373,9 @@ export function MasterTable({
                   controls stay pinned to the right edge instead of scrolling
                   out of view behind the data columns. The bg-background keeps
                   rows from showing through as they slide underneath. */}
-              <TableHead className="sticky right-0 w-24 bg-background text-right">Actions</TableHead>
+              {!readonly && (
+                <TableHead className="sticky right-0 w-24 bg-background text-right">Actions</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -399,7 +415,7 @@ export function MasterTable({
             {isLoading && Array.from({ length: 3 }).map((_, i) => (
               <TableRow key={i}>
                 {fields.map((f) => <TableCell key={f.key}><Skeleton className="h-5 w-full" /></TableCell>)}
-                <TableCell><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
+                {!readonly && <TableCell><Skeleton className="h-5 w-16 ml-auto" /></TableCell>}
               </TableRow>
             ))}
 
@@ -408,7 +424,7 @@ export function MasterTable({
               <TableRow>
                 {/* An empty screen is an invitation, not a dead end — and it
                     names the control by the label actually on the button. */}
-                <TableCell colSpan={fields.length + 1} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={fields.length + (readonly ? 0 : 1)} className="py-10 text-center text-muted-foreground">
                   {trimmedSearch
                     ? `No ${title.toLowerCase()} match "${search.trim()}".`
                     : `No ${title.toLowerCase()} recorded yet. Add the first one to get started.`}
@@ -442,11 +458,22 @@ export function MasterTable({
                         onEscape={cancelEdit}
                         error={fieldErrors[f.key]}
                       />
+                    ) : f.type === "toggle" ? (
+                      // System toggles (e.g. configuration enable) are
+                      // display-only — locked off so they read as system
+                      // managed rather than something the user can flip.
+                      <Switch
+                        checked={String(row[f.key]) === "true"}
+                        disabled
+                        aria-readonly
+                        aria-label={f.label}
+                      />
                     ) : (
                       displayValue(f, row)
                     )}
                   </TableCell>
                 ))}
+                {!readonly && (
                 <TableCell className="sticky right-0 bg-background text-right">
                   {editingId === row.id ? (
                     <div className="flex justify-end gap-1">
@@ -492,6 +519,7 @@ export function MasterTable({
                     </div>
                   )}
                 </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>

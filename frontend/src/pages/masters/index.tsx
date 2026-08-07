@@ -51,6 +51,7 @@ import {
   useCreateDepartmentMaster,
   useUpdateDepartmentMaster,
   useDeleteDepartmentMaster,
+  useListConfigurationCrud,
   getListJobMasterCrudQueryKey,
   getListPartyMasterCrudQueryKey,
   getListMachineMasterCrudQueryKey,
@@ -151,6 +152,7 @@ export default function MastersPage() {
             <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="fabric-type">Fabric Type</TabsTrigger>
             <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="department">Departments</TabsTrigger>
             <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="employee">Employees</TabsTrigger>
+            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="configuration">Configuration</TabsTrigger>
           </TabsList>
 
           <TabsContent value="transaction-type" className="mt-4"><TransactionTypeTab /></TabsContent>
@@ -165,6 +167,7 @@ export default function MastersPage() {
           <TabsContent value="fabric-type" className="mt-4"><FabricTypeTab /></TabsContent>
           <TabsContent value="department" className="mt-4"><DepartmentTab /></TabsContent>
           <TabsContent value="employee" className="mt-4"><EmployeeTab /></TabsContent>
+          <TabsContent value="configuration" className="mt-4"><ConfigurationTab /></TabsContent>
         </Tabs>
       </div>
     </Layout>
@@ -185,6 +188,7 @@ const TAB_IDS = [
   "fabric-type",
   "department",
   "employee",
+  "configuration",
 ];
 
 // ─── Transaction Type ───────────────────────────────────────────────────────
@@ -546,6 +550,33 @@ function EmployeeTab() {
       onAdd={(d) => new Promise((res, rej) => create.mutate({ data: { ...d, departmentId: d.departmentId ? Number(d.departmentId) : null, active: d.active !== "false" } as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
       onUpdate={(id, d) => new Promise((res, rej) => update.mutate({ id, data: { ...d, departmentId: d.departmentId ? Number(d.departmentId) : null, active: d.active !== "false" } as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
       onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+    />
+  );
+}
+
+// ─── Configuration (read-only — managed via DB migration) ────────────────────
+// System configuration is display-only: records are added/updated/deleted only
+// through database migrations, so the table renders with no Add/Edit/Delete and
+// the enabled flag shows as a locked toggle.
+function ConfigurationTab() {
+  const { data, isLoading } = useListConfigurationCrud();
+
+  return (
+    <MasterTable
+      title="Configuration"
+      description="System-wide settings that control daily operations. Configured via database migration and read-only in the app — records can't be added, edited or deleted here."
+      readonly
+      fields={[
+        { key: "name", label: "Name" },
+        { key: "code", label: "Code" },
+        { key: "description", label: "Description" },
+        { key: "enabled", label: "Enabled", type: "toggle" },
+      ]}
+      rows={data as never}
+      isLoading={isLoading}
+      onAdd={() => Promise.resolve()}
+      onUpdate={() => Promise.resolve()}
+      onDelete={() => Promise.resolve()}
     />
   );
 }

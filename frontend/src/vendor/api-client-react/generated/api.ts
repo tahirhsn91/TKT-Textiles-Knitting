@@ -31,6 +31,7 @@ import type {
   LookupItem,
   MachineLookupItem,
   EmployeeLookupItem,
+  ConfigurationItem,
   NotFoundResponse,
   TransactionSummary,
   TransactionWithDetails,
@@ -5502,3 +5503,82 @@ export const useDeleteTransaction = <
 > => {
   return useMutation(getDeleteTransactionMutationOptions(options));
 };
+
+/**
+ * @summary List system configuration entries
+ */
+export const getListConfigurationCrudUrl = () => {
+  return `/api/masters/configuration`;
+};
+
+export const listConfigurationCrud = async (
+  options?: RequestInit,
+): Promise<ConfigurationItem[]> => {
+  return customFetch<ConfigurationItem[]>(
+    getListConfigurationCrudUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListConfigurationCrudQueryKey = () => {
+  return [`/api/masters/configuration`] as const;
+};
+
+export const getListConfigurationCrudQueryOptions = <
+  TData = Awaited<ReturnType<typeof listConfigurationCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listConfigurationCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListConfigurationCrudQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listConfigurationCrud>>
+  > = ({ signal }) =>
+    listConfigurationCrud({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listConfigurationCrud>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListConfigurationCrudQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listConfigurationCrud>>
+>;
+export type ListConfigurationCrudQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List system configuration entries
+ */
+export function useListConfigurationCrud<
+  TData = Awaited<ReturnType<typeof listConfigurationCrud>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listConfigurationCrud>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListConfigurationCrudQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
