@@ -117,6 +117,15 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-[100dvh] w-full bg-background">
+      {/* Keyboard / screen-reader users can jump straight past the sidebar and
+          any page chrome to the main content instead of tabbing through it
+          every visit (WCAG 2.4.1 Bypass Blocks). Hidden until focused. */}
+      <a
+        href="#main"
+        className="pointer-events-none fixed left-4 top-4 z-[100] -translate-y-24 rounded-md border bg-background px-4 py-2 text-sm font-medium text-foreground opacity-0 shadow-sm transition-none focus:pointer-events-auto focus:translate-y-0 focus:opacity-100"
+      >
+        Skip to content
+      </a>
       {/* Development-environment banner — a fixed red strip across the very
           top so nobody mistakes the dev stack for production. Vite strips
           this block out of production builds (import.meta.env.DEV is false
@@ -353,7 +362,7 @@ export function Layout({ children }: { children: ReactNode }) {
           </Link>
         </header>
 
-        <main className="flex-1 p-4 md:p-8 w-full max-w-7xl mx-auto print:p-0 print:max-w-none">
+        <main id="main" className="flex-1 p-4 md:p-8 w-full max-w-7xl mx-auto print:p-0 print:max-w-none">
           {children}
         </main>
       </div>

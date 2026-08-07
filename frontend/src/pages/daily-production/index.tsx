@@ -384,7 +384,7 @@ export default function DailyProductionList() {
               </TableBody>
               {rows.length > 0 && (
                 <tfoot>
-                  <TableRow className="hover:bg-transparent">
+                  <TableRow className="bg-background hover:bg-transparent">
                     <TableCell colSpan={5} className="px-5 text-right text-sm text-muted-foreground">
                       Grand total
                     </TableCell>
@@ -400,7 +400,10 @@ export default function DailyProductionList() {
         </Card>
 
         {isFetching && !isLoading && (
-          <p className="text-xs text-muted-foreground -mt-4">Refreshing…</p>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Spinner className="h-3 w-3" />
+            Updating…
+          </div>
         )}
           </TabsContent>
           <TabsContent value="analytics" className="mt-4">

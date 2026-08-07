@@ -210,6 +210,19 @@ export function ProductionEntryDialog({
     }
   };
 
+  // Validate the half-typed roll weight the moment the field loses focus, so
+  // the floor gets feedback close to the problem instead of only on Enter /
+  // Save. Mirrors handleAddRoll's guard; doesn't add the roll.
+  const handleRollBlur = () => {
+    const trimmed = rollInput.trim();
+    const value = Number(trimmed);
+    if (trimmed && (isNaN(value) || value <= 0)) {
+      setRollError(`"${trimmed}" isn't a valid roll weight — enter a number greater than zero`);
+    } else {
+      setRollError(null);
+    }
+  };
+
   const handleRemoveRoll = (key: number) => {
     setRolls((prev) => prev.filter((r) => r.key !== key));
   };
@@ -524,6 +537,7 @@ export function ProductionEntryDialog({
                     value={rollInput}
                     onChange={(e) => { setRollInput(e.target.value); setRollError(null); }}
                     onKeyDown={handleRollKeyDown}
+                    onBlur={handleRollBlur}
                     // Autofocusing on a phone throws the keyboard up over the
                     // form the moment the dialog opens, hiding the fields the
                     // employee has to fill in first.
