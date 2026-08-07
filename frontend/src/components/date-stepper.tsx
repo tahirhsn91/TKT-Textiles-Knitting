@@ -33,7 +33,7 @@ export function DateStepper({
   };
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex w-full items-center gap-1.5">
       <Button
         type="button"
         variant="outline"
@@ -46,7 +46,7 @@ export function DateStepper({
         <ChevronLeft className="h-4 w-4" />
       </Button>
       <DateInput
-        className="h-9"
+        className="h-9 min-w-0 flex-1"
         value={value}
         max={max}
         onChange={(e) => onChange(e.target.value || value)}
