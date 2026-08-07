@@ -9,6 +9,7 @@ import {
   employeeMasterTable,
   partyMasterTable,
 } from "../db/index.js";
+import { isReconciliationLockEnabled } from "../lib/reconciliation-lock.js";
 
 const router: IRouter = Router();
 
@@ -55,15 +56,18 @@ function todayIso(): string {
 }
 
 /**
- * Reconciled entries are frozen. Enforced here rather than only in the UI —
- * hiding a button stops a user, not a stale browser tab, a retried request or
- * anything calling the API directly.
+ * Reconciled entries are frozen while the Reconciliation lock (config 0001) is
+ * enabled. Enforced here rather than only in the UI — hiding a button stops a
+ * user, not a stale browser tab, a retried request or anything calling the API
+ * directly. When the lock config is disabled, reconciled entries stay editable.
  *
  * Returns a 409 payload when the entry is locked, or null when it is free.
  */
 async function reconciliationBlock(
   id: number,
 ): Promise<{ error: string; reconciledTransactionId: number | null } | null> {
+  if (!(await isReconciliationLockEnabled())) return null;
+
   const [row] = await db
     .select({
       reconciled: dailyProductionHeaderTable.reconciled,
