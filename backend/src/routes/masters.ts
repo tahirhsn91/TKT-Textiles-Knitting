@@ -15,6 +15,7 @@ import {
   fabricTypeMasterTable,
   employeeMasterTable,
   departmentMasterTable,
+  configurationTable,
   insertTransactionTypeMasterSchema,
   insertJobMasterSchema,
   insertPartyMasterSchema,
@@ -74,6 +75,15 @@ function requireFields<Shape extends z.ZodRawShape, K extends keyof Shape & stri
   }
   return parsed.data as { [P in K]: z.infer<Shape[P]> };
 }
+
+// ─── System Configuration ─────────────────────────────────────────────────────
+// Read-only by design: records are added only via database migration, so this
+// table deliberately exposes GET only — no POST/PUT/DELETE routes exist.
+
+router.get("/masters/configuration", async (_req, res): Promise<void> => {
+  const rows = await db.select().from(configurationTable).orderBy(configurationTable.code);
+  res.json(rows);
+});
 
 // ─── Transaction Type Master ─────────────────────────────────────────────────
 

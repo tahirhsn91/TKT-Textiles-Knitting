@@ -50,6 +50,15 @@ export interface EmployeeLookupItem {
   active: boolean;
 }
 
+export interface ConfigurationItem {
+  id: number;
+  name: string;
+  code: string;
+  /** @nullable */
+  description?: string | null;
+  enabled: boolean;
+}
+
 export interface CreateEmployeeBody {
   name: string;
   code: string;
