@@ -65,6 +65,7 @@ const ALL_COLUMNS: { key: ColKey; label: string }[] = [
 ];
 const ALL_COL_KEYS = ALL_COLUMNS.map((c) => c.key);
 const LS_COL_ORDER = "tx-col-order";
+const LS_FILTERS = "tx-filters";
 
 // ─── Filters ──────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,32 @@ const EMPTY_FILTERS = {
   docNumber: "",
   reference: "",
 };
+
+// Persist the active filters to localStorage so they survive navigating to the
+// New/Edit transaction screens (and back), and full page reloads. Mirrors the
+// existing column-order persistence (LS_COL_ORDER) in this screen.
+function loadFilters(): typeof EMPTY_FILTERS {
+  try {
+    const saved = localStorage.getItem(LS_FILTERS);
+    if (!saved) return EMPTY_FILTERS;
+    const parsed = JSON.parse(saved) as Partial<typeof EMPTY_FILTERS>;
+    if (!parsed || typeof parsed !== "object") return EMPTY_FILTERS;
+    // Coerce each field to its expected type so corrupt/stale storage can't
+    // put a non-string or non-array into the filter state.
+    return {
+      transactionTypeId: typeof parsed.transactionTypeId === "string" ? parsed.transactionTypeId : "",
+      partyId: typeof parsed.partyId === "string" ? parsed.partyId : "",
+      dateFrom: typeof parsed.dateFrom === "string" ? parsed.dateFrom : "",
+      dateTo: typeof parsed.dateTo === "string" ? parsed.dateTo : "",
+      jobId: Array.isArray(parsed.jobId) ? parsed.jobId.map(String) : [],
+      yarnBrandId: Array.isArray(parsed.yarnBrandId) ? parsed.yarnBrandId.map(String) : [],
+      docNumber: typeof parsed.docNumber === "string" ? parsed.docNumber : "",
+      reference: typeof parsed.reference === "string" ? parsed.reference : "",
+    };
+  } catch {
+    return EMPTY_FILTERS;
+  }
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -94,7 +121,9 @@ export default function TransactionList() {
   const isMobile = useIsMobile();
   const [, setLocation] = useLocation();
 
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  // Filters are hydrated from localStorage so the active filter set survives
+  // navigating away to New/Edit (which unmounts this screen) and coming back.
+  const [filters, setFilters] = useState(loadFilters);
   const [sort, setSort] = useState<{ key: ColKey; dir: "asc" | "desc" }>({ key: "date", dir: "desc" });
   // Filters collapse behind a toggle on phones (the 8-field wall is a lot of
   // scroll for a screen whose primary use is scanning entries).
@@ -120,6 +149,12 @@ export default function TransactionList() {
   useEffect(() => {
     localStorage.setItem(LS_COL_ORDER, JSON.stringify(colOrder));
   }, [colOrder]);
+
+  // Persist filters on every change so they're restored when the user returns
+  // from the New/Edit screens or after a reload.
+  useEffect(() => {
+    localStorage.setItem(LS_FILTERS, JSON.stringify(filters));
+  }, [filters]);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   const setFilter = (key: keyof typeof EMPTY_FILTERS, value: string | string[]) =>
