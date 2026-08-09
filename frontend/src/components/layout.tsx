@@ -2,7 +2,7 @@ import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   FileText, Database, BarChart2, LayoutDashboard, ClipboardList, Wallet,
-  ChevronDown, Menu, PanelLeftClose, PanelLeftOpen,
+  ChevronDown, Menu, PanelLeftClose, PanelLeftOpen, Search, Settings,
   Factory, PackageCheck, Truck, HardHat,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { Input } from "@/components/ui/input";
 import {
   Tooltip,
   TooltipContent,
@@ -46,6 +47,44 @@ const payrollItems = [
 const reportItems = [
   { href: "/reports/yarn-balance",   label: "Yarn Balance Report" },
   { href: "/reports/yarn-to-fabric", label: "Yarn to Fabric Movement Report" },
+];
+
+// Mobile drawer: the groups and their items, so the drawer can render from
+// config and auto-open the group holding the active route. Sub-item icons are
+// chosen to make the long list scannable.
+const mobileGroups = [
+  {
+    key: "daily",
+    label: "Daily Work",
+    icon: ClipboardList,
+    activeFn: (loc: string) => loc.startsWith("/daily-production") || loc.startsWith("/yarn-receipts") || loc.startsWith("/daily-deliveries"),
+    items: [
+      { href: "/daily-production", label: "Daily Production", icon: Factory },
+      { href: "/yarn-receipts",    label: "Daily Yarn Receipt", icon: PackageCheck },
+      { href: "/daily-deliveries", label: "Daily Delivery",    icon: Truck },
+    ],
+  },
+  {
+    key: "transactions",
+    label: "Transactions & Payroll",
+    icon: FileText,
+    activeFn: (loc: string) => loc.startsWith("/transactions"),
+    items: [
+      { href: "/transactions",           label: "Yarn-Fabric Transactions", icon: FileText },
+      { href: "/transactions/advances",  label: "Advances",                icon: Wallet },
+      { href: "/transactions/monthly-salary-entry", label: "Payroll Maintenance", icon: Settings },
+    ],
+  },
+  {
+    key: "reports",
+    label: "Analysis",
+    icon: BarChart2,
+    activeFn: (loc: string) => loc.startsWith("/reports"),
+    items: [
+      { href: "/reports/yarn-balance",   label: "Yarn Balance Report",      icon: BarChart2 },
+      { href: "/reports/yarn-to-fabric", label: "Yarn to Fabric Movement",   icon: Database },
+    ],
+  },
 ];
 
 // Primary route each collapsed group icon navigates to.
@@ -114,6 +153,11 @@ export function Layout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(LS_SIDEBAR_COLLAPSED) === "true"; } catch { return false; }
   });
+  // Mobile drawer: search query + which accordion groups are expanded.
+  const [mobileQuery, setMobileQuery] = useState("");
+  const [mobileOpenGroups, setMobileOpenGroups] = useState<Set<string>>(
+    () => new Set(mobileGroups.filter((g) => g.activeFn(location)).map((g) => g.key))
+  );
 
   useEffect(() => {
     try { localStorage.setItem(LS_SIDEBAR_COLLAPSED, String(collapsed)); } catch {}
@@ -291,7 +335,7 @@ export function Layout({ children }: { children: ReactNode }) {
               side="left"
               closeAriaLabel="Close menu"
               className={cn(
-                "w-[280px] max-w-[85vw] border-sidebar-border bg-sidebar p-0 text-sidebar-foreground",
+                "flex w-[340px] max-w-[90vw] flex-col border-sidebar-border bg-sidebar p-0 text-sidebar-foreground",
                 import.meta.env.DEV && "top-7"
               )}
               // Backdrop click-to-dismiss: the Sheet is controlled by mobileOpen,
@@ -299,63 +343,43 @@ export function Layout({ children }: { children: ReactNode }) {
               // relying on the small menu toggle (issue #27).
               onPointerDownOutside={() => setMobileOpen(false)}
             >
-              <SheetHeader className="border-b border-sidebar-border px-4 py-4 text-left">
+              <SheetHeader className="flex items-center justify-between gap-3 border-b border-sidebar-border px-4 py-4">
                 <SheetTitle asChild>
                   <div><Wordmark /></div>
                 </SheetTitle>
               </SheetHeader>
-              <nav className="flex flex-col px-2 pb-4">
-                <NavSection label="Overview" />
-                {navItems.map((item) => (
-                  <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}>
-                    <span className={cn(
-                      "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-                      isItemActive(location, item.href)
-                        ? "selvedge bg-sidebar-accent text-sidebar-accent-foreground"
-                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
-                    )}>
-                      <item.icon className="h-4 w-4" />
-                      {item.label}
-                    </span>
-                  </Link>
-                ))}
 
-                <NavSection label="Daily Work" />
-                <MobileGroup label="Daily Operations" icon={ClipboardList} active={dailyProductionActive || yarnReceiptsActive || dailyDeliveriesActive}>
-                  <Link href="/daily-production" onClick={() => setMobileOpen(false)}>
-                    <SubLabel label="Daily Production" active={isSubItemActive(location, "/daily-production")} />
-                  </Link>
-                  <Link href="/yarn-receipts" onClick={() => setMobileOpen(false)}>
-                    <SubLabel label="Daily Yarn Receipt" active={isSubItemActive(location, "/yarn-receipts")} />
-                  </Link>
-                  <Link href="/daily-deliveries" onClick={() => setMobileOpen(false)}>
-                    <SubLabel label="Daily Delivery" active={isSubItemActive(location, "/daily-deliveries")} />
-                  </Link>
-                </MobileGroup>
-                <MobileGroup label="Transactions" icon={FileText} active={transactionsActive}>
-                  {transactionItems.map((item) => (
-                    <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}>
-                      <SubLabel label={item.label} active={isSubItemActive(location, item.href)} />
-                    </Link>
-                  ))}
-                </MobileGroup>
-                <MobileGroup label="Payroll" icon={Wallet} active={payrollActive}>
-                  {payrollItems.map((item) => (
-                    <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}>
-                      <SubLabel label={item.label} active={isSubItemActive(location, item.href)} />
-                    </Link>
-                  ))}
-                </MobileGroup>
+              {/* Search — filters the whole drawer so a long menu stays
+                  discoverable without scrolling. */}
+              <div className="px-3 pt-3">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-sidebar-foreground/40" />
+                  <Input
+                    type="search"
+                    placeholder="Find a menu…"
+                    value={mobileQuery}
+                    onChange={(e) => setMobileQuery(e.target.value)}
+                    className="h-11 border-sidebar-border bg-sidebar-accent/40 pl-9 text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-signal"
+                  />
+                </div>
+              </div>
 
-                <NavSection label="Analysis" />
-                <MobileGroup label="Reports" icon={BarChart2} active={reportsActive}>
-                  {reportItems.map((item) => (
-                    <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}>
-                      <SubLabel label={item.label} active={location.startsWith(item.href)} />
-                    </Link>
-                  ))}
-                </MobileGroup>
+              <nav className="flex flex-1 flex-col overflow-y-auto px-2 pb-4 pt-2">
+                <MobileNavMenu
+                  location={location}
+                  query={mobileQuery}
+                  openGroups={mobileOpenGroups}
+                  setOpenGroups={setMobileOpenGroups}
+                  onNavigate={() => { setMobileOpen(false); setMobileQuery(""); }}
+                />
               </nav>
+
+              {/* Drawer footer — a quiet sign-off so the menu doesn't end
+                  abruptly and shows what build this is. */}
+              <div className="flex items-center justify-between border-t border-sidebar-border px-4 py-3">
+                <span className="text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/40">TKT Textiles</span>
+                <span className="text-[0.625rem] text-sidebar-foreground/30">v{import.meta.env.PACKAGE_VERSION ?? "1.0.0"}</span>
+              </div>
             </SheetContent>
           </Sheet>
 
@@ -530,37 +554,118 @@ function DesktopGroup({
   );
 }
 
-// ── Mobile drawer group ───────────────────────────────────────
-function MobileGroup({
-  label, icon: Icon, active, children,
+// ── Mobile drawer menu ─────────────────────────────────────────
+// Searchable, auto-expanding menu for the phone drawer. Top-level items
+// (Overview) sit flat; the rest are accordion groups that open when active
+// or when the search query matches something inside them, so the drawer
+// stays compact instead of a giant wall of open sections.
+function MobileNavMenu({
+  location,
+  query,
+  openGroups,
+  setOpenGroups,
+  onNavigate,
 }: {
-  label: string;
-  icon: React.ElementType;
-  active: boolean;
-  children: ReactNode;
+  location: string;
+  query: string;
+  openGroups: Set<string>;
+  setOpenGroups: React.Dispatch<React.SetStateAction<Set<string>>>;
+  onNavigate: () => void;
 }) {
-  const [open, setOpen] = useState(true);
+  const q = query.trim().toLowerCase();
+  const matches = (label: string) => !q || label.toLowerCase().includes(q);
+
+  // Overview always shows; other groups each list their items (filtered).
+  const visibleGroups = mobileGroups.filter((g) =>
+    g.items.some((i) => matches(i.label))
+  );
+
+  // When typing, force-open any group that matched so results are visible.
+  const effOpenGroups = q
+    ? new Set(visibleGroups.map((g) => g.key))
+    : openGroups;
+
+  const toggleGroup = (key: string) =>
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+
   return (
-    <div className="flex flex-col">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className={cn(
-          "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-          active
-            ? "text-sidebar-accent-foreground"
-            : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
-        )}
-        aria-expanded={open}
-      >
-        <Icon className="h-4 w-4" />
-        {label}
-        <ChevronDown className={cn("ml-auto h-4 w-4 opacity-50 transition-transform", open && "rotate-180")} />
-      </button>
-      {open && (
-        <div className="ml-[1.4375rem] flex flex-col border-l border-sidebar-border pl-1.5">
-          {children}
-        </div>
-      )}
+    <div className="flex flex-col gap-0.5">
+      <NavSection label="Overview" />
+      {navItems
+        .filter((i) => matches(i.label))
+        .map((item) => (
+          <Link key={item.href} href={item.href} onClick={onNavigate}>
+            <span
+              className={cn(
+                "flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                isItemActive(location, item.href)
+                  ? "selvedge bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+              )}
+            >
+              <item.icon className="h-4 w-4 shrink-0" />
+              {item.label}
+            </span>
+          </Link>
+        ))}
+
+      {visibleGroups.map((group) => {
+        const groupActive = group.activeFn(location);
+        const open = effOpenGroups.has(group.key);
+        const Icon = group.icon;
+        return (
+          <div key={group.key} className="mt-1 flex flex-col">
+            <NavSection label={group.label} />
+            <button
+              onClick={() => toggleGroup(group.key)}
+              className={cn(
+                "flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                groupActive
+                  ? "text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60"
+              )}
+              aria-expanded={open}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="whitespace-nowrap">{group.label}</span>
+              <ChevronDown
+                className={cn("ml-auto h-4 w-4 opacity-50 transition-transform", open && "rotate-180")}
+              />
+            </button>
+            {open && (
+              <div className="ml-[1.4375rem] flex flex-col border-l border-sidebar-border pl-1.5">
+                {group.items
+                  .filter((i) => matches(i.label))
+                  .map((item) => {
+                    const active = isItemActive(location, item.href);
+                    const ItemIcon = item.icon;
+                    return (
+                      <Link key={item.href} href={item.href} onClick={onNavigate}>
+                        <span
+                          className={cn(
+                            "flex min-h-11 items-center gap-3 rounded-md pl-2 pr-3 py-2.5 text-[0.8125rem] transition-colors",
+                            active
+                              ? "selvedge font-semibold text-sidebar-accent-foreground"
+                              : "text-sidebar-foreground/60 hover:text-sidebar-accent-foreground"
+                          )}
+                        >
+                          <ItemIcon
+                            className={cn("h-4 w-4 shrink-0", active ? "text-signal" : "opacity-60")}
+                          />
+                          {item.label}
+                        </span>
+                      </Link>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
