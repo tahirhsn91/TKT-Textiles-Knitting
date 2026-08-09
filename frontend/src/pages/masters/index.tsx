@@ -173,8 +173,20 @@ export default function MastersPage() {
                phone gets one compact, full-width dropdown that lists every tab
                grouped by category — nothing hidden, one tap to jump. */}
           <Select value={activeTab} onValueChange={handleTabChange}>
-            <SelectTrigger className="h-11 w-full bg-sidebar text-sidebar-foreground sm:hidden">
-              <SelectValue placeholder="Select a master list" />
+            <SelectTrigger className="h-11 w-full bg-sidebar text-sidebar-foreground ring-offset-sidebar sm:hidden">
+              <SelectValue placeholder="Select a master list">
+                {(() => {
+                  const current = TABS.find((t) => t.id === activeTab);
+                  if (!current) return null;
+                  const Icon = current.icon;
+                  return (
+                    <span className="flex items-center gap-2">
+                      <Icon className="h-4 w-4 text-signal" />
+                      {current.label}
+                    </span>
+                  );
+                })()}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {TAB_GROUPS.map((group) => (
@@ -196,21 +208,26 @@ export default function MastersPage() {
             </SelectContent>
           </Select>
 
-          {/* ── Desktop (sm+): a grouped rail ───────────────────────────────
-               All thirteen tabs fit on one row; the Radix Tabs.List is the
-               wrapper so every Trigger keeps its RovingFocusGroup context.
-               The list is hidden on a phone (the dropdown above takes over). */}
+          {/* ── Desktop (sm+): a grouped, content-width rail ───────────────
+               The bar hugs its content (no full-width flex-1 spreading that
+               stretched the 13 tabs thin and pushed the hairlines apart); it
+               sits left-aligned, with pills sized to their labels and tight
+               gaps. If the viewport is too narrow a subtle horizontal scroll
+               steps in rather than clipping or wrapping. The Radix Tabs.List
+               stays the wrapper so every Trigger keeps its RovingFocusGroup
+               context. Hidden on a phone (the dropdown above takes over). */}
           <TabsList
-            className="hidden w-full items-stretch gap-0 overflow-x-auto rounded-lg border border-sidebar-border bg-sidebar p-2 shadow-sm sm:flex [&::-webkit-scrollbar]:hidden"
+            className="hidden w-full items-center gap-1 overflow-x-auto rounded-lg border border-sidebar-border bg-sidebar p-2 shadow-sm sm:flex [&::-webkit-scrollbar]:hidden"
             ref={railRef}
           >
             {TAB_GROUPS.map((group, gi) => (
               <div key={group} className="contents">
-                {/* Hairline + uppercase caption separates each group. */}
+                {/* Hairline + uppercase caption separates each group, tight to
+                    the group it precedes (never stretched by flex-1). */}
                 <span
                   aria-hidden
                   className={cn(
-                    "flex items-center self-stretch pl-1 text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/45 sm:mx-1 sm:border-l sm:border-sidebar-border sm:pl-3",
+                    "flex items-center self-stretch pl-1 text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/45 sm:ml-2 sm:mr-0.5 sm:border-l sm:border-sidebar-border sm:pl-3",
                     gi === 0 && "hidden"
                   )}
                 >
@@ -224,7 +241,7 @@ export default function MastersPage() {
                       key={tab.id}
                       value={tab.id}
                       className={cn(
-                        "flex h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full px-3 text-[0.8125rem] font-medium transition-colors",
+                        "flex h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full px-3 text-[0.8125rem] font-medium transition-colors sm:px-3.5",
                         active
                           ? "selvedge-top bg-sidebar-accent text-sidebar-accent-foreground [&_svg]:text-signal"
                           : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
