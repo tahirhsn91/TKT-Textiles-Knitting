@@ -221,7 +221,7 @@ export default function MastersPage() {
                  The Radix Tabs.List is the wrapper so every Trigger keeps its
                  RovingFocusGroup context. */}
             <TabsList
-              className="hidden w-full shrink-0 flex-col items-stretch gap-0.5 rounded-lg border border-sidebar-border bg-sidebar p-2 shadow-sm sm:flex sm:w-60"
+              className="hidden w-full shrink-0 flex-col items-stretch gap-0.5 rounded-lg border border-sidebar-border bg-sidebar p-2 shadow-sm sm:flex sm:w-60 sm:h-auto sm:justify-start"
               ref={railRef}
             >
               {TAB_GROUPS.map((group) => (
