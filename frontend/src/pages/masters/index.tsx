@@ -82,10 +82,13 @@ import { MasterTable } from "@/components/master-table";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -128,13 +131,6 @@ const TABS = [
 const TAB_IDS = TABS.map((t) => t.id);
 // Ordered distinct groups, in display order.
 const TAB_GROUPS = Array.from(new Set(TABS.map((t) => t.group)));
-// Compact captions used as markers inside the mobile scroll rail.
-const GROUP_CAPTIONS: Record<string, string> = {
-  Operations: "OPS",
-  Yarn: "YARN",
-  Product: "PROD",
-  System: "SYS",
-};
 
 export default function MastersPage() {
   // Active tab lives in the URL hash (#machines) so a refresh lands back on
@@ -171,59 +167,77 @@ export default function MastersPage() {
         </header>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} defaultValue="transaction-type">
-          {/* Menu strip: a grouped rail of all 13 master-data tabs. On desktop
-              (sm+) it's a full-width bar whose groups are separated by hairline
-              rules + tiny uppercase captions — no more wall of text. On a phone
-              it's a single horizontally scrollable row of icon pills with 44px
-              touch targets; group captions appear as markers inside the rail,
-              and picking a tab scrolls it into view so the active one is never
-              hidden off-screen. */}
-          <TabsList
-            // The Radix Tabs.List must wrap every Trigger (it provides the
-            // RovingFocusGroup context Triggers depend on) — so it doubles as
-            // the scrollable rail, with the bezel + grouping applied around it.
-            className="-mx-4 flex h-auto w-auto max-w-none items-stretch gap-1 overflow-x-auto px-4 sm:mx-0 sm:w-full sm:flex-wrap sm:gap-0 sm:overflow-visible sm:rounded-lg sm:border sm:border-sidebar-border sm:bg-sidebar sm:p-2 sm:shadow-sm [&::-webkit-scrollbar]:hidden"
-            ref={railRef}
-          >
-              {TAB_GROUPS.map((group, gi) => (
-                <div key={group} className="contents">
-                  {/* Group caption — a compact marker in the mobile scroll
-                      rail; on desktop it becomes a hairline + label that
-                      separates the groups inside the bar. */}
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "flex items-center self-stretch text-[0.5625rem] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/45",
-                      gi > 0 && "sm:ml-1 sm:border-l sm:border-sidebar-border sm:pl-2"
-                    )}
-                  >
-                    <span className="sm:hidden">{GROUP_CAPTIONS[group] ?? group}</span>
-                    <span className="hidden sm:inline">{group}</span>
-                  </span>
+          {/* ── Mobile: a grouped dropdown picker ────────────────────────────
+               Thirteen items can't fit a single phone screen without clipping,
+               so instead of a scroll rail (which hid tabs off both edges) a
+               phone gets one compact, full-width dropdown that lists every tab
+               grouped by category — nothing hidden, one tap to jump. */}
+          <Select value={activeTab} onValueChange={handleTabChange}>
+            <SelectTrigger className="h-11 w-full bg-sidebar text-sidebar-foreground sm:hidden">
+              <SelectValue placeholder="Select a master list" />
+            </SelectTrigger>
+            <SelectContent>
+              {TAB_GROUPS.map((group) => (
+                <SelectGroup key={group}>
+                  <SelectLabel>{group}</SelectLabel>
                   {TABS.filter((t) => t.group === group).map((tab) => {
-                    const active = activeTab === tab.id;
                     const Icon = tab.icon;
                     return (
-                      <TabsTrigger
-                        key={tab.id}
-                        value={tab.id}
-                        className={cn(
-                          // Mobile: icon + short label pill, 44px touch target.
-                          "flex h-11 shrink-0 flex-col items-center justify-center gap-1 rounded-md px-3 text-xs font-medium transition-colors sm:h-10 sm:flex-1 sm:flex-row sm:gap-2 sm:rounded-full sm:px-3 sm:text-[0.8125rem]",
-                          active
-                            ? "selvedge-top bg-sidebar-accent text-sidebar-accent-foreground [&_svg]:text-signal"
-                            : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
-                        )}
-                        onClick={() => railRef.current?.querySelector(`[data-value="${tab.id}"]`)?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" })}
-                      >
-                        <Icon className="h-4 w-4 shrink-0" />
-                        <span className="leading-none">{tab.short}</span>
-                      </TabsTrigger>
+                      <SelectItem key={tab.id} value={tab.id}>
+                        <span className="flex items-center gap-2">
+                          <Icon className="h-4 w-4 opacity-70" />
+                          {tab.label}
+                        </span>
+                      </SelectItem>
                     );
                   })}
-                </div>
+                </SelectGroup>
               ))}
-            </TabsList>
+            </SelectContent>
+          </Select>
+
+          {/* ── Desktop (sm+): a grouped rail ───────────────────────────────
+               All thirteen tabs fit on one row; the Radix Tabs.List is the
+               wrapper so every Trigger keeps its RovingFocusGroup context.
+               The list is hidden on a phone (the dropdown above takes over). */}
+          <TabsList
+            className="hidden w-full items-stretch gap-0 overflow-x-auto rounded-lg border border-sidebar-border bg-sidebar p-2 shadow-sm sm:flex [&::-webkit-scrollbar]:hidden"
+            ref={railRef}
+          >
+            {TAB_GROUPS.map((group, gi) => (
+              <div key={group} className="contents">
+                {/* Hairline + uppercase caption separates each group. */}
+                <span
+                  aria-hidden
+                  className={cn(
+                    "flex items-center self-stretch pl-1 text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/45 sm:mx-1 sm:border-l sm:border-sidebar-border sm:pl-3",
+                    gi === 0 && "hidden"
+                  )}
+                >
+                  {group}
+                </span>
+                {TABS.filter((t) => t.group === group).map((tab) => {
+                  const active = activeTab === tab.id;
+                  const Icon = tab.icon;
+                  return (
+                    <TabsTrigger
+                      key={tab.id}
+                      value={tab.id}
+                      className={cn(
+                        "flex h-10 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full px-3 text-[0.8125rem] font-medium transition-colors",
+                        active
+                          ? "selvedge-top bg-sidebar-accent text-sidebar-accent-foreground [&_svg]:text-signal"
+                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+                      )}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      {tab.short}
+                    </TabsTrigger>
+                  );
+                })}
+              </div>
+            ))}
+          </TabsList>
 
           <TabsContent value="transaction-type" className="mt-4"><TransactionTypeTab /></TabsContent>
           <TabsContent value="job" className="mt-4"><JobTab /></TabsContent>
