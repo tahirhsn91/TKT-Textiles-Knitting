@@ -208,26 +208,28 @@ export default function MastersPage() {
             </SelectContent>
           </Select>
 
-          {/* ── Desktop (sm+): a grouped, content-width rail ───────────────
-               The bar hugs its content (no full-width flex-1 spreading that
-               stretched the 13 tabs thin and pushed the hairlines apart); it
-               sits left-aligned, with pills sized to their labels and tight
-               gaps. If the viewport is too narrow a subtle horizontal scroll
-               steps in rather than clipping or wrapping. The Radix Tabs.List
-               stays the wrapper so every Trigger keeps its RovingFocusGroup
-               context. Hidden on a phone (the dropdown above takes over). */}
+          {/* ── Desktop (sm+): a grouped, wrapping rail ───────────────────
+               13 labelled pills + group captions can't sit on one row inside
+               the max-w-7xl content column (they need ~1600px vs ~1100px
+               available), so a single-row rail either stretched them thin or
+               hid the right-hand tabs behind a scroll. Instead, let the pills
+               wrap onto a second (occasionally third) tidy row — every tab is
+               always visible, none distributed, none clipped. The Radix
+               Tabs.List stays the wrapper so every Trigger keeps its
+               RovingFocusGroup context. Hidden on a phone (the dropdown above
+               takes over). */}
           <TabsList
-            className="hidden w-full items-center gap-1 overflow-x-auto rounded-lg border border-sidebar-border bg-sidebar p-2 shadow-sm sm:flex [&::-webkit-scrollbar]:hidden"
+            className="hidden w-full flex-wrap items-center gap-x-1 gap-y-2 rounded-lg border border-sidebar-border bg-sidebar p-2 shadow-sm sm:flex [&::-webkit-scrollbar]:hidden"
             ref={railRef}
           >
             {TAB_GROUPS.map((group, gi) => (
               <div key={group} className="contents">
                 {/* Hairline + uppercase caption separates each group, tight to
-                    the group it precedes (never stretched by flex-1). */}
+                    the group it precedes (never stretched, never hidden). */}
                 <span
                   aria-hidden
                   className={cn(
-                    "flex items-center self-stretch pl-1 text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/45 sm:ml-2 sm:mr-0.5 sm:border-l sm:border-sidebar-border sm:pl-3",
+                    "flex items-center self-stretch text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/45 sm:ml-2 sm:mr-0 sm:border-l sm:border-sidebar-border sm:pl-3",
                     gi === 0 && "hidden"
                   )}
                 >
