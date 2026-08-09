@@ -167,110 +167,111 @@ export default function MastersPage() {
         </header>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} defaultValue="transaction-type">
-          {/* ── Mobile: a grouped dropdown picker ────────────────────────────
-               Thirteen items can't fit a single phone screen without clipping,
-               so instead of a scroll rail (which hid tabs off both edges) a
-               phone gets one compact, full-width dropdown that lists every tab
-               grouped by category — nothing hidden, one tap to jump. */}
-          <Select value={activeTab} onValueChange={handleTabChange}>
-            <SelectTrigger className="h-11 w-full bg-sidebar text-sidebar-foreground ring-offset-sidebar sm:hidden">
-              <SelectValue placeholder="Select a master list">
-                {(() => {
-                  const current = TABS.find((t) => t.id === activeTab);
-                  if (!current) return null;
-                  const Icon = current.icon;
-                  return (
-                    <span className="flex items-center gap-2">
-                      <Icon className="h-4 w-4 text-signal" />
-                      {current.label}
-                    </span>
-                  );
-                })()}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
+          {/* ── Layout: dropdown (mobile) or two-pane (desktop) ────────────
+               Thirteen reference lists are too many for a horizontal tab bar —
+               every single-row treatment either clipped, distributed, or
+               wrapped awkwardly. So a desktop shows them all in a grouped
+               vertical nav panel (mirroring the app's own dark-bezel
+               sidebar), with the selected table content beside it. A phone
+               gets a grouped dropdown instead. */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
+            {/* ── Mobile: a grouped dropdown picker ──────────────────────── */}
+            <div className="sm:hidden">
+              <Select value={activeTab} onValueChange={handleTabChange}>
+                <SelectTrigger className="h-11 w-full bg-sidebar text-sidebar-foreground ring-offset-sidebar">
+                  <SelectValue placeholder="Select a master list">
+                    {(() => {
+                      const current = TABS.find((t) => t.id === activeTab);
+                      if (!current) return null;
+                      const Icon = current.icon;
+                      return (
+                        <span className="flex items-center gap-2">
+                          <Icon className="h-4 w-4 text-signal" />
+                          {current.label}
+                        </span>
+                      );
+                    })()}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {TAB_GROUPS.map((group) => (
+                    <SelectGroup key={group}>
+                      <SelectLabel>{group}</SelectLabel>
+                      {TABS.filter((t) => t.group === group).map((tab) => {
+                        const Icon = tab.icon;
+                        return (
+                          <SelectItem key={tab.id} value={tab.id}>
+                            <span className="flex items-center gap-2">
+                              <Icon className="h-4 w-4 opacity-70" />
+                              {tab.label}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectGroup>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* ── Desktop: grouped vertical nav panel ──────────────────────
+                 All 13 lists listed under category headers, exactly like the
+                 app's sidebar: dark bezel, selvedge tick on the active row,
+                 signal icon. Hidden on a phone (dropdown above takes over).
+                 The Radix Tabs.List is the wrapper so every Trigger keeps its
+                 RovingFocusGroup context. */}
+            <TabsList
+              className="hidden w-full shrink-0 flex-col items-stretch gap-0.5 rounded-lg border border-sidebar-border bg-sidebar p-2 shadow-sm sm:flex sm:w-60"
+              ref={railRef}
+            >
               {TAB_GROUPS.map((group) => (
-                <SelectGroup key={group}>
-                  <SelectLabel>{group}</SelectLabel>
+                <div key={group} className="contents">
+                  <span
+                    aria-hidden
+                    className="px-3 pt-3 pb-1 text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/45"
+                  >
+                    {group}
+                  </span>
                   {TABS.filter((t) => t.group === group).map((tab) => {
+                    const active = activeTab === tab.id;
                     const Icon = tab.icon;
                     return (
-                      <SelectItem key={tab.id} value={tab.id}>
-                        <span className="flex items-center gap-2">
-                          <Icon className="h-4 w-4 opacity-70" />
-                          {tab.label}
-                        </span>
-                      </SelectItem>
+                      <TabsTrigger
+                        key={tab.id}
+                        value={tab.id}
+                        className={cn(
+                          "flex min-h-9 items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                          active
+                            ? "selvedge bg-sidebar-accent text-sidebar-accent-foreground [&_svg]:text-signal"
+                            : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+                        )}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        {tab.label}
+                      </TabsTrigger>
                     );
                   })}
-                </SelectGroup>
+                </div>
               ))}
-            </SelectContent>
-          </Select>
+            </TabsList>
 
-          {/* ── Desktop (sm+): a grouped, wrapping rail ───────────────────
-               13 labelled pills + group captions can't sit on one row inside
-               the max-w-7xl content column (they need ~1600px vs ~1100px
-               available), so a single-row rail either stretched them thin or
-               hid the right-hand tabs behind a scroll. Instead, let the pills
-               wrap onto a second (occasionally third) tidy row — every tab is
-               always visible, none distributed, none clipped. The Radix
-               Tabs.List stays the wrapper so every Trigger keeps its
-               RovingFocusGroup context. Hidden on a phone (the dropdown above
-               takes over). */}
-          <TabsList
-            className="hidden w-full flex-wrap items-center gap-x-1 gap-y-2 rounded-lg border border-sidebar-border bg-sidebar p-2 shadow-sm sm:flex [&::-webkit-scrollbar]:hidden"
-            ref={railRef}
-          >
-            {TAB_GROUPS.map((group, gi) => (
-              <div key={group} className="contents">
-                {/* Hairline + uppercase caption separates each group, tight to
-                    the group it precedes (never stretched, never hidden). */}
-                <span
-                  aria-hidden
-                  className={cn(
-                    "flex items-center self-stretch text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/45 sm:ml-2 sm:mr-0 sm:border-l sm:border-sidebar-border sm:pl-3",
-                    gi === 0 && "hidden"
-                  )}
-                >
-                  {group}
-                </span>
-                {TABS.filter((t) => t.group === group).map((tab) => {
-                  const active = activeTab === tab.id;
-                  const Icon = tab.icon;
-                  return (
-                    <TabsTrigger
-                      key={tab.id}
-                      value={tab.id}
-                      className={cn(
-                        "flex h-10 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full px-3 text-[0.8125rem] font-medium transition-colors sm:px-3.5",
-                        active
-                          ? "selvedge-top bg-sidebar-accent text-sidebar-accent-foreground [&_svg]:text-signal"
-                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
-                      )}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      {tab.short}
-                    </TabsTrigger>
-                  );
-                })}
-              </div>
-            ))}
-          </TabsList>
-
-          <TabsContent value="transaction-type" className="mt-4"><TransactionTypeTab /></TabsContent>
-          <TabsContent value="job" className="mt-4"><JobTab /></TabsContent>
-          <TabsContent value="party" className="mt-4"><PartyTab /></TabsContent>
-          <TabsContent value="machine" className="mt-4"><MachineTab /></TabsContent>
-          <TabsContent value="location" className="mt-4"><LocationTab /></TabsContent>
-          <TabsContent value="yarn-type" className="mt-4"><YarnTypeTab /></TabsContent>
-          <TabsContent value="yarn-count" className="mt-4"><YarnCountTab /></TabsContent>
-          <TabsContent value="yarn-brand" className="mt-4"><YarnBrandTab /></TabsContent>
-          <TabsContent value="uom" className="mt-4"><UomTab /></TabsContent>
-          <TabsContent value="fabric-type" className="mt-4"><FabricTypeTab /></TabsContent>
-          <TabsContent value="department" className="mt-4"><DepartmentTab /></TabsContent>
-          <TabsContent value="employee" className="mt-4"><EmployeeTab /></TabsContent>
-          <TabsContent value="configuration" className="mt-4"><ConfigurationTab /></TabsContent>
+            {/* ── Content column ─────────────────────────────────────────── */}
+            <div className="min-w-0 flex-1">
+              <TabsContent value="transaction-type" className="mt-0"><TransactionTypeTab /></TabsContent>
+              <TabsContent value="job" className="mt-0"><JobTab /></TabsContent>
+              <TabsContent value="party" className="mt-0"><PartyTab /></TabsContent>
+              <TabsContent value="machine" className="mt-0"><MachineTab /></TabsContent>
+              <TabsContent value="location" className="mt-0"><LocationTab /></TabsContent>
+              <TabsContent value="yarn-type" className="mt-0"><YarnTypeTab /></TabsContent>
+              <TabsContent value="yarn-count" className="mt-0"><YarnCountTab /></TabsContent>
+              <TabsContent value="yarn-brand" className="mt-0"><YarnBrandTab /></TabsContent>
+              <TabsContent value="uom" className="mt-0"><UomTab /></TabsContent>
+              <TabsContent value="fabric-type" className="mt-0"><FabricTypeTab /></TabsContent>
+              <TabsContent value="department" className="mt-0"><DepartmentTab /></TabsContent>
+              <TabsContent value="employee" className="mt-0"><EmployeeTab /></TabsContent>
+              <TabsContent value="configuration" className="mt-0"><ConfigurationTab /></TabsContent>
+            </div>
+          </div>
         </Tabs>
       </div>
     </Layout>
