@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   FileText, Database, BarChart2, LayoutDashboard, ClipboardList, Wallet,
   ChevronDown, Menu, PanelLeftClose, PanelLeftOpen,
+  Factory, PackageCheck, Truck, HardHat,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -21,6 +22,16 @@ import {
 const navItems = [
   { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
   { href: "/masters",      label: "Master Data",  icon: Database },
+];
+
+// Bottom navigation (mobile) — the four entry points a floor operator reaches
+// for most, surfaced as a thumb-friendly tab bar instead of burying them in
+// the drawer. Mirrors the "Daily Work" group in the desktop sidebar.
+const bottomNavItems = [
+  { href: "/dashboard",        label: "Dashboard",        icon: LayoutDashboard },
+  { href: "/daily-production", label: "Daily Production", icon: Factory },
+  { href: "/yarn-receipts",    label: "Yarn Receipt",     icon: PackageCheck },
+  { href: "/daily-deliveries", label: "Delivery",         icon: Truck },
 ];
 
 const transactionItems = [
@@ -353,11 +364,52 @@ export function Layout({ children }: { children: ReactNode }) {
           </Link>
         </header>
 
-        <main className="flex-1 p-4 md:p-8 w-full max-w-7xl mx-auto print:p-0 print:max-w-none">
+        <main className="flex-1 p-4 pb-20 md:p-8 md:pb-8 w-full max-w-7xl mx-auto print:p-0 print:max-w-none">
           {children}
         </main>
+
+        {/* ── Mobile bottom navigation — a fixed tab bar so the four most-used
+               screens are a thumb-tap away (hidden on desktop / print). ── */}
+        <BottomNav location={location} />
       </div>
     </div>
+  );
+}
+
+// ── Mobile bottom navigation bar ────────────────────────────
+function BottomNav({ location }: { location: string }) {
+  return (
+    <nav
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-sidebar-border bg-sidebar text-sidebar-foreground md:hidden print:hidden"
+      aria-label="Main navigation"
+    >
+      <div
+        className="mx-auto grid max-w-7xl grid-cols-4"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        {bottomNavItems.map(({ href, label, icon: Icon }) => {
+          const active = isItemActive(location, href);
+          return (
+            <Link key={href} href={href}>
+              <span
+                className={cn(
+                  "selvedge-top flex flex-col items-center gap-1 pt-2 pb-2.5 text-[0.625rem] font-medium transition-colors",
+                  active
+                    ? "text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground/55 hover:text-sidebar-accent-foreground"
+                )}
+              >
+                <Icon
+                  className={cn("h-5 w-5", active ? "text-signal" : "opacity-80")}
+                  strokeWidth={active ? 2.25 : 2}
+                />
+                {label}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
