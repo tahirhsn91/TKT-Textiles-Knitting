@@ -80,7 +80,7 @@ import { useRef } from "react";
 import { Layout } from "@/components/layout";
 import { MasterTable } from "@/components/master-table";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -178,13 +178,18 @@ export default function MastersPage() {
               touch targets; group captions appear as markers inside the rail,
               and picking a tab scrolls it into view so the active one is never
               hidden off-screen. */}
-          <div className="sm:rounded-lg sm:border sm:border-sidebar-border sm:bg-sidebar sm:px-2 sm:py-2 sm:shadow-sm">
-            <div className="flex items-stretch gap-1 overflow-x-auto px-4 sm:px-0 [&::-webkit-scrollbar]:hidden" ref={railRef}>
+          <TabsList
+            // The Radix Tabs.List must wrap every Trigger (it provides the
+            // RovingFocusGroup context Triggers depend on) — so it doubles as
+            // the scrollable rail, with the bezel + grouping applied around it.
+            className="-mx-4 flex h-auto w-auto max-w-none items-stretch gap-1 overflow-x-auto px-4 sm:mx-0 sm:w-full sm:flex-wrap sm:gap-0 sm:overflow-visible sm:rounded-lg sm:border sm:border-sidebar-border sm:bg-sidebar sm:p-2 sm:shadow-sm [&::-webkit-scrollbar]:hidden"
+            ref={railRef}
+          >
               {TAB_GROUPS.map((group, gi) => (
                 <div key={group} className="contents">
-                  {/* Group caption — a small sticky marker in the mobile
-                      scroll rail; on desktop it becomes a hairline + label
-                      that separates the groups inside the bar. */}
+                  {/* Group caption — a compact marker in the mobile scroll
+                      rail; on desktop it becomes a hairline + label that
+                      separates the groups inside the bar. */}
                   <span
                     aria-hidden
                     className={cn(
@@ -218,8 +223,7 @@ export default function MastersPage() {
                   })}
                 </div>
               ))}
-            </div>
-          </div>
+            </TabsList>
 
           <TabsContent value="transaction-type" className="mt-4"><TransactionTypeTab /></TabsContent>
           <TabsContent value="job" className="mt-4"><JobTab /></TabsContent>
