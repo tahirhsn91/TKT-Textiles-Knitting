@@ -75,11 +75,13 @@ import {
   getListEmployeeMasterQueryKey,
   getListDepartmentMasterQueryKey,
 } from "@workspace/api-client-react";
-import { X } from "lucide-react";
+import { X, Tag, Briefcase, Building2, Cog, MapPin, SwatchBook, Hash, BadgeCheck, Ruler, Layers, Users, Scissors, Settings2 } from "lucide-react";
+import { useRef } from "react";
 import { Layout } from "@/components/layout";
 import { MasterTable } from "@/components/master-table";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -102,6 +104,38 @@ function useInvalidateBoth() {
 // Each tab's data is fetched inside its own child component. Because Radix
 // unmounts inactive TabsContent, a tab's list/CRUD queries only fire once the
 // user actually navigates to that tab — not all at once on page load.
+// ─── Tab metadata ──────────────────────────────────────────────────────────
+// One source of truth for the 13 master-data tabs. Each carries an icon and a
+// group so the menu strip can render a grouped rail instead of a flat wall of
+// thirteen text pills — on a phone that is a horizontally scrollable icon rail,
+// on desktop a sticky bar with hairline group separators.
+const TABS = [
+  { id: "transaction-type", label: "Transaction Type", short: "Trans. Type", icon: Tag, group: "Operations" },
+  { id: "job",               label: "Job Types",       short: "Job Types",   icon: Briefcase, group: "Operations" },
+  { id: "party",             label: "Parties",         short: "Parties",     icon: Building2, group: "Operations" },
+  { id: "machine",           label: "Machines",        short: "Machines",    icon: Cog, group: "Operations" },
+  { id: "location",          label: "Locations",       short: "Locations",   icon: MapPin, group: "Operations" },
+  { id: "department",        label: "Departments",     short: "Depts",       icon: Layers, group: "Operations" },
+  { id: "employee",          label: "Employees",       short: "Employees",   icon: Users, group: "Operations" },
+  { id: "yarn-type",         label: "Yarn Type",       short: "Yarn Type",   icon: SwatchBook, group: "Yarn" },
+  { id: "yarn-count",        label: "Yarn Count",      short: "Yarn Count",  icon: Hash, group: "Yarn" },
+  { id: "yarn-brand",        label: "Yarn Brand",      short: "Yarn Brand",  icon: BadgeCheck, group: "Yarn" },
+  { id: "uom",               label: "UOM",             short: "UOM",         icon: Ruler, group: "Yarn" },
+  { id: "fabric-type",       label: "Fabric Type",     short: "Fabric",      icon: Scissors, group: "Product" },
+  { id: "configuration",     label: "Configuration",   short: "Config",      icon: Settings2, group: "System" },
+];
+
+const TAB_IDS = TABS.map((t) => t.id);
+// Ordered distinct groups, in display order.
+const TAB_GROUPS = Array.from(new Set(TABS.map((t) => t.group)));
+// Compact captions used as markers inside the mobile scroll rail.
+const GROUP_CAPTIONS: Record<string, string> = {
+  Operations: "OPS",
+  Yarn: "YARN",
+  Product: "PROD",
+  System: "SYS",
+};
+
 export default function MastersPage() {
   // Active tab lives in the URL hash (#machines) so a refresh lands back on
   // the same tab and a tab is shareable/deep-linkable. Falls back to the
@@ -110,6 +144,9 @@ export default function MastersPage() {
     const fromHash = window.location.hash.replace(/^#\/?/, "");
     return TAB_IDS.includes(fromHash) ? fromHash : "transaction-type";
   });
+  // The scrollable rail on mobile — scrolled so the active tab is always in
+  // view after a change (or on first paint from a deep link / refresh).
+  const railRef = useRef<HTMLDivElement>(null);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -134,26 +171,55 @@ export default function MastersPage() {
         </header>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} defaultValue="transaction-type">
-          {/* -mx-* + px-* lets the tab strip bleed to the screen edge and scroll
-              horizontally instead of wrapping twelve triggers into a multi-row
-              block that pushes the table off the fold. On desktop the triggers
-              grow equally (flex-1) so the strip spans the full width edge to
-              edge; on a phone it stays a scrollable single row. */}
-          <TabsList className="-mx-4 flex h-auto w-auto max-w-none justify-start gap-1 overflow-x-auto px-4 sm:mx-0 sm:w-full sm:px-2 [&::-webkit-scrollbar]:hidden">
-            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="transaction-type">Transaction Type</TabsTrigger>
-            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="job">Job Types</TabsTrigger>
-            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="party">Parties</TabsTrigger>
-            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="machine">Machines</TabsTrigger>
-            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="location">Locations</TabsTrigger>
-            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="yarn-type">Yarn Type</TabsTrigger>
-            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="yarn-count">Yarn Count</TabsTrigger>
-            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="yarn-brand">Yarn Brand</TabsTrigger>
-            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="uom">UOM</TabsTrigger>
-            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="fabric-type">Fabric Type</TabsTrigger>
-            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="department">Departments</TabsTrigger>
-            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="employee">Employees</TabsTrigger>
-            <TabsTrigger className="sm:flex-1 sm:whitespace-nowrap" value="configuration">Configuration</TabsTrigger>
-          </TabsList>
+          {/* Menu strip: a grouped rail of all 13 master-data tabs. On desktop
+              (sm+) it's a full-width bar whose groups are separated by hairline
+              rules + tiny uppercase captions — no more wall of text. On a phone
+              it's a single horizontally scrollable row of icon pills with 44px
+              touch targets; group captions appear as markers inside the rail,
+              and picking a tab scrolls it into view so the active one is never
+              hidden off-screen. */}
+          <div className="sm:rounded-lg sm:border sm:border-sidebar-border sm:bg-sidebar sm:px-2 sm:py-2 sm:shadow-sm">
+            <div className="flex items-stretch gap-1 overflow-x-auto px-4 sm:px-0 [&::-webkit-scrollbar]:hidden" ref={railRef}>
+              {TAB_GROUPS.map((group, gi) => (
+                <div key={group} className="contents">
+                  {/* Group caption — a small sticky marker in the mobile
+                      scroll rail; on desktop it becomes a hairline + label
+                      that separates the groups inside the bar. */}
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "flex items-center self-stretch text-[0.5625rem] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/45",
+                      gi > 0 && "sm:ml-1 sm:border-l sm:border-sidebar-border sm:pl-2"
+                    )}
+                  >
+                    <span className="sm:hidden">{GROUP_CAPTIONS[group] ?? group}</span>
+                    <span className="hidden sm:inline">{group}</span>
+                  </span>
+                  {TABS.filter((t) => t.group === group).map((tab) => {
+                    const active = activeTab === tab.id;
+                    const Icon = tab.icon;
+                    return (
+                      <TabsTrigger
+                        key={tab.id}
+                        value={tab.id}
+                        className={cn(
+                          // Mobile: icon + short label pill, 44px touch target.
+                          "flex h-11 shrink-0 flex-col items-center justify-center gap-1 rounded-md px-3 text-xs font-medium transition-colors sm:h-10 sm:flex-1 sm:flex-row sm:gap-2 sm:rounded-full sm:px-3 sm:text-[0.8125rem]",
+                          active
+                            ? "selvedge-top bg-sidebar-accent text-sidebar-accent-foreground [&_svg]:text-signal"
+                            : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+                        )}
+                        onClick={() => railRef.current?.querySelector(`[data-value="${tab.id}"]`)?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" })}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span className="leading-none">{tab.short}</span>
+                      </TabsTrigger>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
 
           <TabsContent value="transaction-type" className="mt-4"><TransactionTypeTab /></TabsContent>
           <TabsContent value="job" className="mt-4"><JobTab /></TabsContent>
@@ -173,23 +239,6 @@ export default function MastersPage() {
     </Layout>
   );
 }
-
-// Every tab id, for validating the URL hash on load.
-const TAB_IDS = [
-  "transaction-type",
-  "job",
-  "party",
-  "machine",
-  "location",
-  "yarn-type",
-  "yarn-count",
-  "yarn-brand",
-  "uom",
-  "fabric-type",
-  "department",
-  "employee",
-  "configuration",
-];
 
 // ─── Transaction Type ───────────────────────────────────────────────────────
 function TransactionTypeTab() {
