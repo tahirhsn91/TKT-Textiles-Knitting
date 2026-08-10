@@ -143,7 +143,9 @@ This is a starting point. Add your own conventions, style, and rules as you figu
 
 ## Start-of-Task Sync (set 2026-08-10)
 
-- Whenever the user says they have a new task (or asks to start one), FIRST `git checkout develop` and pull the latest (`git fetch origin` then fast-forward/reset local `develop` to `origin/develop`) before doing any work. If `origin/develop` was force-updated (Backup Bot rebase), reset local to match remote after confirming nothing local is unique. Only then create the feature branch for the new task.
+- **This applies in the dev environment only.** In the dev environment, whenever the user says they have a new task (or asks to start one) — and at the start of a new session — FIRST `git checkout develop` and pull the latest (`git fetch origin` then fast-forward/reset local `develop` to `origin/develop`) before doing any work. If `origin/develop` was force-updated (Backup Bot rebase), reset local to match remote after confirming nothing local is unique. Only then create the feature branch for the new task.
+- **If it is NOT the dev environment**, do not auto-checkout/pull `develop`; just start the new session normally.
+- How to tell: the dev stack shows the fixed red "Development environment" banner (Vite `import.meta.env.DEV`), runs from this `develop`-tracking workspace at `~/project/TKT-Textiles-Knitting`, and uses the dev Docker compose/`.env`. When unsure whether the current environment is dev, ask before syncing.
 
 ## Core Rules
 
