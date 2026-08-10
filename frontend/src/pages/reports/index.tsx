@@ -187,10 +187,32 @@ const GROUP_BY_OPTIONS: { value: GroupByKey; label: string }[] = [
   { value: "uomName",             label: "UOM" },
 ];
 
+/**
+ * Recharts writes colours as SVG presentation attributes, where var() does not
+ * resolve — so these literals mirror the light-mode chart tokens in index.css
+ * (the "dye lot" ramp). Keep them in step if the tokens move. Signal (#FF3C00)
+ * sits last so it only surfaces when a series count actually demands it.
+ */
 const CHART_COLORS = [
-  "#2563eb", "#16a34a", "#dc2626", "#d97706", "#7c3aed",
-  "#0891b2", "#be185d", "#65a30d", "#ea580c", "#6d28d9",
+  "#2A4C7A", "#627C50", "#C8891E", "#AB3F4C", "#FF3C00",
+  "#4E729E", "#87A173", "#E0AC55", "#C97682", "#FF7A4D",
 ];
+
+/* Chart chrome mirrors the dashboard's instrument voice: machine-grey mono
+ * ticks, a rule-coloured grid, and a card-surface tooltip. Recharts writes
+ * these as SVG presentation attributes where var() will not resolve, so the
+ * literals track the light-mode tokens in index.css. */
+const CHART_MACHINE = "#656E5E";
+const CHART_RULE    = "#DFE2DA";
+const axisTick = { fontSize: 11, fill: CHART_MACHINE, fontFamily: "var(--app-font-mono)" };
+const chartTooltipStyle = {
+  background: "#FFFFFF",
+  border: `1px solid ${CHART_RULE}`,
+  borderRadius: 3,
+  fontSize: 12,
+  fontFamily: "var(--app-font-mono)",
+  padding: "6px 10px",
+} as const;
 
 const MONTHS = [
   "January","February","March","April","May","June",
@@ -591,7 +613,7 @@ export default function ReportsPage() {
         ["Total", "", "", rows.length, fmt(totalQty), fmt(totalNetWt), fmt(totalWastageWt), fmt(openingBalance + totalNetWt)],
       ],
       styles: { fontSize: 9 },
-      headStyles: { fillColor: [37, 99, 235] },
+      headStyles: { fillColor: [42, 76, 122] },
       foot: [],
     });
     doc.save("report-summary.pdf");
@@ -653,13 +675,13 @@ export default function ReportsPage() {
       head: [headers],
       body: [obRow, ...bodyRows, grandRow],
       styles: { fontSize: 7 },
-      headStyles: { fillColor: [37, 99, 235] },
+      headStyles: { fillColor: [42, 76, 122] },
       didParseCell: (data) => {
         const label =
           Array.isArray(data.row.raw) ? data.row.raw[0]?.toString() ?? "" : "";
         if (data.section === "body" && label === "Grand Total") {
           data.cell.styles.fontStyle = "bold";
-          data.cell.styles.fillColor = [220, 230, 255];
+          data.cell.styles.fillColor = [237, 238, 233];
         }
       },
     });
@@ -992,7 +1014,7 @@ export default function ReportsPage() {
             </div>
 
             <div className="flex items-center gap-2 pt-1">
-              <Button onClick={runReport} disabled={isFetching} size="sm">
+              <Button onClick={runReport} disabled={isFetching} size="sm" className="btn-signal">
                 {isFetching ? "Loading..." : "Run Report"}
               </Button>
               <Button variant="outline" size="sm" onClick={resetFilters}>Reset</Button>
@@ -1009,22 +1031,22 @@ export default function ReportsPage() {
           <>
             {/* Totals summary bar */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Card>
+              <Card className="selvedge-top">
                 <CardContent className="pt-4 pb-3">
-                  <p className="text-xs text-muted-foreground">Total Rows</p>
-                  <p className="text-2xl font-semibold">{rows.length.toLocaleString()}</p>
+                  <p className="eyebrow">Total Rows</p>
+                  <p className="num mt-1 text-2xl font-semibold">{rows.length.toLocaleString()}</p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="selvedge-top">
                 <CardContent className="pt-4 pb-3">
-                  <p className="text-xs text-muted-foreground">Total Qty</p>
-                  <p className="text-2xl font-semibold">{fmt(totalQty)}</p>
+                  <p className="eyebrow">Total Qty</p>
+                  <p className="num mt-1 text-2xl font-semibold">{fmt(totalQty)}</p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="selvedge-top">
                 <CardContent className="pt-4 pb-3">
-                  <p className="text-xs text-muted-foreground">Running Total</p>
-                  <p className="text-2xl font-semibold">{fmt(openingBalance + totalNetWt)}</p>
+                  <p className="eyebrow">Running Total</p>
+                  <p className={`num mt-1 text-2xl font-semibold ${(openingBalance + totalNetWt) < 0 ? "text-destructive" : ""}`}>{fmt(openingBalance + totalNetWt)}</p>
                 </CardContent>
               </Card>
             </div>
@@ -1180,7 +1202,7 @@ export default function ReportsPage() {
                           <TableCell />
                           <TableCell />
                           <TableCell />
-                          <TableCell className={`text-right whitespace-nowrap font-semibold not-italic ${openingBalance < 0 ? "text-red-600" : "text-blue-700"}`}>
+                          <TableCell className={`num text-right whitespace-nowrap font-semibold not-italic ${openingBalance < 0 ? "text-destructive" : "text-foreground"}`}>
                             {fmt(openingBalance)}
                           </TableCell>
                         </TableRow>
@@ -1193,26 +1215,26 @@ export default function ReportsPage() {
                             <TableCell className="text-xs text-muted-foreground whitespace-nowrap max-w-[180px] truncate" title={r.refs.join(", ")}>
                               {abbrev(r.refs)}
                             </TableCell>
-                            <TableCell className="text-right">{r.count}</TableCell>
-                            <TableCell className="text-right">{fmt(r.qty)}</TableCell>
-                            <TableCell className="text-right">{fmt(r.netWt)}</TableCell>
-                            <TableCell className="text-right text-muted-foreground">
+                            <TableCell className="num text-right">{r.count}</TableCell>
+                            <TableCell className="num text-right">{fmt(r.qty)}</TableCell>
+                            <TableCell className="num text-right">{fmt(r.netWt)}</TableCell>
+                            <TableCell className="num text-right text-muted-foreground">
                               {r.wastageWt !== 0 ? fmt(r.wastageWt) : "—"}
                             </TableCell>
-                            <TableCell className={`text-right whitespace-nowrap font-semibold ${summaryRunningTotals[i] < 0 ? "text-red-600" : "text-blue-700"}`}>
+                            <TableCell className={`num text-right whitespace-nowrap font-semibold ${summaryRunningTotals[i] < 0 ? "text-destructive" : "text-foreground"}`}>
                               {fmt(summaryRunningTotals[i])}
                             </TableCell>
                           </TableRow>
                         ))}
-                        <TableRow className="bg-muted/50 font-semibold">
+                        <TableRow className="selvedge bg-muted/60 font-semibold">
                           <TableCell>Total</TableCell>
                           <TableCell />
                           <TableCell />
-                          <TableCell className="text-right">{rows.length}</TableCell>
-                          <TableCell className="text-right">{fmt(totalQty)}</TableCell>
-                          <TableCell className="text-right">{fmt(totalNetWt)}</TableCell>
-                          <TableCell className="text-right">{fmt(totalWastageWt)}</TableCell>
-                          <TableCell className={`text-right whitespace-nowrap ${(openingBalance + totalNetWt) < 0 ? "text-red-600" : "text-blue-700"}`}>
+                          <TableCell className="num text-right">{rows.length}</TableCell>
+                          <TableCell className="num text-right">{fmt(totalQty)}</TableCell>
+                          <TableCell className="num text-right">{fmt(totalNetWt)}</TableCell>
+                          <TableCell className="num text-right">{fmt(totalWastageWt)}</TableCell>
+                          <TableCell className={`num text-right whitespace-nowrap ${(openingBalance + totalNetWt) < 0 ? "text-destructive" : "text-foreground"}`}>
                             {fmt(openingBalance + totalNetWt)}
                           </TableCell>
                         </TableRow>
@@ -1228,7 +1250,7 @@ export default function ReportsPage() {
                   <Card className="border-dashed print:hidden">
                     <CardContent className="px-4 py-3">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Show / Hide Columns</span>
+                        <span className="eyebrow">Show / Hide Columns</span>
                         <div className="flex gap-2">
                           <button
                             className="text-xs text-primary hover:underline"
@@ -1287,7 +1309,7 @@ export default function ReportsPage() {
                           {visibleColsList.map((c, i) => {
                             if (c.key === "runningBalance") {
                               return (
-                                <TableCell key={c.key} className={`text-right whitespace-nowrap font-semibold not-italic ${openingBalance < 0 ? "text-red-600" : "text-blue-700"}`}>
+                                <TableCell key={c.key} className={`num text-right whitespace-nowrap font-semibold not-italic ${openingBalance < 0 ? "text-destructive" : "text-foreground"}`}>
                                   {fmt(openingBalance)}
                                 </TableCell>
                               );
@@ -1342,31 +1364,31 @@ export default function ReportsPage() {
                                     return <TableCell key={c.key} className="whitespace-nowrap">{r.employeeName ?? "—"}</TableCell>;
                                   case "quantity":
                                     return (
-                                      <TableCell key={c.key} className={`text-right whitespace-nowrap${neg ? " text-red-600" : ""}`}>
+                                      <TableCell key={c.key} className={`num text-right whitespace-nowrap${neg ? " text-destructive" : ""}`}>
                                         {r.quantity != null ? fmt(signedQty(r)) : "—"}
                                       </TableCell>
                                     );
                                   case "netWt":
                                     return (
-                                      <TableCell key={c.key} className={`text-right whitespace-nowrap${neg ? " text-red-600" : ""}`}>
+                                      <TableCell key={c.key} className={`num text-right whitespace-nowrap${neg ? " text-destructive" : ""}`}>
                                         {r.netWt != null ? fmt(signedNetWt(r)) : "—"}
                                       </TableCell>
                                     );
                                   case "wastagePercent":
                                     return (
-                                      <TableCell key={c.key} className="text-right whitespace-nowrap text-amber-700">
+                                      <TableCell key={c.key} className="num text-right whitespace-nowrap text-[hsl(var(--chart-3))]">
                                         {wWt !== 0 ? `${r.partyWastePercent ?? "—"}%` : "—"}
                                       </TableCell>
                                     );
                                   case "wastageWt":
                                     return (
-                                      <TableCell key={c.key} className={`text-right whitespace-nowrap${wWt < 0 ? " text-red-500" : wWt > 0 ? " text-amber-700" : ""}`}>
+                                      <TableCell key={c.key} className={`num text-right whitespace-nowrap${wWt < 0 ? " text-destructive" : wWt > 0 ? " text-[hsl(var(--chart-3))]" : ""}`}>
                                         {wWt !== 0 ? fmt(wWt) : "—"}
                                       </TableCell>
                                     );
                                   case "runningBalance":
                                     return (
-                                      <TableCell key={c.key} className={`text-right whitespace-nowrap font-medium${bal < 0 ? " text-red-600" : " text-blue-700"}`}>
+                                      <TableCell key={c.key} className={`num text-right whitespace-nowrap font-medium${bal < 0 ? " text-destructive" : " text-foreground"}`}>
                                         {fmt(bal)}
                                       </TableCell>
                                     );
@@ -1379,11 +1401,11 @@ export default function ReportsPage() {
                         })}
 
                         {/* Grand Total row */}
-                        <TableRow className="bg-blue-50 font-bold border-t-2 text-blue-900">
+                        <TableRow className="selvedge bg-muted/60 font-bold border-t-2">
                           {visibleColsList.map((c, ci) => {
                             if (ci === 0) return <TableCell key={c.key} className="whitespace-nowrap">Grand Total</TableCell>;
-                            if (c.key === "netWt")    return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(totalDisplayNetWt)}</TableCell>;
-                            if (c.key === "wastageWt") return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(totalWastageWt)}</TableCell>;
+                            if (c.key === "netWt")    return <TableCell key={c.key} className="num text-right whitespace-nowrap">{fmt(totalDisplayNetWt)}</TableCell>;
+                            if (c.key === "wastageWt") return <TableCell key={c.key} className="num text-right whitespace-nowrap">{fmt(totalWastageWt)}</TableCell>;
                             return <TableCell key={c.key} />;
                           })}
                         </TableRow>
@@ -1494,15 +1516,15 @@ function ChartSection({ rows, dateRange }: { rows: ReportRow[]; dateRange: strin
       {byMonth.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Net Wt by Month</CardTitle>
+            <CardTitle className="text-sm font-semibold">Net Wt by Month</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={byMonth} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => fmt(v)} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_RULE} />
+                <XAxis dataKey="month" tick={axisTick} />
+                <YAxis tick={axisTick} />
+                <Tooltip formatter={(v: number) => fmt(v)} contentStyle={chartTooltipStyle} />
                 <Legend />
                 <Bar dataKey="netWt" name="Net Wt" fill={CHART_COLORS[1]} />
               </BarChart>
@@ -1515,15 +1537,15 @@ function ChartSection({ rows, dateRange }: { rows: ReportRow[]; dateRange: strin
       {byMachine.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Net Wt by Machine</CardTitle>
+            <CardTitle className="text-sm font-semibold">Net Wt by Machine</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={byMachine} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => fmt(v)} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_RULE} />
+                <XAxis dataKey="name" tick={axisTick} />
+                <YAxis tick={axisTick} />
+                <Tooltip formatter={(v: number) => fmt(v)} contentStyle={chartTooltipStyle} />
                 <Bar dataKey="netWt" name="Net Wt" fill={CHART_COLORS[2]}>
                   {byMachine.map((_, i) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
@@ -1539,15 +1561,15 @@ function ChartSection({ rows, dateRange }: { rows: ReportRow[]; dateRange: strin
       {byParty.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Net Wt by Party</CardTitle>
+            <CardTitle className="text-sm font-semibold">Net Wt by Party</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={byParty} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => fmt(v)} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_RULE} />
+                <XAxis dataKey="name" tick={axisTick} />
+                <YAxis tick={axisTick} />
+                <Tooltip formatter={(v: number) => fmt(v)} contentStyle={chartTooltipStyle} />
                 <Legend />
                 <Bar dataKey="netWt" name="Net Wt" fill={CHART_COLORS[4]} />
               </BarChart>
@@ -1561,7 +1583,7 @@ function ChartSection({ rows, dateRange }: { rows: ReportRow[]; dateRange: strin
         {byYarnCount.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Net Wt by Yarn Count</CardTitle>
+              <CardTitle className="text-sm font-semibold">Net Wt by Yarn Count</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={240}>
@@ -1580,7 +1602,7 @@ function ChartSection({ rows, dateRange }: { rows: ReportRow[]; dateRange: strin
                       <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number) => fmt(v)} />
+                  <Tooltip formatter={(v: number) => fmt(v)} contentStyle={chartTooltipStyle} />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
@@ -1591,7 +1613,7 @@ function ChartSection({ rows, dateRange }: { rows: ReportRow[]; dateRange: strin
         {byTransactionType.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Net Wt by Transaction Type</CardTitle>
+              <CardTitle className="text-sm font-semibold">Net Wt by Transaction Type</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={240}>
@@ -1610,7 +1632,7 @@ function ChartSection({ rows, dateRange }: { rows: ReportRow[]; dateRange: strin
                       <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number) => fmt(v)} />
+                  <Tooltip formatter={(v: number) => fmt(v)} contentStyle={chartTooltipStyle} />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
