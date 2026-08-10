@@ -10,6 +10,7 @@ import {
   partyMasterTable,
 } from "../db/index.js";
 import { isReconciliationLockEnabled } from "../lib/reconciliation-lock.js";
+import { retrainAfterInsert } from "../lib/plausibility/engine.js";
 
 const router: IRouter = Router();
 
@@ -283,6 +284,9 @@ router.post("/daily-production", async (req, res): Promise<void> => {
 
       return { ...header, rolls: detailRows };
     });
+
+    // Self-tuning: fold the new rolls into the learned baseline. Non-fatal.
+    await retrainAfterInsert("production");
 
     res.status(201).json(result);
   } catch (err) {

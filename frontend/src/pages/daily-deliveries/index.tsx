@@ -42,6 +42,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Layout } from "@/components/layout";
+import { PlausibilityListBanner } from "@/components/plausibility-warning";
+import { usePlausibilityList } from "@/hooks/use-plausibility-list";
 import { useToast } from "@/hooks/use-toast";
 
 const COLUMN_COUNT = 7;
@@ -65,6 +67,12 @@ export default function DailyDeliveryList() {
   const [pendingDelete, setPendingDelete] = useState<DailyDeliveryRow | null>(null);
 
   const { data, isLoading, isFetching } = useGetDailyDeliveriesSummary(date);
+
+  // Plausibility check over this date's unreconciled deliveries.
+  const { data: plausibility } = usePlausibilityList("delivery", {
+    dateFrom: date,
+    dateTo: date,
+  });
   const deleteDelivery = useDeleteDailyDelivery();
 
   const { sorted: rows, sort, toggleSort } = useSort(data?.rows, {
@@ -201,7 +209,14 @@ export default function DailyDeliveryList() {
             <TabsTrigger value="entries">Entries</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
-          <TabsContent value="entries" className="mt-4">
+          <TabsContent value="entries" className="mt-4 space-y-3">
+        {plausibility && (
+          <PlausibilityListBanner
+            abnormalCount={plausibility.abnormalCount}
+            totalChecked={plausibility.totalChecked}
+            noun="deliveries"
+          />
+        )}
         <Card className="overflow-hidden">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-3.5">
             <h2 className="text-sm font-semibold text-foreground">Daily deliveries</h2>

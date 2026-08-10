@@ -9,6 +9,7 @@ import {
   insertDailyDeliverySchema,
 } from "../db/index.js";
 import { isReconciliationLockEnabled } from "../lib/reconciliation-lock.js";
+import { retrainAfterInsert } from "../lib/plausibility/engine.js";
 
 const router: IRouter = Router();
 
@@ -259,6 +260,9 @@ router.post("/daily-deliveries", async (req, res): Promise<void> => {
       createdBy,
     })
     .returning({ id: dailyDeliveryTable.id });
+
+  // Self-tuning: fold the new delivery into the learned baseline. Non-fatal.
+  await retrainAfterInsert("delivery");
 
   res.status(201).json({ id: row.id });
 });

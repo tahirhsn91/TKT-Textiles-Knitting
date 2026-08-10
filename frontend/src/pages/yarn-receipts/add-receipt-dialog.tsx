@@ -40,6 +40,13 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
+import { PlausibilityWarnings } from "@/components/plausibility-warning";
+import {
+  validateDailyEntry,
+  recordPlausibilityFeedback,
+  warningsToFeedback,
+  type PlausibilityWarning,
+} from "@/lib/plausibility";
 
 const LS_ENTERED_BY = "yarn-receipt-entered-by";
 
@@ -125,6 +132,11 @@ export function YarnReceiptDialog({
   const [lines, setLines] = useState<LineRow[]>([]);
   const [lineError, setLineError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<"save" | "saveAndAdd" | null>(null);
+  // Plausibility (warn-only): abnormal net weights / bag ratios require a
+  // deliberate second confirmation before saving.
+  const [plausWarnings, setPlausWarnings] = useState<PlausibilityWarning[]>([]);
+  const [plausConfirmed, setPlausConfirmed] = useState(false);
+  const [validating, setValidating] = useState(false);
 
   const prefilledFor = useRef<number | null | undefined>(undefined);
 
@@ -193,6 +205,12 @@ export function YarnReceiptDialog({
   const totalQty = lines.reduce((s, l) => s + (parseInt(l.quantity, 10) || 0), 0);
   const totalNetWeight = lines.reduce((s, l) => s + (parseFloat(l.netWeight) || 0), 0);
 
+  // Editing any line invalidates a prior plausibility confirmation.
+  useEffect(() => {
+    setPlausConfirmed(false);
+    setPlausWarnings([]);
+  }, [lines]);
+
   const isBusy = createReceipt.isPending || updateReceipt.isPending;
   const isLoadingReceipt = isEdit && receiptQuery.isLoading;
 
@@ -230,6 +248,32 @@ export function YarnReceiptDialog({
 
     const values = form.getValues();
     try { localStorage.setItem(LS_ENTERED_BY, values.enteredBy); } catch {}
+
+    // ── Plausibility gate (warn-only) ──────────────────────────────────────
+    // Validate each line's net weight, bag count and derived weight-per-bag.
+    // Collect all warnings across lines; first save surfaces them, a second
+    // click confirms.
+    if (!plausConfirmed) {
+      setValidating(true);
+      const all: PlausibilityWarning[] = [];
+      for (const l of lines) {
+        const w = await validateDailyEntry("receipt", {
+          netWeight: parseFloat(l.netWeight),
+          quantity: parseInt(l.quantity, 10),
+        });
+        all.push(...w);
+      }
+      setValidating(false);
+      if (all.length > 0) {
+        setPlausWarnings(all);
+        setPlausConfirmed(true);
+        return;
+      }
+    } else if (plausWarnings.length > 0) {
+      void recordPlausibilityFeedback(
+        warningsToFeedback("receipt", plausWarnings, "confirmed_anyway", values.enteredBy),
+      );
+    }
 
     setPendingAction(keepOpen ? "saveAndAdd" : "save");
 
@@ -632,6 +676,12 @@ export function YarnReceiptDialog({
           </Form>
         </div>
 
+        {!readOnly && plausWarnings.length > 0 && (
+          <div className="border-t bg-background px-4 pt-3 sm:px-6">
+            <PlausibilityWarnings warnings={plausWarnings} />
+          </div>
+        )}
+
         <DialogFooter className="gap-2 border-t bg-background px-4 py-4 sm:px-6">
           {readOnly ? (
             <Button
@@ -659,10 +709,10 @@ export function YarnReceiptDialog({
                   variant="secondary"
                   className="w-full sm:w-auto"
                   onClick={() => doSave(true)}
-                  disabled={isBusy}
+                  disabled={isBusy || validating}
                 >
                   {pendingAction === "saveAndAdd" && <Spinner className="mr-2" />}
-                  Save & Add More
+                  {plausWarnings.length > 0 ? "Save anyway & Add More" : "Save & Add More"}
                 </Button>
               )}
               <Button
@@ -670,10 +720,10 @@ export function YarnReceiptDialog({
                 variant="signal"
                 className="w-full sm:w-auto"
                 onClick={() => doSave(false)}
-                disabled={isBusy || isLoadingReceipt}
+                disabled={isBusy || isLoadingReceipt || validating}
               >
-                {pendingAction === "save" && <Spinner className="mr-2" />}
-                Save
+                {(pendingAction === "save" || validating) && <Spinner className="mr-2" />}
+                {plausWarnings.length > 0 ? "Save anyway" : "Save"}
               </Button>
             </>
           )}

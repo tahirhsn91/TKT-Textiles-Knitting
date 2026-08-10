@@ -10,6 +10,7 @@ import dashboardRouter from "./dashboard.js";
 import dailyProductionRouter from "./daily-production.js";
 import yarnReceiptsRouter from "./yarn-receipts.js";
 import dailyDeliveriesRouter from "./daily-deliveries.js";
+import plausibilityRouter from "./plausibility.js";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(dashboardRouter);
 router.use(dailyProductionRouter);
 router.use(yarnReceiptsRouter);
 router.use(dailyDeliveriesRouter);
+router.use(plausibilityRouter);
 
 export default router;
