@@ -141,6 +141,10 @@ This is a starting point. Add your own conventions, style, and rules as you figu
 - Branch naming: `fix/...`, `feat/...`, `docs/...`, `chore/...` (issue id included when relevant, e.g. `fix/issue-8-rate-limiting`).
 - Merge to `main` only via PR from `develop` (release flow, out of scope for this environment).
 
+## Start-of-Task Sync (set 2026-08-10)
+
+- Whenever the user says they have a new task (or asks to start one), FIRST `git checkout develop` and pull the latest (`git fetch origin` then fast-forward/reset local `develop` to `origin/develop`) before doing any work. If `origin/develop` was force-updated (Backup Bot rebase), reset local to match remote after confirming nothing local is unique. Only then create the feature branch for the new task.
+
 ## Core Rules
 
 - Never work directly on `main` or `develop`. Create a feature branch from `develop` for any change before editing files.
