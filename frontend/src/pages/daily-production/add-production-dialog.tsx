@@ -43,6 +43,13 @@ import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { PlausibilityWarnings } from "@/components/plausibility-warning";
+import {
+  validateDailyEntry,
+  recordPlausibilityFeedback,
+  warningsToFeedback,
+  type PlausibilityWarning,
+} from "@/lib/plausibility";
 
 const LS_ENTERED_BY = "daily-production-entered-by";
 
@@ -143,6 +150,11 @@ export function ProductionEntryDialog({
   const [rollInput, setRollInput] = useState("");
   const [rollError, setRollError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<"save" | "saveAndAdd" | null>(null);
+  // Plausibility (warn-only): when a save surfaces abnormal values we show the
+  // warnings and require a second, deliberate click to proceed.
+  const [plausWarnings, setPlausWarnings] = useState<PlausibilityWarning[]>([]);
+  const [plausConfirmed, setPlausConfirmed] = useState(false);
+  const [validating, setValidating] = useState(false);
 
   const rollInputRef = useRef<HTMLInputElement>(null);
 
@@ -216,6 +228,13 @@ export function ProductionEntryDialog({
 
   const totalWeight = rolls.reduce((s, r) => s + (parseFloat(r.weight) || 0), 0);
 
+  // Any change to the roll list invalidates a prior plausibility confirmation:
+  // the operator may have fixed the flagged value, so re-validate on next save.
+  useEffect(() => {
+    setPlausConfirmed(false);
+    setPlausWarnings([]);
+  }, [rolls]);
+
   const isBusy = createEntry.isPending || updateEntry.isPending;
   const isLoadingEntry = isEdit && entryQuery.isLoading;
 
@@ -240,6 +259,28 @@ export function ProductionEntryDialog({
 
     const values = form.getValues();
     try { localStorage.setItem(LS_ENTERED_BY, values.enteredBy); } catch {}
+
+    // ── Plausibility gate (warn-only) ──────────────────────────────────────
+    // On the first save attempt, validate the roll weights. If anything looks
+    // abnormal, surface the warnings and stop — the operator must click again
+    // to confirm. A second attempt (plausConfirmed) skips straight through and
+    // records that they stood behind the values.
+    if (!plausConfirmed) {
+      setValidating(true);
+      const warnings = await validateDailyEntry("production", {
+        rollWeights: rolls.map((r) => parseFloat(r.weight)).filter((n) => !Number.isNaN(n)),
+      });
+      setValidating(false);
+      if (warnings.length > 0) {
+        setPlausWarnings(warnings);
+        setPlausConfirmed(true);
+        return;
+      }
+    } else if (plausWarnings.length > 0) {
+      void recordPlausibilityFeedback(
+        warningsToFeedback("production", plausWarnings, "confirmed_anyway", values.enteredBy),
+      );
+    }
 
     setPendingAction(keepOpen ? "saveAndAdd" : "save");
 
@@ -590,6 +631,15 @@ export function ProductionEntryDialog({
         </Form>
         </div>
 
+        {/* Plausibility warnings (warn-only): shown just above the footer so the
+            operator sees them right next to the Save action they need to
+            reconsider. */}
+        {!readOnly && plausWarnings.length > 0 && (
+          <div className="border-t bg-background px-4 pt-3 sm:px-6">
+            <PlausibilityWarnings warnings={plausWarnings} />
+          </div>
+        )}
+
         {/* Pinned outside the scroll area so Save stays reachable on a short
             mobile viewport. DialogFooter's base only sets sm:space-x-2, which
             leaves stacked mobile buttons flush against each other — hence the
@@ -621,10 +671,10 @@ export function ProductionEntryDialog({
                   variant="secondary"
                   className="w-full sm:w-auto"
                   onClick={() => doSave(true)}
-                  disabled={isBusy}
+                  disabled={isBusy || validating}
                 >
                   {pendingAction === "saveAndAdd" && <Spinner className="mr-2" />}
-                  Save & Add More
+                  {plausWarnings.length > 0 ? "Save anyway & Add More" : "Save & Add More"}
                 </Button>
               )}
               <Button
@@ -632,10 +682,10 @@ export function ProductionEntryDialog({
                 variant="signal"
                 className="w-full sm:w-auto"
                 onClick={() => doSave(false)}
-                disabled={isBusy || isLoadingEntry}
+                disabled={isBusy || isLoadingEntry || validating}
               >
-                {pendingAction === "save" && <Spinner className="mr-2" />}
-                Save
+                {(pendingAction === "save" || validating) && <Spinner className="mr-2" />}
+                {plausWarnings.length > 0 ? "Save anyway" : "Save"}
               </Button>
             </>
           )}
