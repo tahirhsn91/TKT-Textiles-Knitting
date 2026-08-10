@@ -40,6 +40,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Layout } from "@/components/layout";
 import { useToast } from "@/hooks/use-toast";
+import { PlausibilityListBanner } from "@/components/plausibility-warning";
+import { usePlausibilityList } from "@/hooks/use-plausibility-list";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useReconciledLock } from "@/context/config-context";
 import { ProductionAnalytics } from "./analytics-tab";
@@ -85,6 +87,13 @@ export default function DailyProductionList() {
 
   const { data, isLoading, isFetching } = useGetDailyProductionSummary(date);
   const deleteEntry = useDeleteDailyProduction();
+
+  // Plausibility check over this date's unreconciled entries — powers the
+  // top-of-tab warning banner.
+  const { data: plausibility } = usePlausibilityList("production", {
+    dateFrom: date,
+    dateTo: date,
+  });
 
   const { sorted: rows, sort, toggleSort } = useSort(data?.rows, {
     machineName: (r) => r.machineName,
@@ -235,7 +244,14 @@ export default function DailyProductionList() {
             <TabsTrigger value="entries">Entries</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
-          <TabsContent value="entries" className="mt-4">
+          <TabsContent value="entries" className="mt-4 space-y-3">
+        {plausibility && (
+          <PlausibilityListBanner
+            abnormalCount={plausibility.abnormalCount}
+            totalChecked={plausibility.totalChecked}
+            noun="production entries"
+          />
+        )}
         {/* Entries */}
         <Card className="overflow-hidden">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-3.5">

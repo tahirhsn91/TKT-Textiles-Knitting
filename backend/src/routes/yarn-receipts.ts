@@ -12,6 +12,7 @@ import {
   insertYarnReceiptDetailSchema,
 } from "../db/index.js";
 import { isReconciliationLockEnabled } from "../lib/reconciliation-lock.js";
+import { retrainAfterInsert } from "../lib/plausibility/engine.js";
 
 const router: IRouter = Router();
 
@@ -332,6 +333,9 @@ router.post("/yarn-receipts", async (req, res): Promise<void> => {
     );
     return header;
   });
+
+  // Self-tuning: fold the new lines into the learned baseline. Non-fatal.
+  await retrainAfterInsert("receipt");
 
   res.status(201).json({ id: result.id });
 });

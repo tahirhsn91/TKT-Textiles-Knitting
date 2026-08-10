@@ -33,6 +33,13 @@ import {
 } from "@/components/ui/form";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
+import { PlausibilityWarnings } from "@/components/plausibility-warning";
+import {
+  validateDailyEntry,
+  recordPlausibilityFeedback,
+  warningsToFeedback,
+  type PlausibilityWarning,
+} from "@/lib/plausibility";
 
 const LS_ENTERED_BY = "daily-delivery-entered-by";
 
@@ -105,6 +112,20 @@ export function DailyDeliveryDialog({
 
   const [pendingAction, setPendingAction] = useState<"save" | "saveAndAdd" | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  // Plausibility (warn-only): abnormal net weight / GSM / weight-per-roll needs
+  // a deliberate second confirmation before saving.
+  const [plausWarnings, setPlausWarnings] = useState<PlausibilityWarning[]>([]);
+  const [plausConfirmed, setPlausConfirmed] = useState(false);
+  const [validating, setValidating] = useState(false);
+
+  // Changing any figure that feeds the check invalidates a prior confirmation.
+  const watchedQty = form.watch("quantity");
+  const watchedWt = form.watch("netWeight");
+  const watchedGsm = form.watch("gsm");
+  useEffect(() => {
+    setPlausConfirmed(false);
+    setPlausWarnings([]);
+  }, [watchedQty, watchedWt, watchedGsm]);
 
   const prefilledFor = useRef<number | null | undefined>(undefined);
 
@@ -171,6 +192,26 @@ export function DailyDeliveryDialog({
     }
 
     try { localStorage.setItem(LS_ENTERED_BY, values.enteredBy); } catch {}
+
+    // ── Plausibility gate (warn-only) ──────────────────────────────────────
+    if (!plausConfirmed) {
+      setValidating(true);
+      const warnings = await validateDailyEntry("delivery", {
+        netWeight: wt,
+        quantity: qty,
+        gsm: values.gsm?.trim() ? parseInt(values.gsm, 10) : null,
+      });
+      setValidating(false);
+      if (warnings.length > 0) {
+        setPlausWarnings(warnings);
+        setPlausConfirmed(true);
+        return;
+      }
+    } else if (plausWarnings.length > 0) {
+      void recordPlausibilityFeedback(
+        warningsToFeedback("delivery", plausWarnings, "confirmed_anyway", values.enteredBy),
+      );
+    }
 
     setPendingAction(keepOpen ? "saveAndAdd" : "save");
 
@@ -466,6 +507,12 @@ export function DailyDeliveryDialog({
           </Form>
         </div>
 
+        {!readOnly && plausWarnings.length > 0 && (
+          <div className="border-t bg-background px-4 pt-3 sm:px-6">
+            <PlausibilityWarnings warnings={plausWarnings} />
+          </div>
+        )}
+
         <DialogFooter className="gap-2 border-t bg-background px-4 py-4 sm:px-6">
           {readOnly ? (
             <Button
@@ -493,10 +540,10 @@ export function DailyDeliveryDialog({
                   variant="secondary"
                   className="w-full sm:w-auto"
                   onClick={() => doSave(true)}
-                  disabled={isBusy}
+                  disabled={isBusy || validating}
                 >
                   {pendingAction === "saveAndAdd" && <Spinner className="mr-2" />}
-                  Save & Add More
+                  {plausWarnings.length > 0 ? "Save anyway & Add More" : "Save & Add More"}
                 </Button>
               )}
               <Button
@@ -504,10 +551,10 @@ export function DailyDeliveryDialog({
                 variant="signal"
                 className="w-full sm:w-auto"
                 onClick={() => doSave(false)}
-                disabled={isBusy || isLoadingDelivery}
+                disabled={isBusy || isLoadingDelivery || validating}
               >
-                {pendingAction === "save" && <Spinner className="mr-2" />}
-                Save
+                {(pendingAction === "save" || validating) && <Spinner className="mr-2" />}
+                {plausWarnings.length > 0 ? "Save anyway" : "Save"}
               </Button>
             </>
           )}
