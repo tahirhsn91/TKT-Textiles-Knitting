@@ -81,6 +81,7 @@ import { Layout } from "@/components/layout";
 import { MasterTable } from "@/components/master-table";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MachineAnalyticsView } from "./machine-analytics";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -400,24 +401,35 @@ function MachineTab() {
   const done = () => invalidateBoth(getListMachineMasterCrudQueryKey(), getListMachineMasterQueryKey());
 
   return (
-    <MasterTable
-      title="Machines"
-      description="Knitting machines on the production floor."
-      fields={[
-        { key: "name", label: "Name", placeholder: "e.g. Circular Knitting Machine 1" },
-        { key: "machineNumber", label: "Machine Number", placeholder: "e.g. M-001" },
-        { key: "makingRate", label: "Making Rate", placeholder: "3.75", type: "number", step: "0.01", defaultValue: "3.75" },
-        { key: "needleChangeDate", label: "Needle Change Date", type: "date", defaultValue: new Date().toISOString().slice(0, 10) },
-        { key: "needleBrand", label: "Needle Brand", placeholder: "e.g. Sigma", defaultValue: "Sigma" },
-        { key: "sinkerChangeDate", label: "Sinker Change Date", type: "date", defaultValue: new Date().toISOString().slice(0, 10) },
-        { key: "sinkerBrand", label: "Sinker Brand", placeholder: "e.g. Kohala", defaultValue: "Kohala" },
-      ]}
-      rows={data as never}
-      isLoading={isLoading}
-      onAdd={(d) => new Promise((res, rej) => create.mutate({ data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
-      onUpdate={(id, d) => new Promise((res, rej) => update.mutate({ id, data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
-      onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
-    />
+    <Tabs defaultValue="list">
+      <TabsList>
+        <TabsTrigger value="list">List</TabsTrigger>
+        <TabsTrigger value="analytics">Analytics</TabsTrigger>
+      </TabsList>
+      <TabsContent value="list" className="mt-4">
+        <MasterTable
+          title="Machines"
+          description="Knitting machines on the production floor."
+          fields={[
+            { key: "name", label: "Name", placeholder: "e.g. Circular Knitting Machine 1" },
+            { key: "machineNumber", label: "Machine Number", placeholder: "e.g. M-001" },
+            { key: "makingRate", label: "Making Rate", placeholder: "3.75", type: "number", step: "0.01", defaultValue: "3.75" },
+            { key: "needleChangeDate", label: "Needle Change Date", type: "date", defaultValue: new Date().toISOString().slice(0, 10) },
+            { key: "needleBrand", label: "Needle Brand", placeholder: "e.g. Sigma", defaultValue: "Sigma" },
+            { key: "sinkerChangeDate", label: "Sinker Change Date", type: "date", defaultValue: new Date().toISOString().slice(0, 10) },
+            { key: "sinkerBrand", label: "Sinker Brand", placeholder: "e.g. Kohala", defaultValue: "Kohala" },
+          ]}
+          rows={data as never}
+          isLoading={isLoading}
+          onAdd={(d) => new Promise((res, rej) => create.mutate({ data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+          onUpdate={(id, d) => new Promise((res, rej) => update.mutate({ id, data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+          onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+        />
+      </TabsContent>
+      <TabsContent value="analytics" className="mt-4">
+        <MachineAnalyticsView />
+      </TabsContent>
+    </Tabs>
   );
 }
 

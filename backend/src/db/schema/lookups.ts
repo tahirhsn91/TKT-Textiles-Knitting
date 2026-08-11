@@ -1,4 +1,4 @@
-import { pgTable, text, serial, unique, numeric, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, unique, numeric, integer, timestamp, boolean, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -39,9 +39,9 @@ export const machineMasterTable = pgTable("machine_master", {
   name: text("name").notNull(),
   machineNumber: text("machine_number").notNull().unique(),
   makingRate: numeric("making_rate", { precision: 10, scale: 2 }).default("3.75"),
-  needleChangeDate: text("needle_change_date"),
+  needleChangeDate: date("needle_change_date"),
   needleBrand: text("needle_brand").default("Sigma"),
-  sinkerChangeDate: text("sinker_change_date"),
+  sinkerChangeDate: date("sinker_change_date"),
   sinkerBrand: text("sinker_brand").default("Kohala"),
 });
 export const insertMachineMasterSchema = createInsertSchema(machineMasterTable).omit({ id: true });
