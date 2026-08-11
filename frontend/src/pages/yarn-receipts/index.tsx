@@ -215,6 +215,7 @@ export default function YarnReceiptList() {
             abnormalCount={plausibility.abnormalCount}
             totalChecked={plausibility.totalChecked}
             noun="receipts"
+            combinationFindings={plausibility.combinationFindings}
           />
         )}
         <Card className="overflow-hidden">
