@@ -43,6 +43,36 @@ const shareConfig = {
 const fmtKg = (n: number) => `${n.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`;
 const fmtKgFull = (n: number) => `${n.toLocaleString(undefined, { maximumFractionDigits: 2 })} kg`;
 
+/**
+ * Recharts Pie label renderer: draws the slice's machine name outside the arc
+ * for slices that are large enough to label (>=6%). Returns null otherwise, so
+ * small slices stay unlabelled and the legend carries them.
+ */
+function renderOutsideLabel(props: Record<string, unknown>) {
+  const { cx, cy, midAngle, outerRadius, name, percent } = props as {
+    cx: number; cy: number; midAngle: number; outerRadius: number; name: string; percent: number;
+  };
+  if (percent * 100 < 6) return null;
+  const RADIAN = Math.PI / 180;
+  const radius = (typeof outerRadius === "number" ? outerRadius : 0) + 14;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  return (
+    <text
+      x={x}
+      y={y}
+      textAnchor={x > cx ? "start" : "end"}
+      dominantBaseline="central"
+      fill="currentColor"
+      className="fill-muted-foreground"
+      style={{ fontSize: 11, fontWeight: 600 }}
+    >
+      {name}
+    </text>
+  );
+}
+
+
 function BaselineToggle({
   value,
   onChange,
@@ -119,37 +149,74 @@ function ChartCard({ title, note, children }: { title: string; note?: string; ch
   );
 }
 
-/** Donut with a centre total and a companion legend (colour + name + kg). */
+/** Donut with per-slice machine labels, a centre total, and a companion legend. */
 function ShareChart({ rows }: { rows: { name: string; value: number; zero: boolean }[] }) {
   const total = rows.reduce((s, r) => s + r.value, 0);
   const nonZero = rows.filter((r) => !r.zero);
   const chartData = nonZero.length ? nonZero : rows;
 
+  const reducedMotion =
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
   return (
     <div>
-      <ChartContainer className="w-full" config={shareConfig} style={{ height: CHART_HEIGHT }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-            <Pie
-              data={chartData}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              innerRadius="58%"
-              outerRadius="86%"
-              paddingAngle={1}
-              stroke="hsl(var(--background))"
-              strokeWidth={2}
-              labelLine={false}
-              isAnimationActive={!window.matchMedia("(prefers-reduced-motion: reduce)").matches}
-            />
-            <ChartTooltip
-              content={<ChartTooltipContent formatter={(v) => fmtKgFull(Number(v))} />}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      </ChartContainer>
+      <div className="relative">
+        <ChartContainer className="w-full" config={shareConfig} style={{ height: CHART_HEIGHT }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart margin={{ top: 20, right: 12, bottom: 20, left: 12 }}>
+              
+              {/* Centre total */}
+              <text
+                x="50%"
+                y="47%"
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="fill-foreground"
+                style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--app-font-mono)" }}
+              >
+                {total.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </text>
+              <text
+                x="50%"
+                y="56%"
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="fill-muted-foreground"
+                style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em" }}
+              >
+                kg total
+              </text>
+
+              <Pie
+                data={chartData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius="52%"
+                outerRadius="86%"
+                paddingAngle={1.5}
+                stroke="hsl(var(--background))"
+                strokeWidth={2}
+                isAnimationActive={!reducedMotion}
+                label={(props: Record<string, unknown>) =>
+                  renderOutsideLabel(props)
+                }
+                labelLine
+              >
+                {chartData.map((d, i) => (
+                  <Cell key={d.name} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                ))}
+              </Pie>
+
+              <ChartTooltip
+                content={<ChartTooltipContent formatter={(v) => fmtKgFull(Number(v))} />}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartContainer>
+      </div>
       {/* Legend — the accessible counterpart (colour is never the only cue). */}
       <ul className="mt-2 space-y-1 px-1">
         {rows.map((r, i) => (
