@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db } from "../db/index.js";
 import {
@@ -48,6 +48,27 @@ router.get("/maintenance/machine", async (req, res): Promise<void> => {
     .from(machineMaintenanceTable)
     .where(where);
 
+  // Cost totals over SUBMITTED records only (cancelled rows are not spend).
+  // Day = the selected date; Month = 1st of the month through the selected
+  // date, matching the month-to-date convention on the daily-operation pages.
+  const monthStart = `${date.slice(0, 7)}-01`;
+  const activeStatus = "submitted";
+  const [dayCost] = await db
+    .select({ sum: sql<string>`coalesce(sum(${machineMaintenanceTable.cost}), 0)` })
+    .from(machineMaintenanceTable)
+    .where(and(
+      eq(machineMaintenanceTable.maintenanceDate, date),
+      eq(machineMaintenanceTable.status, activeStatus),
+    ));
+  const [monthCost] = await db
+    .select({ sum: sql<string>`coalesce(sum(${machineMaintenanceTable.cost}), 0)` })
+    .from(machineMaintenanceTable)
+    .where(and(
+      gte(machineMaintenanceTable.maintenanceDate, monthStart),
+      lte(machineMaintenanceTable.maintenanceDate, date),
+      eq(machineMaintenanceTable.status, activeStatus),
+    ));
+
   const rows = await db
     .select({
       id: machineMaintenanceTable.id,
@@ -74,6 +95,8 @@ router.get("/maintenance/machine", async (req, res): Promise<void> => {
     pageSize,
     total,
     rows,
+    dayTotalCost: dayCost?.sum ?? "0",
+    monthToDateCost: monthCost?.sum ?? "0",
   });
 });
 
