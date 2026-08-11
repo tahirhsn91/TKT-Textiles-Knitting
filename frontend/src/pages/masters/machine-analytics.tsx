@@ -365,14 +365,16 @@ export function MachineAnalyticsView() {
   const activeMachines = useMemo(() => rows.filter((r) => r.totalKg > 0).length, [rows]);
   const top = rows.length ? rows[0] : null; // already ranked most -> least by the API
 
+  // Donut follows the same sort as the table (Machine ascending by default),
+  // so chart slices and table rows stay in step.
   const donut = useMemo(
     () =>
-      rows.map((r) => ({
+      sortedRows.map((r) => ({
         name: r.machineNumber,
         value: r.totalKg,
         zero: r.totalKg <= 0,
       })),
-    [rows],
+    [sortedRows],
   );
 
   const skeleton = <Skeleton className="w-full" style={{ height: CHART_HEIGHT }} />;
