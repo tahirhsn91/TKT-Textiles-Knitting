@@ -369,7 +369,7 @@ export default function YarnReceiptList() {
             />
           </TabsContent>
           <TabsContent value="abnormal" className="mt-4">
-            <AbnormalDataTab plausibility={plausibility} noun="receipt" />
+            <AbnormalDataTab plausibility={plausibility} noun="receipt" onOpen={openEdit} />
           </TabsContent>
         </Tabs>
 

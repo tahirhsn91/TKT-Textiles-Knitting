@@ -429,7 +429,7 @@ export default function DailyProductionList() {
             />
           </TabsContent>
           <TabsContent value="abnormal" className="mt-4">
-            <AbnormalDataTab plausibility={plausibility} noun="production entry" />
+            <AbnormalDataTab plausibility={plausibility} noun="production entry" onOpen={openEdit} />
           </TabsContent>
         </Tabs>
       </div>
