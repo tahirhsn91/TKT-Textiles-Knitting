@@ -7,11 +7,12 @@
 // Warn-only and read-only: it never edits data, it just surfaces what the
 // validator flagged so a supervisor can investigate before reconciliation.
 
-import { AlertTriangle, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ShieldCheck, Pencil } from "lucide-react";
 import type { ListValidationResult } from "@/lib/plausibility";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 function fmt(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(3).replace(/\.?0+$/, "");
@@ -28,11 +29,14 @@ function SourceBadge({ source }: { source: "learned" | "hard_cap" }) {
 export function AbnormalDataTab({
   plausibility,
   noun,
+  onOpen,
 }: {
   /** The validator result for this date; null/undefined when unavailable. */
   plausibility: ListValidationResult | null | undefined;
   /** Singular noun for the row type, e.g. "production entry", "receipt", "delivery". */
   noun: string;
+  /** Called with the record id when the user wants to open / fix it in the edit popup. */
+  onOpen?: (id: number) => void;
 }) {
   const rows = plausibility?.rows ?? [];
   const combos = plausibility?.combinationFindings ?? [];
@@ -76,13 +80,16 @@ export function AbnormalDataTab({
                   <TableHead className="eyebrow h-11">Expected range</TableHead>
                   <TableHead className="eyebrow h-11">Source</TableHead>
                   <TableHead className="eyebrow h-11">Reason</TableHead>
+                  {onOpen && <TableHead className="eyebrow h-11 text-right">Action</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((r) =>
-                  r.warnings.map((w) => (
+                  r.warnings.map((w, wi) => (
                     <TableRow key={`${r.id}-${w.field}`} className="hover:bg-transparent">
-                      <TableCell className="px-5 num">{r.id}</TableCell>
+                      {wi === 0 && (
+                        <TableCell className="px-5 num" rowSpan={r.warnings.length}>{r.id}</TableCell>
+                      )}
                       <TableCell className="font-medium text-foreground">{w.label}</TableCell>
                       <TableCell className="num text-signal">{fmt(w.value)}</TableCell>
                       <TableCell className="num text-muted-foreground">
@@ -90,6 +97,20 @@ export function AbnormalDataTab({
                       </TableCell>
                       <TableCell><SourceBadge source={w.source} /></TableCell>
                       <TableCell className="text-xs text-muted-foreground">{w.reason}</TableCell>
+                      {wi === 0 && onOpen && (
+                        <TableCell className="text-right" rowSpan={r.warnings.length}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onOpen(r.id)}
+                            aria-label={`Open ${noun} ${r.id} to fix`}
+                          >
+                            <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                            Fix
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   )),
                 )}

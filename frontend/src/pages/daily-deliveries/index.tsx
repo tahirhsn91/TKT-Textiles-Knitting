@@ -373,7 +373,7 @@ export default function DailyDeliveryList() {
             />
           </TabsContent>
           <TabsContent value="abnormal" className="mt-4">
-            <AbnormalDataTab plausibility={plausibility} noun="delivery" />
+            <AbnormalDataTab plausibility={plausibility} noun="delivery" onOpen={openEdit} />
           </TabsContent>
         </Tabs>
 
