@@ -153,10 +153,10 @@ export default function MachineMaintenanceList() {
           </Button>
         </header>
 
-        {/* Filter strip: date stepper + status toggle */}
+        {/* Filter + totals — one strip: date picker, day total cost, month-to-date. */}
         <Card className="overflow-hidden">
-          <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-[220px_1fr] sm:items-end sm:gap-6 sm:px-5 sm:py-4">
-            <div className="flex flex-col justify-center gap-2">
+          <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-[220px_1fr_1fr] sm:divide-x sm:divide-y-0">
+            <div className="flex flex-col justify-center gap-2 px-5 py-4">
               <label className="eyebrow">Date</label>
               <DateStepper
                 value={date}
@@ -164,32 +164,6 @@ export default function MachineMaintenanceList() {
                 onChange={(d) => { setDate(d); setPage(1); }}
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <label className="eyebrow">Status</label>
-              <div className="inline-flex w-fit rounded-md border border-border bg-muted/40 p-0.5">
-                {(["submitted", "cancelled"] as StatusFilter[]).map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => { setStatus(s); setPage(1); }}
-                    className={
-                      "rounded px-3 py-1.5 text-xs font-medium transition-colors " +
-                      (status === s
-                        ? "selvedge bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground")
-                    }
-                  >
-                    {s === "submitted" ? "Active" : "Cancelled"}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Cost totals — day + month to date, same shape as the daily screens. */}
-        <Card className="overflow-hidden">
-          <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
             <div className="flex items-center gap-4 px-5 py-4">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted">
                 <Wrench className="h-5 w-5 text-muted-foreground" />
@@ -220,6 +194,30 @@ export default function MachineMaintenanceList() {
             </div>
           </div>
         </Card>
+
+        {/* Status toggle — below the date/totals strip. */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-col gap-2">
+            <label className="eyebrow">Status</label>
+            <div className="inline-flex w-fit rounded-md border border-border bg-muted/40 p-0.5">
+              {(["submitted", "cancelled"] as StatusFilter[]).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => { setStatus(s); setPage(1); }}
+                  className={
+                    "rounded px-3 py-1.5 text-xs font-medium transition-colors " +
+                    (status === s
+                      ? "selvedge bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground")
+                  }
+                >
+                  {s === "submitted" ? "Active" : "Cancelled"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
 
         {/* List */}
         <Card className="overflow-hidden">
