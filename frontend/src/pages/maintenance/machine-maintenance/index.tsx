@@ -68,6 +68,7 @@ export default function MachineMaintenanceList() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
   const dateLabel = format(new Date(date + "T00:00:00"), "d MMM yyyy");
+  const monthLabel = format(new Date(date + "T00:00:00"), "MMM yyyy");
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/maintenance/machine"] });
@@ -181,6 +182,40 @@ export default function MachineMaintenanceList() {
                     {s === "submitted" ? "Active" : "Cancelled"}
                   </button>
                 ))}
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Cost totals — day + month to date, same shape as the daily screens. */}
+        <Card className="overflow-hidden">
+          <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+            <div className="flex items-center gap-4 px-5 py-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted">
+                <Wrench className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="min-w-0">
+                <p className="eyebrow">Day total cost</p>
+                <p className="num mt-1 text-xl font-semibold leading-none text-foreground sm:text-2xl">
+                  {Number(data?.dayTotalCost ?? 0).toFixed(2)}
+                </p>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  <span className="num">{total}</span> active maintenance record{total === 1 ? "" : "s"} · {dateLabel}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 px-5 py-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted">
+                <Wrench className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="min-w-0">
+                <p className="eyebrow">Month to date</p>
+                <p className="num mt-1 text-xl font-semibold leading-none text-foreground sm:text-2xl">
+                  {Number(data?.monthToDateCost ?? 0).toFixed(2)}
+                </p>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  total maintenance cost · {monthLabel}
+                </p>
               </div>
             </div>
           </div>
