@@ -9,7 +9,10 @@ import {
   type MachineMaintenanceRow,
 } from "@/hooks/use-machine-maintenance";
 import { MachineMaintenanceDialog } from "./add-machine-maintenance-dialog";
+import { MachineMaintenanceAnalytics } from "./analytics-tab";
 import { useIsMobile } from "@/hooks/use-mobile";
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -215,6 +218,13 @@ export default function MachineMaintenanceList() {
           </div>
         </Card>
 
+        {/* Records / Analytics — same date, two views of the records */}
+        <Tabs defaultValue="records">
+          <TabsList>
+            <TabsTrigger value="records">Records</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          </TabsList>
+          <TabsContent value="records" className="mt-4">
         {/* List */}
         <Card className="overflow-hidden">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-3.5">
@@ -366,6 +376,16 @@ export default function MachineMaintenanceList() {
             )}
           </CardContent>
         </Card>
+          </TabsContent>
+          <TabsContent value="analytics" className="mt-4">
+            <MachineMaintenanceAnalytics
+              rows={rows}
+              monthSeries={data?.monthSeries ?? []}
+              isLoading={isLoading}
+              dateLabel={dateLabel}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
 
       <MachineMaintenanceDialog
