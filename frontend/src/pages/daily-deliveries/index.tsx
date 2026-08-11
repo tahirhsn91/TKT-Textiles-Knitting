@@ -215,6 +215,7 @@ export default function DailyDeliveryList() {
             abnormalCount={plausibility.abnormalCount}
             totalChecked={plausibility.totalChecked}
             noun="deliveries"
+            combinationFindings={plausibility.combinationFindings}
           />
         )}
         <Card className="overflow-hidden">

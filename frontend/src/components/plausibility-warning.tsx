@@ -81,7 +81,7 @@ export function PlausibilityListBanner({
   totalChecked: number;
   /** e.g. "production entries", "receipts", "deliveries" */
   noun: string;
-  /** Contextual combination totals flagged (production listing only). */
+  /** Contextual combination totals flagged (production, receipt, delivery). */
   combinationFindings?: CombinationFinding[];
   className?: string;
 }) {
@@ -131,7 +131,7 @@ export function PlausibilityListBanner({
                 aria-expanded={open}
               >
                 <span className="font-semibold num">{grouped.length}</span>
-                {" "}total-weight combination{grouped.length === 1 ? "" : "s"} look abnormal
+                {" "}weight combination{grouped.length === 1 ? "" : "s"} look abnormal
                 <ChevronDown
                   className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")}
                 />
