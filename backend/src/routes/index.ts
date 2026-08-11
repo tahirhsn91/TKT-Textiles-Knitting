@@ -14,6 +14,7 @@ import plausibilityRouter from "./plausibility.js";
 import machineMaintenanceRouter from "./machine-maintenance.js";
 import factoryMaintenanceRouter from "./factory-maintenance.js";
 import machineAnalyticsRouter from "./machine-analytics.js";
+import partyAnalyticsRouter from "./party-analytics.js";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(plausibilityRouter);
 router.use(machineMaintenanceRouter);
 router.use(factoryMaintenanceRouter);
 router.use(machineAnalyticsRouter);
+router.use(partyAnalyticsRouter);
 
 export default router;
