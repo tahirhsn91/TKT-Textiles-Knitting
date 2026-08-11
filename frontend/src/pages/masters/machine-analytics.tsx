@@ -23,6 +23,8 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SortableHead } from "@/components/sortable-head";
+import { useSort } from "@/hooks/use-sort";
 import { useMachineAnalytics, type MachineAnalyticsBaseline, type MachineAnalyticsRow } from "@/hooks/use-machine-analytics";
 
 // Chart colours from the TKT Mass Balance palette (see index.css tokens).
@@ -275,20 +277,28 @@ function MobileRows({ rows }: { rows: MachineAnalyticsRow[] }) {
 }
 
 /** Desktop table — hidden on small screens. */
-function DesktopTable({ rows }: { rows: MachineAnalyticsRow[] }) {
+function DesktopTable({
+  rows,
+  sort,
+  onSort,
+}: {
+  rows: MachineAnalyticsRow[];
+  sort: { key: string | null; dir: "asc" | "desc" };
+  onSort: (key: string) => void;
+}) {
   return (
     <div className="hidden overflow-x-auto sm:block">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b text-left text-xs text-muted-foreground">
-            <th className="py-2.5 pr-4 font-medium">Machine</th>
-            <th className="py-2.5 pr-4 font-medium">Name</th>
-            <th className="py-2.5 pr-4 text-right font-medium">Kg vs before</th>
-            <th className="py-2.5 pr-4 text-right font-medium">Rolls</th>
-            <th className="py-2.5 pr-4 text-right font-medium">Kg/roll</th>
-            <th className="py-2.5 pr-4 text-right font-medium">Transactions</th>
-            <th className="py-2.5 pr-4 font-medium">Change date</th>
-            <th className="py-2.5 text-right font-medium">Since</th>
+            <SortableHead label="Machine" sortKey="machineNumber" sort={sort} onSort={onSort} />
+            <SortableHead label="Name" sortKey="machineName" sort={sort} onSort={onSort} />
+            <SortableHead label="Kg" sortKey="totalKg" sort={sort} onSort={onSort} right />
+            <SortableHead label="Rolls" sortKey="totalRolls" sort={sort} onSort={onSort} right />
+            <SortableHead label="Kg/roll" sortKey="kgPerRoll" sort={sort} onSort={onSort} right />
+            <SortableHead label="Transactions" sortKey="transactionCount" sort={sort} onSort={onSort} right />
+            <SortableHead label="Change date" sortKey="changeDate" sort={sort} onSort={onSort} />
+            <SortableHead label="Since" sortKey="daysSinceChange" sort={sort} onSort={onSort} right />
           </tr>
         </thead>
         <tbody>
@@ -334,6 +344,22 @@ export function MachineAnalyticsView() {
   const { data, isLoading, isError, refetch } = useMachineAnalytics(baseline);
 
   const rows = data?.rows ?? [];
+
+  // Client-side sortable columns; Machine ascending by default.
+  const { sorted: sortedRows, sort, toggleSort } = useSort<
+    MachineAnalyticsRow,
+    "machineNumber" | "machineName" | "totalKg" | "totalRolls" | "kgPerRoll" | "transactionCount" | "changeDate" | "daysSinceChange"
+  >(rows, {
+    machineNumber: (r) => r.machineNumber,
+    machineName: (r) => r.machineName ?? "",
+    totalKg: (r) => r.totalKg,
+    totalRolls: (r) => r.totalRolls,
+    kgPerRoll: (r) => r.kgPerRoll,
+    transactionCount: (r) => r.transactionCount,
+    changeDate: (r) => r.changeDate ?? "",
+    daysSinceChange: (r) => r.daysSinceChange ?? 0,
+  }, { key: "machineNumber", dir: "asc" });
+
   const totalKg = useMemo(() => rows.reduce((s, r) => s + r.totalKg, 0), [rows]);
   const totalRolls = useMemo(() => rows.reduce((s, r) => s + r.totalRolls, 0), [rows]);
   const activeMachines = useMemo(() => rows.filter((r) => r.totalKg > 0).length, [rows]);
@@ -418,8 +444,8 @@ export function MachineAnalyticsView() {
               </p>
             ) : (
               <>
-                <MobileRows rows={rows} />
-                <DesktopTable rows={rows} />
+                <MobileRows rows={sortedRows} />
+                <DesktopTable rows={sortedRows} sort={sort} onSort={toggleSort} />
               </>
             )}
           </ChartCard>
