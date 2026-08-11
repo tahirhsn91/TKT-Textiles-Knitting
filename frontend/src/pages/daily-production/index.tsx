@@ -41,6 +41,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Layout } from "@/components/layout";
 import { useToast } from "@/hooks/use-toast";
 import { PlausibilityListBanner } from "@/components/plausibility-warning";
+import { AbnormalDataTab } from "@/components/abnormal-data-tab";
 import { usePlausibilityList } from "@/hooks/use-plausibility-list";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useReconciledLock } from "@/context/config-context";
@@ -243,6 +244,7 @@ export default function DailyProductionList() {
           <TabsList>
             <TabsTrigger value="entries">Entries</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="abnormal">Abnormal</TabsTrigger>
           </TabsList>
           <TabsContent value="entries" className="mt-4 space-y-3">
         {plausibility && (
@@ -425,6 +427,9 @@ export default function DailyProductionList() {
               isLoading={isLoading}
               dateLabel={dateLabel}
             />
+          </TabsContent>
+          <TabsContent value="abnormal" className="mt-4">
+            <AbnormalDataTab plausibility={plausibility} noun="production entry" />
           </TabsContent>
         </Tabs>
       </div>

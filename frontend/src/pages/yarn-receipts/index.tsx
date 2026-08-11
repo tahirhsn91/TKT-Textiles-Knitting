@@ -44,6 +44,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Layout } from "@/components/layout";
 import { PlausibilityListBanner } from "@/components/plausibility-warning";
+import { AbnormalDataTab } from "@/components/abnormal-data-tab";
 import { usePlausibilityList } from "@/hooks/use-plausibility-list";
 import { useToast } from "@/hooks/use-toast";
 
@@ -208,6 +209,7 @@ export default function YarnReceiptList() {
           <TabsList>
             <TabsTrigger value="entries">Entries</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="abnormal">Abnormal</TabsTrigger>
           </TabsList>
           <TabsContent value="entries" className="mt-4 space-y-3">
         {plausibility && (
@@ -365,6 +367,9 @@ export default function YarnReceiptList() {
               isLoading={isLoading}
               dateLabel={dateLabel}
             />
+          </TabsContent>
+          <TabsContent value="abnormal" className="mt-4">
+            <AbnormalDataTab plausibility={plausibility} noun="receipt" />
           </TabsContent>
         </Tabs>
 
