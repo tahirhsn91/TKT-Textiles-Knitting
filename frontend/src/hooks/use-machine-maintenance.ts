@@ -35,6 +35,8 @@ export interface MachineMaintenanceListResponse {
   dayTotalCost: string;
   /** Month-to-date cost (submitted records) through the selected date. */
   monthToDateCost: string;
+  /** Per-day cost + job count from the 1st of the month through the selected date. */
+  monthSeries: { date: string; jobs: number; cost: string }[];
 }
 
 export interface MachineMaintenanceDetail extends MachineMaintenanceRow {

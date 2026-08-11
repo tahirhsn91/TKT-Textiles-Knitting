@@ -27,6 +27,8 @@ export interface FactoryMaintenanceListResponse {
   pageSize: number;
   total: number;
   rows: FactoryMaintenanceRow[];
+  /** Per-day job count from the 1st of the month through the selected date. */
+  monthSeries: { date: string; jobs: number }[];
 }
 
 export interface FactoryMaintenanceDetail extends FactoryMaintenanceRow {

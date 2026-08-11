@@ -69,6 +69,24 @@ router.get("/maintenance/machine", async (req, res): Promise<void> => {
       eq(machineMaintenanceTable.status, activeStatus),
     ));
 
+  // Per-day cost + job count from the 1st of the month through the selected
+  // date, for the month trend chart (submitted records only). Frontend fills
+  // any day gaps.
+  const monthSeries = await db
+    .select({
+      date: machineMaintenanceTable.maintenanceDate,
+      jobs: sql<number>`count(*)::int`,
+      cost: sql<string>`coalesce(sum(${machineMaintenanceTable.cost}), 0)`,
+    })
+    .from(machineMaintenanceTable)
+    .where(and(
+      gte(machineMaintenanceTable.maintenanceDate, monthStart),
+      lte(machineMaintenanceTable.maintenanceDate, date),
+      eq(machineMaintenanceTable.status, activeStatus),
+    ))
+    .groupBy(machineMaintenanceTable.maintenanceDate)
+    .orderBy(machineMaintenanceTable.maintenanceDate);
+
   const rows = await db
     .select({
       id: machineMaintenanceTable.id,
@@ -97,6 +115,7 @@ router.get("/maintenance/machine", async (req, res): Promise<void> => {
     rows,
     dayTotalCost: dayCost?.sum ?? "0",
     monthToDateCost: monthCost?.sum ?? "0",
+    monthSeries,
   });
 });
 
