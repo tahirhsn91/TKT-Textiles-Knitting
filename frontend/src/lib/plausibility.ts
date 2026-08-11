@@ -55,11 +55,27 @@ export interface ListFinding {
   warnings: PlausibilityWarning[];
 }
 
+export interface CombinationFinding {
+  field: string;
+  /** Human dimension label, e.g. "Shift + Machine". */
+  combination: string;
+  /** The specific key instance, e.g. "Machine 25, Morning". */
+  context: string;
+  value: number;
+  expectedLow: number;
+  expectedHigh: number;
+  source: "learned" | "hard_cap";
+  reason: string;
+}
+
 export interface ListValidationResult {
   operation: PlausibilityOperation;
   totalChecked: number;
   abnormalCount: number;
   rows: ListFinding[];
+  /** Contextual combination totals that look abnormal (production only). */
+  combinationFindings?: CombinationFinding[];
+  combinationAbnormalCount?: number;
 }
 
 /** Validate a listing's unreconciled rows for the top-of-page banner. */
