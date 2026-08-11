@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db } from "../db/index.js";
 import {
@@ -45,6 +45,23 @@ router.get("/maintenance/factory", async (req, res): Promise<void> => {
     .from(factoryMaintenanceTable)
     .where(where);
 
+  // Per-day job count for the month, for the trend chart (submitted only).
+  const activeStatus = "submitted";
+  const monthStart = `${date.slice(0, 7)}-01`;
+  const monthSeries = await db
+    .select({
+      date: factoryMaintenanceTable.maintenanceDate,
+      jobs: sql<number>`count(*)::int`,
+    })
+    .from(factoryMaintenanceTable)
+    .where(and(
+      gte(factoryMaintenanceTable.maintenanceDate, monthStart),
+      lte(factoryMaintenanceTable.maintenanceDate, date),
+      eq(factoryMaintenanceTable.status, activeStatus),
+    ))
+    .groupBy(factoryMaintenanceTable.maintenanceDate)
+    .orderBy(factoryMaintenanceTable.maintenanceDate);
+
   const rows = await db
     .select({
       id: factoryMaintenanceTable.id,
@@ -66,6 +83,7 @@ router.get("/maintenance/factory", async (req, res): Promise<void> => {
     pageSize,
     total,
     rows,
+    monthSeries,
   });
 });
 
