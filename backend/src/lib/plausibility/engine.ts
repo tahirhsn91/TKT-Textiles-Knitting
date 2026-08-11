@@ -311,11 +311,22 @@ interface DateFilter {
   dateTo?: string;
 }
 
+/** Per-line input for a receipt, plus the checkable scalar fields used by
+ *  the other operations. `receiptLines` is set only for receipts and lets the
+ *  validator check each detail line under one header. */
+type CheckInput = {
+  rollWeights?: number[];
+  netWeight?: number;
+  quantity?: number;
+  gsm?: number | null;
+  receiptLines?: { netWeight: number; quantity: number }[];
+};
+
 /** Load unreconciled, non-cancelled rows for an operation as check inputs. */
 async function loadUnreconciledRows(
   operation: Operation,
   filter: DateFilter,
-): Promise<{ id: number; raw: { rollWeights?: number[]; netWeight?: number; quantity?: number; gsm?: number | null } }[]> {
+): Promise<{ id: number; raw: CheckInput }[]> {
   const from = filter.dateFrom ?? null;
   const to = filter.dateTo ?? null;
 
@@ -333,16 +344,29 @@ async function loadUnreconciledRows(
   }
 
   if (operation === "receipt") {
-    const { rows } = await db.execute<{ id: number; net_weight: number; quantity: number }>(sql`
-      SELECT d.id AS id, d.net_weight::float8 AS net_weight, d.quantity::float8 AS quantity
+    // Group detail lines by HEADER so the reported id is the header id — the
+    // listing can then open the whole receipt in the edit dialog. Each line's
+    // net_weight/quantity is carried along so validateList can check them.
+    const { rows } = await db.execute<{ id: number; net_weights: number[]; quantities: number[] }>(sql`
+      SELECT h.id AS id,
+             array_agg(d.net_weight::float8) AS net_weights,
+             array_agg(d.quantity::int) AS quantities
       FROM yarn_receipt_detail d
       JOIN yarn_receipt_header h ON h.id = d.header_id
       WHERE h.status <> 'cancelled' AND h.reconciled = false
         AND (${from}::date IS NULL OR h.receipt_date >= ${from}::date)
-        AND (${to}::date   IS NULL OR h.receipt_date <= ${to}::date)`);
+        AND (${to}::date   IS NULL OR h.receipt_date <= ${to}::date)
+      GROUP BY h.id`);
     return rows.map((r) => ({
       id: r.id,
-      raw: { netWeight: Number(r.net_weight), quantity: Number(r.quantity) },
+      raw: {
+        netWeight: NaN,
+        quantity: NaN,
+        receiptLines: (r.net_weights ?? []).map((nw, i) => ({
+          netWeight: Number(nw),
+          quantity: Number((r.quantities ?? [])[i] ?? 0),
+        })),
+      },
     }));
   }
 
@@ -466,7 +490,17 @@ export async function validateList(
 
   const findings: ListRowFinding[] = [];
   for (const { id, raw } of inputs) {
-    const warnings = checkEntry(operation, raw, baselines);
+    // A receipt row may carry multiple lines; check each line and aggregate
+    // the warnings under the single (header) record id.
+    const lines = raw.receiptLines;
+    const warnings: PlausibilityWarning[] = [];
+    if (lines && lines.length > 0) {
+      for (const line of lines) {
+        warnings.push(...checkEntry("receipt", line, baselines));
+      }
+    } else {
+      warnings.push(...checkEntry(operation, raw, baselines));
+    }
     if (warnings.length > 0) findings.push({ id, warnings });
   }
 
