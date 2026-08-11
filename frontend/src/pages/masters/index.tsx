@@ -82,6 +82,7 @@ import { MasterTable } from "@/components/master-table";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MachineAnalyticsView } from "./machine-analytics";
+import { PartyAnalyticsView } from "./party-analytics";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -374,20 +375,31 @@ function PartyTab() {
   const done = () => invalidateBoth(getListPartyMasterCrudQueryKey(), getListPartyMasterQueryKey());
 
   return (
-    <MasterTable
-      title="Parties"
-      description="Business parties (customers, suppliers, contractors)."
-      fields={[
-        { key: "name", label: "Name", placeholder: "e.g. Sunrise Textiles" },
-        { key: "code", label: "Code", placeholder: "e.g. SUN" },
-        { key: "wastePercent", label: "Waste%", placeholder: "1.00", type: "number", step: "any" },
-      ]}
-      rows={data as never}
-      isLoading={isLoading}
-      onAdd={(d) => new Promise((res, rej) => create.mutate({ data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
-      onUpdate={(id, d) => new Promise((res, rej) => update.mutate({ id, data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
-      onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
-    />
+    <Tabs defaultValue="list">
+      <TabsList>
+        <TabsTrigger value="list">List</TabsTrigger>
+        <TabsTrigger value="analytics">Analytics</TabsTrigger>
+      </TabsList>
+      <TabsContent value="list" className="mt-4">
+        <MasterTable
+          title="Parties"
+          description="Business parties (customers, suppliers, contractors)."
+          fields={[
+            { key: "name", label: "Name", placeholder: "e.g. Sunrise Textiles" },
+            { key: "code", label: "Code", placeholder: "e.g. SUN" },
+            { key: "wastePercent", label: "Waste%", placeholder: "1.00", type: "number", step: "any" },
+          ]}
+          rows={data as never}
+          isLoading={isLoading}
+          onAdd={(d) => new Promise((res, rej) => create.mutate({ data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+          onUpdate={(id, d) => new Promise((res, rej) => update.mutate({ id, data: d as never }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+          onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
+        />
+      </TabsContent>
+      <TabsContent value="analytics" className="mt-4">
+        <PartyAnalyticsView />
+      </TabsContent>
+    </Tabs>
   );
 }
 
