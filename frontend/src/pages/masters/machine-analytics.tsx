@@ -328,16 +328,16 @@ export function MachineAnalyticsView() {
         </div>
       )}
 
-      {/* Donut + table */}
+      {/* Donut + table — stacked vertically (share above, table below) */}
       {isLoading && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-1">{skeleton}</div>
-          <div className="lg:col-span-2">{skeleton}</div>
+        <div className="grid grid-cols-1 gap-4">
+          {skeleton}
+          {skeleton}
         </div>
       )}
 
       {!isLoading && data && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4">
           {/* Kg-share donut + legend */}
           <ChartCard title="Production share" note={`total ${fmtKg(totalKg)}`}>
             <ShareChart rows={donut} />
