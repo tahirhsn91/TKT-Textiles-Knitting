@@ -31,6 +31,10 @@ export interface MachineMaintenanceListResponse {
   pageSize: number;
   total: number;
   rows: MachineMaintenanceRow[];
+  /** Day total cost (submitted records) for the selected date. */
+  dayTotalCost: string;
+  /** Month-to-date cost (submitted records) through the selected date. */
+  monthToDateCost: string;
 }
 
 export interface MachineMaintenanceDetail extends MachineMaintenanceRow {
