@@ -41,6 +41,16 @@ import {
   canonical,
   type Dimension,
 } from "./total-weight.js";
+import {
+  COMBINATIONS as NET_TOTAL_COMBINATIONS,
+  NET_TOTAL_HARD_CAP,
+  comboDailyTotalSeriesSQL as netComboSeriesSQL,
+  comboTotalsForDateSQL as netComboTotalsForDateSQL,
+  comboField as netComboField,
+  comboLabel as netComboLabel,
+  canonical as netCanonical,
+  type ComboOperation,
+} from "./combinations.js";
 
 export type { PlausibilityWarning } from "./check.js";
 
@@ -145,6 +155,15 @@ export async function retrainOperation(operation: Operation): Promise<void> {
     await upsertBaseline("production", TOTAL_WEIGHT_FIELD, await execSeries(perEntryTotalSeriesSQL()));
     for (const dims of TOTAL_WEIGHT_COMBINATIONS) {
       await upsertBaseline("production", comboField(dims), await execSeries(comboDailyTotalSeriesSQL(dims)));
+    }
+  }
+
+  // Receipt and delivery carry the contextual net-total family: per-key daily
+  // net-weight totals across a handful of business-meaningful dimension combos.
+  if (operation === "receipt" || operation === "delivery") {
+    const op = operation as ComboOperation;
+    for (const dims of NET_TOTAL_COMBINATIONS[op]) {
+      await upsertBaseline(op, netComboField(op, dims), await execSeries(netComboSeriesSQL(op, dims)));
     }
   }
 }
@@ -385,6 +404,59 @@ async function evaluateCombinations(
   return out;
 }
 
+/**
+ * Evaluate the contextual net-total combinations for receipt/delivery on a
+ * single date. For each combination we pull that day's per-key net-weight
+ * totals (unreconciled only) and check each against the combination's learned
+ * baseline. Returns every flagged key instance. Requires a concrete date.
+ */
+async function evaluateNetCombinations(
+  operation: ComboOperation,
+  date: string,
+  baselines: BaselineMap,
+): Promise<CombinationFinding[]> {
+  const out: CombinationFinding[] = [];
+
+  for (const dims of NET_TOTAL_COMBINATIONS[operation]) {
+    const field = netComboField(operation, dims);
+    const baseline = baselines[field as PlausibilityField];
+    const keyDims = netCanonical(operation, dims);
+
+    const result = await db.execute<Record<string, unknown>>(
+      netComboTotalsForDateSQL(operation, dims, date),
+    );
+
+    for (const r of result.rows) {
+      const total = Number(r.total);
+      if (!Number.isFinite(total) || total <= 0) continue;
+      const labels = keyDims.map((_, i) => String(r[`label_${i}`] ?? ""));
+      const context = labels.filter(Boolean).join(", ") || "all entries";
+      const w = checkValue(
+        field,
+        `Net total (${netComboLabel(operation, dims)})`,
+        total,
+        NET_TOTAL_HARD_CAP,
+        baseline,
+        context,
+      );
+      if (w) {
+        out.push({
+          field,
+          combination: netComboLabel(operation, dims),
+          context,
+          value: w.value,
+          expectedLow: w.expectedLow,
+          expectedHigh: w.expectedHigh,
+          source: w.source,
+          reason: w.reason,
+        });
+      }
+    }
+  }
+
+  return out;
+}
+
 export async function validateList(
   operation: Operation,
   filter: DateFilter = {},
@@ -405,12 +477,23 @@ export async function validateList(
     rows: findings,
   };
 
-  // Contextual combination totals — production only, and only for a concrete
-  // single day (the listing always scopes to one date).
-  if (operation === "production" && filter.dateFrom && filter.dateFrom === filter.dateTo) {
-    const combinationFindings = await evaluateCombinations(filter.dateFrom, baselines);
-    result.combinationFindings = combinationFindings;
-    result.combinationAbnormalCount = combinationFindings.length;
+  // Contextual combination totals — only for a concrete single day (the
+  // listing always scopes to one date).
+  const singleDay = filter.dateFrom && filter.dateFrom === filter.dateTo;
+  if (singleDay) {
+    if (operation === "production") {
+      const combinationFindings = await evaluateCombinations(filter.dateFrom!, baselines);
+      result.combinationFindings = combinationFindings;
+      result.combinationAbnormalCount = combinationFindings.length;
+    } else if (operation === "receipt" || operation === "delivery") {
+      const combinationFindings = await evaluateNetCombinations(
+        operation as ComboOperation,
+        filter.dateFrom!,
+        baselines,
+      );
+      result.combinationFindings = combinationFindings;
+      result.combinationAbnormalCount = combinationFindings.length;
+    }
   }
 
   return result;
