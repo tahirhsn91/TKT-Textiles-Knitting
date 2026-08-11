@@ -250,6 +250,7 @@ export default function DailyProductionList() {
             abnormalCount={plausibility.abnormalCount}
             totalChecked={plausibility.totalChecked}
             noun="production entries"
+            combinationFindings={plausibility.combinationFindings}
           />
         )}
         {/* Entries */}
