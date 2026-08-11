@@ -24,10 +24,23 @@ import {
 } from "./config.js";
 import {
   checkEntry,
+  checkValue,
   type BaselineEntry,
   type BaselineMap,
   type PlausibilityWarning,
 } from "./check.js";
+import {
+  TOTAL_WEIGHT_COMBINATIONS,
+  TOTAL_WEIGHT_FIELD,
+  TOTAL_WEIGHT_HARD_CAP,
+  perEntryTotalSeriesSQL,
+  comboDailyTotalSeriesSQL,
+  comboTotalsForDateSQL,
+  comboField,
+  comboLabel,
+  canonical,
+  type Dimension,
+} from "./total-weight.js";
 
 export type { PlausibilityWarning } from "./check.js";
 
@@ -90,40 +103,49 @@ async function fetchSeries(operation: Operation, field: PlausibilityField): Prom
 
 // ─── Baseline recompute ────────────────────────────────────────────────────
 
+/** Upsert one learned baseline row from a raw numeric series. */
+async function upsertBaseline(operation: Operation, field: string, values: number[]): Promise<void> {
+  if (values.length === 0) return;
+  const summary = robustSummary(values);
+  const bounds = boundsFromSummary(summary, K);
+  const set = {
+    median: String(summary.median),
+    iqr: String(summary.iqr),
+    mad: String(summary.mad),
+    lowerBound: String(bounds.lower),
+    upperBound: String(bounds.upper),
+    sampleCount: summary.sampleCount,
+    computedAt: new Date(),
+  };
+  await db
+    .insert(plausibilityBaselineTable)
+    .values({ operation, field, ...set })
+    .onConflictDoUpdate({
+      target: [plausibilityBaselineTable.operation, plausibilityBaselineTable.field],
+      set,
+    });
+}
+
+/** Read a raw float series from an arbitrary SQL query returning column `v`. */
+async function execSeries(query: ReturnType<typeof sql>): Promise<number[]> {
+  const { rows } = await db.execute<{ v: number }>(query);
+  return rows.map((r) => Number(r.v)).filter((v) => Number.isFinite(v));
+}
+
 /** Recompute and upsert the baseline for every field of one operation. */
 export async function retrainOperation(operation: Operation): Promise<void> {
   for (const field of OPERATION_FIELDS[operation]) {
     const values = await fetchSeries(operation, field);
-    if (values.length === 0) continue;
+    await upsertBaseline(operation, field, values);
+  }
 
-    const summary = robustSummary(values);
-    const bounds = boundsFromSummary(summary, K);
-
-    await db
-      .insert(plausibilityBaselineTable)
-      .values({
-        operation,
-        field,
-        median: String(summary.median),
-        iqr: String(summary.iqr),
-        mad: String(summary.mad),
-        lowerBound: String(bounds.lower),
-        upperBound: String(bounds.upper),
-        sampleCount: summary.sampleCount,
-        computedAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: [plausibilityBaselineTable.operation, plausibilityBaselineTable.field],
-        set: {
-          median: String(summary.median),
-          iqr: String(summary.iqr),
-          mad: String(summary.mad),
-          lowerBound: String(bounds.lower),
-          upperBound: String(bounds.upper),
-          sampleCount: summary.sampleCount,
-          computedAt: new Date(),
-        },
-      });
+  // Production also carries the total-weight family: A (per-entry total) plus
+  // the 26 contextual combinations, all learned over the trailing window.
+  if (operation === "production") {
+    await upsertBaseline("production", TOTAL_WEIGHT_FIELD, await execSeries(perEntryTotalSeriesSQL()));
+    for (const dims of TOTAL_WEIGHT_COMBINATIONS) {
+      await upsertBaseline("production", comboField(dims), await execSeries(comboDailyTotalSeriesSQL(dims)));
+    }
   }
 }
 
@@ -184,7 +206,23 @@ export async function validateEntry(
   raw: { rollWeights?: number[]; netWeight?: number; quantity?: number; gsm?: number | null },
 ): Promise<PlausibilityWarning[]> {
   const baselines = await loadBaselines(operation);
-  return checkEntry(operation, raw, baselines);
+  const warnings = checkEntry(operation, raw, baselines);
+
+  // Production also checks the per-entry TOTAL weight (combination A) at
+  // insert-time. The contextual combinations are listing-time only.
+  if (operation === "production" && raw.rollWeights && raw.rollWeights.length > 0) {
+    const total = raw.rollWeights.reduce((s, w) => s + (Number.isFinite(w) ? w : 0), 0);
+    const w = checkValue(
+      TOTAL_WEIGHT_FIELD,
+      "Total weight",
+      total,
+      TOTAL_WEIGHT_HARD_CAP,
+      baselines[TOTAL_WEIGHT_FIELD as PlausibilityField],
+    );
+    if (w) warnings.push(w);
+  }
+
+  return warnings;
 }
 
 // ─── Feedback ──────────────────────────────────────────────────────────────
@@ -224,11 +262,29 @@ export interface ListRowFinding {
   warnings: PlausibilityWarning[];
 }
 
+/** A flagged contextual combination total (listing-time, production only). */
+export interface CombinationFinding {
+  /** Encoded key, e.g. "total_weight@shift+machine". */
+  field: string;
+  /** Human dimension label, e.g. "Shift + Machine". */
+  combination: string;
+  /** Human description of the specific key instance, e.g. "Machine 25, Morning". */
+  context: string;
+  value: number;
+  expectedLow: number;
+  expectedHigh: number;
+  source: "learned" | "hard_cap";
+  reason: string;
+}
+
 export interface ListValidationResult {
   operation: Operation;
   totalChecked: number;
   abnormalCount: number;
   rows: ListRowFinding[];
+  /** Contextual combination totals that look abnormal (production only). */
+  combinationFindings?: CombinationFinding[];
+  combinationAbnormalCount?: number;
 }
 
 interface DateFilter {
@@ -284,6 +340,51 @@ async function loadUnreconciledRows(
   }));
 }
 
+/**
+ * Evaluate the 26 contextual total-weight combinations for a single production
+ * date. For each combination we pull the day's per-key totals (unreconciled
+ * only) and check each against that combination's learned baseline. Returns
+ * every flagged key instance. Production-only; requires a concrete date.
+ */
+async function evaluateCombinations(
+  date: string,
+  baselines: BaselineMap,
+): Promise<CombinationFinding[]> {
+  const out: CombinationFinding[] = [];
+
+  for (const dims of TOTAL_WEIGHT_COMBINATIONS) {
+    const field = comboField(dims);
+    const baseline = baselines[field as PlausibilityField];
+    const keyDims = canonical(dims);
+
+    const result = await db.execute<Record<string, unknown>>(
+      comboTotalsForDateSQL(dims, date),
+    );
+
+    for (const r of result.rows) {
+      const total = Number(r.total);
+      if (!Number.isFinite(total) || total <= 0) continue;
+      const labels = keyDims.map((_, i) => String(r[`label_${i}`] ?? ""));
+      const context = labels.filter(Boolean).join(", ") || "all entries";
+      const w = checkValue(field, `Total weight (${comboLabel(dims)})`, total, TOTAL_WEIGHT_HARD_CAP, baseline, context);
+      if (w) {
+        out.push({
+          field,
+          combination: comboLabel(dims),
+          context,
+          value: w.value,
+          expectedLow: w.expectedLow,
+          expectedHigh: w.expectedHigh,
+          source: w.source,
+          reason: w.reason,
+        });
+      }
+    }
+  }
+
+  return out;
+}
+
 export async function validateList(
   operation: Operation,
   filter: DateFilter = {},
@@ -297,10 +398,20 @@ export async function validateList(
     if (warnings.length > 0) findings.push({ id, warnings });
   }
 
-  return {
+  const result: ListValidationResult = {
     operation,
     totalChecked: inputs.length,
     abnormalCount: findings.length,
     rows: findings,
   };
+
+  // Contextual combination totals — production only, and only for a concrete
+  // single day (the listing always scopes to one date).
+  if (operation === "production" && filter.dateFrom && filter.dateFrom === filter.dateTo) {
+    const combinationFindings = await evaluateCombinations(filter.dateFrom, baselines);
+    result.combinationFindings = combinationFindings;
+    result.combinationAbnormalCount = combinationFindings.length;
+  }
+
+  return result;
 }

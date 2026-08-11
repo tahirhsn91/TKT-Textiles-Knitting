@@ -25,7 +25,10 @@ export interface BaselineEntry {
 export type BaselineMap = Partial<Record<PlausibilityField, BaselineEntry>>;
 
 export interface PlausibilityWarning {
-  field: PlausibilityField;
+  // A known field, or an encoded total-weight combination key
+  // (e.g. "total_weight@shift+machine"). Kept as a plain string so the
+  // contextual combinations flow through the same warning type.
+  field: PlausibilityField | string;
   label: string;
   value: number;
   expectedLow: number;
@@ -33,6 +36,8 @@ export interface PlausibilityWarning {
   /** "learned" when the trained band flagged it, "hard_cap" for the backstop. */
   source: "learned" | "hard_cap";
   reason: string;
+  /** Present for contextual combination findings (listing-time). */
+  context?: string;
 }
 
 function round(n: number): number {
@@ -81,6 +86,54 @@ export function checkField(
         expectedHigh: round(hi),
         source: "learned",
         reason: `${label} of ${round(value)} is unusual — typical values run ${round(lo)}–${round(hi)}.`,
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Generic value check for fields outside the fixed PlausibilityField enum —
+ * used by the total-weight family (per-entry total and the contextual
+ * combinations), which supply their own field key, label and hard cap.
+ * Same two-tier logic as checkField: hard cap first, then the learned band
+ * (only when the sample count is trustworthy).
+ */
+export function checkValue(
+  field: string,
+  label: string,
+  value: number,
+  cap: { min: number; max: number },
+  baseline: BaselineEntry | undefined,
+  context?: string,
+): PlausibilityWarning | null {
+  if (!Number.isFinite(value)) return null;
+
+  const ctxSuffix = context ? ` for ${context}` : "";
+
+  if (value < cap.min || value > cap.max) {
+    return {
+      field, label, context,
+      value: round(value),
+      expectedLow: cap.min,
+      expectedHigh: cap.max,
+      source: "hard_cap",
+      reason: `${label}${ctxSuffix} of ${round(value)} is outside the plausible range (${cap.min}–${cap.max}).`,
+    };
+  }
+
+  if (baseline && baseline.sampleCount >= MIN_SAMPLE_COUNT) {
+    const lo = baseline.lowerBound;
+    const hi = baseline.upperBound;
+    if (hi > lo && (value < lo || value > hi)) {
+      return {
+        field, label, context,
+        value: round(value),
+        expectedLow: round(lo),
+        expectedHigh: round(hi),
+        source: "learned",
+        reason: `${label}${ctxSuffix} of ${round(value)} is unusual — typical values run ${round(lo)}–${round(hi)}.`,
       };
     }
   }
