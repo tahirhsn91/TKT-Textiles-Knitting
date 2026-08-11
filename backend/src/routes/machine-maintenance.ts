@@ -1,0 +1,212 @@
+import { Router, type IRouter } from "express";
+import { eq, and, desc, sql } from "drizzle-orm";
+import { z } from "zod/v4";
+import { db } from "../db/index.js";
+import {
+  machineMaintenanceTable,
+  machineMasterTable,
+  insertMachineMaintenanceSchema,
+} from "../db/index.js";
+
+const router: IRouter = Router();
+
+// ─── Validation ────────────────────────────────────────────────────────────
+
+const machineSchema = insertMachineMaintenanceSchema.extend({
+  maintenanceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date (YYYY-MM-DD) is required"),
+  machineId: z.coerce.number().int().positive("Machine is required"),
+  maintenanceWork: z.string().min(1, "Maintenance work is required"),
+  cost: z.coerce.number().min(0, "Cost must be zero or greater").optional().nullable(),
+  vendor: z.string().optional().nullable(),
+  createdBy: z.string().min(1, "Enter your name"),
+  updatedBy: z.string().optional(),
+});
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+const STATUSES = z.enum(["submitted", "cancelled"]);
+
+// ─── List (paginated, by date + status) ────────────────────────────────────
+
+router.get("/maintenance/machine", async (req, res): Promise<void> => {
+  const date = typeof req.query.date === "string" && req.query.date ? req.query.date : todayIso();
+  const statusRaw = typeof req.query.status === "string" ? req.query.status : "submitted";
+  const page = Math.max(parseInt(String(req.query.page ?? "1"), 10) || 1, 1);
+  const pageSize = Math.min(Math.max(parseInt(String(req.query.pageSize ?? "50"), 10) || 50, 1), 200);
+
+  const status = STATUSES.safeParse(statusRaw).success ? statusRaw : "submitted";
+
+  const where = and(
+    eq(machineMaintenanceTable.maintenanceDate, date),
+    eq(machineMaintenanceTable.status, status),
+  );
+
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(machineMaintenanceTable)
+    .where(where);
+
+  const rows = await db
+    .select({
+      id: machineMaintenanceTable.id,
+      maintenanceDate: machineMaintenanceTable.maintenanceDate,
+      machineId: machineMaintenanceTable.machineId,
+      machineNumber: machineMasterTable.machineNumber,
+      machineName: machineMasterTable.name,
+      maintenanceWork: machineMaintenanceTable.maintenanceWork,
+      cost: machineMaintenanceTable.cost,
+      vendor: machineMaintenanceTable.vendor,
+      status: machineMaintenanceTable.status,
+      createdBy: machineMaintenanceTable.createdBy,
+    })
+    .from(machineMaintenanceTable)
+    .leftJoin(machineMasterTable, eq(machineMaintenanceTable.machineId, machineMasterTable.id))
+    .where(where)
+    .orderBy(desc(machineMaintenanceTable.maintenanceDate), desc(machineMaintenanceTable.id))
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
+
+  res.json({
+    maintenanceDate: date,
+    page,
+    pageSize,
+    total,
+    rows,
+  });
+});
+
+// ─── Detail ────────────────────────────────────────────────────────────────
+
+router.get("/maintenance/machine/:id", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid maintenance id" });
+    return;
+  }
+
+  const [row] = await db
+    .select({
+      id: machineMaintenanceTable.id,
+      maintenanceDate: machineMaintenanceTable.maintenanceDate,
+      machineId: machineMaintenanceTable.machineId,
+      machineNumber: machineMasterTable.machineNumber,
+      machineName: machineMasterTable.name,
+      maintenanceWork: machineMaintenanceTable.maintenanceWork,
+      cost: machineMaintenanceTable.cost,
+      vendor: machineMaintenanceTable.vendor,
+      status: machineMaintenanceTable.status,
+      createdBy: machineMaintenanceTable.createdBy,
+      updatedBy: machineMaintenanceTable.updatedBy,
+      createdAt: machineMaintenanceTable.createdAt,
+      updatedAt: machineMaintenanceTable.updatedAt,
+    })
+    .from(machineMaintenanceTable)
+    .leftJoin(machineMasterTable, eq(machineMaintenanceTable.machineId, machineMasterTable.id))
+    .where(eq(machineMaintenanceTable.id, id));
+
+  if (!row) {
+    res.status(404).json({ error: "Machine maintenance record not found" });
+    return;
+  }
+  res.json(row);
+});
+
+// ─── Create ────────────────────────────────────────────────────────────────
+
+router.post("/maintenance/machine", async (req, res): Promise<void> => {
+  const parsed = machineSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid machine maintenance" });
+    return;
+  }
+  const { maintenanceDate, machineId, maintenanceWork, cost, vendor, createdBy } = parsed.data;
+
+  const [row] = await db
+    .insert(machineMaintenanceTable)
+    .values({
+      maintenanceDate,
+      machineId,
+      maintenanceWork,
+      cost: cost != null ? String(cost) : null,
+      vendor: vendor?.trim() ? vendor.trim() : null,
+      createdBy,
+    })
+    .returning({ id: machineMaintenanceTable.id });
+
+  res.status(201).json({ id: row.id });
+});
+
+// ─── Update ────────────────────────────────────────────────────────────────
+
+router.put("/maintenance/machine/:id", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid maintenance id" });
+    return;
+  }
+
+  const parsed = machineSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid machine maintenance" });
+    return;
+  }
+  const { maintenanceDate, machineId, maintenanceWork, cost, vendor, createdBy, updatedBy } = parsed.data;
+
+  const [row] = await db
+    .update(machineMaintenanceTable)
+    .set({
+      maintenanceDate,
+      machineId,
+      maintenanceWork,
+      cost: cost != null ? String(cost) : null,
+      vendor: vendor?.trim() ? vendor.trim() : null,
+      updatedBy: updatedBy ?? createdBy,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(machineMaintenanceTable.id, id), eq(machineMaintenanceTable.status, "submitted")))
+    .returning({ id: machineMaintenanceTable.id });
+
+  if (!row) {
+    // Either the record doesn't exist, or it's cancelled (read-only).
+    res.status(404).json({ error: "Machine maintenance record not found or is cancelled" });
+    return;
+  }
+  res.json({ id });
+});
+
+// ─── Soft-delete (cancel) & restore ────────────────────────────────────────
+
+router.patch("/maintenance/machine/:id/status", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid maintenance id" });
+    return;
+  }
+  const parsed = z.object({ status: STATUSES }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Status must be 'submitted' or 'cancelled'" });
+    return;
+  }
+  const { status } = parsed.data;
+  const by = typeof req.body.updatedBy === "string" ? req.body.updatedBy.trim() : null;
+
+  const [row] = await db
+    .update(machineMaintenanceTable)
+    .set({
+      status,
+      updatedBy: by ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(machineMaintenanceTable.id, id))
+    .returning({ id: machineMaintenanceTable.id, status: machineMaintenanceTable.status });
+
+  if (!row) {
+    res.status(404).json({ error: "Machine maintenance record not found" });
+    return;
+  }
+  res.json({ id, status: row.status });
+});
+
+export default router;

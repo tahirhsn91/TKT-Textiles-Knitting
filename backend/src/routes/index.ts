@@ -11,6 +11,8 @@ import dailyProductionRouter from "./daily-production.js";
 import yarnReceiptsRouter from "./yarn-receipts.js";
 import dailyDeliveriesRouter from "./daily-deliveries.js";
 import plausibilityRouter from "./plausibility.js";
+import machineMaintenanceRouter from "./machine-maintenance.js";
+import factoryMaintenanceRouter from "./factory-maintenance.js";
 
 const router: IRouter = Router();
 
@@ -26,5 +28,7 @@ router.use(dailyProductionRouter);
 router.use(yarnReceiptsRouter);
 router.use(dailyDeliveriesRouter);
 router.use(plausibilityRouter);
+router.use(machineMaintenanceRouter);
+router.use(factoryMaintenanceRouter);
 
 export default router;

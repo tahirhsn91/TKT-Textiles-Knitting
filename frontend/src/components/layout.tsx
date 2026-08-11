@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   FileText, Database, BarChart2, LayoutDashboard, ClipboardList, Wallet,
   ChevronDown, Menu, PanelLeftClose, PanelLeftOpen, Search, Settings,
-  Factory, PackageCheck, Truck, HardHat,
+  Factory, PackageCheck, Truck, HardHat, Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -76,6 +76,16 @@ const mobileGroups = [
     ],
   },
   {
+    key: "maintenance",
+    label: "Maintenance",
+    icon: Wrench,
+    activeFn: (loc: string) => loc.startsWith("/maintenance"),
+    items: [
+      { href: "/maintenance/machine", label: "Machine Maintenance", icon: Factory },
+      { href: "/maintenance/factory", label: "Factory Maintenance",  icon: HardHat },
+    ],
+  },
+  {
     key: "reports",
     label: "Analysis",
     icon: BarChart2,
@@ -91,6 +101,7 @@ const mobileGroups = [
 const TRANSACTIONS_PRIMARY = "/transactions";
 const PAYROLL_PRIMARY = "/transactions/monthly-salary-entry";
 const REPORTS_PRIMARY = "/reports/yarn-balance";
+const MAINTENANCE_PRIMARY = "/maintenance/machine";
 
 const LS_SIDEBAR_COLLAPSED = "sidebar-collapsed";
 
@@ -169,6 +180,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const dailyProductionActive = location.startsWith("/daily-production");
   const yarnReceiptsActive = location.startsWith("/yarn-receipts");
   const dailyDeliveriesActive = location.startsWith("/daily-deliveries");
+  const maintenanceActive = location.startsWith("/maintenance");
 
   return (
     <div className="min-h-[100dvh] w-full bg-background">
@@ -284,6 +296,28 @@ export function Layout({ children }: { children: ReactNode }) {
                   active={isSubItemActive(location, item.href)}
                 />
               ))}
+            </DesktopGroup>
+          </div>
+
+          {!collapsed && <NavSection label="Maintenance" />}
+          <div className={cn("flex flex-col gap-0.5", collapsed && "pt-1")}>
+            <DesktopGroup
+              label="Maintenance"
+              icon={Wrench}
+              primary={MAINTENANCE_PRIMARY}
+              active={maintenanceActive}
+              collapsed={collapsed}
+            >
+              <SubItem
+                href="/maintenance/machine"
+                label="Machine Maintenance"
+                active={isSubItemActive(location, "/maintenance/machine")}
+              />
+              <SubItem
+                href="/maintenance/factory"
+                label="Factory Maintenance"
+                active={isSubItemActive(location, "/maintenance/factory")}
+              />
             </DesktopGroup>
           </div>
 
