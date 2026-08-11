@@ -12,7 +12,7 @@
  */
 import { useState } from "react";
 import { useMemo } from "react";
-import { Pie, PieChart, Cell, ResponsiveContainer } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import { TrendingUp, Package, Activity, Crown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,35 +44,6 @@ const shareConfig = {
 
 const fmtKg = (n: number) => `${n.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg`;
 const fmtKgFull = (n: number) => `${n.toLocaleString(undefined, { maximumFractionDigits: 2 })} kg`;
-
-/**
- * Recharts Pie label renderer: draws the slice's machine name outside the arc
- * for slices that are large enough to label (>=6%). Returns null otherwise, so
- * small slices stay unlabelled and the legend carries them.
- */
-function renderOutsideLabel(props: Record<string, unknown>) {
-  const { cx, cy, midAngle, outerRadius, name, percent } = props as {
-    cx: number; cy: number; midAngle: number; outerRadius: number; name: string; percent: number;
-  };
-  if (percent * 100 < 6) return null;
-  const RADIAN = Math.PI / 180;
-  const radius = (typeof outerRadius === "number" ? outerRadius : 0) + 14;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-  return (
-    <text
-      x={x}
-      y={y}
-      textAnchor={x > cx ? "start" : "end"}
-      dominantBaseline="central"
-      fill="currentColor"
-      className="fill-muted-foreground"
-      style={{ fontSize: 11, fontWeight: 600 }}
-    >
-      {name}
-    </text>
-  );
-}
 
 
 function BaselineToggle({
@@ -151,93 +122,44 @@ function ChartCard({ title, note, children }: { title: string; note?: string; ch
   );
 }
 
-/** Donut with per-slice machine labels, a centre total, and a companion legend. */
+/** Production share as a vertical bar chart (one bar per machine). */
 function ShareChart({ rows }: { rows: { name: string; value: number; zero: boolean }[] }) {
   const total = rows.reduce((s, r) => s + r.value, 0);
-  const nonZero = rows.filter((r) => !r.zero);
-  const chartData = nonZero.length ? nonZero : rows;
-
-  const reducedMotion =
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   return (
     <div>
-      <div className="relative">
-        <ChartContainer className="w-full" config={shareConfig} style={{ height: CHART_HEIGHT }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart margin={{ top: 20, right: 12, bottom: 20, left: 12 }}>
-              
-              {/* Centre total */}
-              <text
-                x="50%"
-                y="47%"
-                textAnchor="middle"
-                dominantBaseline="middle"
-                className="fill-foreground"
-                style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--app-font-mono)" }}
-              >
-                {total.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-              </text>
-              <text
-                x="50%"
-                y="56%"
-                textAnchor="middle"
-                dominantBaseline="middle"
-                className="fill-muted-foreground"
-                style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em" }}
-              >
-                kg total
-              </text>
-
-              <Pie
-                data={chartData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                innerRadius="52%"
-                outerRadius="86%"
-                paddingAngle={1.5}
-                stroke="hsl(var(--background))"
-                strokeWidth={2}
-                isAnimationActive={!reducedMotion}
-                label={(props: Record<string, unknown>) =>
-                  renderOutsideLabel(props)
-                }
-                labelLine
-              >
-                {chartData.map((d, i) => (
-                  <Cell key={d.name} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                ))}
-              </Pie>
-
-              <ChartTooltip
-                content={<ChartTooltipContent formatter={(v) => fmtKgFull(Number(v))} />}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </ChartContainer>
-      </div>
-      {/* Legend — the accessible counterpart (colour is never the only cue). */}
-      <ul className="mt-2 space-y-1 px-1">
-        {rows.map((r, i) => (
-          <li key={r.name} className="flex items-center justify-between gap-2 text-xs">
-            <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
-              <span
-                aria-hidden
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
-              />
-              <span className="truncate font-medium text-foreground">{r.name}</span>
-              {r.zero && <span className="italic text-muted-foreground/70">no production</span>}
-            </span>
-            <span className="num shrink-0 tabular-nums text-muted-foreground">
-              {fmtKg(r.value)}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <ChartContainer className="w-full" config={shareConfig} style={{ height: CHART_HEIGHT }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+              tickLine={false}
+              axisLine={{ stroke: "hsl(var(--border))" }}
+              interval={0}
+            />
+            <YAxis
+              tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+              tickLine={false}
+              axisLine={false}
+              width={52}
+              tickFormatter={(v: number) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v))}
+            />
+            <ChartTooltip
+              content={<ChartTooltipContent formatter={(v) => fmtKgFull(Number(v))} />}
+              cursor={{ fill: "rgba(31,34,28,0.05)" }}
+            />
+            <Bar dataKey="value" radius={[2, 2, 0, 0]} barSize={26} isAnimationActive={false}>
+              {rows.map((d, i) => (
+                <Cell key={d.name} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </ChartContainer>
+      {/* Small total caption for quick reference. */}
+      <p className="eyebrow mt-2 px-1">Total {total.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg</p>
     </div>
   );
 }
