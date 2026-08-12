@@ -1,0 +1,157 @@
+import { Router, type IRouter } from "express";
+import { eq, sql } from "drizzle-orm";
+import { z } from "zod/v4";
+import { db } from "../db/index.js";
+import {
+  companyInfoMasterTable,
+  insertCompanyInfoMasterSchema,
+} from "../db/index.js";
+import { FBR_PROVINCES } from "../lib/fbr/constants.js";
+
+const router: IRouter = Router();
+
+function idParam(req: { params: Record<string, string> }) {
+  const id = parseInt(req.params.id, 10);
+  return isNaN(id) ? null : id;
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code: string }).code === "23505"
+  );
+}
+
+const provinceSchema = z.string().refine(
+  (v) => (FBR_PROVINCES as readonly string[]).includes(v),
+  { message: `Province must be one of: ${FBR_PROVINCES.join(", ")}` },
+);
+
+const companySchema = insertCompanyInfoMasterSchema.extend({
+  ntnCnic: z.string().min(1, "NTN/CNIC is required"),
+  province: provinceSchema,
+  address: z.string().min(1, "Address is required"),
+  name: z.string().min(1, "Company name is required"),
+  fbrSandboxToken: z.string().optional().nullable(),
+  fbrProductionToken: z.string().optional().nullable(),
+});
+
+// ─── List ────────────────────────────────────────────────────────────────
+
+router.get("/masters/company-info", async (_req, res): Promise<void> => {
+  const rows = await db
+    .select()
+    .from(companyInfoMasterTable)
+    .orderBy(sql`${companyInfoMasterTable.isDefault} DESC`, companyInfoMasterTable.name);
+  res.json(rows);
+});
+
+// ─── Set default ─────────────────────────────────────────────────────────
+// Clears isDefault on all companies, then sets the selected one. Enforced in a
+// single transaction so "exactly one default" always holds.
+
+router.post("/masters/company-info/:id/default", async (req, res): Promise<void> => {
+  const id = idParam(req);
+  if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  await db.transaction(async (tx) => {
+    await tx.update(companyInfoMasterTable).set({ isDefault: false });
+    await tx.update(companyInfoMasterTable).set({ isDefault: true }).where(eq(companyInfoMasterTable.id, id));
+  });
+
+  const [row] = await db
+    .select()
+    .from(companyInfoMasterTable)
+    .where(eq(companyInfoMasterTable.id, id));
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(row);
+});
+
+// ─── Create ──────────────────────────────────────────────────────────────
+
+router.post("/masters/company-info", async (req, res): Promise<void> => {
+  const parsed = companySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const { name, ntnCnic, province, address, fbrSandboxToken, fbrProductionToken } = parsed.data;
+
+  // First company → auto default.
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(companyInfoMasterTable);
+  const isDefault = count === 0;
+
+  try {
+    const [row] = await db
+      .insert(companyInfoMasterTable)
+      .values({
+        name,
+        ntnCnic,
+        province,
+        address,
+        fbrSandboxToken: fbrSandboxToken || null,
+        fbrProductionToken: fbrProductionToken || null,
+        isDefault,
+      })
+      .returning();
+    res.status(201).json(row);
+  } catch (err) {
+    if (isUniqueViolation(err)) { res.status(409).json({ error: "A record with duplicate value already exists" }); return; }
+    throw err;
+  }
+});
+
+// ─── Update ──────────────────────────────────────────────────────────────
+
+router.put("/masters/company-info/:id", async (req, res): Promise<void> => {
+  const id = idParam(req);
+  if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
+  const parsed = companySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
+    return;
+  }
+  const { name, ntnCnic, province, address, fbrSandboxToken, fbrProductionToken } = parsed.data;
+  const [row] = await db
+    .update(companyInfoMasterTable)
+    .set({
+      name,
+      ntnCnic,
+      province,
+      address,
+      fbrSandboxToken: fbrSandboxToken || null,
+      fbrProductionToken: fbrProductionToken || null,
+      updatedAt: new Date(),
+    })
+    .where(eq(companyInfoMasterTable.id, id))
+    .returning();
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(row);
+});
+
+// ─── Delete ──────────────────────────────────────────────────────────────
+// Only allowed when not the default company (the default must always exist
+// for invoice generation). Prevents deleting the sole/default seller.
+
+router.delete("/masters/company-info/:id", async (req, res): Promise<void> => {
+  const id = idParam(req);
+  if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const [existing] = await db
+    .select().from(companyInfoMasterTable).where(eq(companyInfoMasterTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+
+  if (existing.isDefault) {
+    res.status(409).json({ error: "Cannot delete the default company. Set another company as default first." });
+    return;
+  }
+
+  await db.delete(companyInfoMasterTable).where(eq(companyInfoMasterTable.id, id));
+  res.sendStatus(204);
+});
+
+export default router;

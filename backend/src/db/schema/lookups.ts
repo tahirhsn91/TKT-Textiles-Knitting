@@ -29,6 +29,16 @@ export const partyMasterTable = pgTable("party_master", {
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
   wastePercent: numeric("waste_percent", { precision: 5, scale: 2 }).default("1.00"),
+
+  // ─── FBR Digital Invoicing (buyer) ────────────────────────────────────────
+  // Buyer-side fields required by the FBR DI API. ntn_cnic is optional (FBR
+  // only requires it for Registered buyers; unregistered buyers leave it
+  // blank). province is validated against FBR_PROVINCES; registration_type is
+  // "Registered" | "Unregistered".
+  ntnCnic: text("ntn_cnic"),
+  province: text("province"),
+  address: text("address"),
+  registrationType: text("registration_type").default("Unregistered"),
 });
 export const insertPartyMasterSchema = createInsertSchema(partyMasterTable).omit({ id: true });
 export type InsertPartyMaster = z.infer<typeof insertPartyMasterSchema>;
@@ -62,6 +72,9 @@ export const yarnTypeMasterTable = pgTable("yarn_type_master", {
   name: text("name").notNull(),
   makeRate: numeric("make_rate"),
   code: text("code").notNull().unique(),
+  // HS Code used on FBR invoices for items of this yarn type (e.g.
+  // "6001.2100" for knit fabric). Empty until configured.
+  hsCode: text("hs_code"),
 });
 export const insertYarnTypeMasterSchema = createInsertSchema(yarnTypeMasterTable).omit({ id: true });
 export type InsertYarnTypeMaster = z.infer<typeof insertYarnTypeMasterSchema>;

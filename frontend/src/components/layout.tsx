@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   FileText, Database, BarChart2, LayoutDashboard, ClipboardList, Wallet,
   ChevronDown, Menu, PanelLeftClose, PanelLeftOpen, Search, Settings,
-  Factory, PackageCheck, Truck, HardHat, Wrench,
+  Factory, PackageCheck, Truck, HardHat, Wrench, Receipt, Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -47,6 +47,11 @@ const payrollItems = [
 const reportItems = [
   { href: "/reports/yarn-balance",   label: "Yarn Balance Report" },
   { href: "/reports/yarn-to-fabric", label: "Yarn to Fabric Movement Report" },
+];
+
+const invoicingItems = [
+  { href: "/invoicing",    label: "Invoicing",    icon: Receipt },
+  { href: "/company-info", label: "Company Info", icon: Building2 },
 ];
 
 // Mobile drawer: the groups and their items, so the drawer can render from
@@ -95,6 +100,13 @@ const mobileGroups = [
       { href: "/reports/yarn-to-fabric", label: "Yarn to Fabric Movement",   icon: Database },
     ],
   },
+  {
+    key: "invoicing",
+    label: "Invoicing",
+    icon: Receipt,
+    activeFn: (loc: string) => loc.startsWith("/invoicing") || loc.startsWith("/company-info"),
+    items: invoicingItems,
+  },
 ];
 
 // Primary route each collapsed group icon navigates to.
@@ -102,6 +114,7 @@ const TRANSACTIONS_PRIMARY = "/transactions";
 const PAYROLL_PRIMARY = "/transactions/monthly-salary-entry";
 const REPORTS_PRIMARY = "/reports/yarn-balance";
 const MAINTENANCE_PRIMARY = "/maintenance/machine";
+const INVOICING_PRIMARY = "/invoicing";
 
 const LS_SIDEBAR_COLLAPSED = "sidebar-collapsed";
 
@@ -181,6 +194,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const yarnReceiptsActive = location.startsWith("/yarn-receipts");
   const dailyDeliveriesActive = location.startsWith("/daily-deliveries");
   const maintenanceActive = location.startsWith("/maintenance");
+  const invoicingActive = location.startsWith("/invoicing") || location.startsWith("/company-info");
 
   return (
     <div className="min-h-[100dvh] w-full bg-background">
@@ -336,6 +350,26 @@ export function Layout({ children }: { children: ReactNode }) {
                   href={item.href}
                   label={item.label}
                   active={location.startsWith(item.href)}
+                />
+              ))}
+            </DesktopGroup>
+          </div>
+
+          {!collapsed && <NavSection label="Invoicing" />}
+          <div className={cn("flex flex-col gap-0.5", collapsed && "pt-1")}>
+            <DesktopGroup
+              label="Invoicing"
+              icon={Receipt}
+              primary={INVOICING_PRIMARY}
+              active={invoicingActive}
+              collapsed={collapsed}
+            >
+              {invoicingItems.map((item) => (
+                <SubItem
+                  key={item.href}
+                  href={item.href}
+                  label={item.label}
+                  active={isSubItemActive(location, item.href)}
                 />
               ))}
             </DesktopGroup>
