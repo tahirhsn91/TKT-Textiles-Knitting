@@ -110,7 +110,7 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
     doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(INK[0], INK[1], INK[2]); text(s, x, y, o);
   };
   invLabel("INVOICE NUMBER", leftX, blockTop + 12);
-  invValue(String(inv.invoiceNumber ?? inv.id).padStart(6, "0"), leftX, blockTop + 24);
+  invValue(String(inv.id).padStart(6, "0"), leftX, blockTop + 24);
   invLabel("INVOICE DATE", W - M, blockTop + 12, { align: "right" });
   invValue(format(new Date(inv.invoiceDate + "T00:00:00"), "dd-MM-yyyy"), W - M, blockTop + 24, { align: "right" });
   invLabel("FBR INVOICE #", leftX, blockTop + 42);

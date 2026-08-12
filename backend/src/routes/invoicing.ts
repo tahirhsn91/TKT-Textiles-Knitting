@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db } from "../db/index.js";
 import {
@@ -120,8 +120,6 @@ router.post("/invoicing/generate", async (req, res): Promise<void> => {
         invoiceDate,
         companyId: company.id,
         partyId,
-        // Next business invoice number from the sequence (starts at 255).
-        invoiceNumber: sql`nextval('invoice_number_seq')`,
         status: "draft",
         totalValue: "0",
         totalTax: "0",
@@ -203,7 +201,6 @@ router.get("/invoicing", async (_req, res): Promise<void> => {
   const rows = await db
     .select({
       id: invoiceTable.id,
-      invoiceNumber: invoiceTable.invoiceNumber,
       invoiceDate: invoiceTable.invoiceDate,
       companyId: invoiceTable.companyId,
       companyName: companyInfoMasterTable.name,
@@ -231,7 +228,6 @@ async function loadInvoiceDetail(id: number) {
   const [inv] = await db
     .select({
       id: invoiceTable.id,
-      invoiceNumber: invoiceTable.invoiceNumber,
       invoiceDate: invoiceTable.invoiceDate,
       companyId: invoiceTable.companyId,
       companyName: companyInfoMasterTable.name,
