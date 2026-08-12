@@ -161,6 +161,15 @@ export function useListInvoices() {
   });
 }
 
+export function useInvoiceDetail(invoiceId: number | null) {
+  return useQuery<InvoiceDetail, ErrorType<unknown>>({
+    queryKey: [`${invoicingKey}/detail`, invoiceId] as unknown as QueryKey,
+    queryFn: () => customFetch<InvoiceDetail>(`${invoicingKey}/${invoiceId}`, { method: "GET" }),
+    enabled: invoiceId != null,
+    staleTime: 15_000,
+  });
+}
+
 export interface GenerateInvoiceBody {
   partyId: number;
   createdBy: string;
