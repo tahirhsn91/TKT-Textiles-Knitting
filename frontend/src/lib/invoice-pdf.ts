@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
+import QRCode from "qrcode";
 import type { InvoiceDetail } from "@/hooks/use-fbr-invoicing";
 import { FBR_INVOICE_LOGO_B64 } from "@/lib/invoice-logo";
 
@@ -11,7 +12,7 @@ import { FBR_INVOICE_LOGO_B64 } from "@/lib/invoice-logo";
  * RATE / VALUE / ST % / SALES TAX, with HS Code + Item Code per line), TOTAL
  * VALUE / SALES TAX / GRAND TOTAL, amount in words, and terms/footer.
  */
-export function downloadInvoicePdf(inv: InvoiceDetail): void {
+export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const W = doc.internal.pageSize.getWidth();
 
@@ -24,12 +25,35 @@ export function downloadInvoicePdf(inv: InvoiceDetail): void {
   doc.setFontSize(22);
   doc.text(inv.companyName ?? "TKT TEXTILES", 20, 78);
 
+  // QR code of the FBR invoice number — top-right corner (mirrors the sample
+  // invoice header icon placement; the FBR spec prints a QR on each invoice).
+  let qrDataUrl: string | null = null;
+  if (inv.fbrInvoiceNumber) {
+    try {
+      qrDataUrl = await QRCode.toDataURL(inv.fbrInvoiceNumber, {
+        errorCorrectionLevel: "M",
+        margin: 1,
+        width: 120,
+      });
+    } catch {
+      qrDataUrl = null;
+    }
+  }
+  const bannerRight = qrDataUrl ? W - 100 : W - 20;
+  if (qrDataUrl) {
+    doc.addImage(qrDataUrl, "PNG", W - 72, 28, 52, 52);
+    doc.setFontSize(6);
+    doc.setFont("helvetica", "normal");
+    doc.text("FBR INVOICE #", W - 46, 84, { align: "center" });
+  }
+
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text("DIGITAL INVOICE", W - 20, 96, { align: "right" });
+  doc.text("DIGITAL INVOICE", bannerRight, 96, { align: "right" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text("S A L E S   T A X", W - 20, 112, { align: "right" });
-  doc.text(`REG. #: ${inv.companyNtnCnic ?? "—"}`, W - 20, 126, { align: "right" });
+  doc.text("S A L E S   T A X", bannerRight, 112, { align: "right" });
+  doc.text(`REG. #: ${inv.companyNtnCnic ?? "—"}`, bannerRight, 126, { align: "right" });
 
   // ── BILL TO (left) + INVOICE (right) blocks ───────────────────────────
   doc.setFont("helvetica", "bold");
