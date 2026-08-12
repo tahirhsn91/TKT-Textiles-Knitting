@@ -456,10 +456,19 @@ export default function TransactionForm() {
     // Derive the reconcile set from the CURRENT visible detail lines (each row
     // carries its source record id). Removing a line therefore drops its source
     // from the reconcile set — fixes the bug where deleting a line still
-    // reconciled the deleted record.
-    const reconcileSourceIds = (values.details ?? [])
-      .map((d) => d.reconcileSourceId)
-      .filter((x): x is number => x != null);
+    // reconciled the deleted record. Deduped so a multi-line Yarn Receipt
+    // (one header spanning several lines) is counted once.
+    const reconcileSourceIds = (() => {
+      const seen = new Set<number>();
+      const out: number[] = [];
+      for (const d of values.details ?? []) {
+        const id = d.reconcileSourceId;
+        if (id == null || seen.has(id)) continue;
+        seen.add(id);
+        out.push(id);
+      }
+      return out;
+    })();
 
     if (isEditing) {
       updateTx.mutate(
