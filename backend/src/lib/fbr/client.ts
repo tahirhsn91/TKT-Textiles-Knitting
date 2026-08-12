@@ -54,6 +54,17 @@ export interface FbrInvoiceItemInput {
   valueSalesExcludingST: string;
   salesTaxApplicable: string;
   saleType: string;
+  /** FBR's sandbox strictly validates every numeric field, so even the
+   *  optional ones must be present as a well-formed 2-dp value (usually
+   *  "0.00") rather than omitted (see error 0300/0302). */
+  fixedNotifiedValueOrRetailPrice: string;
+  salesTaxWithheldAtSource: string;
+  extraTax: string;
+  furtherTax: string;
+  sroScheduleNo: string;
+  fedPayable: string;
+  discount: string;
+  sroItemSerialNo: string;
 }
 
 function round2(n: number): number {
@@ -150,6 +161,18 @@ export function buildFbrInvoicePayload(params: {
       valueSalesExcludingST: it.valueExcludingTax,
       salesTaxApplicable: it.taxAmount,
       saleType: FBR_DEFAULT_SALE_TYPE,
+      // FBR's sandbox validates every numeric field strictly, so the optional
+      // ones must be present as 2-dp values (zero here because fabric sales at
+      // the standard rate carry no discount / FED / extra / further tax /
+      // withholding). Sending "0.00" avoids error 0300/0302.
+      fixedNotifiedValueOrRetailPrice: "0.00",
+      salesTaxWithheldAtSource: "0.00",
+      extraTax: "0.00",
+      furtherTax: "0.00",
+      sroScheduleNo: "",
+      fedPayable: "0.00",
+      discount: "0.00",
+      sroItemSerialNo: "",
     })),
   };
   if (sandbox) {
