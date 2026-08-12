@@ -1,6 +1,5 @@
 import { Router, type IRouter } from "express";
 import { eq, and, sql, desc, inArray } from "drizzle-orm";
-import { z } from "zod/v4";
 import { db } from "../db/index.js";
 import {
   dailyProductionHeaderTable,
@@ -30,17 +29,13 @@ import {
   UpdateTransactionResponse,
   DeleteTransactionParams,
 } from "../api-zod/index.js";
+import {
+  collectReconcileSourceIds,
+  deriveReconcileSets,
+  type ReconcileSource,
+} from "../lib/reconcile-derive.js";
 
 const router: IRouter = Router();
-
-/** Daily-production entries a Fabric Production transaction is claiming. */
-const reconcileIdsSchema = z.object({
-  reconcileProductionIds: z.array(z.number().int().positive()).optional(),
-  /** Yarn receipts a Yarn Receipt transaction is claiming. */
-  reconcileReceiptIds: z.array(z.number().int().positive()).optional(),
-  /** Daily deliveries a Fabric Delivery transaction is claiming. */
-  reconcileDeliveryIds: z.array(z.number().int().positive()).optional(),
-});
 
 function normalizeNumericString(v: string | null | undefined): string | null {
   if (v == null || v === "") return null;
@@ -336,17 +331,25 @@ router.post("/transactions", async (req, res): Promise<void> => {
 
   const { details, ...headerData } = parsed.data;
 
-  // Parsed separately from CreateTransactionBody, which is generated from the
-  // OpenAPI spec and must not be hand-edited. Ids are optional: only the
-  // Fabric Production flow sends them.
-  const reconcile = reconcileIdsSchema.safeParse(req.body);
-  if (!reconcile.success) {
-    res.status(400).json({ error: "reconcileProductionIds must be an array of positive integers" });
-    return;
-  }
-  const reconcileIds = reconcile.data.reconcileProductionIds ?? [];
-  const reconcileReceiptIds = reconcile.data.reconcileReceiptIds ?? [];
-  const reconcileDeliveryIds = reconcile.data.reconcileDeliveryIds ?? [];
+  // The reconcile set is derived from the source records the user actually
+  // kept on the submitted detail lines (issue #130: deleting a line must NOT
+  // reconcile the deleted record). The generated `CreateTransactionBody` zod
+  // strips unknown detail fields, so read `req.body.details[].reconcileSourceId`
+  // directly rather than relying on the generated schema or a separately
+  // passed array.
+  const rawDetails: ReconcileSource[] = Array.isArray(req.body?.details) ? req.body.details : [];
+  const sourceIds = collectReconcileSourceIds(rawDetails);
+
+  // Route the derived set by which operation this transaction is.
+  const txnTypeId = parsed.data.transactionTypeId;
+  const [txnType] = await db
+    .select({ code: transactionTypeMasterTable.code })
+    .from(transactionTypeMasterTable)
+    .where(eq(transactionTypeMasterTable.id, txnTypeId));
+  const sets = deriveReconcileSets(sourceIds, txnType?.code);
+  const reconcileIds = sets.reconcileProductionIds;
+  const reconcileReceiptIds = sets.reconcileReceiptIds;
+  const reconcileDeliveryIds = sets.reconcileDeliveryIds;
 
   let conflict: { error: string } | null = null;
 

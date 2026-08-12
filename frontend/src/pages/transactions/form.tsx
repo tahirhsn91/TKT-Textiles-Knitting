@@ -61,6 +61,10 @@ const detailSchema = z.object({
   uomId: z.number().nullable(),
   quantity: z.string().nullable(),
   netWt: z.string().nullable(),
+  // The source record this line reconciles (daily production header id, yarn
+  // receipt header id, or daily delivery id). Set at auto-fill; carried on the
+  // row so removing a line also drops its source from the reconcile set.
+  reconcileSourceId: z.number().int().nullable().optional(),
 });
 
 const formSchema = z.object({
@@ -88,6 +92,7 @@ const emptyDetail = (): z.infer<typeof detailSchema> => ({
   uomId: null,
   quantity: "1",
   netWt: null,
+  reconcileSourceId: null,
 });
 
 export default function TransactionForm() {
@@ -214,6 +219,7 @@ export default function TransactionForm() {
         uomId: null,
         quantity: String(p.rollCount),
         netWt: p.totalProduction,
+        reconcileSourceId: p.id,
       })),
       { shouldDirty: true },
     );
@@ -260,6 +266,7 @@ export default function TransactionForm() {
         uomId: null,
         quantity: String(r.quantity),
         netWt: r.netWeight,
+        reconcileSourceId: r.id,
       })),
       { shouldDirty: true },
     );
@@ -306,6 +313,7 @@ export default function TransactionForm() {
         uomId: null,
         quantity: String(d.quantity),
         netWt: d.netWeight,
+        reconcileSourceId: d.id,
       })),
       { shouldDirty: true },
     );
@@ -445,6 +453,14 @@ export default function TransactionForm() {
       })),
     };
 
+    // Derive the reconcile set from the CURRENT visible detail lines (each row
+    // carries its source record id). Removing a line therefore drops its source
+    // from the reconcile set — fixes the bug where deleting a line still
+    // reconciled the deleted record.
+    const reconcileSourceIds = (values.details ?? [])
+      .map((d) => d.reconcileSourceId)
+      .filter((x): x is number => x != null);
+
     if (isEditing) {
       updateTx.mutate(
         { id: id!, data: payload },
@@ -461,16 +477,10 @@ export default function TransactionForm() {
         }
       );
     } else {
-      // reconcileProductionIds isn't part of CreateTransactionBody — that type
-      // is generated from the OpenAPI spec and must not be hand-edited, so the
-      // field is attached here and read separately on the server. Re-run the
-      // API codegen and this cast can go.
-      const createPayload = {
-        ...payload,
-        ...(reconcileIds.length > 0 ? { reconcileProductionIds: reconcileIds } : {}),
-        ...(reconcileReceiptIds.length > 0 ? { reconcileReceiptIds } : {}),
-        ...(reconcileDeliveryIds.length > 0 ? { reconcileDeliveryIds } : {}),
-      } as typeof payload;
+      // The reconcile set is carried on each detail line (`reconcileSourceId`)
+      // and the backend derives it from the submitted details (the source of
+      // truth), so no separate array is sent here.
+      const createPayload = payload as typeof payload;
 
       createTx.mutate(
         { data: createPayload },
@@ -478,12 +488,12 @@ export default function TransactionForm() {
           onSuccess: () => {
             toast({
               title: "Transaction created",
-              description: reconcileIds.length > 0
-                ? `${reconcileIds.length} production ${reconcileIds.length === 1 ? "entry" : "entries"} reconciled and locked.`
-                : reconcileReceiptIds.length > 0
-                  ? `${reconcileReceiptIds.length} yarn receipt${reconcileReceiptIds.length === 1 ? "" : "s"} consumed and locked.`
-                  : reconcileDeliveryIds.length > 0
-                    ? `${reconcileDeliveryIds.length} delivery${reconcileDeliveryIds.length === 1 ? "" : "ies"} consumed and locked.`
+              description: isFabricProduction
+                ? `${reconcileSourceIds.length} production ${reconcileSourceIds.length === 1 ? "entry" : "entries"} reconciled and locked.`
+                : isYarnReceipt
+                  ? `${reconcileSourceIds.length} yarn receipt${reconcileSourceIds.length === 1 ? "" : "s"} consumed and locked.`
+                  : isFabricDelivery
+                    ? `${reconcileSourceIds.length} deliver${reconcileSourceIds.length === 1 ? "y" : "ies"} consumed and locked.`
                     : undefined,
             });
             queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() });
