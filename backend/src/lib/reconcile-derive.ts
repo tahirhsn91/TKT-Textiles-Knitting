@@ -32,12 +32,23 @@ const toPositiveInt = (v: unknown): number | null =>
 
 /**
  * Collect the positive, integer source ids from the submitted detail lines
- * (the records the user actually kept).
+ * (the records the user actually kept), deduplicated and order-preserving.
+ *
+ * Deduplication matters for Yarn Receipts: a receipt header can span several
+ * transaction lines (one per receipt line), each carrying the same header id.
+ * The reconcile unit is the header, so it must be claimed once — not once per
+ * line, which would otherwise fail the backend's claimed-count guard.
  */
 export function collectReconcileSourceIds(details: ReconcileSource[]): number[] {
-  return details
-    .map((d) => toPositiveInt(d?.reconcileSourceId))
-    .filter((x): x is number => x != null);
+  const seen = new Set<number>();
+  const out: number[] = [];
+  for (const d of details) {
+    const id = toPositiveInt(d?.reconcileSourceId);
+    if (id == null || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
 }
 
 /**

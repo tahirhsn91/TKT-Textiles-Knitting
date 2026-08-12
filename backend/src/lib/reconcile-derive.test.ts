@@ -48,6 +48,31 @@ test("collect: empty details -> empty reconcile set", () => {
   assert.deepEqual(collectReconcileSourceIds([]), []);
 });
 
+test("collect: dedupes a multi-line receipt header (claimed once, not once per line)", () => {
+  // A Yarn Receipt header (id 77) with three lines appears on three detail
+  // rows; it must be claimed once, so the backend's claimed-count guard passes.
+  assert.deepEqual(
+    collectReconcileSourceIds([
+      { reconcileSourceId: 77 },
+      { reconcileSourceId: 77 },
+      { reconcileSourceId: 77 },
+    ]),
+    [77],
+  );
+});
+
+test("collect: dedup keeps order and drops removed lines", () => {
+  // Two receipts, then one line of receipt B removed -> only kept headers.
+  assert.deepEqual(
+    collectReconcileSourceIds([
+      { reconcileSourceId: 10 },
+      { reconcileSourceId: 20 },
+      { reconcileSourceId: 20 }, // second line of receipt 20
+    ]),
+    [10, 20],
+  );
+});
+
 // ─── deriveReconcileSets ──────────────────────────────────────────────────
 
 test("derive: routes ids to the production bucket", () => {
