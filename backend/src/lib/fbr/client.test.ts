@@ -158,6 +158,32 @@ test("buildFbrInvoicePayload: maps seller/buyer/items and adds scenarioId in san
   assert.equal(p.items[0].saleType, FBR_DEFAULT_SALE_TYPE);
 });
 
+test("buildFbrInvoicePayload: emits every optional numeric FBR field as 2-dp zero", () => {
+  // FBR's sandbox rejects items that omit the optional numeric fields
+  // (error 0300/0302), so they must all be present as "0.00".
+  const p = buildFbrInvoicePayload({
+    invoice: baseInvoice,
+    items: baseItems,
+    company: baseCompany,
+    buyerNtnCnic: "7654321",
+    buyerBusinessName: "Acme Buyer",
+    buyerProvince: "Sindh",
+    buyerAddress: "Karachi",
+    buyerRegistrationType: "Registered",
+    sandbox: true,
+  });
+
+  const it = p.items[0];
+  assert.equal(it.fixedNotifiedValueOrRetailPrice, "0.00");
+  assert.equal(it.salesTaxWithheldAtSource, "0.00");
+  assert.equal(it.extraTax, "0.00");
+  assert.equal(it.furtherTax, "0.00");
+  assert.equal(it.sroScheduleNo, "");
+  assert.equal(it.fedPayable, "0.00");
+  assert.equal(it.discount, "0.00");
+  assert.equal(it.sroItemSerialNo, "");
+});
+
 test("buildFbrInvoicePayload: unregistered buyer → SN002, empty NTN, no scenario in production", () => {
   const p = buildFbrInvoicePayload({
     invoice: baseInvoice,
