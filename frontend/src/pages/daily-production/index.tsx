@@ -197,7 +197,7 @@ export default function DailyProductionList() {
             month-to-date comes from the API (sum of every submitted entry
             from the 1st through the selected date). */}
         <Card className="overflow-hidden">
-          <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-[300px_1fr_1fr] sm:divide-x sm:divide-y-0">
+          <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-[220px_1fr_1fr] sm:divide-x sm:divide-y-0">
             <div className="flex flex-col justify-center gap-2 px-5 py-4">
               <label className="eyebrow">Production date</label>
               <UnreconciledDateStepper
