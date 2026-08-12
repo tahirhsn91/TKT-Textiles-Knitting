@@ -16,7 +16,7 @@ import { ProductionEntryDialog } from "./add-production-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { DateStepper } from "@/components/date-stepper";
+import { UnreconciledDateStepper } from "@/components/unreconciled-date-stepper";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -197,10 +197,11 @@ export default function DailyProductionList() {
             month-to-date comes from the API (sum of every submitted entry
             from the 1st through the selected date). */}
         <Card className="overflow-hidden">
-          <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-[220px_1fr_1fr] sm:divide-x sm:divide-y-0">
+          <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-[300px_1fr_1fr] sm:divide-x sm:divide-y-0">
             <div className="flex flex-col justify-center gap-2 px-5 py-4">
               <label className="eyebrow">Production date</label>
-              <DateStepper
+              <UnreconciledDateStepper
+                operation="production"
                 value={date}
                 max={todayIso()}
                 onChange={(d) => setDate(d)}
