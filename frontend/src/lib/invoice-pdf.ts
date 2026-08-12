@@ -19,14 +19,10 @@ export function downloadInvoicePdf(inv: InvoiceDetail): void {
     Number(n).toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const moneyRaw = (n: string | number) => Number(n).toFixed(2);
 
-  // ── Header: TKT TEXTILES (left) + FBR logo + DIGITAL INVOICE (right) ──
+  // ── Header: TKT TEXTILES (left) + DIGITAL INVOICE banner (right) ──────
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
   doc.text(inv.companyName ?? "TKT TEXTILES", 20, 78);
-
-  // FBR Digital Invoicing logo — top-right, above the DIGITAL INVOICE banner
-  // (mirrors the sample invoice header placement).
-  doc.addImage(FBR_INVOICE_LOGO_B64, "PNG", W - 96, 36, 44, 42);
 
   doc.setFontSize(16);
   doc.text("DIGITAL INVOICE", W - 20, 96, { align: "right" });
@@ -142,12 +138,19 @@ export function downloadInvoicePdf(inv: InvoiceDetail): void {
   doc.text(money(inv.grandTotal), totX, lastY + 74, { align: "right" });
 
   // ── Terms + footer ─────────────────────────────────────────────────────
+  const termsY = Math.max(wy, lastY + 24) + 60;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.text("TERMS & CONDITIONS", 20, Math.max(wy, lastY + 24) + 60);
+  doc.text("TERMS & CONDITIONS", 20, termsY);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  doc.text("- This is a system generated invoice and does not require a signature.", 20, Math.max(wy, lastY + 24) + 72);
+  doc.text("- This is a system generated invoice and does not require a signature.", 20, termsY + 12);
+  doc.text("- Goods once sold will not be taken back.", 20, termsY + 22);
+  doc.text("- Payment due within the agreed credit period; subject to applicable sales tax.", 20, termsY + 32);
+
+  // FBR Digital Invoicing logo — right of the TERMS & CONDITIONS block,
+  // matching the sample invoice footer placement.
+  doc.addImage(FBR_INVOICE_LOGO_B64, "PNG", W - 110, termsY - 8, 66, 64);
 
   const pH = doc.internal.pageSize.getHeight();
   doc.setFontSize(8);
