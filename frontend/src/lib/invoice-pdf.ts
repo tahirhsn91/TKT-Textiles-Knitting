@@ -209,10 +209,14 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   doc.setFontSize(12);
   text(money(inv.grandTotal), totX - 10, bandTop + 4, { align: "right" });
 
-  // ── Terms + footer ─────────────────────────────────────────────────────
-  const bandBottom = bandTop + 14;
-  const termsY = Math.max(wy, bandBottom) + 26;
-  hairline(termsY - 12);
+  // ── Footer: separator + terms + logo, anchored to the bottom of the page ──
+  const pH = doc.internal.pageSize.getHeight();
+  const termsY = pH - 74;
+
+  // Separator line above the footer block.
+  hairline(termsY - 16, M, W - M, [20, 20, 20], 1.0);
+
+  // TERMS & CONDITIONS (bottom-left).
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.setTextColor(INK[0], INK[1], INK[2]);
@@ -224,20 +228,22 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   text("\u2022  Goods once sold will not be taken back.", M, termsY + 24);
   text("\u2022  Payment due within the agreed credit period; subject to applicable sales tax.", M, termsY + 34);
 
-  // FBR Digital Invoicing logo — right of the TERMS block.
+  // FBR Digital Invoicing logo — bottom-right, aligned with the terms block.
   doc.addImage(FBR_INVOICE_LOGO_B64, "PNG", W - 108, termsY - 6, 66, 64);
 
-  const pH = doc.internal.pageSize.getHeight();
-  hairline(pH - 48, 0, W, LINE, 0.4);
+  // Company address + FBR reporting note + version credit at the very bottom.
+  hairline(pH - 32, 0, W, LINE, 0.4);
   doc.setFontSize(8);
   doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-  text(inv.companyAddress ?? "", M, pH - 32);
+  text(inv.companyAddress ?? "", M, pH - 20);
   text(
-    "This is system generated invoice does not require signature",
+    inv.status === "posted"
+      ? `This invoice has been reported to FBR Digital Invoicing (No: ${inv.fbrInvoiceNumber ?? "—"}).`
+      : "Draft invoice — not yet posted to FBR.",
     M,
-    pH - 22,
+    pH - 12,
   );
-  text(`DINVOICE System v1.0 by innovrix`, W - M, pH - 22, { align: "right" });
+  text("DINVOICE System v1.0 by innovrix", W - M, pH - 12, { align: "right" });
 
   doc.save(`invoice-${inv.id}.pdf`);
 }
