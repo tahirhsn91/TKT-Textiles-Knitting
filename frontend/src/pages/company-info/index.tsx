@@ -4,7 +4,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
-import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -90,7 +89,7 @@ function toForm(c: CompanyInfo): CompanyFormValues {
   };
 }
 
-export default function CompanyInfoPage() {
+export function CompanyInfoSection() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<CompanyInfo | null>(null);
@@ -158,7 +157,7 @@ export default function CompanyInfoPage() {
   );
 
   return (
-    <Layout>
+    <>
       <div className="space-y-4">
         <Card className="border-sidebar-border">
           {head}
@@ -368,6 +367,6 @@ export default function CompanyInfoPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Layout>
+    </>
   );
 }

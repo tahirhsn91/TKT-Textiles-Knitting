@@ -26,7 +26,6 @@ const YarnToFabricPage = lazyRetry(() => import("@/pages/reports/yarn-to-fabric"
 const MachineMaintenancePage = lazyRetry(() => import("@/pages/maintenance/machine-maintenance"));
 const FactoryMaintenancePage = lazyRetry(() => import("@/pages/maintenance/factory-maintenance"));
 const InvoicingPage = lazyRetry(() => import("@/pages/invoicing"));
-const CompanyInfoPage = lazyRetry(() => import("@/pages/company-info"));
 
 const queryClient = new QueryClient();
 
@@ -54,7 +53,6 @@ function Router() {
           <Route path="/maintenance/machine" component={MachineMaintenancePage} />
           <Route path="/maintenance/factory" component={FactoryMaintenancePage} />
           <Route path="/invoicing" component={InvoicingPage} />
-          <Route path="/company-info" component={CompanyInfoPage} />
           <Route component={NotFound} />
         </Switch>
       </Suspense>
