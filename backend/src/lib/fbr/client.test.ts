@@ -91,7 +91,6 @@ const baseCompany = {
 
 const baseInvoice = {
   id: 42,
-  invoiceNumber: 255,
   invoiceDate: "2026-08-12",
   companyId: 1,
   partyId: 7,

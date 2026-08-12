@@ -51,7 +51,6 @@ export interface InvoicePreview {
 
 export interface InvoiceListItem {
   id: number;
-  invoiceNumber: number | null;
   invoiceDate: string;
   companyId: number;
   companyName: string | null;
