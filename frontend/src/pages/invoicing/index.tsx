@@ -331,7 +331,7 @@ export default function InvoicingPage() {
                 ) : (
                   (invoices ?? []).map((inv) => (
                     <TableRow key={inv.id}>
-                      <TableCell className="font-medium">#{inv.id}</TableCell>
+                      <TableCell className="font-medium">{String(inv.invoiceNumber ?? inv.id).padStart(6, "0")}</TableCell>
                       <TableCell>{format(new Date(inv.invoiceDate), "dd MMM yyyy")}</TableCell>
                       <TableCell>{inv.partyName}</TableCell>
                       <TableCell>{inv.companyName}</TableCell>
@@ -410,7 +410,7 @@ export default function InvoicingPage() {
         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-4 w-4" /> Invoice #{viewing?.id ?? ""}
+              <FileText className="h-4 w-4" /> Invoice #{String(viewing?.invoiceNumber ?? viewing?.id ?? "").padStart(6, "0")}
             </DialogTitle>
             <DialogDescription>
               {viewing?.status === "posted"
