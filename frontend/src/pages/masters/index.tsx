@@ -75,7 +75,7 @@ import {
   getListEmployeeMasterQueryKey,
   getListDepartmentMasterQueryKey,
 } from "@workspace/api-client-react";
-import { X, Tag, Briefcase, Building2, Cog, MapPin, SwatchBook, Hash, BadgeCheck, Ruler, Layers, Users, Scissors, Settings2 } from "lucide-react";
+import { X, Tag, Briefcase, Building2, Cog, MapPin, SwatchBook, Hash, BadgeCheck, Ruler, Layers, Users, Scissors, Settings2, Landmark } from "lucide-react";
 import { useRef } from "react";
 import { Layout } from "@/components/layout";
 import { MasterTable } from "@/components/master-table";
@@ -83,6 +83,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MachineAnalyticsView } from "./machine-analytics";
 import { PartyAnalyticsView } from "./party-analytics";
+import { CompanyInfoSection } from "@/pages/company-info";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -128,6 +129,7 @@ const TABS = [
   { id: "uom",               label: "UOM",             short: "UOM",         icon: Ruler, group: "Yarn" },
   { id: "fabric-type",       label: "Fabric Type",     short: "Fabric",      icon: Scissors, group: "Product" },
   { id: "configuration",     label: "Configuration",   short: "Config",      icon: Settings2, group: "System" },
+  { id: "company-info",      label: "Company Info",    short: "Company",     icon: Landmark, group: "System" },
 ];
 
 const TAB_IDS = TABS.map((t) => t.id);
@@ -272,6 +274,7 @@ export default function MastersPage() {
               <TabsContent value="department" className="mt-0"><DepartmentTab /></TabsContent>
               <TabsContent value="employee" className="mt-0"><EmployeeTab /></TabsContent>
               <TabsContent value="configuration" className="mt-0"><ConfigurationTab /></TabsContent>
+              <TabsContent value="company-info" className="mt-0"><CompanyInfoSection /></TabsContent>
             </div>
           </div>
         </Tabs>
