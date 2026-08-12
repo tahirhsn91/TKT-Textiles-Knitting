@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import type { InvoiceDetail } from "@/hooks/use-fbr-invoicing";
+import { FBR_INVOICE_LOGO_B64 } from "@/lib/invoice-logo";
 
 /**
  * Build a PDF for a generated FBR invoice, mirroring the reference "DIGITAL
@@ -18,10 +19,14 @@ export function downloadInvoicePdf(inv: InvoiceDetail): void {
     Number(n).toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const moneyRaw = (n: string | number) => Number(n).toFixed(2);
 
-  // ── Header: TKT TEXTILES (left) + DIGITAL INVOICE banner (right) ──────
+  // ── Header: TKT TEXTILES (left) + FBR logo + DIGITAL INVOICE (right) ──
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
   doc.text(inv.companyName ?? "TKT TEXTILES", 20, 78);
+
+  // FBR Digital Invoicing logo — top-right, above the DIGITAL INVOICE banner
+  // (mirrors the sample invoice header placement).
+  doc.addImage(FBR_INVOICE_LOGO_B64, "PNG", W - 96, 36, 44, 42);
 
   doc.setFontSize(16);
   doc.text("DIGITAL INVOICE", W - 20, 96, { align: "right" });
