@@ -141,6 +141,12 @@ This is a starting point. Add your own conventions, style, and rules as you figu
 - Branch naming: `fix/...`, `feat/...`, `docs/...`, `chore/...` (issue id included when relevant, e.g. `fix/issue-8-rate-limiting`).
 - Merge to `main` only via PR from `develop` (release flow, out of scope for this environment).
 
+## Post-Merge Issue Cleanup (set 2026-08-12)
+
+- Whenever a task is completed and merged into `develop`, check whether it has an associated GitHub issue and/or whether the merge generated any new issue/task.
+- Close the corresponding issue if the work resolves it (PR merge with `Closes #N` usually auto-closes; verify it actually closed, and close manually if not).
+- If the merge surfaces a newly-identified follow-up task that is not yet tracked, create/note it as appropriate.
+
 ## Start-of-Task Sync (set 2026-08-10)
 
 - **This applies in the dev environment only.** In the dev environment, whenever the user says they have a new task (or asks to start one) — and at the start of a new session — FIRST `git checkout develop` and pull the latest (`git fetch origin` then fast-forward/reset local `develop` to `origin/develop`) before doing any work. If `origin/develop` was force-updated (Backup Bot rebase), reset local to match remote after confirming nothing local is unique. Only then create the feature branch for the new task.
