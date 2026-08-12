@@ -16,6 +16,8 @@ import machineMaintenanceRouter from "./machine-maintenance.js";
 import factoryMaintenanceRouter from "./factory-maintenance.js";
 import machineAnalyticsRouter from "./machine-analytics.js";
 import partyAnalyticsRouter from "./party-analytics.js";
+import companyInfoRouter from "./company-info.js";
+import invoicingRouter from "./invoicing.js";
 
 const router: IRouter = Router();
 
@@ -36,5 +38,7 @@ router.use(machineMaintenanceRouter);
 router.use(factoryMaintenanceRouter);
 router.use(machineAnalyticsRouter);
 router.use(partyAnalyticsRouter);
+router.use(companyInfoRouter);
+router.use(invoicingRouter);
 
 export default router;
