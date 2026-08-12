@@ -15,18 +15,47 @@ import { FBR_INVOICE_LOGO_B64 } from "@/lib/invoice-logo";
 export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const W = doc.internal.pageSize.getWidth();
+  const M = 20; // page margin
+
+  // ── Design tokens (align with the app's Mass Balance palette) ──────────
+  const INK = [21, 28, 38];          // near-black
+  const MUTED = [112, 122, 138];     // secondary text
+  const BRAND = [37, 99, 235];       // primary blue (book the header/table)
+  const BRAND_DARK = [30, 80, 190];  // accent for the grand-total band
+  const LINE = [222, 226, 232];      // hairlines
+  const BAND = [246, 248, 252];      // zebra / soft fill
 
   const money = (n: string | number) =>
     Number(n).toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const moneyRaw = (n: string | number) => Number(n).toFixed(2);
 
-  // ── Header: TKT TEXTILES (left) + DIGITAL INVOICE banner (right) ──────
+  const text = (s: string, x: number, y: number, opts?: Parameters<typeof doc.text>[3]) =>
+    doc.text(s, x, y, opts);
+  const hairline = (y: number, x1 = M, x2 = W - M, color: number[] = LINE, w = 0.6) => {
+    doc.setDrawColor(color[0], color[1], color[2]);
+    doc.setLineWidth(w);
+    doc.line(x1, y, x2, y);
+  };
+
+  // ── Header ─────────────────────────────────────────────────────────────
+  // Company name block (left) with a brand underline; DIGITAL INVOICE banner
+  // (right) in brand blue; QR of the FBR invoice number at top-right.
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
-  doc.text(inv.companyName ?? "TKT TEXTILES", 20, 78);
+  doc.setFontSize(24);
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  text(inv.companyName ?? "TKT TEXTILES", M, 74);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+  if (inv.companyAddress) {
+    text(inv.companyAddress.split(",")[0] ?? inv.companyAddress, M, 88);
+  }
 
-  // QR code of the FBR invoice number — top-right corner (mirrors the sample
-  // invoice header icon placement; the FBR spec prints a QR on each invoice).
+  // Brand bar under the header.
+  doc.setDrawColor(BRAND[0], BRAND[1], BRAND[2]);
+  doc.setLineWidth(2.2);
+  doc.line(M, 100, W - M, 100);
+
+  // FBR invoice number QR — top-right corner.
   let qrDataUrl: string | null = null;
   if (inv.fbrInvoiceNumber) {
     try {
@@ -39,59 +68,60 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
       qrDataUrl = null;
     }
   }
-  const bannerRight = W - 20;
   if (qrDataUrl) {
-    doc.addImage(qrDataUrl, "PNG", W - 72, 28, 52, 52);
+    doc.addImage(qrDataUrl, "PNG", W - 72, 40, 52, 52);
   }
-
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.text("DIGITAL INVOICE", bannerRight, 96, { align: "right" });
+  doc.setFontSize(13);
+  doc.setTextColor(BRAND[0], BRAND[1], BRAND[2]);
+  text("DIGITAL INVOICE", W - M, 90, { align: "right" });
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.text("S A L E S   T A X", bannerRight, 112, { align: "right" });
-  doc.text(`REG. #: ${inv.companyNtnCnic ?? "—"}`, bannerRight, 126, { align: "right" });
+  doc.setFontSize(8.5);
+  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+  text("S A L E S   T A X", W - M, 102, { align: "right" });
+  text(`REG. #: ${inv.companyNtnCnic ?? "—"}`, W - M, 112, { align: "right" });
 
-  // ── BILL TO (left) + INVOICE (right) blocks ───────────────────────────
+  // ── BILL TO / INVOICE blocks ──────────────────────────────────────────
+  const blockTop = 126;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.text("BILL TO", 20, 148);
-  doc.text("INVOICE", W / 2, 148);
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  text("BILL TO", M, blockTop);
+  text("INVOICE", W / 2, blockTop);
 
-  let by = 164;
-  doc.setFontSize(12);
-  doc.text(inv.partyName ?? "—", 20, by); by += 18;
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  if (inv.partyAddress) { doc.text(inv.partyAddress, 20, by); by += 14; }
-  if (inv.partyProvince) { doc.text(inv.partyProvince.toUpperCase(), 20, by); by += 14; }
-  doc.text(`NTN/CNIC: ${inv.partyNtnCnic ?? "—"}`, 20, by);
-
-  // INVOICE block (right): internal invoice number, date, FBR number.
   const leftX = W / 2 + 8;
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.text("INVOICE NUMBER", leftX, 164);
+  hairline(blockTop + 4);
+
+  // Bill-to details (left column).
+  let by = blockTop + 18;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
-  doc.text(String(inv.id).padStart(6, "0"), leftX, 176);
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  text(inv.partyName ?? "—", M, by); by += 16;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.text("INVOICE DATE", W - 20, 164, { align: "right" });
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text(format(new Date(inv.invoiceDate + "T00:00:00"), "dd-MM-yyyy"), W - 20, 176, { align: "right" });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.text("FBR INVOICE #", leftX, 192);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.text(inv.fbrInvoiceNumber ?? "—", leftX, 204);
+  doc.setFontSize(10);
+  if (inv.partyAddress) { text(inv.partyAddress, M, by); by += 13; }
+  if (inv.partyProvince) { text(inv.partyProvince.toUpperCase(), M, by); by += 13; }
+  text(`NTN/CNIC: ${inv.partyNtnCnic ?? "—"}`, M, by);
+
+  // INVOICE fields (right): number, date, FBR number. Labels muted, values bold.
+  const invLabel = (s: string, x: number, y: number, o?: Parameters<typeof text>[3]) => {
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]); text(s, x, y, o);
+  };
+  const invValue = (s: string, x: number, y: number, o?: Parameters<typeof text>[3]) => {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(INK[0], INK[1], INK[2]); text(s, x, y, o);
+  };
+  invLabel("INVOICE NUMBER", leftX, blockTop + 14);
+  invValue(String(inv.id).padStart(6, "0"), leftX, blockTop + 26);
+  invLabel("INVOICE DATE", W - M, blockTop + 14, { align: "right" });
+  invValue(format(new Date(inv.invoiceDate + "T00:00:00"), "dd-MM-yyyy"), W - M, blockTop + 26, { align: "right" });
+  invLabel("FBR INVOICE #", leftX, blockTop + 44);
+  invValue(inv.fbrInvoiceNumber ?? "—", leftX, blockTop + 56);
 
   // ── Items table ────────────────────────────────────────────────────────
   autoTable(doc, {
-    startY: 220,
-    margin: { left: 20, right: 20 },
+    startY: blockTop + 78,
+    margin: { left: M, right: M },
     head: [["#", "ITEM", "QTY", "RATE", "VALUE", "ST %", "SALES TAX"]],
     body: inv.items.map((it, idx) => [
       String(idx + 1),
@@ -108,18 +138,18 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
       money(it.taxAmount),
     ]),
     theme: "grid",
-    styles: { fontSize: 9, cellPadding: 3 },
-    headStyles: { fillColor: [245, 245, 245], textColor: [15, 15, 15], fontStyle: "bold" },
+    styles: { fontSize: 9, cellPadding: 4, textColor: INK as unknown as string },
+    headStyles: { fillColor: BRAND as unknown as string, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 },
+    alternateRowStyles: { fillColor: BAND as unknown as string },
     columnStyles: {
       0: { cellWidth: 24 },
-      1: { cellWidth: 240 },
-      2: { halign: "right", cellWidth: 72 },
+      1: { cellWidth: 248 },
+      2: { halign: "right", cellWidth: 74 },
       3: { halign: "right", cellWidth: 56 },
-      4: { halign: "right", cellWidth: 72 },
-      5: { halign: "right", cellWidth: 40 },
+      4: { halign: "right", cellWidth: 74 },
+      5: { halign: "right", cellWidth: 38 },
       6: { halign: "right", cellWidth: 66 },
     },
-    // Multi-line item cell: title / description / HS code / item code.
     didParseCell: (data) => {
       if (data.section === "body" && data.column.index === 1 && Array.isArray(data.cell.raw)) {
         data.cell.text = data.cell.raw as string[];
@@ -136,53 +166,76 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   // ── AMOUNT IN WORDS (left) + totals (right) ───────────────────────────
   const words = amountInWords(inv.grandTotal);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.text("AMOUNT IN WORDS", 20, lastY + 24);
+  doc.setFontSize(8);
+  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+  text("AMOUNT IN WORDS", M, lastY + 22);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  const wordsLines = doc.splitTextToSize(words, W - 280);
-  let wy = lastY + 38;
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  const wordsLines = doc.splitTextToSize(words, W - 300);
+  let wy = lastY + 34;
   for (const line of wordsLines) {
-    doc.text(line, 20, wy);
+    text(line, M, wy);
     wy += 13;
   }
 
-  const totX = W - 20;
+  // Totals block (right) with a shaded grand-total band.
+  const totX = W - M;
+  const totLeft = totX - 170;
+  const totTop = lastY + 18;
   doc.setFontSize(9);
-  doc.text("TOTAL VALUE", totX - 150, lastY + 26, { align: "right" });
-  doc.text(money(inv.totalValue), totX, lastY + 26, { align: "right" });
-  doc.text("SALES TAX", totX - 150, lastY + 46, { align: "right" });
-  doc.text(money(inv.totalTax), totX, lastY + 46, { align: "right" });
+  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+  doc.setFont("helvetica", "normal");
+  text("TOTAL VALUE", totLeft, totTop);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text("GRAND TOTAL", totX - 150, lastY + 74, { align: "right" });
-  doc.text(money(inv.grandTotal), totX, lastY + 74, { align: "right" });
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  text(money(inv.totalValue), totX, totTop, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+  text("SALES TAX (18%)", totLeft, totTop + 18);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  text(money(inv.totalTax), totX, totTop + 18, { align: "right" });
 
+  // Grand total band.
+  const bandTop = totTop + 30;
+  doc.setFillColor(BRAND_DARK[0], BRAND_DARK[1], BRAND_DARK[2]);
+  doc.rect(totLeft, bandTop - 10, totX - totLeft, 24, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  text("GRAND TOTAL", totLeft + 10, bandTop + 4);
+  doc.setFontSize(12);
+  text(money(inv.grandTotal), totX - 10, bandTop + 4, { align: "right" });
+
+  hairline(lastY + 46);
   // ── Terms + footer ─────────────────────────────────────────────────────
-  const termsY = Math.max(wy, lastY + 24) + 60;
+  const termsY = Math.max(wy, lastY + 50) + 26;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.text("TERMS & CONDITIONS", 20, termsY);
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  text("TERMS & CONDITIONS", M, termsY);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  doc.text("- This is a system generated invoice and does not require a signature.", 20, termsY + 12);
-  doc.text("- Goods once sold will not be taken back.", 20, termsY + 22);
-  doc.text("- Payment due within the agreed credit period; subject to applicable sales tax.", 20, termsY + 32);
+  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+  text("\u2022  This is a system generated invoice and does not require a signature.", M, termsY + 14);
+  text("\u2022  Goods once sold will not be taken back.", M, termsY + 24);
+  text("\u2022  Payment due within the agreed credit period; subject to applicable sales tax.", M, termsY + 34);
 
-  // FBR Digital Invoicing logo — right of the TERMS & CONDITIONS block,
-  // matching the sample invoice footer placement.
-  doc.addImage(FBR_INVOICE_LOGO_B64, "PNG", W - 110, termsY - 8, 66, 64);
+  // FBR Digital Invoicing logo — right of the TERMS block.
+  doc.addImage(FBR_INVOICE_LOGO_B64, "PNG", W - 108, termsY - 6, 66, 64);
 
   const pH = doc.internal.pageSize.getHeight();
+  hairline(pH - 48, 0, W, LINE, 0.4);
   doc.setFontSize(8);
-  doc.text(inv.companyAddress ?? "", 20, pH - 30);
-  doc.text(
-    inv.status === "posted"
-      ? `This invoice has been reported to FBR Digital Invoicing (No: ${inv.fbrInvoiceNumber ?? "—"}).`
-      : "Draft invoice — not yet posted to FBR.",
-    20,
-    pH - 18,
+  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+  text(inv.companyAddress ?? "", M, pH - 32);
+  text(
+    "This is system generated invoice does not require signature",
+    M,
+    pH - 22,
   );
+  text(`DINVOICE System v1.0 by innovrix`, W - M, pH - 22, { align: "right" });
 
   doc.save(`invoice-${inv.id}.pdf`);
 }
