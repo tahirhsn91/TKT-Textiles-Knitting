@@ -246,7 +246,7 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
     M,
     pH - 12,
   );
-  text("DINVOICE System v1.0 by innovrix", W - M, pH - 12, { align: "right" });
+  text("TKT System v1.0 by TKT", W - M, pH - 12, { align: "right" });
 
   doc.save(`invoice-${inv.id}.pdf`);
 }
