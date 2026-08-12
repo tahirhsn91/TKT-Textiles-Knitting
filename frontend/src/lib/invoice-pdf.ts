@@ -15,15 +15,16 @@ import { FBR_INVOICE_LOGO_B64 } from "@/lib/invoice-logo";
 export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
   const M = 20; // page margin
 
-  // ── Design tokens (align with the app's Mass Balance palette) ──────────
-  const INK = [21, 28, 38];          // near-black
-  const MUTED = [112, 122, 138];     // secondary text
-  const BRAND = [37, 99, 235];       // primary blue (book the header/table)
-  const BRAND_DARK = [30, 80, 190];  // accent for the grand-total band
-  const LINE = [222, 226, 232];      // hairlines
-  const BAND = [246, 248, 252];      // zebra / soft fill
+  // ── Design tokens (black/white invoice) ────────────────────────────────
+  const INK = [20, 20, 20];          // near-black
+  const MUTED = [110, 110, 110];     // secondary grey
+  const LINE = [200, 200, 200];      // light hairline
+  const BAND = [245, 245, 245];      // zebra / soft fill (light grey)
+  const HEAD_FILL = [45, 45, 45];    // table header fill (dark grey)
+  const TOTAL_FILL = [30, 30, 30];   // grand-total band (near-black)
 
   const money = (n: string | number) =>
     Number(n).toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -37,8 +38,8 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   };
 
   // ── Header ─────────────────────────────────────────────────────────────
-  // Company name block (left) with a brand underline; DIGITAL INVOICE banner
-  // (right) in brand blue; QR of the FBR invoice number at top-right.
+  // Company name (left, black) + address below it; QR top-right corner;
+  // DIGITAL INVOICE banner right-aligned below the QR, so nothing overlaps.
   doc.setFont("helvetica", "bold");
   doc.setFontSize(24);
   doc.setTextColor(INK[0], INK[1], INK[2]);
@@ -50,12 +51,7 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
     text(inv.companyAddress.split(",")[0] ?? inv.companyAddress, M, 88);
   }
 
-  // Brand bar under the header.
-  doc.setDrawColor(BRAND[0], BRAND[1], BRAND[2]);
-  doc.setLineWidth(2.2);
-  doc.line(M, 100, W - M, 100);
-
-  // FBR invoice number QR — top-right corner.
+  // FBR invoice number QR — top-right corner (52x52pt, y 40..92).
   let qrDataUrl: string | null = null;
   if (inv.fbrInvoiceNumber) {
     try {
@@ -71,18 +67,24 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   if (qrDataUrl) {
     doc.addImage(qrDataUrl, "PNG", W - 72, 40, 52, 52);
   }
+
+  // DIGITAL INVOICE banner — right-aligned below the QR (y 104..126), clear
+  // of both the QR (y 40..92) and the address text on the left.
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
-  doc.setTextColor(BRAND[0], BRAND[1], BRAND[2]);
-  text("DIGITAL INVOICE", W - M, 90, { align: "right" });
+  doc.setTextColor(INK[0], INK[1], INK[2]);
+  text("DIGITAL INVOICE", W - M, 106, { align: "right" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
   doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-  text("S A L E S   T A X", W - M, 102, { align: "right" });
-  text(`REG. #: ${inv.companyNtnCnic ?? "—"}`, W - M, 112, { align: "right" });
+  text("S A L E S   T A X", W - M, 118, { align: "right" });
+  text(`REG. #: ${inv.companyNtnCnic ?? "—"}`, W - M, 128, { align: "right" });
+
+  // Black header rule below everything (y=138) — clear of all header text.
+  hairline(138, M, W - M, [20, 20, 20], 1.2);
 
   // ── BILL TO / INVOICE blocks ──────────────────────────────────────────
-  const blockTop = 126;
+  const blockTop = 150;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.setTextColor(INK[0], INK[1], INK[2]);
@@ -90,18 +92,17 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   text("INVOICE", W / 2, blockTop);
 
   const leftX = W / 2 + 8;
-  hairline(blockTop + 4);
 
   // Bill-to details (left column).
-  let by = blockTop + 18;
+  let by = blockTop + 16;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.setTextColor(INK[0], INK[1], INK[2]);
-  text(inv.partyName ?? "—", M, by); by += 16;
+  text(inv.partyName ?? "—", M, by); by += 17;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  if (inv.partyAddress) { text(inv.partyAddress, M, by); by += 13; }
-  if (inv.partyProvince) { text(inv.partyProvince.toUpperCase(), M, by); by += 13; }
+  if (inv.partyAddress) { text(inv.partyAddress, M, by); by += 14; }
+  if (inv.partyProvince) { text(inv.partyProvince.toUpperCase(), M, by); by += 14; }
   text(`NTN/CNIC: ${inv.partyNtnCnic ?? "—"}`, M, by);
 
   // INVOICE fields (right): number, date, FBR number. Labels muted, values bold.
@@ -111,12 +112,12 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   const invValue = (s: string, x: number, y: number, o?: Parameters<typeof text>[3]) => {
     doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(INK[0], INK[1], INK[2]); text(s, x, y, o);
   };
-  invLabel("INVOICE NUMBER", leftX, blockTop + 14);
-  invValue(String(inv.id).padStart(6, "0"), leftX, blockTop + 26);
-  invLabel("INVOICE DATE", W - M, blockTop + 14, { align: "right" });
-  invValue(format(new Date(inv.invoiceDate + "T00:00:00"), "dd-MM-yyyy"), W - M, blockTop + 26, { align: "right" });
-  invLabel("FBR INVOICE #", leftX, blockTop + 44);
-  invValue(inv.fbrInvoiceNumber ?? "—", leftX, blockTop + 56);
+  invLabel("INVOICE NUMBER", leftX, blockTop + 12);
+  invValue(String(inv.id).padStart(6, "0"), leftX, blockTop + 24);
+  invLabel("INVOICE DATE", W - M, blockTop + 12, { align: "right" });
+  invValue(format(new Date(inv.invoiceDate + "T00:00:00"), "dd-MM-yyyy"), W - M, blockTop + 24, { align: "right" });
+  invLabel("FBR INVOICE #", leftX, blockTop + 42);
+  invValue(inv.fbrInvoiceNumber ?? "—", leftX, blockTop + 54);
 
   // ── Items table ────────────────────────────────────────────────────────
   autoTable(doc, {
@@ -139,7 +140,7 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
     ]),
     theme: "grid",
     styles: { fontSize: 9, cellPadding: 4, textColor: INK as unknown as string },
-    headStyles: { fillColor: BRAND as unknown as string, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 },
+    headStyles: { fillColor: HEAD_FILL as unknown as string, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 },
     alternateRowStyles: { fillColor: BAND as unknown as string },
     columnStyles: {
       0: { cellWidth: 24 },
@@ -199,7 +200,7 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
 
   // Grand total band.
   const bandTop = totTop + 30;
-  doc.setFillColor(BRAND_DARK[0], BRAND_DARK[1], BRAND_DARK[2]);
+  doc.setFillColor(TOTAL_FILL[0], TOTAL_FILL[1], TOTAL_FILL[2]);
   doc.rect(totLeft, bandTop - 10, totX - totLeft, 24, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
