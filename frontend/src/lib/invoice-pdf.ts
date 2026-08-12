@@ -47,9 +47,6 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-  if (inv.companyAddress) {
-    text(inv.companyAddress.split(",")[0] ?? inv.companyAddress, M, 88);
-  }
 
   // FBR invoice number QR — top-right corner (52x52pt, y 40..92).
   let qrDataUrl: string | null = null;
