@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Send, Trash2, RefreshCw, FileText, StickyNote } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Send, Trash2, RefreshCw, FileText, StickyNote, Eye, Download } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 
@@ -35,17 +35,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useFbrSandboxEnabled } from "@/context/config-context";
 import {
   useUninvoicedParties,
   useInvoicePreview,
   useListInvoices,
+  useInvoiceDetail,
   useGenerateInvoice,
   usePostInvoice,
   useDeleteInvoice,
   type InvoiceListItem,
 } from "@/hooks/use-fbr-invoicing";
+import { downloadInvoicePdf } from "@/lib/invoice-pdf";
 
 const SALES_TAX_PERCENT = 18;
 
@@ -62,10 +72,12 @@ export default function InvoicingPage() {
   const [enteredBy, setEnteredBy] = useState("");
   const [rates, setRates] = useState<Record<string, string>>({});
   const [pendingDelete, setPendingDelete] = useState<InvoiceListItem | null>(null);
+  const [viewingId, setViewingId] = useState<number | null>(null);
 
   const { data: parties } = useUninvoicedParties();
   const { data: preview, isLoading: previewLoading, isFetching: previewFetching } = useInvoicePreview(partyId);
   const { data: invoices } = useListInvoices();
+  const { data: viewing, isLoading: viewingLoading } = useInvoiceDetail(viewingId);
 
   const generate = useGenerateInvoice();
   const post = usePostInvoice();
@@ -137,6 +149,24 @@ export default function InvoicingPage() {
         }),
     });
   };
+
+  // One detail query drives both the View dialog and the PDF download. When
+  // a download is requested we re-point the detail query at that id; once the
+  // items arrive the effect below builds the PDF.
+  const [downloadTarget, setDownloadTarget] = useState<number | null>(null);
+  useEffect(() => {
+    if (downloadTarget != null && viewing && viewing.id === downloadTarget && !viewingLoading) {
+      downloadInvoicePdf(viewing);
+      setDownloadTarget(null);
+    }
+  }, [downloadTarget, viewing, viewingLoading]);
+
+  const handleDownloadPdf = (invoiceId: number) => {
+    setViewingId(invoiceId);
+    setDownloadTarget(invoiceId);
+  };
+
+  const handleView = (invoiceId: number) => setViewingId(invoiceId);
 
   return (
     <Layout>
@@ -329,7 +359,14 @@ export default function InvoicingPage() {
                             </Button>
                           </div>
                         ) : (
-                          <span className="text-xs text-muted-foreground">Read-only</span>
+                          <div className="flex justify-end">
+                            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8" title="View" onClick={() => handleView(inv.id)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8" title="Download PDF" onClick={() => handleDownloadPdf(inv.id)}>
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </div>
                         )}
                       </TableCell>
                     </TableRow>
@@ -368,6 +405,84 @@ export default function InvoicingPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* View invoice detail (posted invoices) */}
+      <Dialog open={viewingId != null} onOpenChange={(o) => { if (!o) { setViewingId(null); setDownloadTarget(null); } }}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-4 w-4" /> Invoice #{viewing?.id ?? ""}
+            </DialogTitle>
+            <DialogDescription>
+              {viewing?.status === "posted"
+                ? `Reported to FBR · ${viewing.fbrInvoiceNumber ?? "no FBR number"}`
+                : "Draft invoice — not yet posted to FBR."}
+            </DialogDescription>
+          </DialogHeader>
+          {viewingLoading && !viewing ? (
+            <div className="space-y-2"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-full" /></div>
+          ) : viewing ? (
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2 text-sm">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Seller</p>
+                  <p className="mt-1 font-medium">{viewing.companyName ?? "—"}</p>
+                  <p className="mt-1 text-muted-foreground">Invoice date: {viewing.invoiceDate}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Bill To</p>
+                  <p className="mt-1 font-medium">{viewing.partyName ?? "—"}</p>
+                  <p className="mt-1 text-muted-foreground">FBR No: {viewing.fbrInvoiceNumber ?? "—"}</p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto rounded-md border border-border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Yarn Type</TableHead>
+                      <TableHead>HS Code</TableHead>
+                      <TableHead>UOM</TableHead>
+                      <TableHead className="text-right">Qty (kg)</TableHead>
+                      <TableHead className="text-right">Rate</TableHead>
+                      <TableHead className="text-right">Value</TableHead>
+                      <TableHead className="text-right">Tax</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {viewing.items.map((it) => (
+                      <TableRow key={it.id}>
+                        <TableCell>{it.yarnTypeName ?? "—"}</TableCell>
+                        <TableCell>{it.hsCode ?? "—"}</TableCell>
+                        <TableCell>{it.uoM ?? "—"}</TableCell>
+                        <TableCell className="text-right tabular-nums">{it.quantity}</TableCell>
+                        <TableCell className="text-right tabular-nums">{money(parseFloat(it.ratePerKg))}</TableCell>
+                        <TableCell className="text-right tabular-nums">{money(parseFloat(it.valueExcludingTax))}</TableCell>
+                        <TableCell className="text-right tabular-nums">{money(parseFloat(it.taxAmount))}</TableCell>
+                        <TableCell className="text-right tabular-nums">{money(parseFloat(it.totalValue))}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="ml-auto w-full max-w-xs space-y-1 border-t border-border pt-3 text-sm">
+                <div className="flex justify-between"><span className="text-muted-foreground">Value</span><span className="tabular-nums">{money(parseFloat(viewing.totalValue))}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Sales Tax (18%)</span><span className="tabular-nums">{money(parseFloat(viewing.totalTax))}</span></div>
+                <div className="flex justify-between font-semibold"><span>Grand Total</span><span className="tabular-nums">{money(parseFloat(viewing.grandTotal))}</span></div>
+              </div>
+
+              <DialogFooter className="gap-2">
+                {viewing.status === "posted" && (
+                  <Button variant="outline" className="gap-2" onClick={() => downloadInvoicePdf(viewing)}>
+                    <Download className="h-4 w-4" /> Download PDF
+                  </Button>
+                )}
+              </DialogFooter>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
