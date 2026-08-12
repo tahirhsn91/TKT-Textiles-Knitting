@@ -139,14 +139,17 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
     styles: { fontSize: 9, cellPadding: 4, textColor: INK as unknown as string },
     headStyles: { fillColor: HEAD_FILL as unknown as string, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 },
     alternateRowStyles: { fillColor: BAND as unknown as string },
+    // Fixed column widths that sum to the printable width (W - 2*M ≈ 555pt),
+    // so the table fits exactly within the margins and never overflows the
+    // page. # ITEM QTY RATE VALUE ST% SALES-TAX = 28+233+72+50+72+30+70 = 555.
     columnStyles: {
-      0: { cellWidth: 24 },
-      1: { cellWidth: 248 },
-      2: { halign: "right", cellWidth: 74 },
-      3: { halign: "right", cellWidth: 56 },
-      4: { halign: "right", cellWidth: 74 },
-      5: { halign: "right", cellWidth: 38 },
-      6: { halign: "right", cellWidth: 66 },
+      0: { cellWidth: 28, halign: "center" },
+      1: { cellWidth: 233 },
+      2: { cellWidth: 72, halign: "right" },
+      3: { cellWidth: 50, halign: "right" },
+      4: { cellWidth: 72, halign: "right" },
+      5: { cellWidth: 30, halign: "right" },
+      6: { cellWidth: 70, halign: "right" },
     },
     didParseCell: (data) => {
       if (data.section === "body" && data.column.index === 1 && Array.isArray(data.cell.raw)) {
