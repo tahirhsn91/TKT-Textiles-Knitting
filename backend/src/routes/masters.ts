@@ -208,10 +208,18 @@ router.post("/masters/party", async (req, res): Promise<void> => {
   const parsed = requireFields(insertPartyMasterSchema, ["name", "code"], req.body, res);
   if (!parsed) return;
   const { name, code } = parsed;
-  const { wastePercent } = req.body;
+  const { wastePercent, ntnCnic, province, address, registrationType } = req.body;
   const waste = wastePercent !== undefined && wastePercent !== "" ? String(parseFloat(wastePercent)) : "1.00";
   try {
-    const [row] = await db.insert(partyMasterTable).values({ name, code, wastePercent: waste }).returning();
+    const [row] = await db.insert(partyMasterTable).values({
+      name,
+      code,
+      wastePercent: waste,
+      ntnCnic: ntnCnic || null,
+      province: province || null,
+      address: address || null,
+      registrationType: registrationType ?? "Unregistered",
+    }).returning();
     res.status(201).json(row);
   } catch (err) {
     if (isUniqueViolation(err)) { res.status(409).json({ error: "Code already exists" }); return; }
@@ -225,10 +233,18 @@ router.put("/masters/party/:id", async (req, res): Promise<void> => {
   const parsed = requireFields(insertPartyMasterSchema, ["name", "code"], req.body, res);
   if (!parsed) return;
   const { name, code } = parsed;
-  const { wastePercent } = req.body;
+  const { wastePercent, ntnCnic, province, address, registrationType } = req.body;
   const waste = wastePercent !== undefined && wastePercent !== "" ? String(parseFloat(wastePercent)) : "1.00";
   try {
-    const [row] = await db.update(partyMasterTable).set({ name, code, wastePercent: waste }).where(eq(partyMasterTable.id, id)).returning();
+    const [row] = await db.update(partyMasterTable).set({
+      name,
+      code,
+      wastePercent: waste,
+      ntnCnic: ntnCnic || null,
+      province: province || null,
+      address: address || null,
+      registrationType: registrationType ?? "Unregistered",
+    }).where(eq(partyMasterTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
     res.json(row);
   } catch (err) {
@@ -362,11 +378,12 @@ router.post("/masters/yarn-type", async (req, res): Promise<void> => {
   const parsed = requireFields(insertYarnTypeMasterSchema, ["name", "code"], req.body, res);
   if (!parsed) return;
   const { name, code } = parsed;
-  const { makeRate } = req.body;
+  const { makeRate, hsCode } = req.body;
   try {
     const [row] = await db.insert(yarnTypeMasterTable).values({
       name, code,
       makeRate: makeRate != null && makeRate !== "" ? String(makeRate) : null,
+      hsCode: hsCode || null,
     }).returning();
     res.status(201).json(row);
   } catch (err) {
@@ -381,11 +398,12 @@ router.put("/masters/yarn-type/:id", async (req, res): Promise<void> => {
   const parsed = requireFields(insertYarnTypeMasterSchema, ["name", "code"], req.body, res);
   if (!parsed) return;
   const { name, code } = parsed;
-  const { makeRate } = req.body;
+  const { makeRate, hsCode } = req.body;
   try {
     const [row] = await db.update(yarnTypeMasterTable).set({
       name, code,
       makeRate: makeRate != null && makeRate !== "" ? String(makeRate) : null,
+      hsCode: hsCode || null,
     }).where(eq(yarnTypeMasterTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
     res.json(row);
