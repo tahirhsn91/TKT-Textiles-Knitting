@@ -228,9 +228,11 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   text("\u2022  Goods once sold will not be taken back.", M, termsY + 24);
   text("\u2022  Payment due within the agreed credit period; subject to applicable sales tax.", M, termsY + 34);
 
-  // FBR Digital Invoicing logo — bottom-right, raised clear of the footer
-  // note below it (logo bottom lands ~pH-30, above the address/note at pH-20).
-  doc.addImage(FBR_INVOICE_LOGO_B64, "PNG", W - 108, termsY - 22, 66, 64);
+  // FBR Digital Invoicing logo — resized smaller and centered in the band
+  // between the separator (termsY-16) and the footer note (pH-12): 40pt tall,
+  // top at termsY-4, so it sits ~12pt clear of the separator above and well
+  // clear of the address/note below.
+  doc.addImage(FBR_INVOICE_LOGO_B64, "PNG", W - 98, termsY - 4, 42, 40);
 
   // Company address + FBR reporting note + version credit at the very bottom.
   hairline(pH - 32, 0, W, LINE, 0.4);
