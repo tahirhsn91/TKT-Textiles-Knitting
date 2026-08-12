@@ -39,12 +39,9 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
       qrDataUrl = null;
     }
   }
-  const bannerRight = qrDataUrl ? W - 100 : W - 20;
+  const bannerRight = W - 20;
   if (qrDataUrl) {
     doc.addImage(qrDataUrl, "PNG", W - 72, 28, 52, 52);
-    doc.setFontSize(6);
-    doc.setFont("helvetica", "normal");
-    doc.text("FBR INVOICE #", W - 46, 84, { align: "center" });
   }
 
   doc.setFont("helvetica", "bold");
