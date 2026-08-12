@@ -209,9 +209,10 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   doc.setFontSize(12);
   text(money(inv.grandTotal), totX - 10, bandTop + 4, { align: "right" });
 
-  hairline(lastY + 46);
   // ── Terms + footer ─────────────────────────────────────────────────────
-  const termsY = Math.max(wy, lastY + 50) + 26;
+  const bandBottom = bandTop + 14;
+  const termsY = Math.max(wy, bandBottom) + 26;
+  hairline(termsY - 12);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.setTextColor(INK[0], INK[1], INK[2]);
