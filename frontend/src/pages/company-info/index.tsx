@@ -1,11 +1,11 @@
-import { useState } from "react";
-import { Plus, Pencil, Trash2, Star } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Plus, Pencil, Trash2, Star, Search } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -94,6 +94,7 @@ export function CompanyInfoSection() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<CompanyInfo | null>(null);
   const [pendingDelete, setPendingDelete] = useState<CompanyInfo | null>(null);
+  const [search, setSearch] = useState("");
 
   const { data: companies, isLoading } = useListCompanyInfo();
   const createCompany = useCreateCompanyInfo();
@@ -139,35 +140,66 @@ export function CompanyInfoSection() {
       });
   };
 
-  const head = (
-    <>
-      <CardHeader>
-        <CardTitle>Company Info</CardTitle>
-        <CardDescription>
-          Seller details used on FBR digital invoices. Multiple companies can be added, but exactly one must be
-          set as default — invoice generation uses the default company.
-        </CardDescription>
-      </CardHeader>
-      <div className="flex justify-end px-6 pb-2">
-        <Button onClick={openCreate} className="gap-2">
-          <Plus className="h-4 w-4" /> Add Company
-        </Button>
-      </div>
-    </>
+  const trimmedSearch = search.trim().toLowerCase();
+  const filtered = useMemo(
+    () =>
+      (companies ?? []).filter((c) =>
+        !trimmedSearch
+          ? true
+          : [c.name, c.ntnCnic, c.province, c.address].some((v) =>
+              (v ?? "").toLowerCase().includes(trimmedSearch),
+            ),
+      ),
+    [companies, trimmedSearch],
   );
 
+  // Matches MasterTable's header + section-head + search layout so the
+  // Company Info tab reads like every other master-data screen.
   return (
     <>
-      <div className="space-y-4">
-        <Card className="border-sidebar-border">
-          {head}
-          <CardContent className="px-0">
-            {isLoading ? (
-              <div className="space-y-2 px-6">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            ) : (
+      <div className="flex flex-col gap-5">
+        {/* Title + description + action — same stack as MasterTable. */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+          <div>
+            <h2 className="text-lg font-semibold leading-none text-foreground">Company Info</h2>
+            <p className="mt-2 max-w-prose text-sm text-muted-foreground sm:max-w-md">
+              Seller details used on FBR digital invoices. Multiple companies can be added, but exactly one must
+              be set as default — invoice generation uses the default company.
+            </p>
+          </div>
+          <Button className="w-full shrink-0 sm:w-auto" onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add new
+          </Button>
+        </div>
+
+        {/* Search — same as the other master tables. */}
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search companies…"
+            className="h-9 pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {/* Card with a hairline section head + record count — same framing as
+            MasterTable's "All {title}" header. */}
+        <Card className="overflow-hidden">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-3.5">
+            <h3 className="text-sm font-semibold text-foreground">All companies</h3>
+            {!isLoading && companies && (
+              <span className="eyebrow">
+                <span className="num">
+                  {trimmedSearch ? `${filtered.length} of ${companies.length} record${companies.length === 1 ? "" : "s"}` : `${companies.length} record${companies.length === 1 ? "" : "s"}`}
+                </span>
+              </span>
+            )}
+          </div>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -176,18 +208,31 @@ export function CompanyInfoSection() {
                     <TableHead>Province</TableHead>
                     <TableHead>Address</TableHead>
                     <TableHead>Default</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="sticky right-0 w-28 bg-background text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(companies ?? []).length === 0 ? (
+                  {isLoading ? (
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                        <TableCell><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                        No companies yet. Add one to start invoicing.
+                      <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                        {trimmedSearch
+                          ? `No companies match "${search.trim()}".`
+                          : "No companies recorded yet. Add the first one to get started."}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    (companies ?? []).map((c) => (
+                    filtered.map((c) => (
                       <TableRow key={c.id}>
                         <TableCell className="font-medium">{c.name}</TableCell>
                         <TableCell>{c.ntnCnic}</TableCell>
@@ -214,15 +259,15 @@ export function CompanyInfoSection() {
                             </Button>
                           )}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="sticky right-0 bg-background text-right">
                           <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openEdit(c)} title="Edit">
+                            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8" onClick={() => openEdit(c)} title="Edit">
                               <Pencil className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="text-destructive hover:text-destructive"
+                              className="h-9 w-9 text-muted-foreground hover:text-destructive sm:h-8 sm:w-8"
                               onClick={() => setPendingDelete(c)}
                               title={c.isDefault ? "Cannot delete the default company" : "Delete"}
                               disabled={c.isDefault}
@@ -236,7 +281,7 @@ export function CompanyInfoSection() {
                   )}
                 </TableBody>
               </Table>
-            )}
+            </div>
           </CardContent>
         </Card>
       </div>
