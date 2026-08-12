@@ -84,6 +84,13 @@ export interface InvoiceItemView {
 }
 
 export interface InvoiceDetail extends InvoiceListItem {
+  companyNtnCnic: string | null;
+  companyAddress: string | null;
+  companyProvince: string | null;
+  partyNtnCnic: string | null;
+  partyAddress: string | null;
+  partyProvince: string | null;
+  partyRegistrationType: string | null;
   items: InvoiceItemView[];
   transactionHeaderIds: number[];
 }
