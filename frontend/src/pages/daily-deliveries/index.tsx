@@ -162,7 +162,7 @@ export default function DailyDeliveryList() {
 
         {/* Filter + totals — one strip, same shape as the other daily screens. */}
         <Card className="overflow-hidden">
-          <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-[300px_1fr_1fr] sm:divide-x sm:divide-y-0">
+          <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-[220px_1fr_1fr] sm:divide-x sm:divide-y-0">
             <div className="flex flex-col justify-center gap-2 px-5 py-4">
               <label className="eyebrow">Delivery date</label>
               <UnreconciledDateStepper

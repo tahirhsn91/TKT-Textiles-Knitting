@@ -38,32 +38,37 @@ export function UnreconciledDateStepper({
   const nextDisabled = isFetching || !data?.next;
 
   return (
-    <div className="flex w-full items-center gap-1.5">
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        className="h-9 w-9 shrink-0"
-        aria-label="Previous date with unconciled data"
-        title="Previous date with unconciled data"
-        onClick={() => data?.prev && onChange(data.prev)}
-        disabled={prevDisabled}
-      >
-        <ChevronsLeft className="h-4 w-4" />
-      </Button>
+    <div className="flex w-full flex-col gap-1.5">
       <DateStepper value={value} max={max} onChange={onChange} />
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        className="h-9 w-9 shrink-0"
-        aria-label="Next date with unconciled data"
-        title="Next date with unconciled data"
-        onClick={() => data?.next && onChange(data.next)}
-        disabled={nextDisabled}
-      >
-        <ChevronsRight className="h-4 w-4" />
-      </Button>
+      <div className="flex items-center gap-1.5 border-t pt-1.5">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          aria-label="Previous date with unconciled data"
+          title="Previous date with unconciled data"
+          onClick={() => data?.prev && onChange(data.prev)}
+          disabled={prevDisabled}
+        >
+          <ChevronsLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          aria-label="Next date with unconciled data"
+          title="Next date with unconciled data"
+          onClick={() => data?.next && onChange(data.next)}
+          disabled={nextDisabled}
+        >
+          <ChevronsRight className="h-4 w-4" />
+        </Button>
+        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+          Unconciled dates
+        </span>
+      </div>
     </div>
   );
 }
