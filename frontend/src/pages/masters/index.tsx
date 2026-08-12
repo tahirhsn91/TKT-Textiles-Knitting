@@ -472,6 +472,7 @@ function YarnTypeTab() {
         { key: "name", label: "Name", placeholder: "e.g. Cotton" },
         { key: "makeRate", label: "Make Rate", placeholder: "e.g. 12.50", type: "number", step: "any" },
         { key: "code", label: "Code", placeholder: "e.g. COT" },
+        { key: "hsCode", label: "HS Code", placeholder: "e.g. 6001.2100" },
       ]}
       rows={data as never}
       isLoading={isLoading}
