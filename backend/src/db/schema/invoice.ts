@@ -34,10 +34,6 @@ import { transactionHeaderTable } from "./transactions.js";
 
 export const invoiceTable = pgTable("invoice", {
   id: serial("id").primaryKey(),
-  // Business invoice number (sequential, starts at a configured value e.g. 255
-  // for the next invoice). Independent of the DB id; shown on the PDF and list
-  // as the human-facing invoice number. Null for pre-migration rows.
-  invoiceNumber: integer("invoice_number"),
   // invoiceDate = the generation date (today). Used as FBR invoiceDate.
   invoiceDate: date("invoice_date").notNull(),
   companyId: integer("company_id")
@@ -69,7 +65,6 @@ export const invoiceTable = pgTable("invoice", {
 
 export const insertInvoiceSchema = createInsertSchema(invoiceTable).omit({
   id: true,
-  invoiceNumber: true,
   status: true,
   fbrInvoiceNumber: true,
   fbrStatusCode: true,
