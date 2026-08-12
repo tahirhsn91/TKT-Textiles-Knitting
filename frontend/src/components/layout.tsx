@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   FileText, Database, BarChart2, LayoutDashboard, ClipboardList, Wallet,
   ChevronDown, Menu, PanelLeftClose, PanelLeftOpen, Search, Settings,
-  Factory, PackageCheck, Truck, HardHat, Wrench, Receipt, Building2,
+  Factory, PackageCheck, Truck, HardHat, Wrench, Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -51,7 +51,6 @@ const reportItems = [
 
 const invoicingItems = [
   { href: "/invoicing",    label: "Invoicing",    icon: Receipt },
-  { href: "/company-info", label: "Company Info", icon: Building2 },
 ];
 
 // Mobile drawer: the groups and their items, so the drawer can render from
@@ -104,7 +103,7 @@ const mobileGroups = [
     key: "invoicing",
     label: "Invoicing",
     icon: Receipt,
-    activeFn: (loc: string) => loc.startsWith("/invoicing") || loc.startsWith("/company-info"),
+    activeFn: (loc: string) => loc.startsWith("/invoicing"),
     items: invoicingItems,
   },
 ];
@@ -194,7 +193,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const yarnReceiptsActive = location.startsWith("/yarn-receipts");
   const dailyDeliveriesActive = location.startsWith("/daily-deliveries");
   const maintenanceActive = location.startsWith("/maintenance");
-  const invoicingActive = location.startsWith("/invoicing") || location.startsWith("/company-info");
+  const invoicingActive = location.startsWith("/invoicing");
 
   return (
     <div className="min-h-[100dvh] w-full bg-background">
