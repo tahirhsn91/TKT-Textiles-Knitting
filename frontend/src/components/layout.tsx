@@ -109,6 +109,12 @@ const mobileGroups = [
   },
 ];
 
+// Mobile-only "Administration" group — the Users & Roles admin lives here so
+// it shows in the phone drawer (the desktop sidebar places it as a flat item).
+const adminItems = [
+  { href: "/settings", label: "Users & Roles", icon: Settings },
+];
+
 // Primary route each collapsed group icon navigates to.
 const TRANSACTIONS_PRIMARY = "/transactions";
 const PAYROLL_PRIMARY = "/transactions/monthly-salary-entry";
@@ -482,6 +488,7 @@ export function Layout({ children }: { children: ReactNode }) {
                   query={mobileQuery}
                   openGroups={mobileOpenGroups}
                   setOpenGroups={setMobileOpenGroups}
+                  canUsers={can("users")}
                   onNavigate={() => { setMobileOpen(false); setMobileQuery(""); }}
                 />
               </nav>
@@ -676,12 +683,14 @@ function MobileNavMenu({
   query,
   openGroups,
   setOpenGroups,
+  canUsers,
   onNavigate,
 }: {
   location: string;
   query: string;
   openGroups: Set<string>;
   setOpenGroups: React.Dispatch<React.SetStateAction<Set<string>>>;
+  canUsers: boolean;
   onNavigate: () => void;
 }) {
   const q = query.trim().toLowerCase();
@@ -778,6 +787,34 @@ function MobileNavMenu({
           </div>
         );
       })}
+
+      {/* Administration — phone-only entry to Users & Roles (admin role). */}
+      {canUsers && (
+        <div className="mt-1 flex flex-col">
+          <NavSection label="Administration" />
+          {adminItems
+            .filter((i) => matches(i.label))
+            .map((item) => {
+              const active = isItemActive(location, item.href);
+              const ItemIcon = item.icon;
+              return (
+                <Link key={item.href} href={item.href} onClick={onNavigate}>
+                  <span
+                    className={cn(
+                      "flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                      active
+                        ? "selvedge bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+                    )}
+                  >
+                    <ItemIcon className="h-4 w-4 shrink-0" />
+                    {item.label}
+                  </span>
+                </Link>
+              );
+            })}
+        </div>
+      )}
     </div>
   );
 }
