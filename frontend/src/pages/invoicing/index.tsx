@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, type ReactNode } from "react";
 import { Send, Trash2, RefreshCw, FileText, StickyNote, Eye, Download } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -41,7 +41,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useFbrSandboxEnabled } from "@/context/config-context";
@@ -54,8 +53,9 @@ import {
   usePostInvoice,
   useDeleteInvoice,
   type InvoiceListItem,
+  type InvoiceDetail,
 } from "@/hooks/use-fbr-invoicing";
-import { downloadInvoicePdf } from "@/lib/invoice-pdf";
+import { downloadInvoicePdf, amountInWords } from "@/lib/invoice-pdf";
 
 const SALES_TAX_PERCENT = 18;
 
@@ -405,13 +405,11 @@ export default function InvoicingPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      {/* View invoice detail (posted invoices) */}
+      {/* View invoice detail — mirrors the FBR "SALES TAX INVOICE" PDF layout */}
       <Dialog open={viewingId != null} onOpenChange={(o) => { if (!o) { setViewingId(null); setDownloadTarget(null); } }}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-4 w-4" /> Invoice #{viewing?.id ?? ""}
-            </DialogTitle>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Invoice #{viewing?.id ?? ""}</DialogTitle>
             <DialogDescription>
               {viewing?.status === "posted"
                 ? `Reported to FBR · ${viewing.fbrInvoiceNumber ?? "no FBR number"}`
@@ -421,68 +419,165 @@ export default function InvoicingPage() {
           {viewingLoading && !viewing ? (
             <div className="space-y-2"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-full" /></div>
           ) : viewing ? (
-            <div className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2 text-sm">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Seller</p>
-                  <p className="mt-1 font-medium">{viewing.companyName ?? "—"}</p>
-                  <p className="mt-1 text-muted-foreground">Invoice date: {viewing.invoiceDate}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Bill To</p>
-                  <p className="mt-1 font-medium">{viewing.partyName ?? "—"}</p>
-                  <p className="mt-1 text-muted-foreground">FBR No: {viewing.fbrInvoiceNumber ?? "—"}</p>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto rounded-md border border-border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Yarn Type</TableHead>
-                      <TableHead>HS Code</TableHead>
-                      <TableHead>UOM</TableHead>
-                      <TableHead className="text-right">Qty (kg)</TableHead>
-                      <TableHead className="text-right">Rate</TableHead>
-                      <TableHead className="text-right">Value</TableHead>
-                      <TableHead className="text-right">Tax</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {viewing.items.map((it) => (
-                      <TableRow key={it.id}>
-                        <TableCell>{it.yarnTypeName ?? "—"}</TableCell>
-                        <TableCell>{it.hsCode ?? "—"}</TableCell>
-                        <TableCell>{it.uoM ?? "—"}</TableCell>
-                        <TableCell className="text-right tabular-nums">{it.quantity}</TableCell>
-                        <TableCell className="text-right tabular-nums">{money(parseFloat(it.ratePerKg))}</TableCell>
-                        <TableCell className="text-right tabular-nums">{money(parseFloat(it.valueExcludingTax))}</TableCell>
-                        <TableCell className="text-right tabular-nums">{money(parseFloat(it.taxAmount))}</TableCell>
-                        <TableCell className="text-right tabular-nums">{money(parseFloat(it.totalValue))}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <div className="ml-auto w-full max-w-xs space-y-1 border-t border-border pt-3 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Value</span><span className="tabular-nums">{money(parseFloat(viewing.totalValue))}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Sales Tax (18%)</span><span className="tabular-nums">{money(parseFloat(viewing.totalTax))}</span></div>
-                <div className="flex justify-between font-semibold"><span>Grand Total</span><span className="tabular-nums">{money(parseFloat(viewing.grandTotal))}</span></div>
-              </div>
-
-              <DialogFooter className="gap-2">
-                {viewing.status === "posted" && (
-                  <Button variant="outline" className="gap-2" onClick={() => downloadInvoicePdf(viewing)}>
-                    <Download className="h-4 w-4" /> Download PDF
-                  </Button>
-                )}
-              </DialogFooter>
-            </div>
+            <InvoiceView inv={viewing} onDownload={() => downloadInvoicePdf(viewing)} />
           ) : null}
         </DialogContent>
       </Dialog>
     </Layout>
+  );
+}
+
+// ─── Invoice view (mirrors the FBR "SALES TAX INVOICE" PDF) ────────────────
+// A small label/value row used inside the boxed detail sections.
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex gap-2 py-0.5 text-[13px] leading-snug">
+      <span className="w-28 shrink-0 text-muted-foreground">{label}</span>
+      <span className="font-medium">{value}</span>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-md border border-foreground/20">
+      <div className="border-b border-foreground/20 bg-muted px-3 py-1.5 text-xs font-bold uppercase tracking-wide">
+        {title}
+      </div>
+      <div className="px-3 py-2">{children}</div>
+    </div>
+  );
+}
+
+function InvoiceView({ inv, onDownload }: { inv: InvoiceDetail; onDownload: () => void }) {
+  const invDate = (() => {
+    try {
+      return format(new Date(inv.invoiceDate + "T00:00:00"), "dd-MMM-yyyy").toUpperCase();
+    } catch {
+      return inv.invoiceDate;
+    }
+  })();
+  const custAddr = [inv.partyAddress, inv.partyProvince].filter(Boolean).join(", ");
+  const words = amountInWords(inv.grandTotal);
+
+  return (
+    <div className="space-y-4 text-foreground">
+      {/* Header: company (left) + SALES TAX INVOICE badge (right) */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-bold uppercase leading-tight">{inv.companyName ?? "TKT TEXTILES"}</h2>
+          {inv.companyAddress && (
+            <p className="mt-0.5 max-w-xs text-xs text-muted-foreground">{inv.companyAddress}</p>
+          )}
+        </div>
+        <div className="rounded bg-foreground px-4 py-2 text-sm font-bold uppercase tracking-wide text-background">
+          Sales Tax Invoice
+        </div>
+      </div>
+
+      {/* Supplier + Transaction */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Section title="Supplier Details">
+          <Field label="Name:" value={(inv.companyName ?? "—").toUpperCase()} />
+          <Field label="NTN / CNIC:" value={inv.companyNtnCnic ?? "—"} />
+          <Field label="Address:" value={inv.companyAddress ?? "—"} />
+        </Section>
+        <Section title="Transaction Details">
+          <Field label="Transaction No.:" value={String(inv.id).padStart(8, "0")} />
+          <Field label="Transaction Date:" value={invDate} />
+          <Field label="Transaction Type:" value={inv.items[0]?.saleType ?? "Goods at standard rate (default)"} />
+          <Field label="FBR Invoice No.:" value={inv.fbrInvoiceNumber ?? "—"} />
+          <Field label="Site Name:" value="Head Office" />
+          <Field label="Store Name:" value="Store 01" />
+        </Section>
+      </div>
+
+      {/* Customer */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Section title="Customer Details">
+          <Field label="Name:" value={(inv.partyName ?? "—").toUpperCase()} />
+          <Field label="NTN:" value={inv.partyNtnCnic ?? "—"} />
+          <Field label="Address:" value={custAddr || "—"} />
+        </Section>
+      </div>
+
+      {/* Line-item table */}
+      <div className="overflow-x-auto rounded-md border border-foreground/20">
+        <table className="w-full border-collapse text-[13px]">
+          <thead>
+            <tr className="bg-muted text-left [&>th]:border-r [&>th]:border-foreground/20 [&>th]:px-2 [&>th]:py-2 [&>th]:align-middle [&>th]:font-bold last:[&>th]:border-r-0">
+              <th className="w-10 text-center">S. #</th>
+              <th>Description</th>
+              <th className="w-14">UOM</th>
+              <th className="text-right">Quantity</th>
+              <th className="text-right">Price</th>
+              <th className="text-right">Taxes Exclusive Value</th>
+              <th className="text-center">Tax Rate</th>
+              <th className="text-right">Tax Amount</th>
+              <th className="text-right">Taxes Inclusive Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {inv.items.map((it, idx) => (
+              <tr
+                key={it.id}
+                className="border-t border-foreground/20 [&>td]:border-r [&>td]:border-foreground/20 [&>td]:px-2 [&>td]:py-2 [&>td]:align-middle last:[&>td]:border-r-0"
+              >
+                <td className="text-center tabular-nums">{idx + 1}</td>
+                <td>
+                  {(it.hsCode ? `${it.hsCode} - ` : "") + (it.yarnTypeName ?? "—")}
+                  {it.yarnCountName ? ` (${it.yarnCountName})` : ""}
+                </td>
+                <td>{it.uoM ?? "KG"}</td>
+                <td className="text-right tabular-nums">{money(parseFloat(it.quantity))}</td>
+                <td className="text-right tabular-nums">{money(parseFloat(it.ratePerKg))}</td>
+                <td className="text-right tabular-nums">{money(parseFloat(it.valueExcludingTax))}</td>
+                <td className="text-center tabular-nums">18%</td>
+                <td className="text-right tabular-nums">{money(parseFloat(it.taxAmount))}</td>
+                <td className="text-right tabular-nums">{money(parseFloat(it.totalValue))}</td>
+              </tr>
+            ))}
+            {/* Amount-in-words row carrying the column totals */}
+            <tr className="border-t border-foreground/20 font-bold [&>td]:px-2 [&>td]:py-2 [&>td]:align-middle">
+              <td colSpan={5}>{words}</td>
+              <td className="border-l border-foreground/20 text-right tabular-nums">{money(parseFloat(inv.totalValue))}</td>
+              <td className="border-l border-foreground/20" />
+              <td className="border-l border-foreground/20 text-right tabular-nums">{money(parseFloat(inv.totalTax))}</td>
+              <td className="border-l border-foreground/20 text-right tabular-nums">{money(parseFloat(inv.grandTotal))}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Totals summary box (right) */}
+      <div className="flex justify-end">
+        <div className="w-full max-w-sm overflow-hidden rounded-md border border-foreground/20 text-sm">
+          <div className="flex justify-between border-b border-foreground/20 px-3 py-2">
+            <span>Total Taxes Exclusive Value</span>
+            <span className="font-semibold tabular-nums">{money(parseFloat(inv.totalValue))}</span>
+          </div>
+          <div className="flex justify-between border-b border-foreground/20 px-3 py-2">
+            <span>Total Tax Amount @ 18%</span>
+            <span className="font-semibold tabular-nums">{money(parseFloat(inv.totalTax))}</span>
+          </div>
+          <div className="flex justify-between px-3 py-2 font-bold">
+            <span>Total Taxes Inclusive Value</span>
+            <span className="tabular-nums">{money(parseFloat(inv.grandTotal))}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer note + download */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+        <p className="text-xs text-muted-foreground">
+          This is a computer generated document. No signature is required.
+        </p>
+        {inv.status === "posted" && (
+          <Button variant="outline" className="gap-2" onClick={onDownload}>
+            <Download className="h-4 w-4" /> Download PDF
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
