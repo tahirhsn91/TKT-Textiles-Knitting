@@ -85,21 +85,9 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   };
 
   // ── Header ─────────────────────────────────────────────────────────────
-  // Company logo (left) + name/address; dark "SALES TAX INVOICE" box (right).
+  // Company name/address (left); dark "SALES TAX INVOICE" box (right).
   const headTop = M;
-  const logoSize = 46;
-  // Placeholder circular logo mark (dotted globe not available) — draw the FBR
-  // logo lightly is wrong here; instead render the company initial in a soft
-  // grey disc so the header never looks empty.
-  setFill([225, 225, 225]);
-  doc.circle(M + logoSize / 2, headTop + logoSize / 2, logoSize / 2, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  setInk([150, 150, 150]);
-  const initial = (inv.companyName ?? "TKT TEXTILES").trim().charAt(0).toUpperCase();
-  text(initial, M + logoSize / 2, headTop + logoSize / 2 + 6, { align: "center" });
-
-  const nameX = M + logoSize + 14;
+  const nameX = M;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
   setInk(INK);
@@ -127,7 +115,7 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   text("SALES TAX INVOICE", stiX + stiW / 2, stiY + stiH / 2 + 4.5, { align: "center" });
 
   // ── Details grid: SUPPLIER (left) + TRANSACTION (right), then CUSTOMER ──
-  const gridTop = Math.max(headTop + logoSize + 14, hy + 6);
+  const gridTop = Math.max(headTop + 50, hy + 6);
   const gap = 12;
   const colW = (INNER - gap) / 2;
   const leftX = M;
