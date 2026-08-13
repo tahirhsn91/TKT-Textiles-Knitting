@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect, type ReactNode } from "react";
-import { Send, Trash2, RefreshCw, FileText, StickyNote, Eye, Download } from "lucide-react";
+import { Send, Trash2, RefreshCw, FileText, Eye, Download } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
@@ -194,16 +194,17 @@ export default function InvoicingPage() {
           <span className="ml-auto text-xs opacity-70">(Configuration &mdash; FBR DI Sandbox)</span>
         </div>
 
-        {/* Generate invoice card */}
-        <Card className="border-sidebar-border">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base"><StickyNote className="h-4 w-4" /> Generate Invoice</CardTitle>
-            <CardDescription>
+        {/* Generate invoice card (same treatment as the app's other list cards) */}
+        <Card className="overflow-hidden">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-3.5">
+            <h2 className="text-sm font-semibold text-foreground">Generate Invoice</h2>
+            <span className="eyebrow">{fbrSandbox ? "FBR sandbox" : "FBR production"}</span>
+          </div>
+          <CardContent className="space-y-4 p-5">
+            <p className="text-sm text-muted-foreground">
               Pick a party with un-invoiced Fabric Delivery transactions. Net weights are summed per yarn
               type/count; enter a per-KG rate for each line to compute value, 18% sales tax, and total.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Party</Label>
@@ -306,13 +307,13 @@ export default function InvoicingPage() {
           </CardContent>
         </Card>
 
-        {/* Invoice list */}
-        <Card className="border-sidebar-border">
-          <CardHeader>
-            <CardTitle className="text-base">Invoices</CardTitle>
-            <CardDescription>Draft invoices can be posted or deleted; posted invoices are read-only.</CardDescription>
-          </CardHeader>
-          <CardContent className="px-0">
+        {/* Invoice list (same treatment as the app's other list cards) */}
+        <Card className="overflow-hidden">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-3.5">
+            <h2 className="text-sm font-semibold text-foreground">Invoices</h2>
+            <span className="eyebrow">Draft · Posted</span>
+          </div>
+          <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
