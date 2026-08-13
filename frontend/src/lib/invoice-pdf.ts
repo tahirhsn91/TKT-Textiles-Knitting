@@ -365,20 +365,22 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
     syy += sumRowH;
   });
 
-  // ── Signature / stamp area (left, below the band) ──────────────────────
-  const stampTop = Math.max(bandTop + logoH + 24, syy + 24);
-  // (Digital invoices carry no wet signature; the reference shows a company
-  // stamp graphic which we don't have, so we leave the space and add the note.)
+  // ── Footer (pinned to the very bottom of the LAST page) ────────────────
+  // Ensure we're on the final page before drawing the footer, then anchor it
+  // to the page bottom regardless of how tall the content above is.
+  const lastPage = doc.getNumberOfPages();
+  doc.setPage(lastPage);
 
-  // ── Footer ─────────────────────────────────────────────────────────────
-  const noteY = Math.min(H - 60, stampTop + 90);
+  const footY = H - 30;
+
+  // "Computer generated document" note — sits at the very bottom, just above
+  // the footer strip separator.
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   setInk(INK);
-  text("This is a computer generated document. No signature is required.", M, noteY);
+  text("This is a computer generated document. No signature is required.", M, footY - 22);
 
   // Footer strip (3 columns) at the very bottom.
-  const footY = H - 30;
   setDraw(BORDER);
   doc.setLineWidth(0.6);
   doc.line(M, footY - 12, RIGHT, footY - 12);
