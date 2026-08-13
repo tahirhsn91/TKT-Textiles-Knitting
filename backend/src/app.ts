@@ -3,6 +3,8 @@ import cors from "cors";
 import { pinoHttp } from "pino-http";
 import rateLimit from "express-rate-limit";
 import router from "./routes/index.js";
+import authRouter from "./routes/auth.js";
+import { requireAuth } from "./lib/auth.js";
 import { logger } from "./lib/logger.js";
 
 const app: Express = express();
@@ -102,6 +104,20 @@ app.use("/api", (req: Request, _res: Response, next: NextFunction) => {
     return mutationLimiter(req, _res, next);
   }
   next();
+});
+
+// ── Auth (issue #135) ────────────────────────────────────────────────────────
+// Fail-closed: only the health route and /api/auth/* are public. Every other
+// /api route requires a valid bearer token (requireAuth) — per-route permission
+// checks (requirePermission) are applied inside each protected router.
+app.use("/api/auth", authRouter);
+app.use("/api", (req, _res, next) => {
+  // Public whitelist: health endpoints + anything under /api/auth (already
+  // mounted above). Everything else requires auth.
+  if (req.path === "/health" || req.path === "/healthz" || req.path.startsWith("/auth/")) {
+    return next();
+  }
+  return requireAuth(req, _res, next);
 });
 
 app.use("/api", router);

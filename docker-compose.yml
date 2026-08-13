@@ -31,6 +31,7 @@ services:
       # Set DATABASE_URL in a local .env file (git-ignored). Falls back to the
       # bundled local Postgres service if unset.
       DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres/${POSTGRES_DB:-heliumdb}?sslmode=disable}
+      JWT_SECRET: ${JWT_SECRET}
       PORT: "8080"
       NODE_ENV: production
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001,http://169.58.108.61:3001,https://tahir.servecounterstrike.com}
