@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { requirePermission } from "../lib/auth.js";
 import healthRouter from "./health.js";
 import lookupsRouter from "./lookups.js";
 import mastersRouter from "./masters.js";
@@ -18,27 +19,35 @@ import machineAnalyticsRouter from "./machine-analytics.js";
 import partyAnalyticsRouter from "./party-analytics.js";
 import companyInfoRouter from "./company-info.js";
 import invoicingRouter from "./invoicing.js";
+import usersRouter from "./users.js";
 
 const router: IRouter = Router();
 
+// Public: health. Exempted from auth by the app.ts whitelist.
 router.use(healthRouter);
-router.use(lookupsRouter);
-router.use(mastersRouter);
-router.use(transactionsRouter);
-router.use(reportsRouter);
-router.use(employeesRouter);
-router.use(salaryEntriesRouter);
-router.use(dashboardRouter);
-router.use(dailyProductionRouter);
-router.use(yarnReceiptsRouter);
-router.use(dailyDeliveriesRouter);
-router.use(plausibilityRouter);
-router.use(unreconciledNavRouter);
-router.use(machineMaintenanceRouter);
-router.use(factoryMaintenanceRouter);
-router.use(machineAnalyticsRouter);
-router.use(partyAnalyticsRouter);
-router.use(companyInfoRouter);
-router.use(invoicingRouter);
+
+// Protected — each router defines its own full paths internally, so we gate it
+// with a route-level permission middleware (no mount prefix). The module id is
+// what the admin toggles in the permissions UI (issue #135). requireAuth is
+// applied globally in app.ts; these guards only check route access.
+router.use(requirePermission("masters"), mastersRouter);
+router.use(requirePermission("transactions"), transactionsRouter);
+router.use(requirePermission("reports"), reportsRouter);
+router.use(requirePermission("employees"), employeesRouter);
+router.use(requirePermission("payroll"), salaryEntriesRouter);
+router.use(requirePermission("dashboard"), dashboardRouter);
+router.use(requirePermission("dailyProduction"), dailyProductionRouter);
+router.use(requirePermission("yarnReceipts"), yarnReceiptsRouter);
+router.use(requirePermission("dailyDeliveries"), dailyDeliveriesRouter);
+router.use(requirePermission("dashboard"), plausibilityRouter);
+router.use(requirePermission("dashboard"), unreconciledNavRouter);
+router.use(requirePermission("maintenance"), machineMaintenanceRouter);
+router.use(requirePermission("maintenance"), factoryMaintenanceRouter);
+router.use(requirePermission("dashboard"), machineAnalyticsRouter);
+router.use(requirePermission("dashboard"), partyAnalyticsRouter);
+router.use(requirePermission("companyInfo"), companyInfoRouter);
+router.use(requirePermission("invoicing"), invoicingRouter);
+// Users/RBAC admin — admin-only enforced inside the router (users.ts).
+router.use(requirePermission("users"), usersRouter);
 
 export default router;
