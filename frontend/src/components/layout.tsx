@@ -2,10 +2,11 @@ import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   FileText, Database, BarChart2, LayoutDashboard, ClipboardList, Wallet,
-  ChevronDown, Menu, PanelLeftClose, PanelLeftOpen, Search, Settings,
+  ChevronDown, Menu, PanelLeftClose, PanelLeftOpen, Search, Settings, LogOut,
   Factory, PackageCheck, Truck, HardHat, Wrench, Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/auth-context";
 import {
   Sheet,
   SheetContent,
@@ -171,7 +172,8 @@ function NavSection({ label }: { label: string }) {
 }
 
 export function Layout({ children }: { children: ReactNode }) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+  const { can, logout, session } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(LS_SIDEBAR_COLLAPSED) === "true"; } catch { return false; }
@@ -356,24 +358,67 @@ export function Layout({ children }: { children: ReactNode }) {
 
           {!collapsed && <NavSection label="Invoicing" />}
           <div className={cn("flex flex-col gap-0.5", collapsed && "pt-1")}>
-            <DesktopGroup
-              label="Invoicing"
-              icon={Receipt}
-              primary={INVOICING_PRIMARY}
-              active={invoicingActive}
-              collapsed={collapsed}
-            >
-              {invoicingItems.map((item) => (
-                <SubItem
-                  key={item.href}
-                  href={item.href}
-                  label={item.label}
-                  active={isSubItemActive(location, item.href)}
-                />
-              ))}
-            </DesktopGroup>
+            {can("invoicing") && (
+              <DesktopGroup
+                label="Invoicing"
+                icon={Receipt}
+                primary={INVOICING_PRIMARY}
+                active={invoicingActive}
+                collapsed={collapsed}
+              >
+                {invoicingItems.map((item) => (
+                  <SubItem
+                    key={item.href}
+                    href={item.href}
+                    label={item.label}
+                    active={isSubItemActive(location, item.href)}
+                  />
+                ))}
+              </DesktopGroup>
+            )}
+            {can("users") && (
+              <DesktopItem
+                href="/settings"
+                label="Users &amp; Roles"
+                icon={Settings}
+                active={isItemActive(location, "/settings")}
+                collapsed={collapsed}
+              />
+            )}
           </div>
         </nav>
+
+        {/* Sidebar footer — signed-in user + logout */}
+        <div className={cn("border-t border-sidebar-border", collapsed ? "flex justify-center p-2" : "p-3")}>
+          {collapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => { logout(); setLocation("/login"); }}
+                  className="flex items-center justify-center rounded-md p-2 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  aria-label="Sign out"
+                  title="Sign out"
+                >
+                  <LogOut className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Sign out</TooltipContent>
+            </Tooltip>
+          ) : (
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-xs font-semibold text-sidebar-accent-foreground">{session?.user.displayName ?? "—"}</p>
+                <p className="truncate text-[0.625rem] uppercase tracking-wide text-sidebar-foreground/55">{session?.role.name ?? ""}</p>
+              </div>
+              <button
+                onClick={() => { logout(); setLocation("/login"); }}
+                className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              >
+                <LogOut className="h-4 w-4" /> Sign out
+              </button>
+            </div>
+          )}
+        </div>
       </aside>
 
       {/* ── Content column (offset by sidebar on desktop) ─────── */}
