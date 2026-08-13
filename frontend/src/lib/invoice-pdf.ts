@@ -436,6 +436,6 @@ function rupeesToWordsAmount(amount: string | number): string {
   return `${ru} Only`;
 }
 
-function amountInWords(amount: string | number): string {
+export function amountInWords(amount: string | number): string {
   return rupeesToWordsAmount(amount);
 }
