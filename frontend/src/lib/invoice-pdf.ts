@@ -387,7 +387,7 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   setInk(MUTED);
-  text("Receipt & Confirmation by Recipient on EDP", M, footY);
+  text("Receipt & Confirmation by Recipient on TKT", M, footY);
   text("Page 1 of 1", W / 2, footY, { align: "center" });
   const printStamp = `Print Date: Server Time: ${format(new Date(), "dd-MMM-yyyy / HH:mm:ss")}`;
   text(printStamp, RIGHT, footY, { align: "right" });
