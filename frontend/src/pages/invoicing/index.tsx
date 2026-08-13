@@ -170,13 +170,16 @@ export default function InvoicingPage() {
 
   return (
     <Layout>
-      <div className="space-y-5">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Invoicing</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+      <div className="flex flex-col gap-6">
+        {/* Page header — matches the rest of the app (eyebrow + 1.75rem title
+            on a hairline rule) rather than the old text-xl treatment. */}
+        <header className="border-b pb-5">
+          <p className="eyebrow">Billing &amp; invoicing</p>
+          <h1 className="mt-2 text-[1.75rem] font-semibold leading-none text-foreground">Invoicing</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
             Generate a digital invoice per party from un-invoiced fabric deliveries, then post it to FBR.
           </p>
-        </div>
+        </header>
 
         {/* Environment banner */}
         <div
