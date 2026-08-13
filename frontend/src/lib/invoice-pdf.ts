@@ -1,294 +1,449 @@
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import QRCode from "qrcode";
 import type { InvoiceDetail } from "@/hooks/use-fbr-invoicing";
 import { FBR_INVOICE_LOGO_B64 } from "@/lib/invoice-logo";
 
 /**
- * Build a PDF for a generated FBR invoice, mirroring the reference "DIGITAL
- * INVOICE" layout (see Lucky_Invoice sample): TKT TEXTILES header with sales
- * tax banner, BILL TO + INVOICE blocks, a line-item table (# / ITEM / QTY /
- * RATE / VALUE / ST % / SALES TAX, with HS Code + Item Code per line), TOTAL
- * VALUE / SALES TAX / GRAND TOTAL, amount in words, and terms/footer.
+ * Build a PDF for a generated FBR invoice, mirroring the government-style FBR
+ * "SALES TAX INVOICE" reference layout:
+ *   - Header: company logo + name/address (left) and a dark "SALES TAX INVOICE"
+ *     box (right).
+ *   - Boxed detail sections: SUPPLIER DETAILS + TRANSACTION DETAILS (row 1),
+ *     CUSTOMER DETAILS (row 2), each with a shaded title strip and label/value
+ *     rows.
+ *   - Bordered line-item table: S.# / Description / UOM / Quantity / Price /
+ *     Taxes Exclusive Value / Tax Rate / Tax Amount / Taxes Inclusive Value,
+ *     followed by an amount-in-words row that also carries the column totals.
+ *   - Bottom-left: FBR Digital Invoicing logo + QR code (FBR invoice number).
+ *   - Bottom-right: totals summary box (Total Taxes Exclusive Value / Total Tax
+ *     Amount @ 18% / Total Taxes Inclusive Value).
+ *   - Footer: "computer generated document" note + a 3-column footer strip.
  */
 export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
-  const M = 20; // page margin
+  const M = 24; // page margin
+  const RIGHT = W - M;
+  const INNER = RIGHT - M; // printable width
 
-  // ── Design tokens (black/white invoice) ────────────────────────────────
-  const INK = [20, 20, 20];          // near-black
-  const MUTED = [110, 110, 110];     // secondary grey
-  const LINE = [200, 200, 200];      // light hairline
-  const BAND = [245, 245, 245];      // zebra / soft fill (light grey)
-  const HEAD_FILL = [45, 45, 45];    // table header fill (dark grey)
-  const TOTAL_FILL = [30, 30, 30];   // grand-total band (near-black)
+  // ── Design tokens (black/white boxed invoice) ──────────────────────────
+  const INK: [number, number, number] = [15, 15, 15]; // near-black text/borders
+  const MUTED: [number, number, number] = [90, 90, 90]; // secondary grey
+  const BORDER: [number, number, number] = [30, 30, 30]; // box borders
+  const TITLE_FILL: [number, number, number] = [235, 235, 235]; // section title strip
+  const DARK_FILL: [number, number, number] = [55, 55, 55]; // "SALES TAX INVOICE" box
 
   const money = (n: string | number) =>
-    Number(n).toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    Math.round(Number(n)).toLocaleString("en-US");
+  const money2 = (n: string | number) =>
+    Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  const setInk = (c: [number, number, number]) => doc.setTextColor(c[0], c[1], c[2]);
+  const setDraw = (c: [number, number, number]) => doc.setDrawColor(c[0], c[1], c[2]);
+  const setFill = (c: [number, number, number]) => doc.setFillColor(c[0], c[1], c[2]);
   const text = (s: string, x: number, y: number, opts?: Parameters<typeof doc.text>[3]) =>
     doc.text(s, x, y, opts);
-  const hairline = (y: number, x1 = M, x2 = W - M, color: number[] = LINE, w = 0.6) => {
-    doc.setDrawColor(color[0], color[1], color[2]);
-    doc.setLineWidth(w);
-    doc.line(x1, y, x2, y);
+
+  // Draw a box; returns nothing. lineWidth default 0.8.
+  const box = (x: number, y: number, w: number, h: number, lw = 0.8) => {
+    setDraw(BORDER);
+    doc.setLineWidth(lw);
+    doc.rect(x, y, w, h);
+  };
+  // Section with a shaded title strip. Returns the y where body content starts.
+  const sectionTitle = (x: number, y: number, w: number, title: string, stripH = 20) => {
+    setFill(TITLE_FILL);
+    setDraw(BORDER);
+    doc.setLineWidth(0.8);
+    doc.rect(x, y, w, stripH, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    setInk(INK);
+    text(title, x + 8, y + stripH - 6);
+    return y + stripH;
+  };
+  // A label/value row inside a details box.
+  const kvRow = (
+    label: string,
+    value: string,
+    x: number,
+    y: number,
+    labelW: number,
+    valueMaxW: number,
+  ): number => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    setInk(MUTED);
+    text(label, x, y);
+    doc.setFont("helvetica", "bold");
+    setInk(INK);
+    const lines = doc.splitTextToSize(value || "\u2014", valueMaxW);
+    text(lines, x + labelW, y);
+    return y + Math.max(1, lines.length) * 12;
   };
 
   // ── Header ─────────────────────────────────────────────────────────────
-  // Company name (left, black) + address below it; QR top-right corner;
-  // DIGITAL INVOICE banner right-aligned below the QR, so nothing overlaps.
+  // Company logo (left) + name/address; dark "SALES TAX INVOICE" box (right).
+  const headTop = M;
+  const logoSize = 46;
+  // Placeholder circular logo mark (dotted globe not available) — draw the FBR
+  // logo lightly is wrong here; instead render the company initial in a soft
+  // grey disc so the header never looks empty.
+  setFill([225, 225, 225]);
+  doc.circle(M + logoSize / 2, headTop + logoSize / 2, logoSize / 2, "F");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(24);
-  doc.setTextColor(INK[0], INK[1], INK[2]);
-  text(inv.companyName ?? "TKT TEXTILES", M, 74);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+  doc.setFontSize(18);
+  setInk([150, 150, 150]);
+  const initial = (inv.companyName ?? "TKT TEXTILES").trim().charAt(0).toUpperCase();
+  text(initial, M + logoSize / 2, headTop + logoSize / 2 + 6, { align: "center" });
 
-  // FBR invoice number QR — top-right corner (52x52pt, y 40..92).
+  const nameX = M + logoSize + 14;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  setInk(INK);
+  text((inv.companyName ?? "TKT TEXTILES").toUpperCase(), nameX, headTop + 16);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  setInk(MUTED);
+  let hy = headTop + 30;
+  if (inv.companyAddress) {
+    const addrLines = doc.splitTextToSize(inv.companyAddress, 280);
+    text(addrLines, nameX, hy);
+    hy += addrLines.length * 11;
+  }
+
+  // Dark "SALES TAX INVOICE" box, right-aligned in the header.
+  const stiW = 200;
+  const stiH = 30;
+  const stiX = RIGHT - stiW;
+  const stiY = headTop + 4;
+  setFill(DARK_FILL);
+  doc.rect(stiX, stiY, stiW, stiH, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  setInk([255, 255, 255]);
+  text("SALES TAX INVOICE", stiX + stiW / 2, stiY + stiH / 2 + 4.5, { align: "center" });
+
+  // ── Details grid: SUPPLIER (left) + TRANSACTION (right), then CUSTOMER ──
+  const gridTop = Math.max(headTop + logoSize + 14, hy + 6);
+  const gap = 12;
+  const colW = (INNER - gap) / 2;
+  const leftX = M;
+  const rightX = M + colW + gap;
+
+  // SUPPLIER DETAILS (left, top)
+  const supTitleY = gridTop;
+  const supBodyTop = sectionTitle(leftX, supTitleY, colW, "SUPPLIER DETAILS");
+  let sy = supBodyTop + 18;
+  const supLabelW = 78;
+  const supValW = colW - supLabelW - 24;
+  sy = kvRow("Name:", (inv.companyName ?? "\u2014").toUpperCase(), leftX + 12, sy, supLabelW, supValW);
+  sy = kvRow("NTN / CNIC:", inv.companyNtnCnic ?? "\u2014", leftX + 12, sy, supLabelW, supValW);
+  sy = kvRow("Address:", inv.companyAddress ?? "\u2014", leftX + 12, sy, supLabelW, supValW);
+  const supBottom = sy + 6;
+
+  // TRANSACTION DETAILS (right, top)
+  const txBodyTop = sectionTitle(rightX, gridTop, colW, "TRANSACTION DETAILS");
+  let ty = txBodyTop + 18;
+  const txLabelW = 92;
+  const txValW = colW - txLabelW - 24;
+  const invNo = String(inv.id).padStart(8, "0");
+  ty = kvRow("Transaction No.:", invNo, rightX + 12, ty, txLabelW, txValW);
+  ty = kvRow(
+    "Transaction Date:",
+    format(new Date(inv.invoiceDate + "T00:00:00"), "dd-MMM-yyyy").toUpperCase(),
+    rightX + 12,
+    ty,
+    txLabelW,
+    txValW,
+  );
+  ty = kvRow(
+    "Transaction Type:",
+    inv.items[0]?.saleType ?? "Goods at standard rate (default)",
+    rightX + 12,
+    ty,
+    txLabelW,
+    txValW,
+  );
+  ty = kvRow("FBR Invoice No.:", inv.fbrInvoiceNumber ?? "\u2014", rightX + 12, ty, txLabelW, txValW);
+  ty = kvRow("Site Name:", "Head Office", rightX + 12, ty, txLabelW, txValW);
+  ty = kvRow("Store Name:", "Store 01", rightX + 12, ty, txLabelW, txValW);
+  ty = kvRow("Remarks:", "", rightX + 12, ty, txLabelW, txValW);
+  const txBottom = ty + 6;
+
+  // Draw the SUPPLIER + TRANSACTION borders. TRANSACTION has more rows, so both
+  // boxes extend to the taller of the two, keeping the row visually aligned.
+  const row1Bottom = Math.max(supBottom, txBottom);
+  box(leftX, supTitleY, colW, row1Bottom - supTitleY);
+  box(rightX, gridTop, colW, row1Bottom - gridTop);
+
+  // CUSTOMER DETAILS (left, second row) — right column of this row is left
+  // blank (matching the reference, where the customer box sits under supplier).
+  const custTitleY = row1Bottom + gap;
+  const custBodyTop = sectionTitle(leftX, custTitleY, colW, "CUSTOMER DETAILS");
+  let cy = custBodyTop + 18;
+  cy = kvRow("Name:", (inv.partyName ?? "\u2014").toUpperCase(), leftX + 12, cy, supLabelW, supValW);
+  cy = kvRow("NTN:", inv.partyNtnCnic ?? "\u2014", leftX + 12, cy, supLabelW, supValW);
+  const custAddr = [inv.partyAddress, inv.partyProvince].filter(Boolean).join(", ");
+  cy = kvRow("Address:", custAddr || "\u2014", leftX + 12, cy, supLabelW, supValW);
+  const custBottom = cy + 6;
+  // Match the customer box height to the transaction box on its right so the
+  // second row aligns with the bottom of the transaction box above-right.
+  const row2Bottom = Math.max(custBottom, row1Bottom); // never taller than needed
+  box(leftX, custTitleY, colW, row2Bottom - custTitleY);
+
+  // ── Items table (fully bordered, government style) ──────────────────────
+  // Columns sized to sum to INNER. Widths tuned for readability.
+  const tableTop = Math.max(row2Bottom, row1Bottom) + gap;
+  const cols = [
+    { key: "sn", label: "S. #", w: 30, align: "left" as const },
+    { key: "desc", label: "Description", w: 150, align: "left" as const },
+    { key: "uom", label: "UOM", w: 40, align: "left" as const },
+    { key: "qty", label: "Quantity", w: 52, align: "right" as const },
+    { key: "price", label: "Price", w: 52, align: "right" as const },
+    { key: "excl", label: "Taxes Exclusive Value", w: 72, align: "right" as const },
+    { key: "rate", label: "Tax Rate", w: 40, align: "center" as const },
+    { key: "tax", label: "Tax Amount", w: 62, align: "right" as const },
+    { key: "incl", label: "Taxes Inclusive Value", w: 0, align: "right" as const },
+  ];
+  // Last column absorbs the remaining width so the table sums exactly to INNER.
+  const fixed = cols.reduce((a, c) => a + c.w, 0);
+  cols[cols.length - 1].w = INNER - fixed;
+
+  // Column x-offsets.
+  const colX: number[] = [];
+  let acc = M;
+  for (const c of cols) {
+    colX.push(acc);
+    acc += c.w;
+  }
+  const cellPad = 5;
+
+  // Header row.
+  const headH = 34;
+  setFill(TITLE_FILL);
+  setDraw(BORDER);
+  doc.setLineWidth(0.8);
+  doc.rect(M, tableTop, INNER, headH, "FD");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  setInk(INK);
+  cols.forEach((c, i) => {
+    const lines = doc.splitTextToSize(c.label, c.w - cellPad * 2);
+    const startY = tableTop + headH / 2 - (lines.length - 1) * 4 + 2.5;
+    if (c.align === "right") {
+      text(lines, colX[i] + c.w - cellPad, startY, { align: "right" });
+    } else if (c.align === "center") {
+      text(lines, colX[i] + c.w / 2, startY, { align: "center" });
+    } else {
+      text(lines, colX[i] + cellPad, startY);
+    }
+  });
+  // Vertical separators in the header.
+  setDraw(BORDER);
+  doc.setLineWidth(0.5);
+  for (let i = 1; i < cols.length; i++) {
+    doc.line(colX[i], tableTop, colX[i], tableTop + headH);
+  }
+
+  // Body rows.
+  let ry = tableTop + headH;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  inv.items.forEach((it, idx) => {
+    const descParts = [
+      (it.hsCode ? `${it.hsCode} - ` : "") + (it.yarnTypeName ?? "\u2014"),
+      it.yarnCountName ? `(${it.yarnCountName})` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const descLines = doc.splitTextToSize(descParts, cols[1].w - cellPad * 2);
+    const rowH = Math.max(24, descLines.length * 10 + 14);
+
+    // Row border.
+    setDraw(BORDER);
+    doc.setLineWidth(0.6);
+    doc.rect(M, ry, INNER, rowH);
+    for (let i = 1; i < cols.length; i++) {
+      doc.line(colX[i], ry, colX[i], ry + rowH);
+    }
+
+    const midY = ry + rowH / 2 + 2.5;
+    setInk(INK);
+    // S.# marker (small filled disc) + number.
+    setFill([120, 120, 120]);
+    doc.circle(colX[0] + 10, ry + rowH / 2, 4, "F");
+    // Description (top-aligned, multi-line).
+    text(descLines, colX[1] + cellPad, ry + 14);
+    // UOM.
+    text(it.uoM ?? "KG", colX[2] + cellPad, midY);
+    // Quantity.
+    text(money2(it.quantity), colX[3] + cols[3].w - cellPad, midY, { align: "right" });
+    // Price (rate per kg).
+    text(money2(it.ratePerKg), colX[4] + cols[4].w - cellPad, midY, { align: "right" });
+    // Taxes Exclusive Value.
+    text(money(it.valueExcludingTax), colX[5] + cols[5].w - cellPad, midY, { align: "right" });
+    // Tax Rate.
+    text("18%", colX[6] + cols[6].w / 2, midY, { align: "center" });
+    // Tax Amount.
+    text(money(it.taxAmount), colX[7] + cols[7].w - cellPad, midY, { align: "right" });
+    // Taxes Inclusive Value.
+    text(money(it.totalValue), colX[8] + cols[8].w - cellPad, midY, { align: "right" });
+
+    ry += rowH;
+    void idx;
+  });
+
+  // Amount-in-words + totals row (spans the desc columns on the left, and
+  // shows the summed totals under the Exclusive / Tax / Inclusive columns).
+  const wordsRowTop = ry;
+  const wordsRowH = 26;
+  setDraw(BORDER);
+  doc.setLineWidth(0.8);
+  doc.rect(M, wordsRowTop, INNER, wordsRowH);
+  // Vertical separators only under the numeric total columns (5,7,8).
+  [colX[5], colX[6], colX[7], colX[8]].forEach((x) => {
+    doc.line(x, wordsRowTop, x, wordsRowTop + wordsRowH);
+  });
+  const words = amountInWords(inv.grandTotal);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  setInk(INK);
+  const wLines = doc.splitTextToSize(words, colX[5] - M - cellPad * 2);
+  text(wLines, M + cellPad, wordsRowTop + wordsRowH / 2 - (wLines.length - 1) * 4 + 2.5);
+  // Totals under numeric columns.
+  const totMidY = wordsRowTop + wordsRowH / 2 + 2.5;
+  text(money(inv.totalValue), colX[5] + cols[5].w - cellPad, totMidY, { align: "right" });
+  text(money(inv.totalTax), colX[7] + cols[7].w - cellPad, totMidY, { align: "right" });
+  text(money(inv.grandTotal), colX[8] + cols[8].w - cellPad, totMidY, { align: "right" });
+
+  const tableBottom = wordsRowTop + wordsRowH;
+
+  // ── Lower band: FBR logo + QR (left) and totals summary box (right) ─────
+  const bandTop = tableBottom + 20;
+
+  // FBR Digital Invoicing logo (left) + QR code beside it.
+  const logoW = 58;
+  const logoH = 46;
+  doc.addImage(FBR_INVOICE_LOGO_B64, "PNG", M, bandTop, logoW, logoH);
+
   let qrDataUrl: string | null = null;
   if (inv.fbrInvoiceNumber) {
     try {
       qrDataUrl = await QRCode.toDataURL(inv.fbrInvoiceNumber, {
         errorCorrectionLevel: "M",
         margin: 1,
-        width: 120,
+        width: 160,
       });
     } catch {
       qrDataUrl = null;
     }
   }
   if (qrDataUrl) {
-    doc.addImage(qrDataUrl, "PNG", W - 72, 40, 52, 52);
+    doc.addImage(qrDataUrl, "PNG", M + logoW + 16, bandTop - 4, 62, 62);
   }
 
-  // DIGITAL INVOICE banner — right-aligned below the QR (y 104..126), clear
-  // of both the QR (y 40..92) and the address text on the left.
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.setTextColor(INK[0], INK[1], INK[2]);
-  text("DIGITAL INVOICE", W - M, 106, { align: "right" });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-  text("S A L E S   T A X", W - M, 118, { align: "right" });
-  text(`REG. #: ${inv.companyNtnCnic ?? "—"}`, W - M, 128, { align: "right" });
-
-  // Black header rule below everything (y=138) — clear of all header text.
-  hairline(138, M, W - M, [20, 20, 20], 1.2);
-
-  // ── BILL TO / INVOICE blocks ──────────────────────────────────────────
-  const blockTop = 150;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(INK[0], INK[1], INK[2]);
-  text("BILL TO", M, blockTop);
-  text("INVOICE", W / 2, blockTop);
-
-  const leftX = W / 2 + 8;
-
-  // Bill-to details (left column).
-  let by = blockTop + 16;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.setTextColor(INK[0], INK[1], INK[2]);
-  text(inv.partyName ?? "—", M, by); by += 17;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  if (inv.partyAddress) { text(inv.partyAddress, M, by); by += 14; }
-  if (inv.partyProvince) { text(inv.partyProvince.toUpperCase(), M, by); by += 14; }
-  text(`NTN/CNIC: ${inv.partyNtnCnic ?? "—"}`, M, by);
-
-  // INVOICE fields (right): number, date, FBR number. Labels muted, values bold.
-  const invLabel = (s: string, x: number, y: number, o?: Parameters<typeof text>[3]) => {
-    doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]); text(s, x, y, o);
-  };
-  const invValue = (s: string, x: number, y: number, o?: Parameters<typeof text>[3]) => {
-    doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(INK[0], INK[1], INK[2]); text(s, x, y, o);
-  };
-  invLabel("INVOICE NUMBER", leftX, blockTop + 12);
-  invValue(String(inv.id).padStart(6, "0"), leftX, blockTop + 24);
-  invLabel("INVOICE DATE", W - M, blockTop + 12, { align: "right" });
-  invValue(format(new Date(inv.invoiceDate + "T00:00:00"), "dd-MM-yyyy"), W - M, blockTop + 24, { align: "right" });
-  invLabel("FBR INVOICE #", leftX, blockTop + 42);
-  invValue(inv.fbrInvoiceNumber ?? "—", leftX, blockTop + 54);
-
-  // ── Items table ────────────────────────────────────────────────────────
-  autoTable(doc, {
-    startY: blockTop + 78,
-    margin: { left: M, right: M },
-    head: [["#", "ITEM", "QTY", "RATE", "VALUE", "ST %", "SALES TAX"]],
-    body: inv.items.map((it, idx) => [
-      String(idx + 1),
-      [
-        (it.yarnTypeName ?? "—") + (it.yarnCountName ? ` (${it.yarnCountName})` : ""),
-        it.yarnTypeName ?? "",
-        `HS Code: ${it.hsCode ?? ""}`.trim(),
-        `Item Code: ${it.yarnTypeName ?? ""} ${it.yarnCountName ?? ""}`.trim(),
-      ],
-      `${Number(it.quantity).toLocaleString("en-PK", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} (${it.uoM ?? "KG"})`,
-      money(it.ratePerKg),
-      money(it.valueExcludingTax),
-      "18%",
-      money(it.taxAmount),
-    ]),
-    theme: "grid",
-    styles: { fontSize: 9, cellPadding: 4, textColor: INK as unknown as string },
-    headStyles: { fillColor: HEAD_FILL as unknown as string, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 },
-    alternateRowStyles: { fillColor: BAND as unknown as string },
-    // Fixed column widths that sum to the printable width (W - 2*M ≈ 555pt),
-    // so the table fits exactly within the margins and never overflows the
-    // page. # ITEM QTY RATE VALUE ST% SALES-TAX = 28+233+72+50+72+30+70 = 555.
-    columnStyles: {
-      0: { cellWidth: 28, halign: "center" },
-      1: { cellWidth: 233 },
-      2: { cellWidth: 72, halign: "right" },
-      3: { cellWidth: 50, halign: "right" },
-      4: { cellWidth: 72, halign: "right" },
-      5: { cellWidth: 30, halign: "right" },
-      6: { cellWidth: 70, halign: "right" },
-    },
-    didParseCell: (data) => {
-      if (data.section === "body" && data.column.index === 1 && Array.isArray(data.cell.raw)) {
-        data.cell.text = data.cell.raw as string[];
-        data.cell.styles.valign = "middle";
+  // Totals summary box (right).
+  const sumW = 300;
+  const sumX = RIGHT - sumW;
+  const sumRowH = 26;
+  const sumLabelW = sumW - 90;
+  const summary: Array<{ label: string; value: string | null; bold?: boolean }> = [
+    { label: "Total Taxes Exclusive Value", value: money(inv.totalValue) },
+    { label: "Total Tax Amount @ 18%", value: money(inv.totalTax) },
+    { label: "", value: null }, // blank spacer row (as in reference)
+    { label: "Total Taxes Inclusive Value", value: money(inv.grandTotal), bold: true },
+  ];
+  let syy = bandTop;
+  setDraw(BORDER);
+  doc.setLineWidth(0.8);
+  summary.forEach((r) => {
+    doc.rect(sumX, syy, sumW, sumRowH);
+    doc.setLineWidth(0.5);
+    doc.line(sumX + sumLabelW, syy, sumX + sumLabelW, syy + sumRowH);
+    doc.setLineWidth(0.8);
+    if (r.label) {
+      doc.setFont("helvetica", r.bold ? "bold" : "normal");
+      doc.setFontSize(9);
+      setInk(INK);
+      text(r.label, sumX + 8, syy + sumRowH / 2 + 3);
+      if (r.value != null) {
+        doc.setFont("helvetica", "bold");
+        text(r.value, sumX + sumW - 8, syy + sumRowH / 2 + 3, { align: "right" });
       }
-      if (data.section === "body" && [2, 3, 4, 5, 6].includes(data.column.index)) {
-        data.cell.styles.halign = "right";
-      }
-    },
+    }
+    syy += sumRowH;
   });
 
-  const lastY = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 260;
+  // ── Signature / stamp area (left, below the band) ──────────────────────
+  const stampTop = Math.max(bandTop + logoH + 24, syy + 24);
+  // (Digital invoices carry no wet signature; the reference shows a company
+  // stamp graphic which we don't have, so we leave the space and add the note.)
 
-  // ── AMOUNT IN WORDS (left) + totals (right) ───────────────────────────
-  const words = amountInWords(inv.grandTotal);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-  text("AMOUNT IN WORDS", M, lastY + 22);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(INK[0], INK[1], INK[2]);
-  const wordsLines = doc.splitTextToSize(words, W - 300);
-  let wy = lastY + 34;
-  for (const line of wordsLines) {
-    text(line, M, wy);
-    wy += 13;
-  }
-
-  // Totals block (right) with a shaded grand-total band.
-  const totX = W - M;
-  const totLeft = totX - 170;
-  const totTop = lastY + 18;
-  doc.setFontSize(9);
-  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-  doc.setFont("helvetica", "normal");
-  text("TOTAL VALUE", totLeft, totTop);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(INK[0], INK[1], INK[2]);
-  text(money(inv.totalValue), totX, totTop, { align: "right" });
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-  text("SALES TAX (18%)", totLeft, totTop + 18);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(INK[0], INK[1], INK[2]);
-  text(money(inv.totalTax), totX, totTop + 18, { align: "right" });
-
-  // Grand total band.
-  const bandTop = totTop + 30;
-  doc.setFillColor(TOTAL_FILL[0], TOTAL_FILL[1], TOTAL_FILL[2]);
-  doc.rect(totLeft, bandTop - 10, totX - totLeft, 24, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  text("GRAND TOTAL", totLeft + 10, bandTop + 4);
-  doc.setFontSize(12);
-  text(money(inv.grandTotal), totX - 10, bandTop + 4, { align: "right" });
-
-  // ── Footer: separator + terms + logo, anchored to the bottom of the page ──
-  const pH = doc.internal.pageSize.getHeight();
-  const termsY = pH - 74;
-
-  // Separator line above the footer block.
-  hairline(termsY - 16, M, W - M, [20, 20, 20], 1.0);
-
-  // TERMS & CONDITIONS (bottom-left).
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(INK[0], INK[1], INK[2]);
-  text("TERMS & CONDITIONS", M, termsY);
+  // ── Footer ─────────────────────────────────────────────────────────────
+  const noteY = Math.min(H - 60, stampTop + 90);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-  text("\u2022  This is a system generated invoice and does not require a signature.", M, termsY + 14);
-  text("\u2022  Goods once sold will not be taken back.", M, termsY + 24);
-  text("\u2022  Payment due within the agreed credit period; subject to applicable sales tax.", M, termsY + 34);
+  setInk(INK);
+  text("This is a computer generated document. No signature is required.", M, noteY);
 
-  // FBR Digital Invoicing logo — resized smaller and centered in the band
-  // between the separator (termsY-16) and the footer note (pH-12): 40pt tall,
-  // top at termsY-4, so it sits ~12pt clear of the separator above and well
-  // clear of the address/note below.
-  doc.addImage(FBR_INVOICE_LOGO_B64, "PNG", W - 98, termsY - 4, 42, 40);
-
-  // Company address + FBR reporting note + version credit at the very bottom.
-  hairline(pH - 32, 0, W, LINE, 0.4);
-  doc.setFontSize(8);
-  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-  text(inv.companyAddress ?? "", M, pH - 20);
-  text(
-    inv.status === "posted"
-      ? `This invoice has been reported to FBR Digital Invoicing (No: ${inv.fbrInvoiceNumber ?? "—"}).`
-      : "Draft invoice — not yet posted to FBR.",
-    M,
-    pH - 12,
-  );
-  text("TKT System v1.0 by TKT", W - M, pH - 12, { align: "right" });
+  // Footer strip (3 columns) at the very bottom.
+  const footY = H - 30;
+  setDraw(BORDER);
+  doc.setLineWidth(0.6);
+  doc.line(M, footY - 12, RIGHT, footY - 12);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  setInk(MUTED);
+  text("Receipt & Confirmation by Recipient on EDP", M, footY);
+  text("Page 1 of 1", W / 2, footY, { align: "center" });
+  const printStamp = `Print Date: Server Time: ${format(new Date(), "dd-MMM-yyyy / HH:mm:ss")}`;
+  text(printStamp, RIGHT, footY, { align: "right" });
 
   doc.save(`invoice-${inv.id}.pdf`);
 }
 
 // ─── Number to words (Pakistani / Indian lakh-crore grouping) ─────────────
-// Groups: crore (10^7), lakh (10^5), thousand, hundred. Returns "AND X AND
-// YY PAISAS ONLY" when there are paisa (fractional) rupees.
-const ONES = ["", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE",
-  "TEN", "ELEVEN", "TWELVE", "THIRTEEN", "FOURTEEN", "FIFTEEN", "SIXTEEN", "SEVENTEEN",
-  "EIGHTEEN", "NINETEEN"];
-const TENS = ["", "", "TWENTY", "THIRTY", "FORTY", "FIFTY", "SIXTY", "SEVENTY", "EIGHTY", "NINETY"];
+// Groups: crore (10^7), lakh (10^5), thousand, hundred. Returns a title-cased
+// string ending in "Only" (with "And N Paisa Only" when paisa are present),
+// matching the reference invoice's amount-in-words style.
+const ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+  "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen",
+  "Eighteen", "Nineteen"];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
 
 function twoDigits(n: number): string {
   if (n < 20) return ONES[n];
-  return `${TENS[Math.floor(n / 10)]}${n % 10 ? " " + ONES[n % 10] : ""}`;
+  return `${TENS[Math.floor(n / 10)]}${n % 10 ? "-" + ONES[n % 10] : ""}`;
 }
 
 function threeDigits(n: number): string {
   const hundreds = Math.floor(n / 100);
   const rest = n % 100;
   let s = "";
-  if (hundreds) s += `${ONES[hundreds]} HUNDRED`;
+  if (hundreds) s += `${ONES[hundreds]} Hundred`;
   if (rest) s += (s ? " " : "") + twoDigits(rest);
   return s;
 }
 
 function rupeesToWordsAmount(amount: string | number): string {
   const n = typeof amount === "number" ? amount : parseFloat(amount);
-  if (!Number.isFinite(n) || n <= 0) return "ZERO";
+  if (!Number.isFinite(n) || n <= 0) return "Zero Only";
   const paise = Math.round((n % 1) * 100);
   let whole = Math.floor(n);
   const crore = Math.floor(whole / 10000000); whole %= 10000000;
   const lakh = Math.floor(whole / 100000); whole %= 100000;
   const thousand = Math.floor(whole / 1000); whole %= 1000;
   const parts: string[] = [];
-  if (crore) parts.push(`${threeDigits(crore)} CRORE`);
-  if (lakh) parts.push(`${threeDigits(lakh)} LAKH`);
-  if (thousand) parts.push(`${threeDigits(thousand)} THOUSAND`);
+  if (crore) parts.push(`${threeDigits(crore)} Crore`);
+  if (lakh) parts.push(`${threeDigits(lakh)} Lakh`);
+  if (thousand) parts.push(`${threeDigits(thousand)} Thousand`);
   if (whole) parts.push(threeDigits(whole));
-  const ru = parts.length ? parts.join(" ") : "ZERO";
-  if (paise) return `${ru} AND ${twoDigits(paise)} PAISAS ONLY`;
-  return `${ru} ONLY`;
+  const ru = parts.length ? parts.join(" ") : "Zero";
+  if (paise) return `${ru} And ${twoDigits(paise)} Paisa Only`;
+  return `${ru} Only`;
 }
 
 function amountInWords(amount: string | number): string {
