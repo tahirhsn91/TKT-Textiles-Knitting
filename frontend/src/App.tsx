@@ -4,12 +4,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ConfigurationProvider } from "@/context/config-context";
+import { AuthProvider } from "@/context/auth-context";
+import { ProtectedRoute } from "@/components/protected-route";
 import {
   RouteErrorBoundary,
   SuspenseFallback,
 } from "@/components/route-error-boundary";
 import { lazyRetry } from "@/lib/lazy-retry";
 import NotFound from "@/pages/not-found";
+import LoginPage from "@/pages/login";
 import DashboardPage from "@/pages/dashboard";
 
 const TransactionList = lazyRetry(() => import("@/pages/transactions"));
@@ -26,6 +29,7 @@ const YarnToFabricPage = lazyRetry(() => import("@/pages/reports/yarn-to-fabric"
 const MachineMaintenancePage = lazyRetry(() => import("@/pages/maintenance/machine-maintenance"));
 const FactoryMaintenancePage = lazyRetry(() => import("@/pages/maintenance/factory-maintenance"));
 const InvoicingPage = lazyRetry(() => import("@/pages/invoicing"));
+const SettingsPage = lazyRetry(() => import("@/pages/settings"));
 
 const queryClient = new QueryClient();
 
@@ -34,25 +38,69 @@ function Router() {
     <RouteErrorBoundary>
       <Suspense fallback={<SuspenseFallback />}>
         <Switch>
-          <Route path="/" component={() => <Redirect to="/dashboard" />} />
-          <Route path="/dashboard" component={DashboardPage} />
-          <Route path="/transactions" component={TransactionList} />
-          <Route path="/transactions/new" component={TransactionForm} />
-          <Route path="/transactions/:id/edit" component={TransactionForm} />
-          <Route path="/daily-production" component={DailyProductionList} />
-          <Route path="/yarn-receipts" component={YarnReceiptList} />
-          <Route path="/daily-deliveries" component={DailyDeliveryList} />
-          <Route path="/transactions/monthly-salary-entry/new" component={PayrollEntryPage} />
-          <Route path="/transactions/monthly-salary-entry/:id/edit" component={PayrollEntryPage} />
-          <Route path="/transactions/monthly-salary-entry" component={MonthlySalaryEntryPage} />
-          <Route path="/transactions/advances" component={AdvancesPage} />
-          <Route path="/masters" component={MastersPage} />
-          <Route path="/reports" component={() => <Redirect to="/reports/yarn-balance" />} />
-          <Route path="/reports/yarn-balance" component={YarnBalancePage} />
-          <Route path="/reports/yarn-to-fabric" component={YarnToFabricPage} />
-          <Route path="/maintenance/machine" component={MachineMaintenancePage} />
-          <Route path="/maintenance/factory" component={FactoryMaintenancePage} />
-          <Route path="/invoicing" component={InvoicingPage} />
+          <Route path="/login" component={LoginPage} />
+          <Route path="/">
+            <ProtectedRoute moduleId="dashboard">
+              <Redirect to="/dashboard" />
+            </ProtectedRoute>
+          </Route>
+          <Route path="/dashboard">
+            <ProtectedRoute moduleId="dashboard"><DashboardPage /></ProtectedRoute>
+          </Route>
+          <Route path="/transactions">
+            <ProtectedRoute moduleId="transactions"><TransactionList /></ProtectedRoute>
+          </Route>
+          <Route path="/transactions/new">
+            <ProtectedRoute moduleId="transactions"><TransactionForm /></ProtectedRoute>
+          </Route>
+          <Route path="/transactions/:id/edit">
+            <ProtectedRoute moduleId="transactions"><TransactionForm /></ProtectedRoute>
+          </Route>
+          <Route path="/daily-production">
+            <ProtectedRoute moduleId="dailyProduction"><DailyProductionList /></ProtectedRoute>
+          </Route>
+          <Route path="/yarn-receipts">
+            <ProtectedRoute moduleId="yarnReceipts"><YarnReceiptList /></ProtectedRoute>
+          </Route>
+          <Route path="/daily-deliveries">
+            <ProtectedRoute moduleId="dailyDeliveries"><DailyDeliveryList /></ProtectedRoute>
+          </Route>
+          <Route path="/transactions/monthly-salary-entry/new">
+            <ProtectedRoute moduleId="payroll"><PayrollEntryPage /></ProtectedRoute>
+          </Route>
+          <Route path="/transactions/monthly-salary-entry/:id/edit">
+            <ProtectedRoute moduleId="payroll"><PayrollEntryPage /></ProtectedRoute>
+          </Route>
+          <Route path="/transactions/monthly-salary-entry">
+            <ProtectedRoute moduleId="payroll"><MonthlySalaryEntryPage /></ProtectedRoute>
+          </Route>
+          <Route path="/transactions/advances">
+            <ProtectedRoute moduleId="payroll"><AdvancesPage /></ProtectedRoute>
+          </Route>
+          <Route path="/masters">
+            <ProtectedRoute moduleId="masters"><MastersPage /></ProtectedRoute>
+          </Route>
+          <Route path="/reports">
+            <ProtectedRoute moduleId="reports"><Redirect to="/reports/yarn-balance" /></ProtectedRoute>
+          </Route>
+          <Route path="/reports/yarn-balance">
+            <ProtectedRoute moduleId="reports"><YarnBalancePage /></ProtectedRoute>
+          </Route>
+          <Route path="/reports/yarn-to-fabric">
+            <ProtectedRoute moduleId="reports"><YarnToFabricPage /></ProtectedRoute>
+          </Route>
+          <Route path="/maintenance/machine">
+            <ProtectedRoute moduleId="maintenance"><MachineMaintenancePage /></ProtectedRoute>
+          </Route>
+          <Route path="/maintenance/factory">
+            <ProtectedRoute moduleId="maintenance"><FactoryMaintenancePage /></ProtectedRoute>
+          </Route>
+          <Route path="/invoicing">
+            <ProtectedRoute moduleId="invoicing"><InvoicingPage /></ProtectedRoute>
+          </Route>
+          <Route path="/settings">
+            <ProtectedRoute moduleId="users"><SettingsPage /></ProtectedRoute>
+          </Route>
           <Route component={NotFound} />
         </Switch>
       </Suspense>
@@ -63,14 +111,16 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ConfigurationProvider>
-        <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-          </WouterRouter>
-          <Toaster />
-        </TooltipProvider>
-      </ConfigurationProvider>
+      <AuthProvider>
+        <ConfigurationProvider>
+          <TooltipProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+            </WouterRouter>
+            <Toaster />
+          </TooltipProvider>
+        </ConfigurationProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
