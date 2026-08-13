@@ -260,9 +260,10 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
 
     const midY = ry + rowH / 2 + 2.5;
     setInk(INK);
-    // S.# marker (small filled disc) + number.
-    setFill([120, 120, 120]);
-    doc.circle(colX[0] + 10, ry + rowH / 2, 4, "F");
+    // S.# = sequential item number (1, 2, 3, ...).
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    text(String(idx + 1), colX[0] + cols[0].w / 2, midY, { align: "center" });
     // Description (top-aligned, multi-line).
     text(descLines, colX[1] + cellPad, ry + 14);
     // UOM.
@@ -281,7 +282,6 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
     text(money(it.totalValue), colX[8] + cols[8].w - cellPad, midY, { align: "right" });
 
     ry += rowH;
-    void idx;
   });
 
   // Amount-in-words + totals row (spans the desc columns on the left, and
