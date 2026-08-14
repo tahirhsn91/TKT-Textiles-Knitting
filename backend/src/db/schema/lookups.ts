@@ -154,7 +154,7 @@ export type EmployeeSalarySettings = typeof employeeSalarySettingsTable.$inferSe
 export const employeeSalaryRecordsTable = pgTable("employee_salary_records", {
   id: serial("id").primaryKey(),
   employeeId: integer("employee_id").notNull().references(() => employeeMasterTable.id),
-  date: text("date").notNull(),
+  date: date("date").notNull(),
   baseWage: numeric("base_wage").notNull(),
   commission: numeric("commission").notNull().default("0"),
   finalSalary: numeric("final_salary").notNull(),
@@ -168,7 +168,7 @@ export type EmployeeSalaryRecord = typeof employeeSalaryRecordsTable.$inferSelec
 export const employeeAdvancesTable = pgTable("employee_advances", {
   id: serial("id").primaryKey(),
   employeeId: integer("employee_id").notNull().references(() => employeeMasterTable.id),
-  date: text("date").notNull(),
+  date: date("date").notNull(),
   amount: numeric("amount").notNull(),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
