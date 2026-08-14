@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Plus, Edit, Trash2, X } from "lucide-react";
+import { Plus, Edit, Trash2, X, Loader2 } from "lucide-react";
 import { SortableHead } from "@/components/sortable-head";
 import { compareValues } from "@/hooks/use-sort";
 import {
@@ -542,8 +542,10 @@ export default function TransactionList() {
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() => handleDelete(t.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  className="gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:opacity-60"
+                                  disabled={deleteTransaction.isPending}
                                 >
+                                  {deleteTransaction.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                                   Delete
                                 </AlertDialogAction>
                               </AlertDialogFooter>
