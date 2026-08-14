@@ -2,6 +2,11 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    # Resource limits (issue #21): bound Postgres so it can't starve the VM's
+    # other services via runaway shared buffers / memory use.
+    mem_limit: 512m
+    mem_reservation: 256m
+    cpus: "1.0"
     dns:
       - 195.179.224.53
       - 209.126.15.53
@@ -23,6 +28,11 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
+    # Resource limits (issue #21): cap the Node backend so a memory leak can't
+    # consume all host RAM; NODE_OPTIONS makes the GC kick in before OOM.
+    mem_limit: 512m
+    mem_reservation: 256m
+    cpus: "1.0"
     dns:
       - 195.179.224.53
       - 209.126.15.53
@@ -34,6 +44,9 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       PORT: "8080"
       NODE_ENV: production
+      # Cap Node's heap well under the 512m container limit so GC triggers before
+      # the limit is hit (issue #21).
+      NODE_OPTIONS: "--max-old-space-size=384"
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001,http://169.58.108.61:3001,https://tahir.servecounterstrike.com}
     # No host port exposed — internal Docker network only
     depends_on:
@@ -49,6 +62,10 @@ services:
   frontend:
     build: ./frontend
     restart: unless-stopped
+    # Resource limits (issue #21): the static web server is light — keep it small.
+    mem_limit: 256m
+    mem_reservation: 128m
+    cpus: "0.5"
     dns:
       - 195.179.224.53
       - 209.126.15.53
