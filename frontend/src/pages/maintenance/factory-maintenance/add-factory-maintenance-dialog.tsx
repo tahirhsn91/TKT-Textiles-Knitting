@@ -32,8 +32,7 @@ import {
 } from "@/components/ui/form";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
-
-const LS_ENTERED_BY = "factory-maintenance-entered-by";
+import { useCurrentUserDisplayName } from "@/hooks/use-current-user";
 
 // Fixed category options (issue #109). "Other" is the default selection and is
 // a member of the list; stored as a plain string so a future change to this
@@ -95,13 +94,12 @@ export function FactoryMaintenanceDialog({
   });
   const record = recordQuery.data;
 
-  const savedEnteredBy = (() => {
-    try { return localStorage.getItem(LS_ENTERED_BY) ?? ""; } catch { return ""; }
-  })();
+  // "Entered By" is always the logged-in user; the field is read-only.
+  const enteredByName = useCurrentUserDisplayName();
 
   const form = useForm<FactoryValues>({
     resolver: zodResolver(factorySchema),
-    defaultValues: defaultValues(savedEnteredBy, defaultDate),
+    defaultValues: defaultValues(enteredByName, defaultDate),
   });
 
   const [pendingAction, setPendingAction] = useState<"save" | "saveAndAdd" | null>(null);
@@ -118,7 +116,7 @@ export function FactoryMaintenanceDialog({
     if (!isEdit) {
       if (prefilledFor.current === null) return;
       prefilledFor.current = null;
-      form.reset(defaultValues(savedEnteredBy, defaultDate));
+      form.reset(defaultValues(enteredByName, defaultDate));
       setPendingAction(null);
       setFormError(null);
       return;
@@ -132,7 +130,7 @@ export function FactoryMaintenanceDialog({
       maintenanceDate: new Date(`${record.maintenanceDate}T00:00:00`),
       category: record.category || "Other",
       maintenanceWork: record.maintenanceWork,
-      enteredBy: savedEnteredBy || record.createdBy,
+      enteredBy: enteredByName,
     });
     setPendingAction(null);
     setFormError(null);
@@ -148,7 +146,6 @@ export function FactoryMaintenanceDialog({
     if (!valid) return;
 
     const values = form.getValues();
-    try { localStorage.setItem(LS_ENTERED_BY, values.enteredBy); } catch {}
 
     setPendingAction(keepOpen ? "saveAndAdd" : "save");
 
@@ -308,7 +305,7 @@ export function FactoryMaintenanceDialog({
                     <FormItem className="sm:col-span-2">
                       <FormLabel>{isEdit ? "Updated By *" : "Entered By *"}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Your name" className="h-11 sm:h-9" disabled={readOnly} {...field} />
+                        <Input placeholder="Your name" className="h-11 sm:h-9" disabled {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
