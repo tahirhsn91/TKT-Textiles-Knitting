@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import {
   ChevronDown,
   KeyRound,
@@ -14,7 +14,6 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
 import { useChangePassword } from "@/hooks/use-rbac";
 import { useToast } from "@/hooks/use-toast";
-import { Wordmark } from "@/components/wordmark";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,10 +35,9 @@ import {
 } from "@/components/ui/dialog";
 
 /**
- * Top bar shown across the whole app. Left: hamburger (mobile) + wordmark.
- * Right: account dropdown (user + role, Users & Roles, Change Password,
- * Sign out). Uses the same brand Wordmark and height as the sidebar header so
- * the whole top region reads consistently on desktop and mobile.
+ * Top bar shown across the whole app. Left: hamburger (mobile). Right:
+ * account dropdown (user + role, Users & Roles, Change Password, Sign out).
+ * Uses the same height as the sidebar header so the top region is consistent.
  */
 export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
   const { session, can, logout } = useAuth();
@@ -59,7 +57,7 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
         import.meta.env.DEV && "top-7"
       )}
     >
-      {/* Left: hamburger (mobile) + wordmark. */}
+      {/* Left: hamburger (mobile). */}
       <div className="flex min-w-0 items-center gap-1">
         {onMenuClick && (
           <button
@@ -70,13 +68,10 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
             <Menu className="h-5 w-5" />
           </button>
         )}
-        <Link href="/dashboard" className="shrink-0 transition-opacity hover:opacity-80">
-          <Wordmark />
-        </Link>
       </div>
 
       {/* Right: account dropdown aligned to the top-right corner. */}
-      <div className="flex items-center">
+      <div className="flex flex-1 items-center justify-end">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
