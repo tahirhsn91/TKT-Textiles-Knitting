@@ -130,6 +130,7 @@ function ChangePasswordDialog({ open, onClose }: { open: boolean; onClose: () =>
   const changePassword = useChangePassword();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const submit = () => {
@@ -145,6 +146,10 @@ function ChangePasswordDialog({ open, onClose }: { open: boolean; onClose: () =>
       setError("New password must be different from the current password.");
       return;
     }
+    if (newPassword !== confirmPassword) {
+      setError("New password and confirm password do not match.");
+      return;
+    }
     setError(null);
     changePassword.mutate(
       { currentPassword, newPassword },
@@ -153,6 +158,7 @@ function ChangePasswordDialog({ open, onClose }: { open: boolean; onClose: () =>
           toast({ title: "Password changed" });
           setCurrentPassword("");
           setNewPassword("");
+          setConfirmPassword("");
           onClose();
         },
         onError: (e) => {
@@ -188,6 +194,15 @@ function ChangePasswordDialog({ open, onClose }: { open: boolean; onClose: () =>
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="6+ characters"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Confirm password</Label>
+            <Input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter your new password"
             />
           </div>
           {error && (
