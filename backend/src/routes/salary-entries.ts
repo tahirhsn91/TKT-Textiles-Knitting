@@ -19,6 +19,15 @@ function idParam(req: { params: Record<string, string> }) {
   return isNaN(id) ? null : id;
 }
 
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code: string }).code === "23505"
+  );
+}
+
 function toNum(val: unknown): number {
   const n = parseFloat(String(val ?? ""));
   return isNaN(n) ? 0 : n;
@@ -241,59 +250,98 @@ router.post("/salary-entries", async (req, res): Promise<void> => {
 
   const employeeIds = details.map((d) => d.employeeId);
 
-  // Enforce DB-level uniqueness: check if any (employeeId, month, year) already exists
-  const existingDetails = await db
-    .select({ employeeId: salaryDetailTable.employeeId })
-    .from(salaryDetailTable)
-    .where(
-      and(
-        eq(salaryDetailTable.month, month),
-        eq(salaryDetailTable.year, year),
-        inArray(salaryDetailTable.employeeId, employeeIds)
-      )
-    );
+  // Enforce DB-level uniqueness inside a single transaction so two concurrent
+  // saves for the same employees can't both pass the app-level check. If a
+  // duplicate slips through (race), the unique constraint (23505) is caught
+  // here and surfaced as a friendly 409 instead of a generic 500 (issue #20).
+  try {
+    const result = await db.transaction(async (tx) => {
+      // Best-effort check — the constraint below is the real backstop.
+      const existingDetails = await tx
+        .select({ employeeId: salaryDetailTable.employeeId })
+        .from(salaryDetailTable)
+        .where(
+          and(
+            eq(salaryDetailTable.month, month),
+            eq(salaryDetailTable.year, year),
+            inArray(salaryDetailTable.employeeId, employeeIds)
+          )
+        );
 
-  if (existingDetails.length > 0) {
-    const ops = await db
-      .select({ id: employeeMasterTable.id, name: employeeMasterTable.name })
-      .from(employeeMasterTable)
-      .where(inArray(employeeMasterTable.id, existingDetails.map((e) => e.employeeId)));
-    const names = ops.map((o) => o.name).join(", ");
-    res.status(409).json({ error: `Duplicate: salary already entered for ${names} in ${month}/${year}` });
-    return;
+      if (existingDetails.length > 0) {
+        const ops = await tx
+          .select({ id: employeeMasterTable.id, name: employeeMasterTable.name })
+          .from(employeeMasterTable)
+          .where(inArray(employeeMasterTable.id, existingDetails.map((e) => e.employeeId)));
+        const names = ops.map((o) => o.name).join(", ");
+        return { conflict: `Duplicate: salary already entered for ${names} in ${month}/${year}` } as const;
+      }
+
+      const [header] = await tx
+        .insert(salaryHeaderTable)
+        .values({ month, year, departmentIds, posted: false })
+        .returning();
+
+      const detailRows = details.map((d) => ({
+        headerId: header.id,
+        employeeId: d.employeeId,
+        month,
+        year,
+        departmentId: d.departmentId ?? null,
+        employeeName: d.employeeName,
+        basicSalary: String(toNum(d.basicSalary)),
+        otRateHr: String(toNum(d.otRateHr)),
+        attAllowance: String(toNum(d.attAllowance)),
+        othAllowance: String(toNum(d.othAllowance)),
+        presentDays: String(toNum(d.presentDays)),
+        absentDays: String(toNum(d.absentDays)),
+        holidays: String(toNum(d.holidays)),
+        totalAttendance: String(toNum(d.totalAttendance)),
+        totalSalary: String(toNum(d.totalSalary)),
+        otHours: String(toNum(d.otHours)),
+        otAmount: String(toNum(d.otAmount)),
+        advanceDeduction: String(toNum(d.advanceDeduction)),
+        loanDeduction: String(toNum(d.loanDeduction)),
+        otherDeduction: String(toNum(d.otherDeduction)),
+        payableSalary: String(toNum(d.payableSalary)),
+      }));
+
+      const insertedDetails = await tx.insert(salaryDetailTable).values(detailRows).returning();
+      return { header, details: insertedDetails } as const;
+    });
+
+    if ("conflict" in result) {
+      res.status(409).json({ error: result.conflict });
+      return;
+    }
+    res.status(201).json({ ...result.header, details: result.details });
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      // A concurrent save won the race — the constraint caught it. Surface the
+      // conflicting employees so the user knows exactly what to fix.
+      const conflictRows = await db
+        .select({ employeeId: salaryDetailTable.employeeId })
+        .from(salaryDetailTable)
+        .where(
+          and(
+            eq(salaryDetailTable.month, month),
+            eq(salaryDetailTable.year, year),
+            inArray(salaryDetailTable.employeeId, employeeIds)
+          )
+        );
+      const ops =
+        conflictRows.length > 0
+          ? await db
+              .select({ id: employeeMasterTable.id, name: employeeMasterTable.name })
+              .from(employeeMasterTable)
+              .where(inArray(employeeMasterTable.id, conflictRows.map((e) => e.employeeId)))
+          : [];
+      const conflicting = ops.map((o) => o.name).join(", ") || "this employee(s)";
+      res.status(409).json({ error: `Duplicate: salary already entered for ${conflicting} in ${month}/${year}` });
+      return;
+    }
+    throw err;
   }
-
-  const [header] = await db
-    .insert(salaryHeaderTable)
-    .values({ month, year, departmentIds, posted: false })
-    .returning();
-
-  const detailRows = details.map((d) => ({
-    headerId: header.id,
-    employeeId: d.employeeId,
-    month,
-    year,
-    departmentId: d.departmentId ?? null,
-    employeeName: d.employeeName,
-    basicSalary: String(toNum(d.basicSalary)),
-    otRateHr: String(toNum(d.otRateHr)),
-    attAllowance: String(toNum(d.attAllowance)),
-    othAllowance: String(toNum(d.othAllowance)),
-    presentDays: String(toNum(d.presentDays)),
-    absentDays: String(toNum(d.absentDays)),
-    holidays: String(toNum(d.holidays)),
-    totalAttendance: String(toNum(d.totalAttendance)),
-    totalSalary: String(toNum(d.totalSalary)),
-    otHours: String(toNum(d.otHours)),
-    otAmount: String(toNum(d.otAmount)),
-    advanceDeduction: String(toNum(d.advanceDeduction)),
-    loanDeduction: String(toNum(d.loanDeduction)),
-    otherDeduction: String(toNum(d.otherDeduction)),
-    payableSalary: String(toNum(d.payableSalary)),
-  }));
-
-  const insertedDetails = await db.insert(salaryDetailTable).values(detailRows).returning();
-  res.status(201).json({ ...header, details: insertedDetails });
 });
 
 // ─── Update header + details ───────────────────────────────────────────────────
