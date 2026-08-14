@@ -12,6 +12,27 @@ import {
 
 const router: IRouter = Router();
 
+// ── In-memory dashboard cache (issue #24) ───────────────────────────────────
+// The dashboard runs several heavier queries on every request. Cache each
+// widget's result for a short TTL so repeated refreshes don't hammer Postgres.
+// A 60s window means the numbers can lag up to a minute behind a mutation,
+// which is acceptable for a dashboard overview (data settles over the day).
+const DASHBOARD_CACHE_TTL_MS = 60_000;
+const dashboardCache = new Map<string, { data: unknown; expiresAt: number }>();
+
+function withCache<T>(key: string, compute: () => Promise<T>): () => Promise<T> {
+  return async () => {
+    const now = Date.now();
+    const hit = dashboardCache.get(key);
+    if (hit && hit.expiresAt > now) {
+      return hit.data as T;
+    }
+    const data = await compute();
+    dashboardCache.set(key, { data, expiresAt: now + DASHBOARD_CACHE_TTL_MS });
+    return data;
+  };
+}
+
 function toNum(val: unknown): number {
   const n = parseFloat(String(val ?? ""));
   return isNaN(n) ? 0 : n;
@@ -195,26 +216,35 @@ async function getEmployeeOutput() {
   return rows.map((r) => ({ name: r.employeeName ?? "Unknown", netWeight: toNum(r.totalNetWeight) }));
 }
 
+// ── Cached widget getters (TTL-cached) ─────────────────────────────────────
+const getCachedKpis = withCache("kpis", getKpis);
+const getCachedMonthlyTrend = withCache("monthly-trend", getMonthlyTrend);
+const getCachedDailyProduction = withCache("daily-production", getDailyProduction);
+const getCachedFabricBreakdown = withCache("fabric-breakdown", getFabricBreakdown);
+const getCachedTopParties = withCache("top-parties", getTopParties);
+const getCachedMachineUtilization = withCache("machine-utilization", getMachineUtilization);
+const getCachedEmployeeOutput = withCache("employee-output", getEmployeeOutput);
+
 // ── Per-widget endpoints ────────────────────────────────────────────────────
-router.get("/dashboard/kpis",                async (_req, res) => { res.json(await getKpis()); });
-router.get("/dashboard/monthly-trend",       async (_req, res) => { res.json(await getMonthlyTrend()); });
-router.get("/dashboard/daily-production",    async (_req, res) => { res.json(await getDailyProduction()); });
-router.get("/dashboard/fabric-breakdown",    async (_req, res) => { res.json(await getFabricBreakdown()); });
-router.get("/dashboard/top-parties",         async (_req, res) => { res.json(await getTopParties()); });
-router.get("/dashboard/machine-utilization", async (_req, res) => { res.json(await getMachineUtilization()); });
-router.get("/dashboard/employee-output",     async (_req, res) => { res.json(await getEmployeeOutput()); });
+router.get("/dashboard/kpis",                async (_req, res) => { res.json(await getCachedKpis()); });
+router.get("/dashboard/monthly-trend",       async (_req, res) => { res.json(await getCachedMonthlyTrend()); });
+router.get("/dashboard/daily-production",    async (_req, res) => { res.json(await getCachedDailyProduction()); });
+router.get("/dashboard/fabric-breakdown",    async (_req, res) => { res.json(await getCachedFabricBreakdown()); });
+router.get("/dashboard/top-parties",         async (_req, res) => { res.json(await getCachedTopParties()); });
+router.get("/dashboard/machine-utilization", async (_req, res) => { res.json(await getCachedMachineUtilization()); });
+router.get("/dashboard/employee-output",     async (_req, res) => { res.json(await getCachedEmployeeOutput()); });
 
 // ── Aggregated summary (kept for backward compatibility) ────────────────────
 router.get("/dashboard/summary", async (_req, res): Promise<void> => {
   const [kpis, monthlyTrend, dailyProduction, fabricBreakdown, topParties, machineUtilization, employeeOutput] =
     await Promise.all([
-      getKpis(),
-      getMonthlyTrend(),
-      getDailyProduction(),
-      getFabricBreakdown(),
-      getTopParties(),
-      getMachineUtilization(),
-      getEmployeeOutput(),
+      getCachedKpis(),
+      getCachedMonthlyTrend(),
+      getCachedDailyProduction(),
+      getCachedFabricBreakdown(),
+      getCachedTopParties(),
+      getCachedMachineUtilization(),
+      getCachedEmployeeOutput(),
     ]);
 
   res.json({ kpis, monthlyTrend, dailyProduction, fabricBreakdown, topParties, machineUtilization, employeeOutput });
