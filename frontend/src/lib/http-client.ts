@@ -28,6 +28,21 @@ httpClient.interceptors.request.use((config) => {
   if (token) {
     config.headers.set("Authorization", `Bearer ${token}`);
   }
+
+  // Axios does not set `Content-Type: application/json` when the body is a
+  // pre-serialized JSON string (lots of call sites pass JSON.stringify(...)).
+  // For those the request goes out as application/x-www-form-urlencoded, so
+  // Express never parses the JSON body and validation middleware returns 400
+  // (or the handler sees an empty body). Enforce JSON for body-carrying
+  // methods unless the caller already set a content type. (issue #25 E2E)
+  const method = (config.method ?? "get").toUpperCase();
+  const hasBody = config.data !== undefined && config.data !== null;
+  if (hasBody && ["POST", "PUT", "PATCH"].includes(method)) {
+    if (!config.headers.has("Content-Type")) {
+      config.headers.set("Content-Type", "application/json");
+    }
+  }
+
   return config;
 });
 
