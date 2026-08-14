@@ -13,7 +13,10 @@ import {
 import { lazyRetry } from "@/lib/lazy-retry";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
-import DashboardPage from "@/pages/dashboard";
+
+// Dashboard is the heaviest page (7 data hooks, Recharts, charts) — lazy-load
+// it like the other heavy screens so the initial bundle doesn't include it.
+const DashboardPage = lazyRetry(() => import("@/pages/dashboard"));
 
 const TransactionList = lazyRetry(() => import("@/pages/transactions"));
 const TransactionForm = lazyRetry(() => import("@/pages/transactions/form"));
