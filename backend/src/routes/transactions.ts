@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, sql, desc, inArray } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "../db/index.js";
 import {
   dailyProductionHeaderTable,
@@ -29,6 +30,7 @@ import {
   UpdateTransactionResponse,
   DeleteTransactionParams,
 } from "../api-zod/index.js";
+import { validateBody, validateParams } from "../lib/validate.js";
 import {
   collectReconcileSourceIds,
   deriveReconcileSets,
@@ -322,14 +324,8 @@ router.get("/transactions", async (_req, res): Promise<void> => {
   res.json(ListTransactionsResponse.parse(rows));
 });
 
-router.post("/transactions", async (req, res): Promise<void> => {
-  const parsed = CreateTransactionBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
-
-  const { details, ...headerData } = parsed.data;
+router.post("/transactions", validateBody(CreateTransactionBody), async (req, res): Promise<void> => {
+  const { details, ...headerData } = req.body as unknown as z.infer<typeof CreateTransactionBody>;
 
   // The reconcile set is derived from the source records the user actually
   // kept on the submitted detail lines (issue #130: deleting a line must NOT
@@ -341,7 +337,7 @@ router.post("/transactions", async (req, res): Promise<void> => {
   const sourceIds = collectReconcileSourceIds(rawDetails);
 
   // Route the derived set by which operation this transaction is.
-  const txnTypeId = parsed.data.transactionTypeId;
+  const txnTypeId = (req.body as unknown as z.infer<typeof CreateTransactionBody>).transactionTypeId;
   const [txnType] = await db
     .select({ code: transactionTypeMasterTable.code })
     .from(transactionTypeMasterTable)
@@ -508,17 +504,13 @@ router.post("/transactions/import", async (req, res): Promise<void> => {
 
 // ─── Single-transaction CRUD ──────────────────────────────────────────────────
 
-router.get("/transactions/:id", async (req, res): Promise<void> => {
-  const params = GetTransactionParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+router.get("/transactions/:id", validateParams(GetTransactionParams), async (req, res): Promise<void> => {
+  const { id } = req.params as unknown as z.infer<typeof GetTransactionParams>;
 
   const [header] = await db
     .select()
     .from(transactionHeaderTable)
-    .where(eq(transactionHeaderTable.id, params.data.id));
+    .where(eq(transactionHeaderTable.id, id));
 
   if (!header) {
     res.status(404).json({ error: "Transaction not found" });
@@ -528,39 +520,29 @@ router.get("/transactions/:id", async (req, res): Promise<void> => {
   const details = await db
     .select()
     .from(transactionDetailTable)
-    .where(eq(transactionDetailTable.headerId, params.data.id))
+    .where(eq(transactionDetailTable.headerId, id))
     .orderBy(transactionDetailTable.id);
 
   res.json(GetTransactionResponse.parse({ ...header, details }));
 });
 
-router.put("/transactions/:id", async (req, res): Promise<void> => {
-  const params = UpdateTransactionParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+router.put("/transactions/:id", validateParams(UpdateTransactionParams), validateBody(UpdateTransactionBody), async (req, res): Promise<void> => {
+  const { id } = req.params as unknown as z.infer<typeof UpdateTransactionParams>;
 
-  const parsed = UpdateTransactionBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
-
-  const { details, ...headerData } = parsed.data;
+  const { details, ...headerData } = req.body as unknown as z.infer<typeof UpdateTransactionBody>;
 
   const result = await db.transaction(async (tx) => {
     const [header] = await tx
       .update(transactionHeaderTable)
       .set(headerData)
-      .where(eq(transactionHeaderTable.id, params.data.id))
+      .where(eq(transactionHeaderTable.id, id))
       .returning();
 
     if (!header) return null;
 
     await tx
       .delete(transactionDetailTable)
-      .where(eq(transactionDetailTable.headerId, params.data.id));
+      .where(eq(transactionDetailTable.headerId, id));
 
     let detailRows: (typeof transactionDetailTable.$inferSelect)[] = [];
     if (details && details.length > 0) {
@@ -581,16 +563,12 @@ router.put("/transactions/:id", async (req, res): Promise<void> => {
   res.json(UpdateTransactionResponse.parse(result));
 });
 
-router.delete("/transactions/:id", async (req, res): Promise<void> => {
-  const params = DeleteTransactionParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+router.delete("/transactions/:id", validateParams(DeleteTransactionParams), async (req, res): Promise<void> => {
+  const { id } = req.params as unknown as z.infer<typeof DeleteTransactionParams>;
 
   const [deleted] = await db
     .delete(transactionHeaderTable)
-    .where(eq(transactionHeaderTable.id, params.data.id))
+    .where(eq(transactionHeaderTable.id, id))
     .returning();
 
   if (!deleted) {
