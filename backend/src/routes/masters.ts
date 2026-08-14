@@ -29,6 +29,11 @@ import {
   insertDepartmentMasterSchema,
   insertEmployeeMasterSchema,
 } from "../db/index.js";
+import {
+  DEFAULT_NEEDLE_BRAND,
+  DEFAULT_SINKER_BRAND,
+  normaliseMakingRate,
+} from "../lib/factory-defaults.js";
 
 const router: IRouter = Router();
 
@@ -277,11 +282,11 @@ router.post("/masters/machine", async (req, res): Promise<void> => {
     const [row] = await db.insert(machineMasterTable).values({
       name,
       machineNumber,
-      makingRate: makingRate != null && makingRate !== "" ? String(parseFloat(makingRate)) : "3.75",
+      makingRate: normaliseMakingRate(makingRate),
       needleChangeDate: needleChangeDate || null,
-      needleBrand: needleBrand || "Sigma",
+      needleBrand: needleBrand || DEFAULT_NEEDLE_BRAND,
       sinkerChangeDate: sinkerChangeDate || null,
-      sinkerBrand: sinkerBrand || "Kohala",
+      sinkerBrand: sinkerBrand || DEFAULT_SINKER_BRAND,
     }).returning();
     res.status(201).json(row);
   } catch (err) {
@@ -301,11 +306,11 @@ router.put("/masters/machine/:id", async (req, res): Promise<void> => {
     const [row] = await db.update(machineMasterTable).set({
       name,
       machineNumber,
-      makingRate: makingRate != null && makingRate !== "" ? String(parseFloat(makingRate)) : "3.75",
+      makingRate: normaliseMakingRate(makingRate),
       needleChangeDate: needleChangeDate || null,
-      needleBrand: needleBrand || "Sigma",
+      needleBrand: needleBrand || DEFAULT_NEEDLE_BRAND,
       sinkerChangeDate: sinkerChangeDate || null,
-      sinkerBrand: sinkerBrand || "Kohala",
+      sinkerBrand: sinkerBrand || DEFAULT_SINKER_BRAND,
     }).where(eq(machineMasterTable.id, id)).returning();
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
     res.json(row);
