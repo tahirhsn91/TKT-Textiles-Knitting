@@ -7,11 +7,12 @@ import {
   insertCompanyInfoMasterSchema,
 } from "../db/index.js";
 import { FBR_PROVINCES } from "../lib/fbr/constants.js";
+import { validateBody } from "../lib/validate.js";
 
 const router: IRouter = Router();
 
-function idParam(req: { params: Record<string, string> }) {
-  const id = parseInt(req.params.id, 10);
+function idParam(req: { params: Record<string, string | string[] | undefined> }) {
+  const id = parseInt(String(req.params.id), 10);
   return isNaN(id) ? null : id;
 }
 
@@ -71,67 +72,65 @@ router.post("/masters/company-info/:id/default", async (req, res): Promise<void>
 
 // ─── Create ──────────────────────────────────────────────────────────────
 
-router.post("/masters/company-info", async (req, res): Promise<void> => {
-  const parsed = companySchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
-    return;
-  }
-  const { name, ntnCnic, province, address, fbrSandboxToken, fbrProductionToken } = parsed.data;
+router.post(
+  "/masters/company-info",
+  validateBody(companySchema),
+  async (req, res): Promise<void> => {
+    const { name, ntnCnic, province, address, fbrSandboxToken, fbrProductionToken } = req.body as unknown as z.infer<typeof companySchema>;
 
-  // First company → auto default.
-  const [{ count }] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(companyInfoMasterTable);
-  const isDefault = count === 0;
+    // First company → auto default.
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(companyInfoMasterTable);
+    const isDefault = count === 0;
 
-  try {
+    try {
+      const [row] = await db
+        .insert(companyInfoMasterTable)
+        .values({
+          name,
+          ntnCnic,
+          province,
+          address,
+          fbrSandboxToken: fbrSandboxToken || null,
+          fbrProductionToken: fbrProductionToken || null,
+          isDefault,
+        })
+        .returning();
+      res.status(201).json(row);
+    } catch (err) {
+      if (isUniqueViolation(err)) { res.status(409).json({ error: "A record with duplicate value already exists" }); return; }
+      throw err;
+    }
+  },
+);
+
+// ─── Update ──────────────────────────────────────────────────────────────
+
+router.put(
+  "/masters/company-info/:id",
+  validateBody(companySchema),
+  async (req, res): Promise<void> => {
+    const id = idParam(req);
+    if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
+    const { name, ntnCnic, province, address, fbrSandboxToken, fbrProductionToken } = req.body as unknown as z.infer<typeof companySchema>;
     const [row] = await db
-      .insert(companyInfoMasterTable)
-      .values({
+      .update(companyInfoMasterTable)
+      .set({
         name,
         ntnCnic,
         province,
         address,
         fbrSandboxToken: fbrSandboxToken || null,
         fbrProductionToken: fbrProductionToken || null,
-        isDefault,
+        updatedAt: new Date(),
       })
+      .where(eq(companyInfoMasterTable.id, id))
       .returning();
-    res.status(201).json(row);
-  } catch (err) {
-    if (isUniqueViolation(err)) { res.status(409).json({ error: "A record with duplicate value already exists" }); return; }
-    throw err;
-  }
-});
-
-// ─── Update ──────────────────────────────────────────────────────────────
-
-router.put("/masters/company-info/:id", async (req, res): Promise<void> => {
-  const id = idParam(req);
-  if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
-  const parsed = companySchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
-    return;
-  }
-  const { name, ntnCnic, province, address, fbrSandboxToken, fbrProductionToken } = parsed.data;
-  const [row] = await db
-    .update(companyInfoMasterTable)
-    .set({
-      name,
-      ntnCnic,
-      province,
-      address,
-      fbrSandboxToken: fbrSandboxToken || null,
-      fbrProductionToken: fbrProductionToken || null,
-      updatedAt: new Date(),
-    })
-    .where(eq(companyInfoMasterTable.id, id))
-    .returning();
-  if (!row) { res.status(404).json({ error: "Not found" }); return; }
-  res.json(row);
-});
+    if (!row) { res.status(404).json({ error: "Not found" }); return; }
+    res.json(row);
+  },
+);
 
 // ─── Delete ──────────────────────────────────────────────────────────────
 // Only allowed when not the default company (the default must always exist
