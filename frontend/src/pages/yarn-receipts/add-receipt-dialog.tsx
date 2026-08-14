@@ -6,6 +6,7 @@ import * as z from "zod";
 import { format } from "date-fns";
 import { Plus, Trash2 } from "lucide-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { customFetch } from "@/vendor/api-client-react/custom-fetch";
 
 import {
   useListPartyMaster,
@@ -110,8 +111,7 @@ export function YarnReceiptDialog({
   // Next doc number suggestion (YR-<n>), like the transactions screen.
   const { data: suggestions } = useQuery<{ nextDocNumber: string }>({
     queryKey: ["/api/yarn-receipts/suggestions"],
-    queryFn: () =>
-      fetch("/api/yarn-receipts/suggestions").then((r) => r.json()) as Promise<{ nextDocNumber: string }>,
+    queryFn: () => customFetch<{ nextDocNumber: string }>("/api/yarn-receipts/suggestions", { method: "GET" }),
   });
 
   const receiptQuery = useGetYarnReceipt(receiptId ?? null, {
@@ -325,7 +325,7 @@ export function YarnReceiptDialog({
             // number — refetch the suggestion so YR-<n> advances.
             queryClient.invalidateQueries({ queryKey: ["/api/yarn-receipts/suggestions"] });
             queryClient
-              .fetchQuery({ queryKey: ["/api/yarn-receipts/suggestions"], queryFn: () => fetch("/api/yarn-receipts/suggestions").then((r) => r.json()) as Promise<{ nextDocNumber: string }> })
+              .fetchQuery({ queryKey: ["/api/yarn-receipts/suggestions"], queryFn: () => customFetch<{ nextDocNumber: string }>("/api/yarn-receipts/suggestions", { method: "GET" }) })
               .then((s) => {
                 if (s?.nextDocNumber) form.setValue("docNumber", s.nextDocNumber);
               })

@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { customFetch } from "@/vendor/api-client-react/custom-fetch";
 
 import { useListPartyMaster, useListYarnTypeMaster } from "@workspace/api-client-react";
 import {
@@ -130,8 +131,7 @@ export function DailyDeliveryDialog({
   // Next challan suggestion (D-<n>), like the other daily screens.
   const { data: suggestions } = useQuery<{ nextChallanNo: string }>({
     queryKey: ["/api/daily-deliveries/suggestions"],
-    queryFn: () =>
-      fetch("/api/daily-deliveries/suggestions").then((r) => r.json()) as Promise<{ nextChallanNo: string }>,
+    queryFn: () => customFetch<{ nextChallanNo: string }>("/api/daily-deliveries/suggestions", { method: "GET" }),
   });
 
   useEffect(() => {
@@ -261,7 +261,7 @@ export function DailyDeliveryDialog({
             // the next challan suggestion (D-<n> advances).
             queryClient.invalidateQueries({ queryKey: ["/api/daily-deliveries/suggestions"] });
             queryClient
-              .fetchQuery({ queryKey: ["/api/daily-deliveries/suggestions"], queryFn: () => fetch("/api/daily-deliveries/suggestions").then((r) => r.json()) as Promise<{ nextChallanNo: string }> })
+              .fetchQuery({ queryKey: ["/api/daily-deliveries/suggestions"], queryFn: () => customFetch<{ nextChallanNo: string }>("/api/daily-deliveries/suggestions", { method: "GET" }) })
               .then((s) => {
                 if (s?.nextChallanNo) form.setValue("challanNo", s.nextChallanNo);
               })

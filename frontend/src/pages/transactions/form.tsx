@@ -9,6 +9,7 @@ import { useUnreconciledProduction } from "@/hooks/use-daily-production";
 import { useUnreconciledYarnReceipts } from "@/hooks/use-yarn-receipts";
 import { useUnreconciledDailyDeliveries } from "@/hooks/use-daily-deliveries";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { customFetch } from "@/vendor/api-client-react/custom-fetch";
 import { format } from "date-fns";
 
 import {
@@ -109,7 +110,7 @@ export default function TransactionForm() {
 
   const { data: suggestions } = useQuery<{ nextDocNumber: string; lastReference: string | null }>({
     queryKey: ["transaction-suggestions"],
-    queryFn: () => fetch(`${import.meta.env.BASE_URL}api/transactions/suggestions`).then((r) => r.json()),
+    queryFn: () => customFetch<{ nextDocNumber: string; lastReference: string | null }>("/api/transactions/suggestions", { method: "GET" }),
     enabled: !isEditing,
     staleTime: 0,
   });
