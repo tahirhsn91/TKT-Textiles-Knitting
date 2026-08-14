@@ -148,7 +148,9 @@ export function Layout({ children }: { children: ReactNode }) {
   const { can } = useAuth();
   // Load all master/lookup lists once and seed the per-list caches, so the
   // individual useList*Master hooks resolve from cache instead of N requests.
-  useSeedAllLookups();
+  // The Master Data page is the exception: it lazy-loads each tab on activation,
+  // so we opt it out of the one-shot load-everything prefetch.
+  useSeedAllLookups(!location.startsWith("/masters"));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(LS_SIDEBAR_COLLAPSED) === "true"; } catch { return false; }
