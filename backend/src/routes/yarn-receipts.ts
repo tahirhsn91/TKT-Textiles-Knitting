@@ -11,6 +11,7 @@ import {
   insertYarnReceiptHeaderSchema,
   insertYarnReceiptDetailSchema,
 } from "../db/index.js";
+import { validateBody } from "../lib/validate.js";
 import { isReconciliationLockEnabled } from "../lib/reconciliation-lock.js";
 import { retrainAfterInsert } from "../lib/plausibility/engine.js";
 
@@ -309,13 +310,8 @@ router.get("/yarn-receipts/:id", async (req, res): Promise<void> => {
 
 // ─── Create ────────────────────────────────────────────────────────────────
 
-router.post("/yarn-receipts", async (req, res): Promise<void> => {
-  const parsed = receiptBodySchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid receipt" });
-    return;
-  }
-  const { docNumber, receiptDate, partyId, createdBy, lines } = parsed.data;
+router.post("/yarn-receipts", validateBody(receiptBodySchema), async (req, res): Promise<void> => {
+  const { docNumber, receiptDate, partyId, createdBy, lines } = req.body as unknown as z.infer<typeof receiptBodySchema>;
 
   const result = await db.transaction(async (tx) => {
     const [header] = await tx
@@ -342,19 +338,14 @@ router.post("/yarn-receipts", async (req, res): Promise<void> => {
 
 // ─── Update (replace header + lines wholesale) ─────────────────────────────
 
-router.put("/yarn-receipts/:id", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+router.put("/yarn-receipts/:id", validateBody(receiptBodySchema), async (req, res): Promise<void> => {
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid receipt id" });
     return;
   }
 
-  const parsed = receiptBodySchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid receipt" });
-    return;
-  }
-  const { docNumber, receiptDate, partyId, createdBy, updatedBy, lines } = parsed.data;
+  const { docNumber, receiptDate, partyId, createdBy, updatedBy, lines } = req.body as unknown as z.infer<typeof receiptBodySchema>;
 
   const [existing] = await db
     .select({ id: yarnReceiptHeaderTable.id })
