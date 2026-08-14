@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
+import { customFetch } from "@/vendor/api-client-react/custom-fetch";
 import { Upload, AlertCircle, CheckCircle2, SkipForward, XCircle, FileText, Download } from "lucide-react";
 import {
   Dialog,
@@ -336,13 +337,10 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
     setIsLoading(true);
 
     try {
-      const res = await fetch("/api/transactions/import/preview", {
+      const data = await customFetch<ImportPreview>("/api/transactions/import/preview", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rows }),
       });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json() as ImportPreview;
       setPreview(data);
       setStep("preview");
     } catch (err) {
@@ -358,13 +356,10 @@ export function ImportDialog({ open, onOpenChange, onSuccess }: ImportDialogProp
     setStep("importing");
 
     try {
-      const res = await fetch("/api/transactions/import", {
+      const data = await customFetch<ImportResult>("/api/transactions/import", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rows: parsedRows }),
       });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json() as ImportResult;
       setResult(data);
       setStep("done");
 

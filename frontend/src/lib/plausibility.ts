@@ -25,7 +25,7 @@ export interface EntryValues {
   gsm?: number | null;
 }
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+import { customFetch } from "@/vendor/api-client-react/custom-fetch";
 
 /**
  * Validate a single entry the operator is about to save. Returns warnings
@@ -37,13 +37,10 @@ export async function validateDailyEntry(
   values: EntryValues,
 ): Promise<PlausibilityWarning[]> {
   try {
-    const res = await fetch(`${BASE}/api/validate/daily-entry`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ operation, values }),
-    });
-    if (!res.ok) return [];
-    const json = (await res.json()) as { warnings?: PlausibilityWarning[] };
+    const json = await customFetch<{ warnings?: PlausibilityWarning[] }>(
+      "/api/validate/daily-entry",
+      { method: "POST", body: JSON.stringify({ operation, values }) },
+    );
     return json.warnings ?? [];
   } catch {
     return [];
@@ -84,13 +81,10 @@ export async function validateDailyList(
   opts: { dateFrom?: string; dateTo?: string } = {},
 ): Promise<ListValidationResult | null> {
   try {
-    const res = await fetch(`${BASE}/api/validate/daily-list`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ operation, ...opts }),
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as ListValidationResult;
+    return await customFetch<ListValidationResult>(
+      "/api/validate/daily-list",
+      { method: "POST", body: JSON.stringify({ operation, ...opts }) },
+    );
   } catch {
     return null;
   }
@@ -112,9 +106,8 @@ export interface FeedbackItem {
 export async function recordPlausibilityFeedback(items: FeedbackItem[]): Promise<void> {
   if (items.length === 0) return;
   try {
-    await fetch(`${BASE}/api/plausibility/feedback`, {
+    await customFetch("/api/plausibility/feedback", {
       method: "POST",
-      headers: { "content-type": "application/json" },
       body: JSON.stringify({ items }),
     });
   } catch {

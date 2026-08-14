@@ -10,8 +10,7 @@ import {
 import { Layout } from "@/components/layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+import { customFetch } from "@/vendor/api-client-react/custom-fetch";
 
 /**
  * Recharts writes colours as SVG presentation attributes, where var() does not
@@ -57,14 +56,12 @@ type NameLines = { name: string; lines: number };
 type NameNetWeight = { name: string; netWeight: number };
 
 // ── Generic per-widget fetch hook ────────────────────────────────────────────
+// Uses customFetch so the bearer auth token is attached — a bare fetch() here
+// omitted Authorization and every /api/dashboard call 401'd (dashboard blank).
 function useWidget<T>(key: string): UseQueryResult<T> {
   return useQuery<T>({
     queryKey: ["dashboard", key],
-    queryFn: async () => {
-      const res = await fetch(`${BASE}/api/dashboard/${key}`);
-      if (!res.ok) throw new Error(`Failed to load ${key}`);
-      return res.json();
-    },
+    queryFn: () => customFetch<T>(`/api/dashboard/${key}`, { method: "GET" }),
   });
 }
 
