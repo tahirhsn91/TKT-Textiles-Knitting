@@ -43,6 +43,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrentUserDisplayName } from "@/hooks/use-current-user";
 import { useFbrSandboxEnabled } from "@/context/config-context";
 import {
   useUninvoicedParties,
@@ -69,7 +70,8 @@ export default function InvoicingPage() {
   const fbrSandbox = useFbrSandboxEnabled();
 
   const [partyId, setPartyId] = useState<number | null>(null);
-  const [enteredBy, setEnteredBy] = useState("");
+  // "Entered by" is always the logged-in user; the field is read-only.
+  const enteredBy = useCurrentUserDisplayName();
   const [rates, setRates] = useState<Record<string, string>>({});
   const [pendingDelete, setPendingDelete] = useState<InvoiceListItem | null>(null);
   const [viewingId, setViewingId] = useState<number | null>(null);
@@ -224,7 +226,7 @@ export default function InvoicingPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>Entered by</Label>
-                <Input placeholder="Your name" value={enteredBy} onChange={(e) => setEnteredBy(e.target.value)} />
+                <Input placeholder="Your name" value={enteredBy} disabled />
               </div>
             </div>
 

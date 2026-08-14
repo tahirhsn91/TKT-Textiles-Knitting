@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/form";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrentUserDisplayName } from "@/hooks/use-current-user";
 import { PlausibilityWarnings } from "@/components/plausibility-warning";
 import {
   validateDailyEntry,
@@ -40,8 +41,6 @@ import {
   warningsToFeedback,
   type PlausibilityWarning,
 } from "@/lib/plausibility";
-
-const LS_ENTERED_BY = "daily-delivery-entered-by";
 
 const deliverySchema = z.object({
   challanNo: z.string().min(1, "Challan # is required"),
@@ -101,13 +100,12 @@ export function DailyDeliveryDialog({
   });
   const delivery = deliveryQuery.data;
 
-  const savedEnteredBy = (() => {
-    try { return localStorage.getItem(LS_ENTERED_BY) ?? ""; } catch { return ""; }
-  })();
+  // "Entered By" is always the logged-in user; the field is read-only.
+  const enteredByName = useCurrentUserDisplayName();
 
   const form = useForm<DeliveryValues>({
     resolver: zodResolver(deliverySchema),
-    defaultValues: defaultValues(savedEnteredBy, defaultDate),
+    defaultValues: defaultValues(enteredByName, defaultDate),
   });
 
   const [pendingAction, setPendingAction] = useState<"save" | "saveAndAdd" | null>(null);
@@ -145,7 +143,7 @@ export function DailyDeliveryDialog({
     if (!isEdit) {
       if (prefilledFor.current === null) return;
       prefilledFor.current = null;
-      form.reset(defaultValues(savedEnteredBy, defaultDate));
+      form.reset(defaultValues(enteredByName, defaultDate));
       if (suggestions?.nextChallanNo) {
         form.setValue("challanNo", suggestions.nextChallanNo);
       }
@@ -166,7 +164,7 @@ export function DailyDeliveryDialog({
       gsm: delivery.gsm != null ? String(delivery.gsm) : "",
       quantity: String(delivery.quantity),
       netWeight: delivery.netWeight,
-      enteredBy: savedEnteredBy || delivery.createdBy,
+      enteredBy: enteredByName,
     });
     setPendingAction(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -190,8 +188,6 @@ export function DailyDeliveryDialog({
       setFormError("Quantity (rolls) and net weight must both be greater than zero");
       return;
     }
-
-    try { localStorage.setItem(LS_ENTERED_BY, values.enteredBy); } catch {}
 
     // ── Plausibility gate (warn-only) ──────────────────────────────────────
     if (!plausConfirmed) {
@@ -496,7 +492,7 @@ export function DailyDeliveryDialog({
                     <FormItem className="sm:col-span-2">
                       <FormLabel>{isEdit ? "Updated By *" : "Entered By *"}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Your name" className="h-11 sm:h-9" disabled={readOnly} {...field} />
+                        <Input placeholder="Your name" className="h-11 sm:h-9" disabled {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
