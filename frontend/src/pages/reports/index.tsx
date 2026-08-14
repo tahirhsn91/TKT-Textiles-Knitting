@@ -928,12 +928,12 @@ export default function ReportsPage() {
             {/* Date / Period row */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <div className="flex flex-col gap-1">
-                <Label className="text-xs text-muted-foreground">Date From</Label>
-                <DateInput className="h-8 text-sm" value={filters.dateFrom} onChange={(e) => set("dateFrom", e.target.value)} />
+                <Label htmlFor="report-date-from" className="text-xs text-muted-foreground">Date From</Label>
+                <DateInput id="report-date-from" aria-label="Date from" className="h-8 text-sm" value={filters.dateFrom} onChange={(e) => set("dateFrom", e.target.value)} />
               </div>
               <div className="flex flex-col gap-1">
-                <Label className="text-xs text-muted-foreground">Date To</Label>
-                <DateInput className="h-8 text-sm" value={filters.dateTo} onChange={(e) => set("dateTo", e.target.value)} />
+                <Label htmlFor="report-date-to" className="text-xs text-muted-foreground">Date To</Label>
+                <DateInput id="report-date-to" aria-label="Date to" className="h-8 text-sm" value={filters.dateTo} onChange={(e) => set("dateTo", e.target.value)} />
               </div>
               <div className="flex flex-col gap-1">
                 <Label className="text-xs text-muted-foreground">Year</Label>

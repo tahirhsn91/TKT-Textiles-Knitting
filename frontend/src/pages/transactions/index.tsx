@@ -349,8 +349,10 @@ export default function TransactionList() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs text-muted-foreground">Date From</Label>
+              <Label htmlFor="transaction-date-from" className="text-xs text-muted-foreground">Date From</Label>
               <DateInput
+                id="transaction-date-from"
+                aria-label="Date from"
                 className="h-11 sm:h-9"
                 value={filters.dateFrom}
                 onChange={(e) => setFilter("dateFrom", e.target.value)}
@@ -358,8 +360,10 @@ export default function TransactionList() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs text-muted-foreground">Date To</Label>
+              <Label htmlFor="transaction-date-to" className="text-xs text-muted-foreground">Date To</Label>
               <DateInput
+                id="transaction-date-to"
+                aria-label="Date to"
                 className="h-11 sm:h-9"
                 value={filters.dateTo}
                 onChange={(e) => setFilter("dateTo", e.target.value)}
