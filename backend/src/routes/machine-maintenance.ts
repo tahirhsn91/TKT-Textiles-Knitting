@@ -7,6 +7,7 @@ import {
   machineMasterTable,
   insertMachineMaintenanceSchema,
 } from "../db/index.js";
+import { validateBody } from "../lib/validate.js";
 
 const router: IRouter = Router();
 
@@ -157,13 +158,8 @@ router.get("/maintenance/machine/:id", async (req, res): Promise<void> => {
 
 // ─── Create ────────────────────────────────────────────────────────────────
 
-router.post("/maintenance/machine", async (req, res): Promise<void> => {
-  const parsed = machineSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid machine maintenance" });
-    return;
-  }
-  const { maintenanceDate, machineId, maintenanceWork, cost, vendor, createdBy } = parsed.data;
+router.post("/maintenance/machine", validateBody(machineSchema), async (req, res): Promise<void> => {
+  const { maintenanceDate, machineId, maintenanceWork, cost, vendor, createdBy } = req.body as unknown as z.infer<typeof machineSchema>;
 
   const [row] = await db
     .insert(machineMaintenanceTable)
@@ -182,19 +178,14 @@ router.post("/maintenance/machine", async (req, res): Promise<void> => {
 
 // ─── Update ────────────────────────────────────────────────────────────────
 
-router.put("/maintenance/machine/:id", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+router.put("/maintenance/machine/:id", validateBody(machineSchema), async (req, res): Promise<void> => {
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid maintenance id" });
     return;
   }
 
-  const parsed = machineSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid machine maintenance" });
-    return;
-  }
-  const { maintenanceDate, machineId, maintenanceWork, cost, vendor, createdBy, updatedBy } = parsed.data;
+  const { maintenanceDate, machineId, maintenanceWork, cost, vendor, createdBy, updatedBy } = req.body as unknown as z.infer<typeof machineSchema>;
 
   const [row] = await db
     .update(machineMaintenanceTable)
@@ -220,19 +211,15 @@ router.put("/maintenance/machine/:id", async (req, res): Promise<void> => {
 
 // ─── Soft-delete (cancel) & restore ────────────────────────────────────────
 
-router.patch("/maintenance/machine/:id/status", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+router.patch("/maintenance/machine/:id/status", validateBody(z.object({ status: STATUSES })), async (req, res): Promise<void> => {
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid maintenance id" });
     return;
   }
-  const parsed = z.object({ status: STATUSES }).safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Status must be 'submitted' or 'cancelled'" });
-    return;
-  }
-  const { status } = parsed.data;
-  const by = typeof req.body.updatedBy === "string" ? req.body.updatedBy.trim() : null;
+  const { status } = req.body as unknown as { status: z.infer<typeof STATUSES> };
+  const bodyAny = req.body as { updatedBy?: string | null };
+  const by = typeof bodyAny.updatedBy === "string" ? bodyAny.updatedBy.trim() : null;
 
   const [row] = await db
     .update(machineMaintenanceTable)
