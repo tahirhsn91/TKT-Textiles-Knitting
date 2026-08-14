@@ -26,6 +26,14 @@ const router: IRouter = Router();
 // Public: health. Exempted from auth by the app.ts whitelist.
 router.use(healthRouter);
 
+// Lookups are universal reference data (party, machine, employee, yarn types,
+// …) used by virtually every authenticated screen across all roles. They are
+// NOT scoped to a single module, so they are mounted auth-only here (global
+// requireAuth in app.ts already guards them) rather than behind a
+// requirePermission gate — gating them under e.g. "masters" would 401 short
+// any role that lacks that module (issue #135 regression).
+router.use(lookupsRouter);
+
 // Protected — each router defines its own full paths internally, so we gate it
 // with a route-level permission middleware (no mount prefix). The module id is
 // what the admin toggles in the permissions UI (issue #135). requireAuth is
