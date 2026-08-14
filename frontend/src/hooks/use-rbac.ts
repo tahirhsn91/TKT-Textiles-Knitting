@@ -99,6 +99,16 @@ export function useResetPassword() {
   });
 }
 
+/** Delete a user (DELETE /api/users/:id). Admin-only, enforced server-side. */
+export function useDeleteUser() {
+  const qc = useQueryClient();
+  return useMutation<{ ok: boolean }, ErrorType<unknown>, { id: number }>({
+    mutationFn: ({ id }) =>
+      customFetch<{ ok: boolean }>(`${usersKey}/${id}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [usersKey] }),
+  });
+}
+
 /** Replace a role's permission set (PUT /api/users/permissions). */
 export function useSavePermissions() {
   const qc = useQueryClient();

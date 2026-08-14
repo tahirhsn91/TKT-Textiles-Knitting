@@ -7,6 +7,7 @@ import {
   Pencil,
   Check,
   X,
+  Trash2,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { customFetch } from "@/vendor/api-client-react/custom-fetch";
@@ -41,6 +42,22 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import {
   useListRoles,
@@ -49,6 +66,7 @@ import {
   useCreateUser,
   useUpdateUser,
   useResetPassword,
+  useDeleteUser,
   useSavePermissions,
   type UserView,
   type RolePermissions,
@@ -114,6 +132,8 @@ export default function SettingsPage() {
 // ─── Users tab ───────────────────────────────────────────────────────────────
 
 function UsersTab() {
+  const { session } = useAuth();
+  const isAdmin = session?.role.isAdmin === true;
   const { data: users, isLoading } = useListUsers();
   const { data: roles } = useListRoles();
   const { data: employees } = useQuery<EmployeeLookup[]>({
@@ -123,8 +143,10 @@ function UsersTab() {
   });
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<UserView | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UserView | null>(null);
 
   return (
+    <TooltipProvider delayDuration={200}>
     <Card className="overflow-hidden">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-3.5">
         <h2 className="text-sm font-semibold text-foreground">Users</h2>
@@ -170,6 +192,29 @@ function UsersTab() {
                       <Button variant="ghost" size="sm" className="gap-1" onClick={() => setEditTarget(u)}>
                         <Pencil className="h-4 w-4" /> Edit
                       </Button>
+                      {isAdmin && u.roleName !== "Admin" && session?.user.id !== u.id ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(u)}
+                        >
+                          <Trash2 className="h-4 w-4" /> Delete
+                        </Button>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex cursor-not-allowed items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground/50">
+                              <Trash2 className="h-4 w-4" /> Delete
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" align="end">
+                            {u.roleName === "Admin"
+                              ? "Admin accounts cannot be deleted"
+                              : "You cannot delete your own account"}
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -194,7 +239,57 @@ function UsersTab() {
           onClose={() => setEditTarget(null)}
         />
       )}
+      {deleteTarget && (
+        <DeleteUserDialog
+          user={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+        />
+      )}
     </Card>
+    </TooltipProvider>
+  );
+}
+
+function DeleteUserDialog({ user, onClose }: { user: UserView; onClose: () => void }) {
+  const { toast } = useToast();
+  const del = useDeleteUser();
+
+  const confirm = () => {
+    del.mutate(
+      { id: user.id },
+      {
+        onSuccess: () => {
+          toast({ title: "User deleted" });
+          onClose();
+        },
+        onError: (e) => {
+          toast({ title: "Could not delete user", description: (e as { message?: string })?.message, variant: "destructive" });
+        },
+      },
+    );
+  };
+
+  return (
+    <AlertDialog open onOpenChange={(o) => !o && onClose()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete user — {user.username}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This permanently removes {user.displayName || user.username} and their ability to sign in. This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            disabled={del.isPending}
+            onClick={confirm}
+          >
+            <Trash2 className="h-4 w-4" /> Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
