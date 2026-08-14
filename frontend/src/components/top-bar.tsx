@@ -58,7 +58,7 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
         import.meta.env.DEV && "top-7"
       )}
     >
-      {/* Left: hamburger (mobile) + account dropdown (top-left). */}
+      {/* Left: hamburger (mobile). */}
       <div className="flex items-center gap-1">
         {onMenuClick && (
           <button
@@ -69,6 +69,16 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
             <Menu className="h-5 w-5" />
           </button>
         )}
+      </div>
+
+      {/* Right: wordmark (left) then account dropdown at the far top-right. */}
+      <Link href="/dashboard" className="shrink-0 transition-opacity hover:opacity-80">
+        <span className="text-sm font-semibold tracking-[0.12em] text-sidebar-accent-foreground">
+          TKT <span className="text-sidebar-foreground/55">Textiles</span>
+        </span>
+      </Link>
+
+      <div className="flex items-center gap-2 flex-1 justify-end">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -84,7 +94,7 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
               <ChevronDown className="h-4 w-4 opacity-60" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-60">
+          <DropdownMenuContent align="end" className="w-60">
             <DropdownMenuLabel className="font-normal">
               <p className="truncate text-sm font-semibold">{session?.user.displayName ?? "—"}</p>
               <p className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -116,13 +126,6 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-
-      {/* Right: wordmark (kept for brand, hidden on very small screens). */}
-      <Link href="/dashboard" className="shrink-0 transition-opacity hover:opacity-80">
-        <span className="text-sm font-semibold tracking-[0.12em] text-sidebar-accent-foreground">
-          TKT <span className="text-sidebar-foreground/55">Textiles</span>
-        </span>
-      </Link>
 
       {pwOpen && <ChangePasswordDialog open={pwOpen} onClose={() => setPwOpen(false)} />}
     </header>
