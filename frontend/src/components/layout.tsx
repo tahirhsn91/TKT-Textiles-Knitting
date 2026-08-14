@@ -8,6 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
 import { TopBar } from "@/components/top-bar";
+import { Wordmark } from "@/components/wordmark";
 import {
   Sheet,
   SheetContent,
@@ -132,43 +133,6 @@ function isSubItemActive(location: string, href: string) {
   return href === "/transactions" ? location === href : location.startsWith(href);
 }
 
-/**
- * The house mark: a single knit stitch. The face of jersey fabric is nothing
- * but this V, repeated a few hundred thousand times per metre.
- */
-function StitchMark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 40 40" aria-hidden="true" className={cn("h-5 w-5 shrink-0", className)}>
-      <path
-        d="M7 11 Q 14 14 20 27 Q 26 14 33 11"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function Wordmark({ collapsed = false }: { collapsed?: boolean }) {
-  return (
-    <span className="flex items-center gap-2.5">
-      <StitchMark className="text-signal" />
-      {!collapsed && (
-        <span className="flex flex-col leading-none">
-          <span className="text-[0.9375rem] font-semibold tracking-[0.12em] text-sidebar-accent-foreground">
-            TKT
-          </span>
-          <span className="mt-1 text-[0.625rem] font-medium uppercase tracking-[0.16em] text-sidebar-foreground/55">
-            Textiles
-          </span>
-        </span>
-      )}
-    </span>
-  );
-}
-
 /** Stamped section divider inside the nav. */
 function NavSection({ label }: { label: string }) {
   return (
@@ -228,7 +192,7 @@ export function Layout({ children }: { children: ReactNode }) {
       >
         {/* Sidebar header: wordmark + collapse toggle */}
         <div className={cn(
-          "flex h-16 items-center border-b border-sidebar-border",
+          "flex h-14 items-center border-b border-sidebar-border shrink-0",
           collapsed ? "justify-center px-0" : "justify-between px-4"
         )}>
           {!collapsed && (
