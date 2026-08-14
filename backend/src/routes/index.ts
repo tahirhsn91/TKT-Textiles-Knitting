@@ -34,28 +34,50 @@ router.use(healthRouter);
 // any role that lacks that module (issue #135 regression).
 router.use(lookupsRouter);
 
-// Protected — each router defines its own full paths internally, so we gate it
-// with a route-level permission middleware (no mount prefix). The module id is
-// what the admin toggles in the permissions UI (issue #135). requireAuth is
-// applied globally in app.ts; these guards only check route access.
-router.use(requirePermission("masters"), mastersRouter);
-router.use(requirePermission("transactions"), transactionsRouter);
-router.use(requirePermission("reports"), reportsRouter);
-router.use(requirePermission("employees"), employeesRouter);
-router.use(requirePermission("payroll"), salaryEntriesRouter);
-router.use(requirePermission("dashboard"), dashboardRouter);
-router.use(requirePermission("dailyProduction"), dailyProductionRouter);
-router.use(requirePermission("yarnReceipts"), yarnReceiptsRouter);
-router.use(requirePermission("dailyDeliveries"), dailyDeliveriesRouter);
-router.use(requirePermission("dashboard"), plausibilityRouter);
-router.use(requirePermission("dashboard"), unreconciledNavRouter);
-router.use(requirePermission("maintenance"), machineMaintenanceRouter);
-router.use(requirePermission("maintenance"), factoryMaintenanceRouter);
-router.use(requirePermission("dashboard"), machineAnalyticsRouter);
-router.use(requirePermission("dashboard"), partyAnalyticsRouter);
-router.use(requirePermission("companyInfo"), companyInfoRouter);
-router.use(requirePermission("invoicing"), invoicingRouter);
+// Protected — each router defines its own full (absolute) paths internally, so
+// each is mounted at the root (router.use(subRouter)) and its routes match their
+// own prefixes. The permission guard is mounted separately with a path prefix so
+// it ONLY runs for requests hitting that router — mounting the guard with
+// router.use(guard, subRouter) and no path applied the permission check to EVERY
+// request and 403'd any role missing a single module (issue #135 regression).
+// The module id is what the admin toggles in the permissions UI; requireAuth is
+// applied globally in app.ts, these guards only check route access.
+router.use("/masters", requirePermission("masters"));
+router.use(mastersRouter);
+router.use("/transactions", requirePermission("transactions"));
+router.use(transactionsRouter);
+router.use("/reports", requirePermission("reports"));
+router.use(reportsRouter);
+router.use("/employees", requirePermission("employees"));
+router.use(employeesRouter);
+router.use("/salary-entries", requirePermission("payroll"));
+router.use(salaryEntriesRouter);
+router.use("/dashboard", requirePermission("dashboard"));
+router.use(dashboardRouter);
+router.use("/daily-production", requirePermission("dailyProduction"));
+router.use(dailyProductionRouter);
+router.use("/yarn-receipts", requirePermission("yarnReceipts"));
+router.use(yarnReceiptsRouter);
+router.use("/daily-deliveries", requirePermission("dailyDeliveries"));
+router.use(dailyDeliveriesRouter);
+router.use(["/validate", "/plausibility"], requirePermission("dashboard"));
+router.use(plausibilityRouter);
+router.use("/daily-ops", requirePermission("dashboard"));
+router.use(unreconciledNavRouter);
+router.use("/maintenance/machine", requirePermission("maintenance"));
+router.use(machineMaintenanceRouter);
+router.use("/maintenance/factory", requirePermission("maintenance"));
+router.use(factoryMaintenanceRouter);
+router.use("/machine-analytics", requirePermission("dashboard"));
+router.use(machineAnalyticsRouter);
+router.use("/party-analytics", requirePermission("dashboard"));
+router.use(partyAnalyticsRouter);
+router.use("/masters/company-info", requirePermission("companyInfo"));
+router.use(companyInfoRouter);
+router.use("/invoicing", requirePermission("invoicing"));
+router.use(invoicingRouter);
 // Users/RBAC admin — admin-only enforced inside the router (users.ts).
-router.use(requirePermission("users"), usersRouter);
+router.use("/users", requirePermission("users"));
+router.use(usersRouter);
 
 export default router;
