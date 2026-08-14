@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
 import { useChangePassword } from "@/hooks/use-rbac";
 import { useToast } from "@/hooks/use-toast";
+import { Wordmark } from "@/components/wordmark";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,10 +36,10 @@ import {
 } from "@/components/ui/dialog";
 
 /**
- * Top bar shown across the whole app (desktop + mobile). The top-left trigger
- * opens the account dropdown: user + role, Users & Roles (admin only),
- * Change Password, and Sign out. On mobile a hamburger (left) opens the nav
- * drawer via onMenuClick.
+ * Top bar shown across the whole app. Left: hamburger (mobile) + wordmark.
+ * Right: account dropdown (user + role, Users & Roles, Change Password,
+ * Sign out). Uses the same brand Wordmark and height as the sidebar header so
+ * the whole top region reads consistently on desktop and mobile.
  */
 export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
   const { session, can, logout } = useAuth();
@@ -53,40 +54,37 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-sidebar-border bg-sidebar px-3 text-sidebar-foreground print:hidden",
+        "sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-sidebar-border bg-sidebar px-3 text-sidebar-foreground print:hidden",
         // Push below the fixed dev banner in dev builds.
         import.meta.env.DEV && "top-7"
       )}
     >
-      {/* Left: hamburger (mobile). */}
-      <div className="flex items-center gap-1">
+      {/* Left: hamburger (mobile) + wordmark. */}
+      <div className="flex min-w-0 items-center gap-1">
         {onMenuClick && (
           <button
             onClick={onMenuClick}
-            className="flex items-center justify-center rounded-md p-2 text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground md:hidden"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground md:hidden"
             aria-label="Open navigation menu"
           >
             <Menu className="h-5 w-5" />
           </button>
         )}
+        <Link href="/dashboard" className="shrink-0 transition-opacity hover:opacity-80">
+          <Wordmark />
+        </Link>
       </div>
 
-      {/* Right: wordmark (left) then account dropdown at the far top-right. */}
-      <Link href="/dashboard" className="shrink-0 transition-opacity hover:opacity-80">
-        <span className="text-sm font-semibold tracking-[0.12em] text-sidebar-accent-foreground">
-          TKT <span className="text-sidebar-foreground/55">Textiles</span>
-        </span>
-      </Link>
-
-      <div className="flex items-center gap-2 flex-1 justify-end">
+      {/* Right: account dropdown aligned to the top-right corner. */}
+      <div className="flex items-center">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              className="flex h-8 items-center gap-2 rounded-md px-2 text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               aria-label="Account menu"
             >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground">
-                <UserIcon className="h-4 w-4" />
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground">
+                <UserIcon className="h-3.5 w-3.5" />
               </span>
               <span className="hidden max-w-[10rem] truncate sm:block">
                 {session?.user.displayName ?? session?.user.username ?? "Account"}
