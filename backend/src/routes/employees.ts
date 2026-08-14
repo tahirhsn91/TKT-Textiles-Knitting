@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, gte, lte, like, sql } from "drizzle-orm";
+import { eq, and, gte, lte, lt, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   employeeMasterTable,
@@ -34,13 +34,24 @@ router.get("/employees/advances", async (req, res): Promise<void> => {
   if (employeeId) conditions.push(eq(employeeAdvancesTable.employeeId, Number(employeeId)));
   if (dateFrom) conditions.push(gte(employeeAdvancesTable.date, dateFrom));
   if (dateTo) conditions.push(lte(employeeAdvancesTable.date, dateTo));
-  // Month/year filter — dates are stored as YYYY-MM-DD, so a month match is
-  // a string prefix on the date column (e.g. year=2026&month=8 -> 2026-08%).
+  // Month/year filter — `employee_advances.date` is a Postgres `date` column,
+  // so a prefix LIKE (`LIKE on a date`) would raise PG 42883. Instead use a
+  // closed date-range comparison (e.g. year=2026&month=8 -> [2026-08-01, 2026-09-01)).
   if (year && month) {
-    const ym = `${year}-${String(Number(month)).padStart(2, "0")}`;
-    conditions.push(like(employeeAdvancesTable.date, `${ym}%`));
+    const y = Number(year);
+    const m = Number(month);
+    if (Number.isInteger(y) && y > 0 && Number.isInteger(m) && m >= 1 && m <= 12) {
+      const start = `${y}-${String(m).padStart(2, "0")}-01`;
+      const end = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}-01`;
+      conditions.push(gte(employeeAdvancesTable.date, start));
+      conditions.push(lt(employeeAdvancesTable.date, end));
+    }
   } else if (year) {
-    conditions.push(like(employeeAdvancesTable.date, `${year}%`));
+    const y = Number(year);
+    if (Number.isInteger(y) && y > 0) {
+      conditions.push(gte(employeeAdvancesTable.date, `${y}-01-01`));
+      conditions.push(lt(employeeAdvancesTable.date, `${y + 1}-01-01`));
+    }
   }
 
   const rows = await db
