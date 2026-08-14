@@ -31,7 +31,19 @@ const FactoryMaintenancePage = lazyRetry(() => import("@/pages/maintenance/facto
 const InvoicingPage = lazyRetry(() => import("@/pages/invoicing"));
 const SettingsPage = lazyRetry(() => import("@/pages/settings"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Master/lookup data changes rarely; skip re-fetch for 5 minutes to stop
+      // the app from hammering the API on every navigation. Mutations already
+      // invalidate their affected queries, so a long staleTime is safe. (issue #15)
+      staleTime: 5 * 60 * 1000,
+      // Keep cached data around a while so returning to a screen is instant.
+      gcTime: 30 * 60 * 1000,
+      retry: 2,
+    },
+  },
+});
 
 function Router() {
   return (
