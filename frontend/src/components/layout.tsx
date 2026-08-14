@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
 import { TopBar } from "@/components/top-bar";
 import { Wordmark } from "@/components/wordmark";
+import { useSeedAllLookups } from "@/hooks/use-all-lookups";
 import {
   Sheet,
   SheetContent,
@@ -145,6 +146,9 @@ function NavSection({ label }: { label: string }) {
 export function Layout({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
   const { can } = useAuth();
+  // Load all master/lookup lists once and seed the per-list caches, so the
+  // individual useList*Master hooks resolve from cache instead of N requests.
+  useSeedAllLookups();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(LS_SIDEBAR_COLLAPSED) === "true"; } catch { return false; }

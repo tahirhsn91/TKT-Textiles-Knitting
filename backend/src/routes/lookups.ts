@@ -32,6 +32,69 @@ import {
 
 const router: IRouter = Router();
 
+/**
+ * GET /api/lookups/all — returns every lookup list in one request (issue #19).
+ * Pages that need several master lists (most screens) can fetch this once
+ * instead of firing N parallel lookup calls. Same shapes as the individual
+ * endpoints, just batched under named keys. Auth-only route (the whole
+ * lookups router is auth-gated), so it can't be nested behind a per-route
+ * module permission.
+ */
+router.get("/lookups/all", async (_req, res): Promise<void> => {
+  const [
+    transactionTypes,
+    jobs,
+    parties,
+    machines,
+    locations,
+    yarnTypes,
+    yarnCounts,
+    yarnBrands,
+    uoms,
+    fabricTypes,
+    employees,
+    departments,
+  ] = await Promise.all([
+    db.select().from(transactionTypeMasterTable).orderBy(transactionTypeMasterTable.name),
+    db
+      .select({
+        id: jobMasterTable.id,
+        name: jobMasterTable.name,
+        code: jobMasterTable.code,
+        partyId: jobMasterTable.partyId,
+        partyName: partyMasterTable.name,
+      })
+      .from(jobMasterTable)
+      .leftJoin(partyMasterTable, eq(jobMasterTable.partyId, partyMasterTable.id))
+      .orderBy(partyMasterTable.name, jobMasterTable.name),
+    db.select().from(partyMasterTable).orderBy(partyMasterTable.name),
+    db.select().from(machineMasterTable).orderBy(machineMasterTable.name),
+    db.select().from(locationMasterTable).orderBy(locationMasterTable.name),
+    db.select().from(yarnTypeMasterTable).orderBy(yarnTypeMasterTable.name),
+    db.select().from(yarnCountMasterTable).orderBy(yarnCountMasterTable.name),
+    db.select().from(yarnBrandMasterTable).orderBy(yarnBrandMasterTable.name),
+    db.select().from(uomMasterTable).orderBy(uomMasterTable.name),
+    db.select().from(fabricTypeMasterTable).orderBy(fabricTypeMasterTable.name),
+    db.select().from(employeeMasterTable).orderBy(employeeMasterTable.name),
+    db.select().from(departmentMasterTable).orderBy(departmentMasterTable.name),
+  ]);
+
+  res.json({
+    transactionTypes,
+    jobs,
+    parties,
+    machines,
+    locations,
+    yarnTypes,
+    yarnCounts,
+    yarnBrands,
+    uoms,
+    fabricTypes,
+    employees,
+    departments,
+  });
+});
+
 router.get("/lookups/job-master", async (_req, res): Promise<void> => {
   const rows = await db
     .select({
