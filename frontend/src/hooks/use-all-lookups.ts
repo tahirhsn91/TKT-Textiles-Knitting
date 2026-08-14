@@ -43,12 +43,16 @@ export interface AllLookupsResponse {
  * Call this once at the app root (Layout). Returns richer data only as the
  * single aggregate query result — most screens keep using the per-list hook.
  */
-export function useSeedAllLookups() {
+export function useSeedAllLookups(enabled = true) {
   const queryClient = useQueryClient();
 
   const query = useQuery<AllLookupsResponse>({
     queryKey: ["/api/lookups/all"],
     queryFn: () => customFetch<AllLookupsResponse>("/api/lookups/all", { method: "GET" }),
+    // The Master Data page lazy-loads each tab's data on activation, so it opts
+    // out of the aggregate prefetch (issue #19 follow-up): pass enabled=false to
+    // skip the one-shot load-everything call there.
+    enabled,
     staleTime: 30 * 60 * 1000, // lookups change rarely — cache 30 min
     gcTime: 60 * 60 * 1000,
   });
