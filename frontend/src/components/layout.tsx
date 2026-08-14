@@ -22,41 +22,42 @@ import {
 } from "@/components/ui/tooltip";
 
 const navItems = [
-  { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
-  { href: "/masters",      label: "Master Data",  icon: Database },
+  { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard, module: "dashboard" },
+  { href: "/masters",      label: "Master Data",  icon: Database,        module: "masters" },
 ];
 
 // Bottom navigation (mobile) — the four entry points a floor operator reaches
 // for most, surfaced as a thumb-friendly tab bar instead of burying them in
 // the drawer. Mirrors the "Daily Work" group in the desktop sidebar.
 const bottomNavItems = [
-  { href: "/dashboard",        label: "Dashboard",        icon: LayoutDashboard },
-  { href: "/daily-production", label: "Daily Production", icon: Factory },
-  { href: "/yarn-receipts",    label: "Yarn Receipt",     icon: PackageCheck },
-  { href: "/daily-deliveries", label: "Delivery",         icon: Truck },
+  { href: "/dashboard",        label: "Dashboard",        icon: LayoutDashboard, module: "dashboard" },
+  { href: "/daily-production", label: "Daily Production", icon: Factory,        module: "dailyProduction" },
+  { href: "/yarn-receipts",    label: "Yarn Receipt",     icon: PackageCheck,   module: "yarnReceipts" },
+  { href: "/daily-deliveries", label: "Delivery",         icon: Truck,          module: "dailyDeliveries" },
 ];
 
 const transactionItems = [
-  { href: "/transactions",           label: "Yarn-Fabric Transactions" },
+  { href: "/transactions",           label: "Yarn-Fabric Transactions", module: "transactions" },
 ];
 
 const payrollItems = [
-  { href: "/transactions/advances",             label: "Advances" },
-  { href: "/transactions/monthly-salary-entry", label: "Payroll Maintenance" },
+  { href: "/transactions/advances",             label: "Advances",             module: "payroll" },
+  { href: "/transactions/monthly-salary-entry", label: "Payroll Maintenance",  module: "payroll" },
 ];
 
 const reportItems = [
-  { href: "/reports/yarn-balance",   label: "Yarn Balance Report" },
-  { href: "/reports/yarn-to-fabric", label: "Yarn to Fabric Movement Report" },
+  { href: "/reports/yarn-balance",   label: "Yarn Balance Report",         module: "reports" },
+  { href: "/reports/yarn-to-fabric", label: "Yarn to Fabric Movement Report", module: "reports" },
 ];
 
 const invoicingItems = [
-  { href: "/invoicing",    label: "Invoicing",    icon: Receipt },
+  { href: "/invoicing",    label: "Invoicing",    icon: Receipt,     module: "invoicing" },
 ];
 
 // Mobile drawer: the groups and their items, so the drawer can render from
 // config and auto-open the group holding the active route. Sub-item icons are
-// chosen to make the long list scannable.
+// chosen to make the long list scannable. Each item declares the RBAC module
+// it needs so the drawer hides what the signed-in role can't open.
 const mobileGroups = [
   {
     key: "daily",
@@ -64,9 +65,9 @@ const mobileGroups = [
     icon: ClipboardList,
     activeFn: (loc: string) => loc.startsWith("/daily-production") || loc.startsWith("/yarn-receipts") || loc.startsWith("/daily-deliveries"),
     items: [
-      { href: "/daily-production", label: "Daily Production", icon: Factory },
-      { href: "/yarn-receipts",    label: "Daily Yarn Receipt", icon: PackageCheck },
-      { href: "/daily-deliveries", label: "Daily Delivery",    icon: Truck },
+      { href: "/daily-production", label: "Daily Production", icon: Factory,      module: "dailyProduction" },
+      { href: "/yarn-receipts",    label: "Daily Yarn Receipt", icon: PackageCheck, module: "yarnReceipts" },
+      { href: "/daily-deliveries", label: "Daily Delivery",    icon: Truck,        module: "dailyDeliveries" },
     ],
   },
   {
@@ -75,9 +76,9 @@ const mobileGroups = [
     icon: FileText,
     activeFn: (loc: string) => loc.startsWith("/transactions"),
     items: [
-      { href: "/transactions",           label: "Yarn-Fabric Transactions", icon: FileText },
-      { href: "/transactions/advances",  label: "Advances",                icon: Wallet },
-      { href: "/transactions/monthly-salary-entry", label: "Payroll Maintenance", icon: Settings },
+      { href: "/transactions",           label: "Yarn-Fabric Transactions", icon: FileText,  module: "transactions" },
+      { href: "/transactions/advances",  label: "Advances",                icon: Wallet,    module: "payroll" },
+      { href: "/transactions/monthly-salary-entry", label: "Payroll Maintenance", icon: Settings, module: "payroll" },
     ],
   },
   {
@@ -86,8 +87,8 @@ const mobileGroups = [
     icon: Wrench,
     activeFn: (loc: string) => loc.startsWith("/maintenance"),
     items: [
-      { href: "/maintenance/machine", label: "Machine Maintenance", icon: Factory },
-      { href: "/maintenance/factory", label: "Factory Maintenance",  icon: HardHat },
+      { href: "/maintenance/machine", label: "Machine Maintenance", icon: Factory, module: "maintenance" },
+      { href: "/maintenance/factory", label: "Factory Maintenance",  icon: HardHat, module: "maintenance" },
     ],
   },
   {
@@ -96,8 +97,8 @@ const mobileGroups = [
     icon: BarChart2,
     activeFn: (loc: string) => loc.startsWith("/reports"),
     items: [
-      { href: "/reports/yarn-balance",   label: "Yarn Balance Report",      icon: BarChart2 },
-      { href: "/reports/yarn-to-fabric", label: "Yarn to Fabric Movement",   icon: Database },
+      { href: "/reports/yarn-balance",   label: "Yarn Balance Report",      icon: BarChart2, module: "reports" },
+      { href: "/reports/yarn-to-fabric", label: "Yarn to Fabric Movement",   icon: Database,  module: "reports" },
     ],
   },
   {
@@ -112,7 +113,7 @@ const mobileGroups = [
 // Mobile-only "Administration" group — the Users & Roles admin lives here so
 // it shows in the phone drawer (the desktop sidebar places it as a flat item).
 const adminItems = [
-  { href: "/settings", label: "Users & Roles", icon: Settings },
+  { href: "/settings", label: "Users & Roles", icon: Settings, module: "users" },
 ];
 
 // Primary route each collapsed group icon navigates to.
@@ -249,7 +250,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <nav className="flex flex-1 flex-col overflow-y-auto px-2 pb-4">
           {!collapsed && <NavSection label="Overview" />}
           <div className={cn("flex flex-col gap-0.5", collapsed && "pt-2")}>
-            {navItems.map((item) => (
+            {navItems.filter((item) => can(item.module)).map((item) => (
               <DesktopItem
                 key={item.href}
                 href={item.href}
@@ -261,8 +262,9 @@ export function Layout({ children }: { children: ReactNode }) {
             ))}
           </div>
 
-          {!collapsed && <NavSection label="Daily Work" />}
+          {(can("dailyProduction") || can("yarnReceipts") || can("dailyDeliveries") || can("transactions") || can("payroll")) && !collapsed && <NavSection label="Daily Work" />}
           <div className={cn("flex flex-col gap-0.5", collapsed && "pt-1")}>
+            {(can("dailyProduction") || can("yarnReceipts") || can("dailyDeliveries")) && (
             <DesktopGroup
               label="Daily Operations"
               icon={ClipboardList}
@@ -270,22 +272,30 @@ export function Layout({ children }: { children: ReactNode }) {
               active={dailyProductionActive || yarnReceiptsActive || dailyDeliveriesActive}
               collapsed={collapsed}
             >
+              {can("dailyProduction") && (
               <SubItem
                 href="/daily-production"
                 label="Daily Production"
                 active={isSubItemActive(location, "/daily-production")}
               />
+              )}
+              {can("yarnReceipts") && (
               <SubItem
                 href="/yarn-receipts"
                 label="Daily Yarn Receipt"
                 active={isSubItemActive(location, "/yarn-receipts")}
               />
+              )}
+              {can("dailyDeliveries") && (
               <SubItem
                 href="/daily-deliveries"
                 label="Daily Delivery"
                 active={isSubItemActive(location, "/daily-deliveries")}
               />
+              )}
             </DesktopGroup>
+            )}
+            {can("transactions") && (
             <DesktopGroup
               label="Transactions"
               icon={FileText}
@@ -293,7 +303,7 @@ export function Layout({ children }: { children: ReactNode }) {
               active={transactionsActive}
               collapsed={collapsed}
             >
-              {transactionItems.map((item) => (
+              {transactionItems.filter((item) => can(item.module)).map((item) => (
                 <SubItem
                   key={item.href}
                   href={item.href}
@@ -302,6 +312,8 @@ export function Layout({ children }: { children: ReactNode }) {
                 />
               ))}
             </DesktopGroup>
+            )}
+            {can("payroll") && (
             <DesktopGroup
               label="Payroll"
               icon={Wallet}
@@ -309,7 +321,7 @@ export function Layout({ children }: { children: ReactNode }) {
               active={payrollActive}
               collapsed={collapsed}
             >
-              {payrollItems.map((item) => (
+              {payrollItems.filter((item) => can(item.module)).map((item) => (
                 <SubItem
                   key={item.href}
                   href={item.href}
@@ -318,10 +330,12 @@ export function Layout({ children }: { children: ReactNode }) {
                 />
               ))}
             </DesktopGroup>
+            )}
           </div>
 
-          {!collapsed && <NavSection label="Maintenance" />}
+          {can("maintenance") && !collapsed && <NavSection label="Maintenance" />}
           <div className={cn("flex flex-col gap-0.5", collapsed && "pt-1")}>
+            {can("maintenance") && (
             <DesktopGroup
               label="Maintenance"
               icon={Wrench}
@@ -340,10 +354,12 @@ export function Layout({ children }: { children: ReactNode }) {
                 active={isSubItemActive(location, "/maintenance/factory")}
               />
             </DesktopGroup>
+            )}
           </div>
 
-          {!collapsed && <NavSection label="Analysis" />}
+          {can("reports") && !collapsed && <NavSection label="Analysis" />}
           <div className={cn("flex flex-col gap-0.5", collapsed && "pt-1")}>
+            {can("reports") && (
             <DesktopGroup
               label="Reports"
               icon={BarChart2}
@@ -351,7 +367,7 @@ export function Layout({ children }: { children: ReactNode }) {
               active={reportsActive}
               collapsed={collapsed}
             >
-              {reportItems.map((item) => (
+              {reportItems.filter((item) => can(item.module)).map((item) => (
                 <SubItem
                   key={item.href}
                   href={item.href}
@@ -360,6 +376,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 />
               ))}
             </DesktopGroup>
+            )}
           </div>
 
           {!collapsed && <NavSection label="Invoicing" />}
@@ -488,7 +505,7 @@ export function Layout({ children }: { children: ReactNode }) {
                   query={mobileQuery}
                   openGroups={mobileOpenGroups}
                   setOpenGroups={setMobileOpenGroups}
-                  canUsers={can("users")}
+                  can={can}
                   onNavigate={() => { setMobileOpen(false); setMobileQuery(""); }}
                 />
               </nav>
@@ -513,14 +530,14 @@ export function Layout({ children }: { children: ReactNode }) {
 
         {/* ── Mobile bottom navigation — a fixed tab bar so the four most-used
                screens are a thumb-tap away (hidden on desktop / print). ── */}
-        <BottomNav location={location} />
+        <BottomNav location={location} can={can} />
       </div>
     </div>
   );
 }
 
 // ── Mobile bottom navigation bar ────────────────────────────
-function BottomNav({ location }: { location: string }) {
+function BottomNav({ location, can }: { location: string; can: (moduleId: string) => boolean }) {
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-30 border-t border-sidebar-border bg-sidebar text-sidebar-foreground md:hidden print:hidden"
@@ -530,7 +547,7 @@ function BottomNav({ location }: { location: string }) {
         className="mx-auto grid max-w-7xl grid-cols-4"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        {bottomNavItems.map(({ href, label, icon: Icon }) => {
+        {bottomNavItems.filter((item) => can(item.module)).map(({ href, label, icon: Icon }) => {
           const active = isItemActive(location, href);
           return (
             <Link key={href} href={href}>
@@ -683,23 +700,26 @@ function MobileNavMenu({
   query,
   openGroups,
   setOpenGroups,
-  canUsers,
+  can,
   onNavigate,
 }: {
   location: string;
   query: string;
   openGroups: Set<string>;
   setOpenGroups: React.Dispatch<React.SetStateAction<Set<string>>>;
-  canUsers: boolean;
+  can: (moduleId: string) => boolean;
   onNavigate: () => void;
 }) {
   const q = query.trim().toLowerCase();
   const matches = (label: string) => !q || label.toLowerCase().includes(q);
 
-  // Overview always shows; other groups each list their items (filtered).
-  const visibleGroups = mobileGroups.filter((g) =>
-    g.items.some((i) => matches(i.label))
-  );
+  // Only groups with at least one permitted item (matching the query) show.
+  const visibleGroups = mobileGroups
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((i) => can(i.module) && matches(i.label)),
+    }))
+    .filter((g) => g.items.length > 0);
 
   // When typing, force-open any group that matched so results are visible.
   const effOpenGroups = q
@@ -717,7 +737,7 @@ function MobileNavMenu({
     <div className="flex flex-col gap-0.5">
       <NavSection label="Overview" />
       {navItems
-        .filter((i) => matches(i.label))
+        .filter((i) => can(i.module) && matches(i.label))
         .map((item) => (
           <Link key={item.href} href={item.href} onClick={onNavigate}>
             <span
@@ -789,11 +809,11 @@ function MobileNavMenu({
       })}
 
       {/* Administration — phone-only entry to Users & Roles (admin role). */}
-      {canUsers && (
+      {can("users") && (
         <div className="mt-1 flex flex-col">
           <NavSection label="Administration" />
           {adminItems
-            .filter((i) => matches(i.label))
+            .filter((i) => can(i.module) && matches(i.label))
             .map((item) => {
               const active = isItemActive(location, item.href);
               const ItemIcon = item.icon;
