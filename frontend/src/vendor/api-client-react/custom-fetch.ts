@@ -1,3 +1,11 @@
+import type { AxiosError, AxiosRequestConfig } from "axios";
+import { httpClient } from "@/lib/http-client";
+
+// ---------------------------------------------------------------------------
+// Types — preserved from the original fetch-based wrapper so all call sites
+// and the generated API client keep compiling unchanged.
+// ---------------------------------------------------------------------------
+
 export type CustomFetchOptions = RequestInit & {
   responseType?: "json" | "text" | "blob" | "auto";
 };
@@ -8,167 +16,34 @@ export type BodyType<T> = T;
 
 export type AuthTokenGetter = () => Promise<string | null> | string | null;
 
-const NO_BODY_STATUS = new Set([204, 205, 304]);
-const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
-
 // ---------------------------------------------------------------------------
-// Module-level configuration
+// Backward-compatible no-ops. The bearer token is now attached by the Axios
+// request interceptor (src/lib/http-client.ts), which reads localStorage
+// directly, so these legacy hooks are kept only so existing callers (e.g.
+// AuthProvider's effect) don't break.
 // ---------------------------------------------------------------------------
 
-let _baseUrl: string | null = null;
-let _authTokenGetter: AuthTokenGetter | null = null;
+/** @deprecated Axios interceptor handles auth; kept for signature compatibility. */
+export function setBaseUrl(_url: string | null): void {}
 
 /**
- * Set a base URL that is prepended to every relative request URL
- * (i.e. paths that start with `/`).
- *
- * Useful for Expo bundles that need to call a remote API server.
- * Pass `null` to clear the base URL.
+ * @deprecated Axios interceptor reads the token from localStorage directly;
+ * kept for signature compatibility with the AuthProvider effect.
  */
-export function setBaseUrl(url: string | null): void {
-  _baseUrl = url ? url.replace(/\/+$/, "") : null;
+export function setAuthTokenGetter(_getter: AuthTokenGetter | null): void {}
+
+// ---------------------------------------------------------------------------
+// Error classes — preserved shape (status / data / message) so callers that
+// `instanceof Error`, read `.status` (e.g. 409 handling) or `.data.error`
+// keep working. They are now surfaced from Axios errors.
+// ---------------------------------------------------------------------------
+
+function errorData(axiosError: AxiosError): unknown {
+  return axiosError.response?.data ?? null;
 }
 
-/**
- * Register a getter that supplies a bearer auth token.  Before every fetch
- * the getter is invoked; when it returns a non-null string, an
- * `Authorization: Bearer <token>` header is attached to the request.
- *
- * Useful for Expo bundles making token-gated API calls.
- * Pass `null` to clear the getter.
- *
- * NOTE: This function should never be used in web applications where session
- * token cookies are automatically associated with API calls by the browser.
- */
-export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
-  _authTokenGetter = getter;
-}
-
-function isRequest(input: RequestInfo | URL): input is Request {
-  return typeof Request !== "undefined" && input instanceof Request;
-}
-
-function resolveMethod(input: RequestInfo | URL, explicitMethod?: string): string {
-  if (explicitMethod) return explicitMethod.toUpperCase();
-  if (isRequest(input)) return input.method.toUpperCase();
-  return "GET";
-}
-
-// Use loose check for URL — some runtimes (e.g. React Native) polyfill URL
-// differently, so `instanceof URL` can fail.
-function isUrl(input: RequestInfo | URL): input is URL {
-  return typeof URL !== "undefined" && input instanceof URL;
-}
-
-function applyBaseUrl(input: RequestInfo | URL): RequestInfo | URL {
-  if (!_baseUrl) return input;
-  const url = resolveUrl(input);
-  // Only prepend to relative paths (starting with /)
-  if (!url.startsWith("/")) return input;
-
-  const absolute = `${_baseUrl}${url}`;
-  if (typeof input === "string") return absolute;
-  if (isUrl(input)) return new URL(absolute);
-  return new Request(absolute, input as Request);
-}
-
-function resolveUrl(input: RequestInfo | URL): string {
-  if (typeof input === "string") return input;
-  if (isUrl(input)) return input.toString();
-  return input.url;
-}
-
-function mergeHeaders(...sources: Array<HeadersInit | undefined>): Headers {
-  const headers = new Headers();
-
-  for (const source of sources) {
-    if (!source) continue;
-    new Headers(source).forEach((value, key) => {
-      headers.set(key, value);
-    });
-  }
-
-  return headers;
-}
-
-function getMediaType(headers: Headers): string | null {
-  const value = headers.get("content-type");
-  return value ? value.split(";", 1)[0].trim().toLowerCase() : null;
-}
-
-function isJsonMediaType(mediaType: string | null): boolean {
-  return mediaType === "application/json" || Boolean(mediaType?.endsWith("+json"));
-}
-
-function isTextMediaType(mediaType: string | null): boolean {
-  return Boolean(
-    mediaType &&
-      (mediaType.startsWith("text/") ||
-        mediaType === "application/xml" ||
-        mediaType === "text/xml" ||
-        mediaType.endsWith("+xml") ||
-        mediaType === "application/x-www-form-urlencoded"),
-  );
-}
-
-// Use strict equality: in browsers, `response.body` is `null` when the
-// response genuinely has no content.  In React Native, `response.body` is
-// always `undefined` because the ReadableStream API is not implemented —
-// even when the response carries a full payload readable via `.text()` or
-// `.json()`.  Loose equality (`== null`) matches both `null` and `undefined`,
-// which causes every React Native response to be treated as empty.
-function hasNoBody(response: Response, method: string): boolean {
-  if (method === "HEAD") return true;
-  if (NO_BODY_STATUS.has(response.status)) return true;
-  if (response.headers.get("content-length") === "0") return true;
-  if (response.body === null) return true;
-  return false;
-}
-
-function stripBom(text: string): string {
-  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
-}
-
-function looksLikeJson(text: string): boolean {
-  const trimmed = text.trimStart();
-  return trimmed.startsWith("{") || trimmed.startsWith("[");
-}
-
-function getStringField(value: unknown, key: string): string | undefined {
-  if (!value || typeof value !== "object") return undefined;
-
-  const candidate = (value as Record<string, unknown>)[key];
-  if (typeof candidate !== "string") return undefined;
-
-  const trimmed = candidate.trim();
-  return trimmed === "" ? undefined : trimmed;
-}
-
-function truncate(text: string, maxLength = 300): string {
-  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
-}
-
-function buildErrorMessage(response: Response, data: unknown): string {
-  const prefix = `HTTP ${response.status} ${response.statusText}`;
-
-  if (typeof data === "string") {
-    const text = data.trim();
-    return text ? `${prefix}: ${truncate(text)}` : prefix;
-  }
-
-  const title = getStringField(data, "title");
-  const detail = getStringField(data, "detail");
-  const message =
-    getStringField(data, "message") ??
-    getStringField(data, "error_description") ??
-    getStringField(data, "error");
-
-  if (title && detail) return `${prefix}: ${title} — ${detail}`;
-  if (detail) return `${prefix}: ${detail}`;
-  if (message) return `${prefix}: ${message}`;
-  if (title) return `${prefix}: ${title}`;
-
-  return prefix;
+function errorStatus(axiosError: AxiosError): number {
+  return axiosError.response?.status ?? 0;
 }
 
 export class ApiError<T = unknown> extends Error {
@@ -176,26 +51,24 @@ export class ApiError<T = unknown> extends Error {
   readonly status: number;
   readonly statusText: string;
   readonly data: T | null;
-  readonly headers: Headers;
-  readonly response: Response;
   readonly method: string;
   readonly url: string;
 
-  constructor(
-    response: Response,
-    data: T | null,
-    requestInfo: { method: string; url: string },
-  ) {
-    super(buildErrorMessage(response, data));
+  constructor(axiosError: AxiosError, data: T | null) {
+    const status = errorStatus(axiosError);
+    const statusText = axiosError.response?.statusText ?? "";
+    const reason =
+      (data && typeof data === "object" && (data as Record<string, unknown>).error) as
+        | string
+        | undefined;
+    super(reason || axiosError.message || `HTTP ${status} ${statusText}`);
     Object.setPrototypeOf(this, new.target.prototype);
 
-    this.status = response.status;
-    this.statusText = response.statusText;
+    this.status = status;
+    this.statusText = statusText;
     this.data = data;
-    this.headers = response.headers;
-    this.response = response;
-    this.method = requestInfo.method;
-    this.url = response.url || requestInfo.url;
+    this.method = (axiosError.config?.method ?? "GET").toUpperCase();
+    this.url = typeof axiosError.config?.url === "string" ? axiosError.config.url : "";
   }
 }
 
@@ -203,169 +76,96 @@ export class ResponseParseError extends Error {
   readonly name = "ResponseParseError";
   readonly status: number;
   readonly statusText: string;
-  readonly headers: Headers;
-  readonly response: Response;
   readonly method: string;
   readonly url: string;
   readonly rawBody: string;
   readonly cause: unknown;
 
   constructor(
-    response: Response,
+    err: Error,
+    config: { method: string; url: string },
+    status: number,
+    statusText: string,
     rawBody: string,
-    cause: unknown,
-    requestInfo: { method: string; url: string },
   ) {
-    super(
-      `Failed to parse response from ${requestInfo.method} ${response.url || requestInfo.url} ` +
-        `(${response.status} ${response.statusText}) as JSON`,
-    );
+    super(`Failed to parse response from ${config.method} ${config.url} (${status} ${statusText}) as JSON`);
     Object.setPrototypeOf(this, new.target.prototype);
 
-    this.status = response.status;
-    this.statusText = response.statusText;
-    this.headers = response.headers;
-    this.response = response;
-    this.method = requestInfo.method;
-    this.url = response.url || requestInfo.url;
+    this.status = status;
+    this.statusText = statusText;
+    this.method = config.method;
+    this.url = config.url;
     this.rawBody = rawBody;
-    this.cause = cause;
+    this.cause = err;
   }
 }
 
-async function parseJsonBody(
-  response: Response,
-  requestInfo: { method: string; url: string },
-): Promise<unknown> {
-  const raw = await response.text();
-  const normalized = stripBom(raw);
+// ---------------------------------------------------------------------------
+// customFetch — the app-wide request helper, now backed by Axios.
+//
+// Same signature as before: customFetch<T>(url, { method, headers, body,
+// responseType }). It resolves relative URLs against the Vite base URL and
+// delegates to the Axios client, whose request interceptor attaches the bearer
+// token from localStorage. The axios request body may be a plain object or a
+// pre-serialized JSON string (the old call sites pass JSON.stringify(...));
+// we accept both and let axios set the content-type.
+// ---------------------------------------------------------------------------
 
-  if (normalized.trim() === "") {
-    return null;
-  }
-
-  try {
-    return JSON.parse(normalized);
-  } catch (cause) {
-    throw new ResponseParseError(response, raw, cause, requestInfo);
-  }
+function toUrl(input: string | URL | Request): string {
+  if (typeof input === "string") return input;
+  if (typeof URL !== "undefined" && input instanceof URL) return input.href;
+  // Remaining: a Request object — the generated client only ever passes
+  // string URLs, but keep this branch safe for generic consumers.
+  return (input as Request).url;
 }
 
-async function parseErrorBody(response: Response, method: string): Promise<unknown> {
-  if (hasNoBody(response, method)) {
-    return null;
-  }
-
-  const mediaType = getMediaType(response.headers);
-
-  // Fall back to text when blob() is unavailable (e.g. some React Native builds).
-  if (mediaType && !isJsonMediaType(mediaType) && !isTextMediaType(mediaType)) {
-    return typeof response.blob === "function" ? response.blob() : response.text();
-  }
-
-  const raw = await response.text();
-  const normalized = stripBom(raw);
-  const trimmed = normalized.trim();
-
-  if (trimmed === "") {
-    return null;
-  }
-
-  if (isJsonMediaType(mediaType) || looksLikeJson(normalized)) {
-    try {
-      return JSON.parse(normalized);
-    } catch {
-      return raw;
-    }
-  }
-
-  return raw;
-}
-
-function inferResponseType(response: Response): "json" | "text" | "blob" {
-  const mediaType = getMediaType(response.headers);
-
-  if (isJsonMediaType(mediaType)) return "json";
-  if (isTextMediaType(mediaType) || mediaType == null) return "text";
-  return "blob";
-}
-
-async function parseSuccessBody(
-  response: Response,
-  responseType: "json" | "text" | "blob" | "auto",
-  requestInfo: { method: string; url: string },
-): Promise<unknown> {
-  if (hasNoBody(response, requestInfo.method)) {
-    return null;
-  }
-
-  const effectiveType =
-    responseType === "auto" ? inferResponseType(response) : responseType;
-
-  switch (effectiveType) {
-    case "json":
-      return parseJsonBody(response, requestInfo);
-
-    case "text": {
-      const text = await response.text();
-      return text === "" ? null : text;
-    }
-
-    case "blob":
-      if (typeof response.blob !== "function") {
-        throw new TypeError(
-          "Blob responses are not supported in this runtime. " +
-            "Use responseType \"json\" or \"text\" instead.",
-        );
-      }
-      return response.blob();
-  }
+function stringifyBody(body: unknown): unknown {
+  // Already a string (call sites used JSON.stringify) — leave as-is so axios
+  // sends it verbatim with the caller's content-type.
+  return body;
 }
 
 export async function customFetch<T = unknown>(
-  input: RequestInfo | URL,
+  input: string | URL | Request,
   options: CustomFetchOptions = {},
 ): Promise<T> {
-  input = applyBaseUrl(input);
-  const { responseType = "auto", headers: headersInit, ...init } = options;
+  const url = toUrl(input);
+  const method = (options.method ?? "GET").toUpperCase();
+  const { responseType, headers: headersInit, body } = options;
 
-  const method = resolveMethod(input, init.method);
+  const axiosConfig: AxiosRequestConfig = {
+    url,
+    method,
+    data: body !== null && body !== undefined ? stringifyBody(body) : undefined,
+    signal: (options.signal ?? undefined) as AxiosRequestConfig["signal"],
+  };
 
-  if (init.body != null && (method === "GET" || method === "HEAD")) {
-    throw new TypeError(`customFetch: ${method} requests cannot have a body.`);
+  if (headersInit) {
+    axiosConfig.headers = headersInit as AxiosRequestConfig["headers"];
   }
 
-  const headers = mergeHeaders(isRequest(input) ? input.headers : undefined, headersInit);
+  try {
+    const axiosResponse = await httpClient.request<T>(axiosConfig);
 
-  if (
-    typeof init.body === "string" &&
-    !headers.has("content-type") &&
-    looksLikeJson(init.body)
-  ) {
-    headers.set("content-type", "application/json");
-  }
-
-  if (responseType === "json" && !headers.has("accept")) {
-    headers.set("accept", DEFAULT_JSON_ACCEPT);
-  }
-
-  // Attach bearer token when an auth getter is configured and no
-  // Authorization header has been explicitly provided.
-  if (_authTokenGetter && !headers.has("authorization")) {
-    const token = await _authTokenGetter();
-    if (token) {
-      headers.set("authorization", `Bearer ${token}`);
+    // Honour the responseType override (axios default already handles JSON).
+    if (responseType === "text") {
+      return String(axiosResponse.data) as T;
     }
+    return axiosResponse.data as T;
+  } catch (err) {
+    const axiosError = err as AxiosError;
+    // Never throw non-Axios errors as ApiError (e.g. cancelled requests).
+    if (!axiosError || !axiosError.isAxiosError) {
+      throw err;
+    }
+    const data = errorData(axiosError) as T | null;
+
+    // 204/205/304 have no body — return null like the old wrapper did.
+    const noBodyStatus = [204, 205, 304].includes(axiosError.response?.status ?? 0);
+    if (axiosError.response && noBodyStatus && !axiosError.response.data) {
+      return null as T;
+    }
+
+    throw new ApiError<T>(axiosError, data);
   }
-
-  const requestInfo = { method, url: resolveUrl(input) };
-
-  const response = await fetch(input, { ...init, method, headers });
-
-  if (!response.ok) {
-    const errorData = await parseErrorBody(response, method);
-    throw new ApiError(response, errorData, requestInfo);
-  }
-
-  return (await parseSuccessBody(response, responseType, requestInfo)) as T;
 }
