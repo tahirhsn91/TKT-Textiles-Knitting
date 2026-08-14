@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
 import { pool } from "../db/index.js";
+import { validateQuery } from "../lib/validate.js";
 import {
   findNearestUnreconciledDates,
 } from "../lib/unreconciled-nav.js";
@@ -19,23 +20,19 @@ const navSchema = z.object({
 // unreconciled row (reconciled=false, status<>'cancelled'), or null when none
 // exists in that direction. The frontend uses the null targets to disable the
 // corresponding navigation button (issue #120).
-router.get("/daily-ops/unreconciled/prev-next", async (req, res): Promise<void> => {
-  const parsed = navSchema.safeParse({
-    operation: req.query.operation,
-    date: req.query.date,
-  });
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
-    return;
-  }
-  const { operation, date } = parsed.data;
-  try {
-    const result = await findNearestUnreconciledDates(pool, operation, date);
-    res.json(result);
-  } catch (err) {
-    // Surface a server error without leaking internals.
-    res.status(500).json({ error: "Failed to resolve unreconciled dates" });
-  }
-});
+router.get(
+  "/daily-ops/unreconciled/prev-next",
+  validateQuery(navSchema),
+  async (req, res): Promise<void> => {
+    const { operation, date } = req.query as unknown as { operation: "production" | "receipt" | "delivery"; date: string };
+    try {
+      const result = await findNearestUnreconciledDates(pool, operation, date);
+      res.json(result);
+    } catch (err) {
+      // Surface a server error without leaking internals.
+      res.status(500).json({ error: "Failed to resolve unreconciled dates" });
+    }
+  },
+);
 
 export default router;
