@@ -56,6 +56,13 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Parse an integer query param with a clamped default (used for pagination). */
+function clampInt(value: unknown, fallback: number, min: number, max: number): number {
+  const n = typeof value === "string" ? Number.parseInt(value, 10) : NaN;
+  if (Number.isNaN(n)) return fallback;
+  return Math.min(Math.max(n, min), max);
+}
+
 /**
  * Reconciled entries are frozen while the Reconciliation lock (config 0001) is
  * enabled. Enforced here rather than only in the UI — hiding a button stops a
@@ -107,6 +114,24 @@ async function reconciliationBlock(
 router.get("/daily-production", async (req, res): Promise<void> => {
   const date = typeof req.query.date === "string" && req.query.date ? req.query.date : todayIso();
 
+  // Pagination (issue #16): bound the response so a long history of headers can't
+  // grow unbounded. Defaults keep the existing behaviour for a single day, and
+  // the frontend can use page/limit/total/totalPages for controls later.
+  const page = clampInt(req.query.page, 1, 1, 1_000_000);
+  const limit = clampInt(req.query.limit, 100, 1, 500);
+  const offset = (page - 1) * limit;
+
+  // Total number of matching headers, for pagination math. The month-to-date
+  // aggregates are over the whole month, so they're intentionally NOT limited.
+  const [totalRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(dailyProductionHeaderTable)
+    .where(and(
+      eq(dailyProductionHeaderTable.productionDate, date),
+      eq(dailyProductionHeaderTable.status, "submitted"),
+    ));
+  const total = totalRow?.count ?? 0;
+
   const rows = await db
     .select({
       id: dailyProductionHeaderTable.id,
@@ -143,7 +168,9 @@ router.get("/daily-production", async (req, res): Promise<void> => {
       employeeMasterTable.name,
       partyMasterTable.name,
     )
-    .orderBy(machineMasterTable.name, dailyProductionHeaderTable.shift, dailyProductionHeaderTable.id);
+    .orderBy(machineMasterTable.name, dailyProductionHeaderTable.shift, dailyProductionHeaderTable.id)
+    .limit(limit)
+    .offset(offset);
 
   // Month-to-date totals: every submitted entry from the 1st of the month
   // through the selected date (inclusive). One aggregate per day view, so the
@@ -166,6 +193,10 @@ router.get("/daily-production", async (req, res): Promise<void> => {
   res.json({
     productionDate: date,
     rows,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
     monthToDate: {
       rollCount: monthToDate?.rollCount ?? 0,
       totalProduction: monthToDate?.totalProduction ?? "0",
