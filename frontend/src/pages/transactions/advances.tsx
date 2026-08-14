@@ -37,10 +37,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { customFetch } from "@/vendor/api-client-react/custom-fetch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdvancesAnalytics, AdvanceKpiStrip } from "./advances-analytics";
-
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 function toNum(v: string | number | null | undefined): number {
   const n = parseFloat(String(v ?? ""));
@@ -89,17 +88,12 @@ interface Advance {
   notes: string | null;
 }
 
-async function apiFetch(path: string, opts?: RequestInit) {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...opts,
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || body.message || `HTTP ${res.status}`);
+async function apiFetch<T = unknown>(path: string, opts?: RequestInit): Promise<T> {
+  try {
+    return await customFetch<T>(path, opts ?? { method: "GET" });
+  } catch (err) {
+    throw err instanceof Error ? err : new Error(`HTTP request failed`);
   }
-  if (res.status === 204) return null;
-  return res.json();
 }
 
 export default function AdvancesPage() {

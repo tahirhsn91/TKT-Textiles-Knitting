@@ -1,6 +1,7 @@
 import { NUM_DECIMALS } from "@/lib/format";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { customFetch } from "@/vendor/api-client-react/custom-fetch";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
@@ -729,11 +730,7 @@ export default function ReportsPage() {
 
   const { data: rawRows = [], isFetching, isError } = useQuery<ReportRow[]>({
     queryKey: ["reports/data", qs],
-    queryFn: async () => {
-      const res = await fetch(`/api/reports/data${qs ? `?${qs}` : ""}`);
-      if (!res.ok) throw new Error("Failed to fetch report data");
-      return res.json();
-    },
+    queryFn: () => customFetch<ReportRow[]>(`/api/reports/data${qs ? `?${qs}` : ""}`, { method: "GET" }),
     enabled: hasRun,
   });
 
@@ -759,11 +756,7 @@ export default function ReportsPage() {
 
   const { data: rawOpeningRows = [] } = useQuery<ReportRow[]>({
     queryKey: ["reports/opening-balance", openingQs],
-    queryFn: async () => {
-      const res = await fetch(`/api/reports/data${openingQs ? `?${openingQs}` : ""}`);
-      if (!res.ok) throw new Error("Failed to fetch opening balance");
-      return res.json();
-    },
+    queryFn: () => customFetch<ReportRow[]>(`/api/reports/data${openingQs ? `?${openingQs}` : ""}`, { method: "GET" }),
     enabled: hasRun && openingQs !== null,
   });
 
