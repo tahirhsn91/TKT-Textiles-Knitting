@@ -33,8 +33,7 @@ import {
 } from "@/components/ui/form";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
-
-const LS_ENTERED_BY = "machine-maintenance-entered-by";
+import { useCurrentUserDisplayName } from "@/hooks/use-current-user";
 
 const machineSchema = z.object({
   maintenanceDate: z.date({ required_error: "Date is required" }),
@@ -89,13 +88,12 @@ export function MachineMaintenanceDialog({
   });
   const record = recordQuery.data;
 
-  const savedEnteredBy = (() => {
-    try { return localStorage.getItem(LS_ENTERED_BY) ?? ""; } catch { return ""; }
-  })();
+  // "Entered By" is always the logged-in user; the field is read-only.
+  const enteredByName = useCurrentUserDisplayName();
 
   const form = useForm<MachineValues>({
     resolver: zodResolver(machineSchema),
-    defaultValues: defaultValues(savedEnteredBy, defaultDate, defaultMachineId),
+    defaultValues: defaultValues(enteredByName, defaultDate, defaultMachineId),
   });
 
   const [pendingAction, setPendingAction] = useState<"save" | "saveAndAdd" | null>(null);
@@ -113,7 +111,7 @@ export function MachineMaintenanceDialog({
     if (!isEdit) {
       if (prefilledFor.current === null) return;
       prefilledFor.current = null;
-      form.reset(defaultValues(savedEnteredBy, defaultDate, savedMachineId ?? defaultMachineId));
+      form.reset(defaultValues(enteredByName, defaultDate, savedMachineId ?? defaultMachineId));
       setPendingAction(null);
       setFormError(null);
       return;
@@ -129,7 +127,7 @@ export function MachineMaintenanceDialog({
       maintenanceWork: record.maintenanceWork,
       cost: record.cost != null ? String(record.cost) : "",
       vendor: record.vendor ?? "",
-      enteredBy: savedEnteredBy || record.createdBy,
+      enteredBy: enteredByName,
     });
     setPendingAction(null);
     setFormError(null);
@@ -145,7 +143,6 @@ export function MachineMaintenanceDialog({
     if (!valid) return;
 
     const values = form.getValues();
-    try { localStorage.setItem(LS_ENTERED_BY, values.enteredBy); } catch {}
 
     setPendingAction(keepOpen ? "saveAndAdd" : "save");
 
@@ -357,7 +354,7 @@ export function MachineMaintenanceDialog({
                     <FormItem className="sm:col-span-2">
                       <FormLabel>{isEdit ? "Updated By *" : "Entered By *"}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Your name" className="h-11 sm:h-9" disabled={readOnly} {...field} />
+                        <Input placeholder="Your name" className="h-11 sm:h-9" disabled {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

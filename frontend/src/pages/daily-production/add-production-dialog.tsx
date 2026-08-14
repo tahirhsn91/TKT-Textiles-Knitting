@@ -42,6 +42,7 @@ import {
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrentUserDisplayName } from "@/hooks/use-current-user";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PlausibilityWarnings } from "@/components/plausibility-warning";
 import {
@@ -50,8 +51,6 @@ import {
   warningsToFeedback,
   type PlausibilityWarning,
 } from "@/lib/plausibility";
-
-const LS_ENTERED_BY = "daily-production-entered-by";
 
 const headerSchema = z.object({
   productionDate: z.date({ required_error: "Production date is required" }),
@@ -137,13 +136,12 @@ export function ProductionEntryDialog({
   });
   const entry = entryQuery.data;
 
-  const savedEnteredBy = (() => {
-    try { return localStorage.getItem(LS_ENTERED_BY) ?? ""; } catch { return ""; }
-  })();
+  // "Entered By" is always the logged-in user; the field is read-only.
+  const enteredByName = useCurrentUserDisplayName();
 
   const form = useForm<HeaderValues>({
     resolver: zodResolver(headerSchema),
-    defaultValues: defaultHeaderValues(savedEnteredBy, defaultDate),
+    defaultValues: defaultHeaderValues(enteredByName, defaultDate),
   });
 
   const [rolls, setRolls] = useState<RollRow[]>([]);
@@ -175,7 +173,7 @@ export function ProductionEntryDialog({
     if (!isEdit) {
       if (prefilledFor.current === null) return;
       prefilledFor.current = null;
-      form.reset(defaultHeaderValues(savedEnteredBy, defaultDate));
+      form.reset(defaultHeaderValues(enteredByName, defaultDate));
       setRolls([]);
       setRollInput("");
       setRollError(null);
@@ -193,7 +191,7 @@ export function ProductionEntryDialog({
       employeeId: entry.employeeId,
       partyId: entry.partyId,
       shift: entry.shift,
-      enteredBy: savedEnteredBy || entry.createdBy,
+      enteredBy: enteredByName,
     });
     setRolls(entry.rolls.map((r) => ({ key: ++rollKeySeq, weight: r.rollWeight })));
     setRollInput("");
@@ -258,7 +256,6 @@ export function ProductionEntryDialog({
     }
 
     const values = form.getValues();
-    try { localStorage.setItem(LS_ENTERED_BY, values.enteredBy); } catch {}
 
     // ── Plausibility gate (warn-only) ──────────────────────────────────────
     // On the first save attempt, validate the roll weights. If anything looks
@@ -537,7 +534,7 @@ export function ProductionEntryDialog({
                   <FormItem>
                     <FormLabel>{isEdit ? "Updated By *" : "Entered By *"}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Your name" className="h-11 sm:h-9" disabled={readOnly} {...field} />
+                      <Input placeholder="Your name" className="h-11 sm:h-9" disabled {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

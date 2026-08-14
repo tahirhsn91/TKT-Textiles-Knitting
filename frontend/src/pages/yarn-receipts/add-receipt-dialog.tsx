@@ -40,6 +40,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrentUserDisplayName } from "@/hooks/use-current-user";
 import { PlausibilityWarnings } from "@/components/plausibility-warning";
 import {
   validateDailyEntry,
@@ -47,8 +48,6 @@ import {
   warningsToFeedback,
   type PlausibilityWarning,
 } from "@/lib/plausibility";
-
-const LS_ENTERED_BY = "yarn-receipt-entered-by";
 
 const headerSchema = z.object({
   docNumber: z.string().min(1, "Document number is required"),
@@ -120,13 +119,12 @@ export function YarnReceiptDialog({
   });
   const receipt = receiptQuery.data;
 
-  const savedEnteredBy = (() => {
-    try { return localStorage.getItem(LS_ENTERED_BY) ?? ""; } catch { return ""; }
-  })();
+  // "Entered By" is always the logged-in user; the field is read-only.
+  const enteredByName = useCurrentUserDisplayName();
 
   const form = useForm<HeaderValues>({
     resolver: zodResolver(headerSchema),
-    defaultValues: defaultHeaderValues(savedEnteredBy, defaultDate),
+    defaultValues: defaultHeaderValues(enteredByName, defaultDate),
   });
 
   const [lines, setLines] = useState<LineRow[]>([]);
@@ -151,7 +149,7 @@ export function YarnReceiptDialog({
     if (!isEdit) {
       if (prefilledFor.current === null) return;
       prefilledFor.current = null;
-      form.reset(defaultHeaderValues(savedEnteredBy, defaultDate));
+      form.reset(defaultHeaderValues(enteredByName, defaultDate));
       // Auto-fill the next doc number on a fresh receipt.
       if (suggestions?.nextDocNumber) {
         form.setValue("docNumber", suggestions.nextDocNumber);
@@ -173,7 +171,7 @@ export function YarnReceiptDialog({
       docNumber: receipt.docNumber,
       receiptDate: new Date(`${receipt.receiptDate}T00:00:00`),
       partyId: receipt.partyId,
-      enteredBy: savedEnteredBy || receipt.createdBy,
+      enteredBy: enteredByName,
     });
     setLines(
       receipt.lines.map((l) => ({
@@ -247,7 +245,6 @@ export function YarnReceiptDialog({
     setLineError(null);
 
     const values = form.getValues();
-    try { localStorage.setItem(LS_ENTERED_BY, values.enteredBy); } catch {}
 
     // ── Plausibility gate (warn-only) ──────────────────────────────────────
     // Validate each line's net weight, bag count and derived weight-per-bag.
@@ -441,7 +438,7 @@ export function YarnReceiptDialog({
                     <FormItem>
                       <FormLabel>{isEdit ? "Updated By *" : "Entered By *"}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Your name" className="h-11 sm:h-9" disabled={readOnly} {...field} />
+                        <Input placeholder="Your name" className="h-11 sm:h-9" disabled {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
