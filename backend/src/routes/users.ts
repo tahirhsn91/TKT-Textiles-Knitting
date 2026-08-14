@@ -245,6 +245,48 @@ router.patch("/users/:id", async (req, res): Promise<void> => {
   res.json(serializeUser(fresh));
 });
 
+/**
+ * DELETE /api/users/:id — permanently delete a user.
+ * Admin-only (the router is already admin-gated via requirePermission("users");
+ * we also assert isAdmin on the request for defense in depth). Admin accounts
+ * and the caller's own account cannot be deleted here.
+ */
+router.delete("/users/:id", async (req, res): Promise<void> => {
+  if (!req.auth?.isAdmin) {
+    res.status(403).json({ error: "Only an admin can delete a user" });
+    return;
+  }
+  const id = Number(req.params.id);
+  if (!id) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const [existing] = await db
+    .select({
+      id: userTable.id,
+      roleName: roleTable.name,
+      isAdmin: roleTable.isAdmin,
+    })
+    .from(userTable)
+    .innerJoin(roleTable, eq(userTable.roleId, roleTable.id))
+    .where(eq(userTable.id, id))
+    .limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  if (existing.isAdmin) {
+    res.status(400).json({ error: "Admin accounts cannot be deleted" });
+    return;
+  }
+  if (id === req.auth.sub) {
+    res.status(400).json({ error: "You cannot delete your own account" });
+    return;
+  }
+  await db.delete(userTable).where(eq(userTable.id, id));
+  res.json({ ok: true, id });
+});
+
 /** PUT /api/users/:id/password — admin resets a user's password. */
 router.put("/users/:id/password", async (req, res): Promise<void> => {
   const id = Number(req.params.id);
