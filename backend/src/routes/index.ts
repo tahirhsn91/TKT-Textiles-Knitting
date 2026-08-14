@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { requirePermission } from "../lib/auth.js";
+import { requireAnyPermission, requirePermission } from "../lib/auth.js";
 import healthRouter from "./health.js";
 import lookupsRouter from "./lookups.js";
 import mastersRouter from "./masters.js";
@@ -48,7 +48,11 @@ router.use("/transactions", requirePermission("transactions"));
 router.use(transactionsRouter);
 router.use("/reports", requirePermission("reports"));
 router.use(reportsRouter);
-router.use("/employees", requirePermission("employees"));
+// Employees router serves advances + payroll-summary, which the frontend
+// treats under BOTH "employees" (Employees page tabs) and "payroll" (the
+// standalone Advances page and monthly salary entry). Allow either module so a
+// payroll-only role isn't 403'd on routes the UI already lets it open.
+router.use("/employees", requireAnyPermission("employees", "payroll"));
 router.use(employeesRouter);
 router.use("/salary-entries", requirePermission("payroll"));
 router.use(salaryEntriesRouter);

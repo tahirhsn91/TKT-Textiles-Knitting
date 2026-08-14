@@ -132,3 +132,37 @@ export function requirePermission(moduleId: string) {
     res.status(403).json({ error: `You do not have access to ${moduleId}` });
   };
 }
+
+/**
+ * Route guard that passes when the role has ANY of the given modules.
+ *
+ * Some routes serve multiple modules (e.g. employee advances are both an
+ * "employees" and a "payroll" concern — the frontend Advances page is guarded
+ * by "payroll" while it calls the /employees/* backend routes). Requiring a
+ * single module would 403 a role that legitimately holds the other one.
+ */
+export function requireAnyPermission(...moduleIds: string[]) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    if (!req.auth) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+    if (req.auth.isAdmin) {
+      next();
+      return;
+    }
+    const set = await loadRolePermissions(req.auth.sub);
+    if (!set) {
+      res.status(403).json({ error: "Account not found" });
+      return;
+    }
+    if (
+      set.permissions.includes("*") ||
+      moduleIds.some((m) => set.permissions.includes(m))
+    ) {
+      next();
+      return;
+    }
+    res.status(403).json({ error: `You do not have access to ${moduleIds.join(" or ")}` });
+  };
+}
