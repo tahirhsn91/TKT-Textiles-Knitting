@@ -18,6 +18,7 @@ import {
 } from "../lib/invoice-engine.js";
 import { isFbrSandboxEnabled } from "../lib/fbr/config.js";
 import { buildFbrInvoicePayload, postInvoiceToFbr } from "../lib/fbr/client.js";
+import { validateBody } from "../lib/validate.js";
 
 const router: IRouter = Router();
 
@@ -69,13 +70,8 @@ const generateBodySchema = z.object({
   })).min(1, "At least one item is required"),
 });
 
-router.post("/invoicing/generate", async (req, res): Promise<void> => {
-  const parsed = generateBodySchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
-    return;
-  }
-  const { partyId, createdBy, items } = parsed.data;
+router.post("/invoicing/generate", validateBody(generateBodySchema), async (req, res): Promise<void> => {
+  const { partyId, createdBy, items } = req.body as unknown as z.infer<typeof generateBodySchema>;
 
   // Re-resolve the un-invoiced transactions fresh (concurrency guard).
   const preview = await getUninvoicedPreview(partyId);

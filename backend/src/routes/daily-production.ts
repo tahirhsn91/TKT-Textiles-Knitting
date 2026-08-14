@@ -10,6 +10,7 @@ import {
   partyMasterTable,
 } from "../db/index.js";
 import { isReconciliationLockEnabled } from "../lib/reconciliation-lock.js";
+import { validateBody } from "../lib/validate.js";
 import { retrainAfterInsert } from "../lib/plausibility/engine.js";
 
 const router: IRouter = Router();
@@ -43,8 +44,8 @@ const updateSchema = createSchema.omit({ createdBy: true }).extend({
   updatedBy: z.string().trim().min(1, "updatedBy is required"),
 });
 
-function idParam(req: { params: Record<string, string> }) {
-  const id = parseInt(req.params.id, 10);
+function idParam(req: { params: Record<string, string | string[] | undefined> }) {
+  const id = parseInt(String(req.params.id), 10);
   return isNaN(id) ? null : id;
 }
 
@@ -286,13 +287,8 @@ router.get("/daily-production/:id", async (req, res): Promise<void> => {
 // modal — each click is one independent call to this endpoint; "Save & Add"
 // simply keeps the modal open and fires it again for the next batch.
 
-router.post("/daily-production", async (req, res): Promise<void> => {
-  const parsed = createSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
-    return;
-  }
-  const { rolls, ...headerData } = parsed.data;
+router.post("/daily-production", validateBody(createSchema), async (req, res): Promise<void> => {
+  const { rolls, ...headerData } = req.body as unknown as z.infer<typeof createSchema>;
 
   try {
     const result = await db.transaction(async (tx) => {
@@ -331,20 +327,14 @@ router.post("/daily-production", async (req, res): Promise<void> => {
 // exposes Add. Rolls are replaced wholesale (delete-then-reinsert) so
 // roll_number stays a contiguous 1..N sequence after edits.
 
-router.put("/daily-production/:id", async (req, res): Promise<void> => {
+router.put("/daily-production/:id", validateBody(updateSchema), async (req, res): Promise<void> => {
   const id = idParam(req);
   if (id == null) { res.status(400).json({ error: "Invalid id" }); return; }
-
-  const parsed = updateSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
-    return;
-  }
 
   const blocked = await reconciliationBlock(id);
   if (blocked) { res.status(409).json(blocked); return; }
 
-  const { rolls, ...headerData } = parsed.data;
+  const { rolls, ...headerData } = req.body as unknown as z.infer<typeof updateSchema>;
 
   try {
     const result = await db.transaction(async (tx) => {
@@ -387,16 +377,15 @@ router.put("/daily-production/:id", async (req, res): Promise<void> => {
 // (status flag) rather than removed, preserving the audit trail. Not yet
 // wired to the current UI.
 
-router.post("/daily-production/:id/cancel", async (req, res): Promise<void> => {
+router.post("/daily-production/:id/cancel", validateBody(z.object({ updatedBy: z.string().trim().min(1) })), async (req, res): Promise<void> => {
   const id = idParam(req);
   if (id == null) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  const body = z.object({ updatedBy: z.string().trim().min(1) }).safeParse(req.body);
-  if (!body.success) { res.status(400).json({ error: "updatedBy is required" }); return; }
+  const { updatedBy } = req.body as unknown as { updatedBy: string };
 
   const [row] = await db
     .update(dailyProductionHeaderTable)
-    .set({ status: "cancelled", updatedBy: body.data.updatedBy, updatedAt: new Date() })
+    .set({ status: "cancelled", updatedBy, updatedAt: new Date() })
     .where(eq(dailyProductionHeaderTable.id, id))
     .returning();
 

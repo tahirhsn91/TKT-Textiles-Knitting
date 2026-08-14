@@ -8,6 +8,7 @@ import {
   yarnTypeMasterTable,
   insertDailyDeliverySchema,
 } from "../db/index.js";
+import { validateBody } from "../lib/validate.js";
 import { isReconciliationLockEnabled } from "../lib/reconciliation-lock.js";
 import { retrainAfterInsert } from "../lib/plausibility/engine.js";
 
@@ -238,13 +239,8 @@ router.get("/daily-deliveries/:id", async (req, res): Promise<void> => {
 
 // ─── Create ────────────────────────────────────────────────────────────────
 
-router.post("/daily-deliveries", async (req, res): Promise<void> => {
-  const parsed = deliverySchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid delivery" });
-    return;
-  }
-  const { deliveryDate, partyId, yarnTypeId, challanNo, sl, gsm, quantity, netWeight, createdBy } = parsed.data;
+router.post("/daily-deliveries", validateBody(deliverySchema), async (req, res): Promise<void> => {
+  const { deliveryDate, partyId, yarnTypeId, challanNo, sl, gsm, quantity, netWeight, createdBy } = req.body as unknown as z.infer<typeof deliverySchema>;
 
   const [row] = await db
     .insert(dailyDeliveryTable)
@@ -269,19 +265,14 @@ router.post("/daily-deliveries", async (req, res): Promise<void> => {
 
 // ─── Update ────────────────────────────────────────────────────────────────
 
-router.put("/daily-deliveries/:id", async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+router.put("/daily-deliveries/:id", validateBody(deliverySchema), async (req, res): Promise<void> => {
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid delivery id" });
     return;
   }
 
-  const parsed = deliverySchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid delivery" });
-    return;
-  }
-  const { deliveryDate, partyId, yarnTypeId, challanNo, sl, gsm, quantity, netWeight, createdBy, updatedBy } = parsed.data;
+  const { deliveryDate, partyId, yarnTypeId, challanNo, sl, gsm, quantity, netWeight, createdBy, updatedBy } = req.body as unknown as z.infer<typeof deliverySchema>;
 
   const blocked = await reconciliationBlock(id);
   if (blocked) { res.status(409).json(blocked); return; }

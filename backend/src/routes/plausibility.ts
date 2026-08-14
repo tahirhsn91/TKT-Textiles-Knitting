@@ -8,6 +8,7 @@ import {
   getAllBaselines,
 } from "../lib/plausibility/engine.js";
 import { type Operation } from "../lib/plausibility/config.js";
+import { validateBody } from "../lib/validate.js";
 
 const router: IRouter = Router();
 
@@ -28,13 +29,8 @@ const entrySchema = z.object({
   }),
 });
 
-router.post("/validate/daily-entry", async (req, res): Promise<void> => {
-  const parsed = entrySchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
-    return;
-  }
-  const { operation, values } = parsed.data;
+router.post("/validate/daily-entry", validateBody(entrySchema), async (req, res): Promise<void> => {
+  const { operation, values } = req.body as unknown as z.infer<typeof entrySchema>;
   const warnings = await validateEntry(operation as Operation, values);
   res.json({ warnings, abnormal: warnings.length > 0 });
 });
@@ -49,13 +45,8 @@ const listSchema = z.object({
   dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
-router.post("/validate/daily-list", async (req, res): Promise<void> => {
-  const parsed = listSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid input" });
-    return;
-  }
-  const { operation, dateFrom, dateTo } = parsed.data;
+router.post("/validate/daily-list", validateBody(listSchema), async (req, res): Promise<void> => {
+  const { operation, dateFrom, dateTo } = req.body as unknown as z.infer<typeof listSchema>;
   const result = await validateList(operation as Operation, { dateFrom, dateTo });
   res.json(result);
 });
@@ -76,13 +67,9 @@ const feedbackSchema = z.object({
   })).min(1),
 });
 
-router.post("/plausibility/feedback", async (req, res): Promise<void> => {
-  const parsed = feedbackSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid feedback" });
-    return;
-  }
-  await recordFeedback(parsed.data.items.map((i) => ({
+router.post("/plausibility/feedback", validateBody(feedbackSchema), async (req, res): Promise<void> => {
+  const items = (req.body as unknown as z.infer<typeof feedbackSchema>).items;
+  await recordFeedback(items.map((i) => ({
     operation: i.operation as Operation,
     field: i.field,
     enteredValue: i.enteredValue,
@@ -91,7 +78,7 @@ router.post("/plausibility/feedback", async (req, res): Promise<void> => {
     outcome: i.outcome,
     createdBy: i.createdBy ?? null,
   })));
-  res.status(201).json({ recorded: parsed.data.items.length });
+  res.status(201).json({ recorded: items.length });
 });
 
 // ─── Manual full retrain (Option C manual path) ────────────────────────────

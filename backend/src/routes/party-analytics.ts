@@ -9,6 +9,7 @@ import {
   partyMasterTable,
   fabricTypeMasterTable,
 } from "../db/index.js";
+import { validateQuery } from "../lib/validate.js";
 
 const router: IRouter = Router();
 
@@ -65,13 +66,8 @@ const partySchema = z.object({
  * Only Fabric Production + Fabric Delivery types are counted. Roll (quantity)
  * and net weight (kg) come from transaction_detail rows.
  */
-router.get("/party-analytics", async (req, res): Promise<void> => {
-  const parsed = partySchema.safeParse(req.query);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid filters" });
-    return;
-  }
-  const { month, year, partyId } = parsed.data;
+router.get("/party-analytics", validateQuery(partySchema), async (req, res): Promise<void> => {
+  const { month, year, partyId } = req.query as unknown as z.infer<typeof partySchema>;
 
   const now = new Date();
   const nowYear = now.getFullYear();
