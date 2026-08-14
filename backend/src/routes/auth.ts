@@ -100,4 +100,50 @@ router.get("/me", requireAuth, async (req, res): Promise<void> => {
   });
 });
 
+/**
+ * PUT /api/auth/password — authenticated self-service password change.
+ * Verifies the current password (argon2), then rehashes and stores the new one.
+ * The existing bearer token stays valid — the user is not forced to re-login.
+ */
+router.put("/password", requireAuth, async (req, res): Promise<void> => {
+  const uid = req.auth!.sub;
+  const { currentPassword, newPassword } = req.body ?? {};
+
+  if (typeof currentPassword !== "string" || !currentPassword) {
+    res.status(400).json({ error: "currentPassword is required" });
+    return;
+  }
+  if (typeof newPassword !== "string" || newPassword.length < 6) {
+    res.status(400).json({ error: "newPassword must be at least 6 characters" });
+    return;
+  }
+  if (newPassword === currentPassword) {
+    res.status(400).json({ error: "New password must be different from the current password" });
+    return;
+  }
+
+  const [user] = await db
+    .select({ id: userTable.id, passwordHash: userTable.passwordHash })
+    .from(userTable)
+    .where(eq(userTable.id, uid))
+    .limit(1);
+
+  if (!user) {
+    res.status(401).json({ error: "Account not found" });
+    return;
+  }
+  if (!(await argon2.verify(user.passwordHash, currentPassword))) {
+    res.status(400).json({ error: "Current password is incorrect" });
+    return;
+  }
+
+  const hash = await argon2.hash(newPassword);
+  await db
+    .update(userTable)
+    .set({ passwordHash: hash, updatedAt: new Date() })
+    .where(eq(userTable.id, uid));
+
+  res.json({ ok: true });
+});
+
 export default router;
