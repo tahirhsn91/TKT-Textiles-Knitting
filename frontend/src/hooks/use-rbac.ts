@@ -119,5 +119,24 @@ export function useSavePermissions() {
   });
 }
 
+// ─── Self-service password change (PUT /api/auth/password) ───────────────
+
+export interface ChangePasswordBody {
+  currentPassword: string;
+  newPassword: string;
+}
+
+/** Change the signed-in user's own password. Session token stays valid. */
+export function useChangePassword() {
+  return useMutation<{ ok: boolean }, ErrorType<unknown>, ChangePasswordBody>({
+    mutationFn: (body) =>
+      customFetch<{ ok: boolean }>("/api/auth/password", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+  });
+}
+
 // Convenience: reuse the auth role type for created roles where compatible.
 export type { AuthRole, AuthUser };

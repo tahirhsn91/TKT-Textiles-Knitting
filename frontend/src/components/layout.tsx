@@ -2,17 +2,17 @@ import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   FileText, Database, BarChart2, LayoutDashboard, ClipboardList, Wallet,
-  ChevronDown, Menu, PanelLeftClose, PanelLeftOpen, Search, Settings, LogOut,
+  ChevronDown, PanelLeftClose, PanelLeftOpen, Search, Settings,
   Factory, PackageCheck, Truck, HardHat, Wrench, Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
+import { TopBar } from "@/components/top-bar";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import {
@@ -180,7 +180,7 @@ function NavSection({ label }: { label: string }) {
 
 export function Layout({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
-  const { can, logout, session } = useAuth();
+  const { can } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(LS_SIDEBAR_COLLAPSED) === "true"; } catch { return false; }
@@ -410,38 +410,6 @@ export function Layout({ children }: { children: ReactNode }) {
             )}
           </div>
         </nav>
-
-        {/* Sidebar footer — signed-in user + logout */}
-        <div className={cn("border-t border-sidebar-border", collapsed ? "flex justify-center p-2" : "p-3")}>
-          {collapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => { logout(); setLocation("/login"); }}
-                  className="flex items-center justify-center rounded-md p-2 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  aria-label="Sign out"
-                  title="Sign out"
-                >
-                  <LogOut className="h-5 w-5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Sign out</TooltipContent>
-            </Tooltip>
-          ) : (
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="truncate text-xs font-semibold text-sidebar-accent-foreground">{session?.user.displayName ?? "—"}</p>
-                <p className="truncate text-[0.625rem] uppercase tracking-wide text-sidebar-foreground/55">{session?.role.name ?? ""}</p>
-              </div>
-              <button
-                onClick={() => { logout(); setLocation("/login"); }}
-                className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              >
-                <LogOut className="h-4 w-4" /> Sign out
-              </button>
-            </div>
-          )}
-        </div>
       </aside>
 
       {/* ── Content column (offset by sidebar on desktop) ─────── */}
@@ -452,77 +420,65 @@ export function Layout({ children }: { children: ReactNode }) {
         // the sidebar/header offsets above).
         import.meta.env.DEV && "pt-7"
       )}>
-        {/* Top bar — mobile hamburger + wordmark (hidden on desktop) */}
-        <header className={cn(
-          "sticky z-20 flex h-14 items-center gap-3 border-b border-sidebar-border bg-sidebar px-4 text-sidebar-foreground md:hidden print:hidden",
-          import.meta.env.DEV && "top-7"
-        )}>
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger asChild>
-              <button
-                className="flex items-center justify-center rounded-md p-2 -ml-1 text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                aria-label="Open navigation menu"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-            </SheetTrigger>
-            <SheetContent
-              side="left"
-              closeAriaLabel="Close menu"
-              className={cn(
-                "flex w-[340px] max-w-[90vw] flex-col border-sidebar-border bg-sidebar p-0 text-sidebar-foreground",
-                import.meta.env.DEV && "top-7"
-              )}
-              // Backdrop click-to-dismiss: the Sheet is controlled by mobileOpen,
-              // so an outside pointer-down must close it explicitly rather than
-              // relying on the small menu toggle (issue #27).
-              onPointerDownOutside={() => setMobileOpen(false)}
-            >
-              <SheetHeader className="flex items-center justify-between gap-3 border-b border-sidebar-border px-4 py-4">
-                <SheetTitle asChild>
-                  <div><Wordmark /></div>
-                </SheetTitle>
-              </SheetHeader>
+        {/* Global top bar — account dropdown (top-left): user/role, Users &
+            Roles, Change Password, Sign out. Hamburger opens the nav drawer on
+            mobile. */}
+        <TopBar onMenuClick={() => setMobileOpen(true)} />
 
-              {/* Search — filters the whole drawer so a long menu stays
-                  discoverable without scrolling. */}
-              <div className="px-3 pt-3">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-sidebar-foreground/40" />
-                  <Input
-                    type="search"
-                    placeholder="Find a menu…"
-                    value={mobileQuery}
-                    onChange={(e) => setMobileQuery(e.target.value)}
-                    className="h-11 border-sidebar-border bg-sidebar-accent/40 pl-9 text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-signal"
-                  />
-                </div>
-              </div>
+        {/* Mobile nav drawer (sheet) — controlled by the TopBar hamburger. */}
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+          <SheetContent
+            side="left"
+            closeAriaLabel="Close menu"
+            className={cn(
+              "flex w-[340px] max-w-[90vw] flex-col border-sidebar-border bg-sidebar p-0 text-sidebar-foreground z-40",
+              import.meta.env.DEV && "top-7"
+            )}
+            // Backdrop click-to-dismiss: the Sheet is controlled by mobileOpen,
+            // so an outside pointer-down must close it explicitly rather than
+            // relying on the small menu toggle (issue #27).
+            onPointerDownOutside={() => setMobileOpen(false)}
+          >
+            <SheetHeader className="flex items-center justify-between gap-3 border-b border-sidebar-border px-4 py-4">
+              <SheetTitle asChild>
+                <div><Wordmark /></div>
+              </SheetTitle>
+            </SheetHeader>
 
-              <nav className="flex flex-1 flex-col overflow-y-auto px-2 pb-4 pt-2">
-                <MobileNavMenu
-                  location={location}
-                  query={mobileQuery}
-                  openGroups={mobileOpenGroups}
-                  setOpenGroups={setMobileOpenGroups}
-                  can={can}
-                  onNavigate={() => { setMobileOpen(false); setMobileQuery(""); }}
+            {/* Search — filters the whole drawer so a long menu stays
+                discoverable without scrolling. */}
+            <div className="px-3 pt-3">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-sidebar-foreground/40" />
+                <Input
+                  type="search"
+                  placeholder="Find a menu…"
+                  value={mobileQuery}
+                  onChange={(e) => setMobileQuery(e.target.value)}
+                  className="h-11 border-sidebar-border bg-sidebar-accent/40 pl-9 text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-signal"
                 />
-              </nav>
-
-              {/* Drawer footer — a quiet sign-off so the menu doesn't end
-                  abruptly and shows what build this is. */}
-              <div className="flex items-center justify-between border-t border-sidebar-border px-4 py-3">
-                <span className="text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/40">TKT Textiles</span>
-                <span className="text-[0.625rem] text-sidebar-foreground/30">v{import.meta.env.PACKAGE_VERSION ?? "1.0.0"}</span>
               </div>
-            </SheetContent>
-          </Sheet>
+            </div>
 
-          <Link href="/dashboard" className="shrink-0 transition-opacity hover:opacity-80">
-            <Wordmark />
-          </Link>
-        </header>
+            <nav className="flex flex-1 flex-col overflow-y-auto px-2 pb-4 pt-2">
+              <MobileNavMenu
+                location={location}
+                query={mobileQuery}
+                openGroups={mobileOpenGroups}
+                setOpenGroups={setMobileOpenGroups}
+                can={can}
+                onNavigate={() => { setMobileOpen(false); setMobileQuery(""); }}
+              />
+            </nav>
+
+            {/* Drawer footer — a quiet sign-off so the menu doesn't end
+                abruptly and shows what build this is. */}
+            <div className="flex items-center justify-between border-t border-sidebar-border px-4 py-3">
+              <span className="text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/40">TKT Textiles</span>
+              <span className="text-[0.625rem] text-sidebar-foreground/30">v{import.meta.env.PACKAGE_VERSION ?? "1.0.0"}</span>
+            </div>
+          </SheetContent>
+        </Sheet>
 
         <main className="flex-1 p-4 pb-20 md:p-8 md:pb-8 w-full max-w-7xl mx-auto print:p-0 print:max-w-none">
           {children}
