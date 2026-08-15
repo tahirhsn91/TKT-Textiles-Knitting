@@ -316,6 +316,8 @@ router.get("/transactions", async (_req, res): Promise<void> => {
       gsm:               transactionHeaderTable.gsm,
       reference:         transactionHeaderTable.reference,
       yarnBrandIds:      sql<number[]>`array_remove(array_agg(DISTINCT ${transactionDetailTable.yarnBrandId}), NULL)`,
+      // Summed net weight across detail lines (numeric comes back as a string).
+      netWt:             sql<string>`coalesce(sum(${transactionDetailTable.netWt}), 0)`,
     })
     .from(transactionHeaderTable)
     .leftJoin(transactionDetailTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
