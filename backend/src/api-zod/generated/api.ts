@@ -760,6 +760,7 @@ export const ListTransactionsResponseItem = zod.object({
   gsm: zod.number().nullish(),
   reference: zod.string().nullish(),
   yarnBrandIds: zod.array(zod.number()).optional(),
+  netWt: zod.string().nullish(),
 });
 export const ListTransactionsResponse = zod.array(ListTransactionsResponseItem);
 

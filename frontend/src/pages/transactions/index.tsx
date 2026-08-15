@@ -56,14 +56,14 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 
-type ColKey = "docNumber" | "transactionType" | "date" | "party" | "location" | "reference";
+type ColKey = "docNumber" | "transactionType" | "date" | "party" | "netWt" | "reference";
 
 const ALL_COLUMNS: { key: ColKey; label: string }[] = [
   { key: "docNumber",        label: "Doc Number" },
   { key: "transactionType",  label: "Transaction Type" },
   { key: "date",             label: "Date" },
   { key: "party",            label: "Party" },
-  { key: "location",         label: "Location" },
+  { key: "netWt",            label: "Net Weight" },
   { key: "reference",        label: "Reference" },
 ];
 const ALL_COL_KEYS = ALL_COLUMNS.map((c) => c.key);
@@ -218,7 +218,7 @@ export default function TransactionList() {
         case "date":              av = a.date ?? "";                                   bv = b.date ?? "";                                   break;
         case "transactionType":   av = lookupName(transactionTypeMaster, a.transactionTypeId); bv = lookupName(transactionTypeMaster, b.transactionTypeId); break;
         case "party":             av = lookupName(partyMaster, a.partyId);             bv = lookupName(partyMaster, b.partyId);             break;
-        case "location":          av = lookupName(locationMaster, a.locationId);       bv = lookupName(locationMaster, b.locationId);       break;
+        case "netWt":             av = (a as { netWt?: string | null }).netWt ?? "";          bv = (b as { netWt?: string | null }).netWt ?? "";          break;
         case "reference":         av = (a as { reference?: string | null }).reference ?? ""; bv = (b as { reference?: string | null }).reference ?? ""; break;
       }
       // compareValues instead of a bare localeCompare: the previous version
@@ -228,7 +228,7 @@ export default function TransactionList() {
       return sort.dir === "asc" ? compareValues(av, bv) : compareValues(bv, av);
     });
     return arr;
-  }, [filtered, sort, transactionTypeMaster, partyMaster, locationMaster]);
+  }, [filtered, sort, transactionTypeMaster, partyMaster]);
 
   // ── Sort handlers ──────────────────────────────────────────────────────────
   function handleSort(key: ColKey) {
@@ -502,7 +502,7 @@ export default function TransactionList() {
                           case "transactionType": return <TableCell key={c.key} className="whitespace-nowrap">{lookupName(transactionTypeMaster, t.transactionTypeId)}</TableCell>;
                           case "date":            return <TableCell key={c.key} className="whitespace-nowrap">{new Date(t.date + "T00:00:00").toLocaleDateString()}</TableCell>;
                           case "party":           return <TableCell key={c.key} className="whitespace-nowrap">{lookupName(partyMaster, t.partyId)}</TableCell>;
-                          case "location":        return <TableCell key={c.key} className="whitespace-nowrap">{lookupName(locationMaster, t.locationId)}</TableCell>;
+                          case "netWt":            return <TableCell key={c.key} className="whitespace-nowrap text-right">{t.netWt ?? "-"}</TableCell>;
                           case "reference":       return <TableCell key={c.key} className="whitespace-nowrap text-muted-foreground">{ref ?? "-"}</TableCell>;
                           default:                return <TableCell key={c.key} />;
                         }
