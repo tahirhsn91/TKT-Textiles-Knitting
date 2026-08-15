@@ -181,7 +181,7 @@ export function Layout({ children }: { children: ReactNode }) {
           this block out of production builds (import.meta.env.DEV is false
           there), so it can never ship. */}
       {import.meta.env.DEV && (
-        <div className="fixed inset-x-0 top-0 z-50 flex h-7 items-center justify-center gap-2 bg-red-600 px-4 text-center text-xs font-semibold uppercase tracking-[0.14em] text-white print:hidden">
+        <div className="fixed inset-x-0 top-0 z-[60] flex h-7 items-center justify-center gap-2 bg-red-600 px-4 text-center text-xs font-semibold uppercase tracking-[0.14em] text-white print:hidden">
           <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-white/90" />
           Development environment
         </div>
@@ -401,7 +401,7 @@ export function Layout({ children }: { children: ReactNode }) {
             side="left"
             closeAriaLabel="Close menu"
             className={cn(
-              "flex w-[340px] max-w-[90vw] flex-col border-sidebar-border bg-sidebar p-0 text-sidebar-foreground z-40",
+              "flex w-[340px] max-w-[90vw] flex-col border-sidebar-border bg-sidebar p-0 text-sidebar-foreground z-50",
               import.meta.env.DEV && "top-7"
             )}
             // Backdrop click-to-dismiss: the Sheet is controlled by mobileOpen,
