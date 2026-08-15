@@ -51,7 +51,12 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardContent className="space-y-5 pt-6">
           <div className="space-y-1 text-center">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">Sign in to TKT</h1>
+            {/* Brand logo (light-tuned lockup — suited to the light card surface). */}
+            <img
+              src="/logo.png"
+              alt="TKT Textiles"
+              className="mx-auto mb-1 h-14 w-auto object-contain"
+            />
             <p className="text-sm text-muted-foreground">Enter your credentials to continue</p>
           </div>
 
