@@ -35,6 +35,12 @@ services:
     environment:
       # Vite dev server proxies /api to the backend over the internal network.
       VITE_API_TARGET: http://backend:8080
+    # Vite's dev server + esbuild needs more headroom than the static nginx
+    # server the base file caps at 256m (issue #21). Without this override the
+    # dev frontend inherits 256m and gets OOM-killed under load (SIGKILL /
+    # esbuild EPIPE crash-loops). Prod image stays at 256m via the base file.
+    mem_limit: 512m
+    mem_reservation: 256m
     volumes:
       - ./frontend:/app
       - /app/node_modules
