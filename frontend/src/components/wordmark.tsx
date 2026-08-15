@@ -3,6 +3,9 @@ import { cn } from "@/lib/utils";
 /**
  * The house mark: a single knit stitch. The face of jersey fabric is nothing
  * but this V, repeated a few hundred thousand times per metre.
+ *
+ * Used as the collapsed-sidebar glyph (a wide lockup has no room in the
+ * w-16 rail) and as the favicon-adjacent mark.
  */
 export function StitchMark({ className }: { className?: string }) {
   return (
@@ -19,21 +22,24 @@ export function StitchMark({ className }: { className?: string }) {
   );
 }
 
-/** Brand wordmark — single source of truth used by the sidebar and top bar. */
+/**
+ * Brand wordmark — single source of truth used by the sidebar header (desktop)
+ * and mobile drawer header.
+ *
+ * Expanded: renders the full TKT lockup. The sidebar surface is dark graphite,
+ * so we use the light-on-dark variant (logo-dark.png) — charcoal letterforms
+ * would disappear on it. Collapsed: falls back to the stitch mark, since the
+ * w-16 rail has no room for the wide lockup.
+ */
 export function Wordmark({ collapsed = false }: { collapsed?: boolean }) {
+  if (collapsed) {
+    return <StitchMark className="text-signal" />;
+  }
   return (
-    <span className="flex items-center gap-2.5">
-      <StitchMark className="text-signal" />
-      {!collapsed && (
-        <span className="flex flex-col leading-none">
-          <span className="text-[0.9375rem] font-semibold tracking-[0.12em] text-sidebar-accent-foreground">
-            TKT
-          </span>
-          <span className="mt-1 text-[0.625rem] font-medium uppercase tracking-[0.16em] text-sidebar-foreground/55">
-            Textiles
-          </span>
-        </span>
-      )}
-    </span>
+    <img
+      src="/logo-dark.png"
+      alt="TKT Textiles"
+      className="h-9 w-auto max-w-[13rem] object-contain"
+    />
   );
 }
