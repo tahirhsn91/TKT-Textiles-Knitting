@@ -169,6 +169,8 @@ export interface TransactionSummary {
   /** @nullable */
   reference?: string | null;
   yarnBrandIds?: number[];
+  /** @nullable */
+  netWt?: string | null;
 }
 
 export interface TransactionWithDetails {
