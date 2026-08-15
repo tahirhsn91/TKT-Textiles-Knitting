@@ -30,6 +30,14 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+    // Vite-in-Docker fix: on bind mounts (overlay/VM filesystems) inotify event
+    // storms can kill the esbuild transform service -> "Internal server error:
+    // The service is no longer running: write EPIPE". Polling avoids relying on
+    // FS events for the watcher, which stops the disconnects. Small CPU cost,
+    // acceptable for the dev-only frontend.
+    watch: {
+      usePolling: true,
+    },
   },
   build: {
     outDir: "dist",
