@@ -391,7 +391,7 @@ router.get("/invoicing/rates/:partyId", async (req, res): Promise<void> => {
  * recent invoice item for that combination, across all parties (when
  * `partyId` is undefined) or for one party. Key = `${yarnTypeId}|${yarnCountId}`.
  */
-async function loadLatestRates(partyId: number | undefined): Promise<Map<string, { ratePerKg: string; invoiceDate: string }>> {
+async function loadLatestRates(partyId: number | undefined): Promise<Map<string, { ratePerKg: string; invoiceDate: string; invoiceId: number }>> {
   const conditions = partyId != null ? eq(invoiceTable.partyId, partyId) : undefined;
   const rows = await db
     .selectDistinctOn(
@@ -418,11 +418,11 @@ async function loadLatestRates(partyId: number | undefined): Promise<Map<string,
       desc(invoiceTable.id),
     );
 
-  const byKey = new Map<string, { ratePerKg: string; invoiceDate: string }>();
+  const byKey = new Map<string, { ratePerKg: string; invoiceDate: string; invoiceId: number }>();
   for (const r of rows) {
     const key = `${r.partyId}|${r.yarnTypeId}|${r.yarnCountId ?? ""}`;
     if (!byKey.has(key)) {
-      byKey.set(key, { ratePerKg: r.ratePerKg, invoiceDate: r.invoiceDate });
+      byKey.set(key, { ratePerKg: r.ratePerKg, invoiceDate: r.invoiceDate, invoiceId: r.invoiceId });
     }
   }
   return byKey;
