@@ -122,7 +122,7 @@ export default function InvoicingPage() {
   // defaulting to show everything (empty selection = no restriction).
   const [partySel, setPartySel] = useState<string[]>([]);
   const [statusSel, setStatusSel] = useState<string[]>(["draft", "posted"]);
-  const [dueSel, setDueSel] = useState<string[]>(["pending", "overdue", "paid", "overpaid"]);
+  const [dueSel, setDueSel] = useState<string[]>(["pending", "overdue"]);
 
   // Payment dialog state
   const [payFor, setPayFor] = useState<InvoiceListItem | null>(null);
