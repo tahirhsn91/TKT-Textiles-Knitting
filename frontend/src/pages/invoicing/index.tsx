@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, type ReactNode } from "react";
+import { useState, useMemo, useEffect, useRef, type ReactNode } from "react";
 import { Send, Trash2, RefreshCw, FileText, Eye, Download, Plus, Banknote, CalendarPlus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -59,6 +59,7 @@ import { useFbrSandboxEnabled } from "@/context/config-context";
 import {
   useUninvoicedParties,
   useInvoicePreview,
+  useLatestRates,
   useListInvoices,
   useInvoiceDetail,
   useGenerateInvoice,
@@ -123,6 +124,8 @@ export default function InvoicingPage() {
   const [partyId, setPartyId] = useState<number | null>(null);
   const enteredBy = useCurrentUserDisplayName();
   const [rates, setRates] = useState<Record<string, string>>({});
+  // Keys the user has manually edited — the auto-fill never overwrites these.
+  const touchedRates = useRef<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<InvoiceListItem | null>(null);
   const [viewingId, setViewingId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"invoices" | "receivables" | "analytics">("invoices");
@@ -149,6 +152,7 @@ export default function InvoicingPage() {
 
   const { data: parties } = useUninvoicedParties();
   const { data: preview, isLoading: previewLoading, isFetching: previewFetching } = useInvoicePreview(partyId);
+  const { data: latestRates } = useLatestRates(partyId);
   const { data: invoices } = useListInvoices();
   const { data: viewing, isLoading: viewingLoading } = useInvoiceDetail(viewingId);
   const { data: receivables } = useReceivables();
@@ -218,7 +222,30 @@ export default function InvoicingPage() {
   const selectParty = (v: string) => {
     setPartyId(Number(v));
     setRates({});
+    touchedRates.current = new Set();
   };
+
+  // Pre-fill each rate box with the latest rate for (party, yarn type, yarn
+  // count) fetched from previous invoices, but never overwrite a rate the user
+  // has manually typed this session.
+  useEffect(() => {
+    if (!latestRates || !preview) return;
+    const defaults = new Map(latestRates.map((r) => [r.key, r.ratePerKg]));
+    setRates((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const g of preview.groups) {
+        const key = `${g.yarnTypeId}|${g.yarnCountId ?? ""}`;
+        if (touchedRates.current.has(key)) continue;
+        const val = defaults.get(key);
+        if (val != null && (next[key] ?? "") === "") {
+          next[key] = val;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [latestRates, preview]);
 
   // Rows computed from preview groups + entered rates.
   const rows = useMemo(() => {
@@ -483,7 +510,10 @@ export default function InvoicingPage() {
                                     className="ml-auto h-8 w-28 text-right"
                                     placeholder="Rate"
                                     value={rates[r.key] ?? ""}
-                                    onChange={(e) => setRates((prev) => ({ ...prev, [r.key]: e.target.value }))}
+                                    onChange={(e) => {
+                                      touchedRates.current.add(r.key);
+                                      setRates((prev) => ({ ...prev, [r.key]: e.target.value }));
+                                    }}
                                   />
                                 </TableCell>
                                 <TableCell className="text-right tabular-nums">{money(r.value)}</TableCell>

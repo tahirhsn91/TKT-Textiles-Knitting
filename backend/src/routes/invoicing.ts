@@ -369,6 +369,45 @@ function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+// ─── Latest invoice rate per (party, yarn type, yarn count) ──────────────
+// Feeds the invoice-generation form's rate boxes: pre-fill with the most
+// recent rate used for the same party + yarn type (+ count), while the user
+// is free to override it.
+router.get("/invoicing/rates/:partyId", async (req, res): Promise<void> => {
+  const partyId = parseInt(req.params.partyId ?? "", 10);
+  if (isNaN(partyId)) { res.status(400).json({ error: "Invalid party id" }); return; }
+
+  const rows = await db
+    .selectDistinctOn(
+      [invoiceItemTable.yarnTypeId, invoiceItemTable.yarnCountId],
+      {
+        yarnTypeId: invoiceItemTable.yarnTypeId,
+        yarnCountId: invoiceItemTable.yarnCountId,
+        ratePerKg: invoiceItemTable.ratePerKg,
+        invoiceDate: invoiceTable.invoiceDate,
+        invoiceId: invoiceTable.id,
+      },
+    )
+    .from(invoiceItemTable)
+    .innerJoin(invoiceTable, eq(invoiceItemTable.invoiceId, invoiceTable.id))
+    .where(eq(invoiceTable.partyId, partyId))
+    .orderBy(
+      invoiceItemTable.yarnTypeId,
+      invoiceItemTable.yarnCountId,
+      desc(invoiceTable.invoiceDate),
+      desc(invoiceTable.id),
+    );
+
+  const byKey = new Map<string, { ratePerKg: string; invoiceDate: string }>();
+  for (const r of rows) {
+    const key = `${r.yarnTypeId}|${r.yarnCountId ?? ""}`;
+    if (!byKey.has(key)) {
+      byKey.set(key, { ratePerKg: r.ratePerKg, invoiceDate: r.invoiceDate });
+    }
+  }
+  res.json(Array.from(byKey.entries()).map(([key, v]) => ({ key, ...v })));
+});
+
 
 // ─── Single invoice detail ────────────────────────────────────────────────
 
