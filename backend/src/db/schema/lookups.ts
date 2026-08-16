@@ -29,6 +29,10 @@ export const partyMasterTable = pgTable("party_master", {
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
   wastePercent: numeric("waste_percent", { precision: 5, scale: 2 }).default("1.00"),
+  // Invoice credit terms: 0 = no credit tracking (pay on posting); >0 =
+  // calendar days of credit from the posting date. Snapshot onto the invoice
+  // as due_days at post time.
+  creditDays: integer("credit_days").notNull().default(0),
 
   // ─── FBR Digital Invoicing (buyer) ────────────────────────────────────────
   // Buyer-side fields required by the FBR DI API. ntn_cnic is optional (FBR

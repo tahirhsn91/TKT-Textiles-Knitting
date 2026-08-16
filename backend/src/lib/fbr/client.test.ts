@@ -95,6 +95,8 @@ const baseInvoice = {
   companyId: 1,
   partyId: 7,
   status: "draft" as const,
+  origin: "fbr" as const,
+  dueDays: null,
   fbrInvoiceNumber: null,
   fbrStatusCode: null,
   fbrRawResponse: null,
