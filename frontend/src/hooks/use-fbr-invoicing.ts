@@ -193,6 +193,7 @@ export interface LatestRate {
   key: string;
   ratePerKg: string;
   invoiceDate: string;
+  invoiceId: number;
 }
 
 /** Latest per-line rate for a party (key = `${yarnTypeId}|${yarnCountId}`). */
