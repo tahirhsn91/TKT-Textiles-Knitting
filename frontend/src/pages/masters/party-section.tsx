@@ -34,6 +34,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import {
   Select,
@@ -72,6 +73,7 @@ interface PartyRow {
   name: string;
   code: string;
   wastePercent?: string | null;
+  creditDays?: number | null;
   ntnCnic?: string | null;
   province?: string | null;
   address?: string | null;
@@ -82,6 +84,7 @@ const partySchema = z.object({
   name: z.string().min(1, "Name is required"),
   code: z.string().min(1, "Code is required"),
   wastePercent: z.string().optional(),
+  creditDays: z.string().optional(),
   ntnCnic: z.string().optional(),
   province: z.string().optional(),
   address: z.string().optional(),
@@ -90,7 +93,7 @@ const partySchema = z.object({
 type PartyFormValues = z.infer<typeof partySchema>;
 
 function emptyForm(): PartyFormValues {
-  return { name: "", code: "", wastePercent: "", ntnCnic: "", province: "", address: "", registrationType: "Unregistered" };
+  return { name: "", code: "", wastePercent: "", creditDays: "0", ntnCnic: "", province: "", address: "", registrationType: "Unregistered" };
 }
 
 function toForm(p: PartyRow): PartyFormValues {
@@ -98,6 +101,7 @@ function toForm(p: PartyRow): PartyFormValues {
     name: p.name,
     code: p.code,
     wastePercent: p.wastePercent ?? "",
+    creditDays: String(p.creditDays ?? 0),
     ntnCnic: p.ntnCnic ?? "",
     province: p.province ?? "",
     address: p.address ?? "",
@@ -147,6 +151,7 @@ export function PartySection() {
       name: values.name,
       code: values.code,
       wastePercent: values.wastePercent || undefined,
+      creditDays: values.creditDays === "" ? 0 : Number(values.creditDays),
       ntnCnic: values.ntnCnic || null,
       province: values.province || null,
       address: values.address || null,
@@ -243,6 +248,7 @@ export function PartySection() {
                     <TableHead>Name</TableHead>
                     <TableHead>Code</TableHead>
                     <TableHead>Waste%</TableHead>
+                    <TableHead>Credit Days</TableHead>
                     <TableHead>NTN/CNIC</TableHead>
                     <TableHead>Province</TableHead>
                     <TableHead>Address</TableHead>
@@ -276,6 +282,7 @@ export function PartySection() {
                         <TableCell className="font-medium">{p.name}</TableCell>
                         <TableCell>{p.code}</TableCell>
                         <TableCell>{p.wastePercent ?? "—"}</TableCell>
+                        <TableCell>{p.creditDays ?? 0}</TableCell>
                         <TableCell>{p.ntnCnic ?? "—"}</TableCell>
                         <TableCell>{p.province ?? "—"}</TableCell>
                         <TableCell className="max-w-[200px] truncate">{p.address ?? "—"}</TableCell>
@@ -354,6 +361,18 @@ export function PartySection() {
                   <FormItem>
                     <FormLabel>Waste %</FormLabel>
                     <FormControl><Input type="number" step="0.01" placeholder="1.00" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="creditDays"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Credit Days</FormLabel>
+                    <FormControl><Input type="number" min="0" step="1" placeholder="0" {...field} /></FormControl>
+                    <FormDescription>Invoice credit period in days after posting (0 = pay on posting, no tracking).</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
