@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MultiSelect } from "@/components/ui/multi-select";
 import {
   Table,
   TableBody,
@@ -95,6 +96,16 @@ function paymentState(inv: { status: string; paid: boolean; overdue: boolean; ou
   };
 }
 
+/** Due-status label for an invoice; null for drafts (no due state). */
+function dueStatusOf(inv: { status: string; paid?: boolean; outstanding?: number; overdue?: boolean }): string | null {
+  if (inv.status !== "posted") return null;
+  const outstanding = inv.outstanding ?? parseFloat((inv as { grandTotal?: string }).grandTotal ?? "0");
+  if (inv.paid && (outstanding ?? 0) < 0) return "overpaid";
+  if (inv.paid) return "paid";
+  if (inv.overdue) return "overdue";
+  return "pending";
+}
+
 export default function InvoicingPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -107,9 +118,11 @@ export default function InvoicingPage() {
   const [viewingId, setViewingId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"invoices" | "receivables">("invoices");
 
-  // Invoice table: party filter (default All) + status filter + sort.
-  const [partyFilter, setPartyFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  // Invoice table filters: multi-select Party, Status, and Due Status, each
+  // defaulting to show everything (empty selection = no restriction).
+  const [partySel, setPartySel] = useState<string[]>([]);
+  const [statusSel, setStatusSel] = useState<string[]>(["draft", "posted"]);
+  const [dueSel, setDueSel] = useState<string[]>(["pending", "overdue", "paid", "overpaid"]);
 
   // Payment dialog state
   const [payFor, setPayFor] = useState<InvoiceListItem | null>(null);
@@ -150,16 +163,21 @@ export default function InvoicingPage() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [invoices]);
 
-  // Filter by the selected party and status.
-  const filteredInvoices = useMemo(
-    () =>
-      (invoices ?? []).filter((inv) => {
-        if (partyFilter !== "all" && String(inv.partyId) !== partyFilter) return false;
-        if (statusFilter !== "all" && inv.status !== statusFilter) return false;
-        return true;
-      }),
-    [invoices, partyFilter, statusFilter],
-  );
+  // Filter by party, status, and due status (multi-select; empty = all).
+  const filteredInvoices = useMemo(() => {
+    const partySet = new Set(partySel);
+    const statusSet = new Set(statusSel);
+    const dueSet = new Set(dueSel);
+    return (invoices ?? []).filter((inv) => {
+      if (partySel.length > 0 && (inv.partyId == null || !partySet.has(String(inv.partyId)))) return false;
+      if (statusSel.length > 0 && !statusSet.has(inv.status)) return false;
+      if (dueSel.length > 0) {
+        const ds = dueStatusOf(inv);
+        if (ds === null || !dueSet.has(ds)) return false;
+      }
+      return true;
+    });
+  }, [invoices, partySel, statusSel, dueSel]);
 
   // Grand total of the filtered invoices (sum of Grand Total column).
   const filteredGrandTotal = useMemo(
@@ -498,26 +516,41 @@ export default function InvoicingPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <label className="flex items-center gap-2 text-xs text-muted-foreground">
                     Party
-                    <Select value={partyFilter} onValueChange={setPartyFilter}>
-                      <SelectTrigger className="h-8 w-48 text-sm"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        {invoiceParties.map((p) => (
-                          <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={invoiceParties.map((p) => ({ value: String(p.id), label: p.name }))}
+                      selected={partySel}
+                      onChange={setPartySel}
+                      placeholder="All"
+                      className="w-44"
+                    />
                   </label>
                   <label className="flex items-center gap-2 text-xs text-muted-foreground">
                     Status
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="h-8 w-32 text-sm"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="draft">Draft</SelectItem>
-                        <SelectItem value="posted">Posted</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={[
+                        { value: "draft", label: "Draft" },
+                        { value: "posted", label: "Posted" },
+                      ]}
+                      selected={statusSel}
+                      onChange={setStatusSel}
+                      placeholder="All"
+                      className="w-32"
+                    />
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    Due Status
+                    <MultiSelect
+                      options={[
+                        { value: "pending", label: "Pending" },
+                        { value: "overdue", label: "Overdue" },
+                        { value: "paid", label: "Paid" },
+                        { value: "overpaid", label: "Overpaid" },
+                      ]}
+                      selected={dueSel}
+                      onChange={setDueSel}
+                      placeholder="All"
+                      className="w-36"
+                    />
                   </label>
                   <span className="eyebrow">Draft · Posted</span>
                 </div>
@@ -540,7 +573,7 @@ export default function InvoicingPage() {
                     {sortedInvoices.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-                          {partyFilter !== "all" || statusFilter !== "all" ? "No invoices match the selected filters." : "No invoices yet."}
+                          {partySel.length > 0 || statusSel.length > 0 || dueSel.length > 0 ? "No invoices match the selected filters." : "No invoices yet."}
                         </TableCell>
                       </TableRow>
                     ) : (
