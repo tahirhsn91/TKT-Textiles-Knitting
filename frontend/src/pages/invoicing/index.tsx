@@ -107,8 +107,9 @@ export default function InvoicingPage() {
   const [viewingId, setViewingId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"invoices" | "receivables">("invoices");
 
-  // Invoice table: party filter (default All) + sort.
+  // Invoice table: party filter (default All) + status filter + sort.
   const [partyFilter, setPartyFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // Payment dialog state
   const [payFor, setPayFor] = useState<InvoiceListItem | null>(null);
@@ -149,13 +150,21 @@ export default function InvoicingPage() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [invoices]);
 
-  // Filter by the selected party.
+  // Filter by the selected party and status.
   const filteredInvoices = useMemo(
     () =>
-      partyFilter === "all"
-        ? (invoices ?? [])
-        : (invoices ?? []).filter((inv) => String(inv.partyId) === partyFilter),
-    [invoices, partyFilter],
+      (invoices ?? []).filter((inv) => {
+        if (partyFilter !== "all" && String(inv.partyId) !== partyFilter) return false;
+        if (statusFilter !== "all" && inv.status !== statusFilter) return false;
+        return true;
+      }),
+    [invoices, partyFilter, statusFilter],
+  );
+
+  // Grand total of the filtered invoices (sum of Grand Total column).
+  const filteredGrandTotal = useMemo(
+    () => (filteredInvoices ?? []).reduce((s, inv) => s + (parseFloat(inv.grandTotal) || 0), 0),
+    [filteredInvoices],
   );
 
   // Client-side sorting (all list endpoints here return the full set).
@@ -486,7 +495,7 @@ export default function InvoicingPage() {
             <Card className="overflow-hidden">
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-5 py-3">
                 <h2 className="text-sm font-semibold text-foreground">Invoices</h2>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <label className="flex items-center gap-2 text-xs text-muted-foreground">
                     Party
                     <Select value={partyFilter} onValueChange={setPartyFilter}>
@@ -496,6 +505,17 @@ export default function InvoicingPage() {
                         {invoiceParties.map((p) => (
                           <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    Status
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="h-8 w-32 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="draft">Draft</SelectItem>
+                        <SelectItem value="posted">Posted</SelectItem>
                       </SelectContent>
                     </Select>
                   </label>
@@ -520,7 +540,7 @@ export default function InvoicingPage() {
                     {sortedInvoices.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
-                          {partyFilter !== "all" ? "No invoices for this party." : "No invoices yet."}
+                          {partyFilter !== "all" || statusFilter !== "all" ? "No invoices match the selected filters." : "No invoices yet."}
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -572,6 +592,15 @@ export default function InvoicingPage() {
                           </TableCell>
                         </TableRow>
                       ))
+                    )}
+                    {sortedInvoices.length > 0 && (
+                      <TableRow className="bg-muted/50 font-semibold">
+                        <TableCell colSpan={4} className="whitespace-nowrap">
+                          Grand Total ({sortedInvoices.length} invoice{sortedInvoices.length === 1 ? "" : "s"})
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-foreground">{money(filteredGrandTotal)}</TableCell>
+                        <TableCell colSpan={3} />
+                      </TableRow>
                     )}
                   </TableBody>
                 </Table>
