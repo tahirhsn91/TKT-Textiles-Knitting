@@ -211,6 +211,8 @@ router.get("/invoicing", async (_req, res): Promise<void> => {
       partyId: invoiceTable.partyId,
       partyName: partyMasterTable.name,
       status: invoiceTable.status,
+      origin: invoiceTable.origin,
+      dueDays: invoiceTable.dueDays,
       fbrInvoiceNumber: invoiceTable.fbrInvoiceNumber,
       totalValue: invoiceTable.totalValue,
       totalTax: invoiceTable.totalTax,
@@ -223,8 +225,150 @@ router.get("/invoicing", async (_req, res): Promise<void> => {
     .leftJoin(companyInfoMasterTable, eq(invoiceTable.companyId, companyInfoMasterTable.id))
     .leftJoin(partyMasterTable, eq(invoiceTable.partyId, partyMasterTable.id))
     .orderBy(desc(invoiceTable.id));
-  res.json(rows);
+
+  // Attach derived payment state per invoice (issue #189).
+  const ids = rows.map((r) => r.id);
+  const payments = ids.length > 0
+    ? await db
+        .select({
+          invoiceId: invoicePaymentTable.invoiceId,
+          amount: invoicePaymentTable.amount,
+          taxDeduction: invoicePaymentTable.taxDeduction,
+        })
+        .from(invoicePaymentTable)
+        .where(inArray(invoicePaymentTable.invoiceId, ids))
+    : [];
+  const payByInvoice = new Map<number, typeof payments>();
+  for (const p of payments) {
+    const arr = payByInvoice.get(p.invoiceId) ?? [];
+    arr.push(p);
+    payByInvoice.set(p.invoiceId, arr);
+  }
+
+  const out = rows.map((r) => {
+    const state = computePaymentState({
+      grandTotal: r.grandTotal,
+      dueDays: r.dueDays,
+      postedDateIso: toISODate(r.postedAt ?? new Date(r.invoiceDate)),
+      payments: payByInvoice.get(r.id) ?? [],
+    });
+    return {
+      ...r,
+      dueDate: state.dueDateIso,
+      paidAmount: state.paidAmount,
+      outstanding: state.outstanding,
+      overdue: state.overdue,
+      paid: state.paid,
+      overpaid: state.overpaid,
+      totalTaxDeduction: state.totalTaxDeduction,
+    };
+  });
+  res.json(out);
 });
+
+
+// ─── Receivables: per-party outstanding + aging ────────────────────────────
+router.get("/invoicing/receivables", async (_req, res): Promise<void> => {
+  const invoices = await db
+    .select({
+      id: invoiceTable.id,
+      invoiceDate: invoiceTable.invoiceDate,
+      partyId: invoiceTable.partyId,
+      partyName: partyMasterTable.name,
+      grandTotal: invoiceTable.grandTotal,
+      dueDays: invoiceTable.dueDays,
+      postedAt: invoiceTable.postedAt,
+      origin: invoiceTable.origin,
+    })
+    .from(invoiceTable)
+    .leftJoin(partyMasterTable, eq(invoiceTable.partyId, partyMasterTable.id))
+    .where(eq(invoiceTable.status, "posted"));
+
+  const payments = await db
+    .select({
+      invoiceId: invoicePaymentTable.invoiceId,
+      amount: invoicePaymentTable.amount,
+      taxDeduction: invoicePaymentTable.taxDeduction,
+    })
+    .from(invoicePaymentTable);
+
+  const payByInvoice = new Map<number, typeof payments>();
+  for (const p of payments) {
+    const arr = payByInvoice.get(p.invoiceId) ?? [];
+    arr.push(p);
+    payByInvoice.set(p.invoiceId, arr);
+  }
+
+  const today = toISODate(new Date());
+  const partyMap = new Map<number, {
+    partyName: string;
+    totalInvoiced: number;
+    totalPaid: number;
+    outstanding: number;
+    totalWht: number;
+    buckets: { current: number; b1_30: number; b31_60: number; b60: number };
+  }>();
+
+  for (const inv of invoices) {
+    const p = payByInvoice.get(inv.id) ?? [];
+    const state = computePaymentState({
+      grandTotal: inv.grandTotal,
+      dueDays: inv.dueDays,
+      postedDateIso: toISODate(inv.postedAt ?? new Date(inv.invoiceDate ?? "")),
+      payments: p,
+    });
+
+    const e = partyMap.get(inv.partyId) ?? {
+      partyName: inv.partyName ?? `Party #${inv.partyId}`,
+      totalInvoiced: 0,
+      totalPaid: 0,
+      outstanding: 0,
+      totalWht: 0,
+      buckets: { current: 0, b1_30: 0, b31_60: 0, b60: 0 },
+    };
+    e.totalInvoiced += toNum(inv.grandTotal);
+    e.totalPaid += state.paidAmount;
+    e.totalWht += state.totalTaxDeduction;
+
+    if (state.outstanding > 0) {
+      e.outstanding += state.outstanding;
+      if (state.overdue && state.dueDateIso) {
+        const days = daysBetween(today, state.dueDateIso);
+        if (days > 60) e.buckets.b60 += state.outstanding;
+        else if (days > 30) e.buckets.b31_60 += state.outstanding;
+        else if (days > 0) e.buckets.b1_30 += state.outstanding;
+        else e.buckets.current += state.outstanding;
+      } else {
+        e.buckets.current += state.outstanding;
+      }
+    }
+    partyMap.set(inv.partyId, e);
+  }
+
+  const rows = Array.from(partyMap.entries())
+    .map(([partyId, v]) => ({
+      partyId,
+      partyName: v.partyName,
+      totalInvoiced: round2(v.totalInvoiced),
+      totalPaid: round2(v.totalPaid),
+      outstanding: round2(v.outstanding),
+      totalTaxDeduction: round2(v.totalWht),
+      aging: {
+        current: round2(v.buckets.current),
+        b1_30: round2(v.buckets.b1_30),
+        b31_60: round2(v.buckets.b31_60),
+        b60: round2(v.buckets.b60),
+      },
+    }))
+    .sort((a, b) => a.partyName.localeCompare(b.partyName));
+
+  res.json({ today, parties: rows });
+});
+
+function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
 
 // ─── Single invoice detail ────────────────────────────────────────────────
 
@@ -673,107 +817,5 @@ router.post("/invoicing/backdated", validateBody(backdatedSchema), async (req, r
   const detail = await loadInvoiceDetail(invoice!.id);
   res.status(201).json({ message: "Backdated invoice created", invoice: detail });
 });
-
-// ─── Receivables: per-party outstanding + aging ────────────────────────────
-router.get("/invoicing/receivables", async (_req, res): Promise<void> => {
-  const invoices = await db
-    .select({
-      id: invoiceTable.id,
-      invoiceDate: invoiceTable.invoiceDate,
-      partyId: invoiceTable.partyId,
-      partyName: partyMasterTable.name,
-      grandTotal: invoiceTable.grandTotal,
-      dueDays: invoiceTable.dueDays,
-      postedAt: invoiceTable.postedAt,
-      origin: invoiceTable.origin,
-    })
-    .from(invoiceTable)
-    .leftJoin(partyMasterTable, eq(invoiceTable.partyId, partyMasterTable.id))
-    .where(eq(invoiceTable.status, "posted"));
-
-  const payments = await db
-    .select({
-      invoiceId: invoicePaymentTable.invoiceId,
-      amount: invoicePaymentTable.amount,
-      taxDeduction: invoicePaymentTable.taxDeduction,
-    })
-    .from(invoicePaymentTable);
-
-  const payByInvoice = new Map<number, typeof payments>();
-  for (const p of payments) {
-    const arr = payByInvoice.get(p.invoiceId) ?? [];
-    arr.push(p);
-    payByInvoice.set(p.invoiceId, arr);
-  }
-
-  const today = toISODate(new Date());
-  const partyMap = new Map<number, {
-    partyName: string;
-    totalInvoiced: number;
-    totalPaid: number;
-    outstanding: number;
-    totalWht: number;
-    buckets: { current: number; b1_30: number; b31_60: number; b60: number };
-  }>();
-
-  for (const inv of invoices) {
-    const p = payByInvoice.get(inv.id) ?? [];
-    const state = computePaymentState({
-      grandTotal: inv.grandTotal,
-      dueDays: inv.dueDays,
-      postedDateIso: toISODate(inv.postedAt ?? new Date(inv.invoiceDate ?? "")),
-      payments: p,
-    });
-
-    const e = partyMap.get(inv.partyId) ?? {
-      partyName: inv.partyName ?? `Party #${inv.partyId}`,
-      totalInvoiced: 0,
-      totalPaid: 0,
-      outstanding: 0,
-      totalWht: 0,
-      buckets: { current: 0, b1_30: 0, b31_60: 0, b60: 0 },
-    };
-    e.totalInvoiced += toNum(inv.grandTotal);
-    e.totalPaid += state.paidAmount;
-    e.totalWht += state.totalTaxDeduction;
-
-    if (state.outstanding > 0) {
-      e.outstanding += state.outstanding;
-      if (state.overdue && state.dueDateIso) {
-        const days = daysBetween(today, state.dueDateIso);
-        if (days > 60) e.buckets.b60 += state.outstanding;
-        else if (days > 30) e.buckets.b31_60 += state.outstanding;
-        else if (days > 0) e.buckets.b1_30 += state.outstanding;
-        else e.buckets.current += state.outstanding;
-      } else {
-        e.buckets.current += state.outstanding;
-      }
-    }
-    partyMap.set(inv.partyId, e);
-  }
-
-  const rows = Array.from(partyMap.entries())
-    .map(([partyId, v]) => ({
-      partyId,
-      partyName: v.partyName,
-      totalInvoiced: round2(v.totalInvoiced),
-      totalPaid: round2(v.totalPaid),
-      outstanding: round2(v.outstanding),
-      totalTaxDeduction: round2(v.totalWht),
-      aging: {
-        current: round2(v.buckets.current),
-        b1_30: round2(v.buckets.b1_30),
-        b31_60: round2(v.buckets.b31_60),
-        b60: round2(v.buckets.b60),
-      },
-    }))
-    .sort((a, b) => a.partyName.localeCompare(b.partyName));
-
-  res.json({ today, parties: rows });
-});
-
-function round2(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
-}
 
 export default router;
