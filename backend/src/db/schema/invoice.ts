@@ -44,6 +44,13 @@ export const invoiceTable = pgTable("invoice", {
     .references(() => partyMasterTable.id),
   // draft | posted
   status: text("status").notNull().default("draft"),
+  // How this invoice was posted: 'fbr' (via FBR), 'local' (unregistered
+  // party, posted without FBR), or 'manual' (backdated from another system).
+  // Set at creation; immutable.
+  origin: text("origin").notNull().default("fbr"),
+  // Snapshot of the party's credit days at post time (calendar days from the
+  // posting date). null = untracked (never overdue).
+  dueDays: integer("due_days"),
   // FBR's returned top-level invoice number once posted (nullable pre-post).
   fbrInvoiceNumber: text("fbr_invoice_number"),
   // 00 = valid, 01 = invalid (nullable until a post attempt).
@@ -66,6 +73,8 @@ export const invoiceTable = pgTable("invoice", {
 export const insertInvoiceSchema = createInsertSchema(invoiceTable).omit({
   id: true,
   status: true,
+  origin: true,
+  dueDays: true,
   fbrInvoiceNumber: true,
   fbrStatusCode: true,
   fbrRawResponse: true,
@@ -130,3 +139,29 @@ export const invoiceTransactionTable = pgTable("invoice_transaction", {
 export const insertInvoiceTransactionSchema = createInsertSchema(invoiceTransactionTable).omit({ id: true });
 export type InsertInvoiceTransaction = z.infer<typeof insertInvoiceTransactionSchema>;
 export type InvoiceTransaction = typeof invoiceTransactionTable.$inferSelect;
+
+// ─── Invoice payment ───────────────────────────────────────────────────────
+// A payment recorded against an invoice. `amount` is the GROSS amount paid;
+// `taxDeduction` is withholding tax (WHT) deducted, so the NET amount applied
+// to the invoice = amount - taxDeduction. Partial payments are allowed; an
+// invoice is considered paid when Σ (amount - taxDeduction) >= grandTotal.
+export const invoicePaymentTable = pgTable("invoice_payment", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id")
+    .notNull()
+    .references(() => invoiceTable.id, { onDelete: "cascade" }),
+  amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+  taxDeduction: numeric("tax_deduction", { precision: 14, scale: 2 }).notNull().default("0"),
+  paymentDate: date("payment_date").notNull(),
+  method: text("method"),
+  reference: text("reference"),
+  notes: text("notes"),
+  paidBy: text("paid_by").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("invoice_payment_invoice_idx").on(t.invoiceId),
+]);
+
+export const insertInvoicePaymentSchema = createInsertSchema(invoicePaymentTable).omit({ id: true, createdAt: true });
+export type InsertInvoicePayment = z.infer<typeof insertInvoicePaymentSchema>;
+export type InvoicePayment = typeof invoicePaymentTable.$inferSelect;
