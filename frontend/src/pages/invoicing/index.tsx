@@ -962,12 +962,16 @@ function FutureInvoicesView({ rows, loading }: { rows: FutureInvoiceRow[]; loadi
   const totals = useMemo(() => {
     let qty = 0;
     let valued = 0;
+    let tax = 0;
+    let total = 0;
     let unvalued = 0;
     for (const r of rows) {
       qty += parseFloat(r.quantity) || 0;
       if (r.value != null) valued += r.value; else unvalued += parseFloat(r.quantity) || 0;
+      tax += r.tax ?? 0;
+      total += r.total ?? 0;
     }
-    return { qty, valued, unvalued };
+    return { qty, valued, tax, total, unvalued };
   }, [rows]);
 
   if (loading) {
@@ -982,7 +986,7 @@ function FutureInvoicesView({ rows, loading }: { rows: FutureInvoiceRow[]; loadi
     <Card className="overflow-hidden">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-3.5">
         <h2 className="text-sm font-semibold text-foreground">Future Invoice Amount</h2>
-        <span className="eyebrow">Estimated {money(totals.valued)}</span>
+        <span className="eyebrow">Estimated Total {money(totals.total)}</span>
       </div>
       <CardContent className="p-0">
         {rows.length === 0 ? (
@@ -999,6 +1003,8 @@ function FutureInvoicesView({ rows, loading }: { rows: FutureInvoiceRow[]; loadi
                   <TableHead className="text-right">Rate / kg</TableHead>
                   <TableHead>Rate From</TableHead>
                   <TableHead className="text-right">Value</TableHead>
+                  <TableHead className="text-right">Tax (18%)</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1010,7 +1016,9 @@ function FutureInvoicesView({ rows, loading }: { rows: FutureInvoiceRow[]; loadi
                     <TableCell className="text-right tabular-nums">{parseFloat(r.quantity).toLocaleString("en-PK", { minimumFractionDigits: 3 })}</TableCell>
                     <TableCell className="text-right tabular-nums">{r.ratePerKg != null ? money(r.ratePerKg) : <span className="text-muted-foreground">—</span>}</TableCell>
                     <TableCell className="text-muted-foreground">{r.rateDate ? format(new Date(r.rateDate), "dd MMM yyyy") : "—"}</TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{r.value != null ? money(r.value) : <span className="text-muted-foreground">—</span>}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.value != null ? money(r.value) : <span className="text-muted-foreground">—</span>}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.tax != null ? money(r.tax) : <span className="text-muted-foreground">—</span>}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">{r.total != null ? money(r.total) : <span className="text-muted-foreground">—</span>}</TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="bg-muted/50 font-semibold">
@@ -1019,6 +1027,8 @@ function FutureInvoicesView({ rows, loading }: { rows: FutureInvoiceRow[]; loadi
                   <TableCell className="text-right tabular-nums">{totals.qty.toLocaleString("en-PK", { minimumFractionDigits: 3 })}</TableCell>
                   <TableCell /><TableCell />
                   <TableCell className="text-right tabular-nums text-foreground">{money(totals.valued)}</TableCell>
+                  <TableCell className="text-right tabular-nums text-foreground">{money(totals.tax)}</TableCell>
+                  <TableCell className="text-right tabular-nums text-foreground">{money(totals.total)}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>

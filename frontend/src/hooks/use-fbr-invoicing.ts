@@ -219,6 +219,8 @@ export interface FutureInvoiceRow {
   ratePerKg: number | null;
   rateDate: string | null;
   value: number | null;
+  tax: number | null;
+  total: number | null;
 }
 
 /** All parties' un-invoiced deliveries valued at the latest rate. */
