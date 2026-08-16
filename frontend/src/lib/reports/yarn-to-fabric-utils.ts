@@ -60,7 +60,7 @@ export type GroupByKey =
   | "yarnTypeName" | "yarnCountName" | "yarnBrandName" | "uomName";
 
 export type SummarySortKey      = "label" | "count" | "qty";
-export type PartyBalanceSortKey = "party" | "fabricDelivery" | "wastage" | "fabricReturn" | "netOutstanding";
+export type PartyBalanceSortKey = "party" | "fabricDelivery" | "fabricReturn" | "netOutstanding";
 export type SortDir             = "asc" | "desc";
 
 export type DetailColKey =
@@ -68,7 +68,7 @@ export type DetailColKey =
   | "jobName" | "partyName" | "locationName" | "fabricTypeName"
   | "yarnTypeName" | "yarnCountName" | "yarnBrandName" | "uomName"
   | "machineName" | "employeeName" | "quantity"
-  | "fabricProduction" | "fabricDelivery" | "wastageWt"
+  | "fabricProduction" | "fabricDelivery"
   | "fabricDeliveryReturn" | "runningFabricBalance";
 
 export type Y2FGroupedRow = {
@@ -77,7 +77,6 @@ export type Y2FGroupedRow = {
   qty: number;
   fabricProduction: number;
   fabricDelivery: number;
-  wastageWt: number;
   fabricDeliveryReturn: number;
   fabricDelta: number;
   docNums: string[];
@@ -148,7 +147,6 @@ export const DETAIL_COLUMNS: { key: DetailColKey; label: string }[] = [
   { key: "quantity",              label: "Qty" },
   { key: "fabricProduction",      label: "Fabric Production" },
   { key: "fabricDelivery",        label: "Fabric Delivery" },
-  { key: "wastageWt",             label: "Wastage Wt" },
   { key: "fabricDeliveryReturn",  label: "Fab Del Return" },
   { key: "runningFabricBalance",  label: "Run Fabric Bal." },
 ];
@@ -156,7 +154,7 @@ export const DETAIL_COLUMNS: { key: DetailColKey; label: string }[] = [
 export const ALL_DETAIL_KEYS = DETAIL_COLUMNS.map((c) => c.key);
 
 export const RIGHT_ALIGNED: Set<DetailColKey> = new Set([
-  "quantity", "fabricProduction", "fabricDelivery", "wastageWt",
+  "quantity", "fabricProduction", "fabricDelivery",
   "fabricDeliveryReturn", "runningFabricBalance",
 ]);
 
@@ -214,18 +212,12 @@ export function signedNetWt(row: ReportRow): number {
   return toNum(row.netWt) * getMultiplier(row.transactionTypeAction);
 }
 
-export function wastageWt(row: ReportRow): number {
-  const name = row.transactionTypeName;
-  if (name !== "Fabric Delivery" && name !== "Fabric Delivery Return") return 0;
-  return signedNetWt(row) * (toNum(row.partyWastePercent) / 100);
-}
-
 /** Fabric stock change for a single row. Only fabric-related types contribute. */
 export function fabricBalanceDelta(row: ReportRow): number {
   const name = row.transactionTypeName;
   if (name === "Fabric Production") return signedNetWt(row);
   if (name === "Fabric Delivery" || name === "Fabric Delivery Return") {
-    return signedNetWt(row) + wastageWt(row);
+    return signedNetWt(row);
   }
   return 0;
 }
@@ -275,7 +267,7 @@ export function groupRows(rows: ReportRow[], key: GroupByKey): Y2FGroupedRow[] {
   const map = new Map<string, {
     count: number; qty: number;
     fabricProduction: number; fabricDelivery: number;
-    wastageWt: number; fabricDeliveryReturn: number;
+    fabricDeliveryReturn: number;
     fabricDelta: number;
     docNumSet: Set<string>; refSet: Set<string>;
   }>();
@@ -286,7 +278,7 @@ export function groupRows(rows: ReportRow[], key: GroupByKey): Y2FGroupedRow[] {
     const e = map.get(k) ?? {
       count: 0, qty: 0,
       fabricProduction: 0, fabricDelivery: 0,
-      wastageWt: 0, fabricDeliveryReturn: 0,
+      fabricDeliveryReturn: 0,
       fabricDelta: 0,
       docNumSet: new Set<string>(), refSet: new Set<string>(),
     };
@@ -297,7 +289,6 @@ export function groupRows(rows: ReportRow[], key: GroupByKey): Y2FGroupedRow[] {
     if (name === "Fabric Production")      e.fabricProduction     += signedNetWt(row);
     if (name === "Fabric Delivery")        e.fabricDelivery       += signedNetWt(row);
     if (name === "Fabric Delivery Return") e.fabricDeliveryReturn += signedNetWt(row);
-    e.wastageWt += wastageWt(row);
     if (row.docNumber) e.docNumSet.add(row.docNumber);
     if (row.reference) e.refSet.add(row.reference);
     map.set(k, e);
@@ -308,7 +299,6 @@ export function groupRows(rows: ReportRow[], key: GroupByKey): Y2FGroupedRow[] {
       label, count: v.count, qty: v.qty,
       fabricProduction: v.fabricProduction,
       fabricDelivery: v.fabricDelivery,
-      wastageWt: v.wastageWt,
       fabricDeliveryReturn: v.fabricDeliveryReturn,
       fabricDelta: v.fabricDelta,
       docNums: [...v.docNumSet], refs: [...v.refSet],
