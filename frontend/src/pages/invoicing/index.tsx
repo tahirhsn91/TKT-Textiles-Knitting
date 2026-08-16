@@ -217,7 +217,7 @@ export default function InvoicingPage() {
       status: (inv) => inv.status,
       fbrInvoiceNumber: (inv) => inv.fbrInvoiceNumber ?? "",
     },
-    { key: "invoiceDate", dir: "desc" },
+    { key: "invoiceDate", dir: "asc" },
   );
   const handleSortInvoice = (key: string) => toggleSort(key);
 
