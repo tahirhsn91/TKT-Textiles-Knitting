@@ -71,6 +71,8 @@ import {
   useAllowBackdatedInvoices,
   useCreateBackdatedInvoice,
   useListPartiesForInvoicing,
+  useFutureInvoices,
+  type FutureInvoiceRow,
   type InvoiceListItem,
   type InvoiceDetail,
   type InvoicePayment,
@@ -128,7 +130,7 @@ export default function InvoicingPage() {
   const touchedRates = useRef<Set<string>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<InvoiceListItem | null>(null);
   const [viewingId, setViewingId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<"invoices" | "receivables" | "analytics">("invoices");
+  const [activeTab, setActiveTab] = useState<"invoices" | "receivables" | "future" | "analytics">("invoices");
 
   // Invoice table filters: multi-select Party, Status, and Due Status, each
   // defaulting to show everything (empty selection = no restriction).
@@ -156,6 +158,7 @@ export default function InvoicingPage() {
   const { data: invoices } = useListInvoices();
   const { data: viewing, isLoading: viewingLoading } = useInvoiceDetail(viewingId);
   const { data: receivables } = useReceivables();
+  const { data: futureInvoices } = useFutureInvoices();
   const { data: allParties } = useListPartiesForInvoicing();
 
   const generate = useGenerateInvoice();
@@ -409,11 +412,12 @@ export default function InvoicingPage() {
         </div>
 
         {/* Tabs: Invoices + Receivables (issue #189) */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "invoices" | "receivables" | "analytics")}>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "invoices" | "receivables" | "future" | "analytics")}>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <TabsList>
               <TabsTrigger value="invoices">Invoices</TabsTrigger>
               <TabsTrigger value="receivables">Receivables</TabsTrigger>
+              <TabsTrigger value="future">Future Invoices</TabsTrigger>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
             </TabsList>
             {activeTab === "receivables" && (
@@ -686,6 +690,11 @@ export default function InvoicingPage() {
             <ReceivablesView data={receivables} loading={!receivables} />
           </TabsContent>
 
+          {/* Future Invoices tab (before Analytics) */}
+          <TabsContent value="future" className="mt-3 space-y-4">
+            <FutureInvoicesView rows={futureInvoices ?? []} loading={!futureInvoices} />
+          </TabsContent>
+
           {/* Analytics tab */}
           <TabsContent value="analytics" className="mt-3 space-y-4">
             <AnalyticsView invoices={invoices ?? []} loading={!invoices} />
@@ -939,6 +948,86 @@ function ReceivablesView({ data, loading }: { data: import("@/hooks/use-fbr-invo
               </TableBody>
             </Table>
           </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Future Invoices tab ───────────────────────────────────────────────────
+// Shows all parties' un-invoiced Fabric_Dispatch transactions valued at the
+// latest rate from previous invoices (same party + yarn type + yarn count).
+function FutureInvoicesView({ rows, loading }: { rows: FutureInvoiceRow[]; loading: boolean }) {
+  // Totals across the displayed rows.
+  const totals = useMemo(() => {
+    let qty = 0;
+    let valued = 0;
+    let unvalued = 0;
+    for (const r of rows) {
+      qty += parseFloat(r.quantity) || 0;
+      if (r.value != null) valued += r.value; else unvalued += parseFloat(r.quantity) || 0;
+    }
+    return { qty, valued, unvalued };
+  }, [rows]);
+
+  if (loading) {
+    return (
+      <Card className="overflow-hidden">
+        <CardContent className="p-5 space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-3.5">
+        <h2 className="text-sm font-semibold text-foreground">Future Invoice Amount</h2>
+        <span className="eyebrow">Estimated {money(totals.valued)}</span>
+      </div>
+      <CardContent className="p-0">
+        {rows.length === 0 ? (
+          <p className="py-10 text-center text-muted-foreground">No un-invoiced Fabric Delivery transactions.</p>
+        ) : (
+          <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Party</TableHead>
+                  <TableHead>Yarn Type</TableHead>
+                  <TableHead>Count</TableHead>
+                  <TableHead className="text-right">Qty (kg)</TableHead>
+                  <TableHead className="text-right">Rate / kg</TableHead>
+                  <TableHead>Rate From</TableHead>
+                  <TableHead className="text-right">Value</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((r, i) => (
+                  <TableRow key={`${r.partyId}-${r.yarnTypeId}-${r.yarnCountId}-${i}`}>
+                    <TableCell className="font-medium whitespace-nowrap">{r.partyName}</TableCell>
+                    <TableCell>{r.yarnTypeName ?? "—"}</TableCell>
+                    <TableCell>{r.yarnCountName ?? "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums">{parseFloat(r.quantity).toLocaleString("en-PK", { minimumFractionDigits: 3 })}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.ratePerKg != null ? money(r.ratePerKg) : <span className="text-muted-foreground">—</span>}</TableCell>
+                    <TableCell className="text-muted-foreground">{r.rateDate ? format(new Date(r.rateDate), "dd MMM yyyy") : "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">{r.value != null ? money(r.value) : <span className="text-muted-foreground">—</span>}</TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="bg-muted/50 font-semibold">
+                  <TableCell>Total</TableCell>
+                  <TableCell /><TableCell />
+                  <TableCell className="text-right tabular-nums">{totals.qty.toLocaleString("en-PK", { minimumFractionDigits: 3 })}</TableCell>
+                  <TableCell /><TableCell />
+                  <TableCell className="text-right tabular-nums text-foreground">{money(totals.valued)}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        )}
+        {totals.unvalued > 0 && (
+          <p className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
+            {money(totals.unvalued)} kg has no prior rate for the party/yarn combination and is shown without a value.
+          </p>
         )}
       </CardContent>
     </Card>
