@@ -532,17 +532,16 @@ export default function InvoicingPage() {
                                         setRates((prev) => ({ ...prev, [r.key]: e.target.value }));
                                       }}
                                     />
-                                    {rateSourceByKey.has(r.key) && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                        title={`View invoice #${rateSourceByKey.get(r.key)} this rate came from`}
-                                        onClick={() => handleView(rateSourceByKey.get(r.key)!)}
-                                      >
-                                        <History className="h-4 w-4" />
-                                      </Button>
-                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className={`h-8 w-8 ${rateSourceByKey.has(r.key) ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/40 cursor-not-allowed"}`}
+                                      title={rateSourceByKey.has(r.key) ? `View invoice #${rateSourceByKey.get(r.key)} this rate came from` : "No previous rate found for this party/yarn"}
+                                      disabled={!rateSourceByKey.has(r.key)}
+                                      onClick={() => handleView(rateSourceByKey.get(r.key)!)}
+                                    >
+                                      <History className="h-4 w-4" />
+                                    </Button>
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right tabular-nums">{money(r.value)}</TableCell>
