@@ -189,6 +189,22 @@ export function useInvoicePreview(partyId: number | null) {
   });
 }
 
+export interface LatestRate {
+  key: string;
+  ratePerKg: string;
+  invoiceDate: string;
+}
+
+/** Latest per-line rate for a party (key = `${yarnTypeId}|${yarnCountId}`). */
+export function useLatestRates(partyId: number | null) {
+  return useQuery<LatestRate[], ErrorType<unknown>>({
+    queryKey: [`${invoicingKey}/rates`, partyId] as unknown as QueryKey,
+    queryFn: () => customFetch<LatestRate[]>(`${invoicingKey}/rates/${partyId}`, { method: "GET" }),
+    enabled: partyId != null,
+    staleTime: 30_000,
+  });
+}
+
 export function useListInvoices() {
   return useQuery<InvoiceListItem[], ErrorType<unknown>>({
     queryKey: [invoicingKey] as unknown as QueryKey,
