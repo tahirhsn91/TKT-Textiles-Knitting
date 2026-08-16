@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, type ReactNode } from "react";
-import { Send, Trash2, RefreshCw, FileText, Eye, Download, Plus, Banknote, CalendarPlus } from "lucide-react";
+import { Send, Trash2, RefreshCw, FileText, Eye, Download, Plus, Banknote, CalendarPlus, History } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 
@@ -251,6 +251,18 @@ export default function InvoicingPage() {
   }, [latestRates, preview]);
 
   // Rows computed from preview groups + entered rates.
+
+  // Map of preview key → source invoice id for rates that were auto-fetched
+  // from a previous invoice (so the user can open the source invoice).
+  const rateSourceByKey = useMemo(() => {
+    const map = new Map<string, number>();
+    if (latestRates) {
+      for (const r of latestRates) {
+        if (r.invoiceId != null) map.set(r.key, r.invoiceId);
+      }
+    }
+    return map;
+  }, [latestRates]);
   const rows = useMemo(() => {
     if (!preview) return [];
     return preview.groups.map((g) => {
@@ -507,18 +519,31 @@ export default function InvoicingPage() {
                                 <TableCell>{r.group.uoM ?? "—"}</TableCell>
                                 <TableCell className="text-right tabular-nums">{r.group.quantity}</TableCell>
                                 <TableCell className="text-right">
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    className="ml-auto h-8 w-28 text-right"
-                                    placeholder="Rate"
-                                    value={rates[r.key] ?? ""}
-                                    onChange={(e) => {
-                                      touchedRates.current.add(r.key);
-                                      setRates((prev) => ({ ...prev, [r.key]: e.target.value }));
-                                    }}
-                                  />
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      className="h-8 w-28 text-right"
+                                      placeholder="Rate"
+                                      value={rates[r.key] ?? ""}
+                                      onChange={(e) => {
+                                        touchedRates.current.add(r.key);
+                                        setRates((prev) => ({ ...prev, [r.key]: e.target.value }));
+                                      }}
+                                    />
+                                    {rateSourceByKey.has(r.key) && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                        title={`View invoice #${rateSourceByKey.get(r.key)} this rate came from`}
+                                        onClick={() => handleView(rateSourceByKey.get(r.key)!)}
+                                      >
+                                        <History className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </div>
                                 </TableCell>
                                 <TableCell className="text-right tabular-nums">{money(r.value)}</TableCell>
                                 <TableCell className="text-right tabular-nums">{money(r.tax)}</TableCell>
