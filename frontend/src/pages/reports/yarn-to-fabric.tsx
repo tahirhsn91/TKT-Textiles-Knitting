@@ -67,7 +67,7 @@ import {
   EMPTY_FILTERS, GROUP_BY_OPTIONS, CHART_COLORS, MONTHS, FABRIC_TX_TYPES,
   DETAIL_COLUMNS, ALL_DETAIL_KEYS, RIGHT_ALIGNED,
   toISODate, defaultFilters, loadSavedFilters, toNum, getMultiplier,
-  signedQty, signedNetWt, wastageWt, fabricBalanceDelta, signedNetWtIfType,
+  signedQty, signedNetWt, fabricBalanceDelta, signedNetWtIfType,
   fmt, getMonthLabel, getGroupLabel, abbrev, buildQueryString, groupRows,
 } from "@/lib/reports/yarn-to-fabric-utils";
 
@@ -237,7 +237,7 @@ export default function YarnToFabricPage() {
     [rawOpeningRows]
   );
 
-  // Opening fabric balance = Σ(Fabric Production signed) + Σ(Fabric Delivery signed + Wastage) + Σ(Fab Del Return signed + Wastage)
+  // Opening fabric balance = Σ(Fabric Production signed) + Σ(Fabric Delivery signed) + Σ(Fab Del Return signed)
   const openingFabricBalance = useMemo(
     () => openingRows.reduce((s, r) => s + fabricBalanceDelta(r), 0),
     [openingRows]
@@ -249,7 +249,6 @@ export default function YarnToFabricPage() {
   const totalFabricProd     = useMemo(() => rows.reduce((s, r) => s + (r.transactionTypeName === "Fabric Production"      ? signedNetWt(r) : 0), 0), [rows]);
   const totalFabricDelivery = useMemo(() => rows.reduce((s, r) => s + (r.transactionTypeName === "Fabric Delivery"        ? signedNetWt(r) : 0), 0), [rows]);
   const totalFabricDelRtn   = useMemo(() => rows.reduce((s, r) => s + (r.transactionTypeName === "Fabric Delivery Return" ? signedNetWt(r) : 0), 0), [rows]);
-  const totalWastageWt      = useMemo(() => rows.reduce((s, r) => s + wastageWt(r), 0), [rows]);
 
   const runningFabricBalances = useMemo(() => {
     let bal = openingFabricBalance;
@@ -268,7 +267,6 @@ export default function YarnToFabricPage() {
   const partyBalanceRows = useMemo(() => {
     const map = new Map<string, {
       fabricDelivery: number;
-      wastage: number;
       fabricReturn: number;
     }>();
 
@@ -278,15 +276,12 @@ export default function YarnToFabricPage() {
       const name = r.transactionTypeName;
       if (name !== "Fabric Delivery" && name !== "Fabric Delivery Return") continue;
       const party = r.partyName ?? "—";
-      const e = map.get(party) ?? { fabricDelivery: 0, wastage: 0, fabricReturn: 0 };
+      const e = map.get(party) ?? { fabricDelivery: 0, fabricReturn: 0 };
       const sNetWt = signedNetWt(r);
-      const wWt    = wastageWt(r);
       if (name === "Fabric Delivery") {
         e.fabricDelivery += sNetWt;
-        e.wastage        += wWt;
       } else {
         e.fabricReturn += sNetWt;
-        e.wastage      += wWt;
       }
       map.set(party, e);
     }
@@ -294,9 +289,8 @@ export default function YarnToFabricPage() {
     return Array.from(map.entries()).map(([party, v]) => ({
       party,
       fabricDelivery: v.fabricDelivery,
-      wastage:        v.wastage,
       fabricReturn:   v.fabricReturn,
-      netOutstanding: v.fabricDelivery + v.wastage + v.fabricReturn,
+      netOutstanding: v.fabricDelivery + v.fabricReturn,
     }));
   }, [openingRows, rows]);
 
@@ -316,7 +310,6 @@ export default function YarnToFabricPage() {
 
   const partyBalanceTotals = useMemo(() => ({
     fabricDelivery: partyBalanceRows.reduce((s, r) => s + r.fabricDelivery, 0),
-    wastage:        partyBalanceRows.reduce((s, r) => s + r.wastage,        0),
     fabricReturn:   partyBalanceRows.reduce((s, r) => s + r.fabricReturn,   0),
     netOutstanding: partyBalanceRows.reduce((s, r) => s + r.netOutstanding, 0),
   }), [partyBalanceRows]);
@@ -369,7 +362,6 @@ export default function YarnToFabricPage() {
         case "fabricProduction":     av = signedNetWtIfType(a.r, "Fabric Production")      ?? 0; bv = signedNetWtIfType(b.r, "Fabric Production")      ?? 0; break;
         case "fabricDelivery":       av = signedNetWtIfType(a.r, "Fabric Delivery")        ?? 0; bv = signedNetWtIfType(b.r, "Fabric Delivery")        ?? 0; break;
         case "fabricDeliveryReturn": av = signedNetWtIfType(a.r, "Fabric Delivery Return") ?? 0; bv = signedNetWtIfType(b.r, "Fabric Delivery Return") ?? 0; break;
-        case "wastageWt":            av = wastageWt(a.r);                       bv = wastageWt(b.r);                       break;
         case "gsm":                  av = a.r.gsm ?? 0;                         bv = b.r.gsm ?? 0;                         break;
         default: {
           const rawA = a.r[key as keyof ReportRow];
@@ -509,15 +501,15 @@ export default function YarnToFabricPage() {
 
   function exportSummaryCSV() {
     const groupLabel = GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? groupBy;
-    const headers = [groupLabel, "Doc Number(s)", "Rows", "Qty", "Fabric Production", "Fabric Delivery", "Wastage Wt", "Fab Del Return", "Run Fabric Bal."];
+    const headers = [groupLabel, "Doc Number(s)", "Rows", "Qty", "Fabric Production", "Fabric Delivery", "Fab Del Return", "Run Fabric Bal."];
     let fabricBal = openingFabricBalance;
     const data: (string | number)[][] = [
-      ["Opening Balance", "", "", "", "", "", "", "", fmt(openingFabricBalance)],
+      ["Opening Balance", "", "", "", "", "", "", fmt(openingFabricBalance)],
       ...sortedGrouped.map((r) => {
         fabricBal += r.fabricDelta;
-        return [r.label, r.docNums.join(", "), r.count, fmt(r.qty), fmt(r.fabricProduction), fmt(r.fabricDelivery), fmt(r.wastageWt), fmt(r.fabricDeliveryReturn), fmt(fabricBal)];
+        return [r.label, r.docNums.join(", "), r.count, fmt(r.qty), fmt(r.fabricProduction), fmt(r.fabricDelivery), fmt(r.fabricDeliveryReturn), fmt(fabricBal)];
       }),
-      ["Total", "", rows.length, fmt(totalQty), fmt(totalFabricProd), fmt(totalFabricDelivery), fmt(totalWastageWt), fmt(totalFabricDelRtn), ""],
+      ["Total", "", rows.length, fmt(totalQty), fmt(totalFabricProd), fmt(totalFabricDelivery), fmt(totalFabricDelRtn), ""],
     ];
     downloadBlob(csvHeading() + toCSV(headers, data), "ytf-summary.csv", "text/csv;charset=utf-8;");
   }
@@ -532,7 +524,6 @@ export default function YarnToFabricPage() {
     const bodyRows: (string | number)[][] = [];
     for (const item of detailRenderRows) {
       const { r, fabricBal } = item;
-      const wWt = wastageWt(r);
       bodyRows.push(visibleColsList.map((c) => {
         switch (c.key) {
           case "date":                  return r.date;
@@ -554,7 +545,6 @@ export default function YarnToFabricPage() {
           case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "";
           case "fabricProduction":      { const v = signedNetWtIfType(r, "Fabric Production");      return v != null ? fmt(v) : ""; }
           case "fabricDelivery":        { const v = signedNetWtIfType(r, "Fabric Delivery");        return v != null ? fmt(v) : ""; }
-          case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "";
           case "fabricDeliveryReturn":  { const v = signedNetWtIfType(r, "Fabric Delivery Return"); return v != null ? fmt(v) : ""; }
           case "runningFabricBalance":  return fmt(fabricBal);
           default:                      return "";
@@ -565,7 +555,6 @@ export default function YarnToFabricPage() {
       ci === 0                           ? "Grand Total"
       : c.key === "fabricProduction"     ? fmt(totalFabricProd)
       : c.key === "fabricDelivery"       ? fmt(totalFabricDelivery)
-      : c.key === "wastageWt"            ? fmt(totalWastageWt)
       : c.key === "fabricDeliveryReturn" ? fmt(totalFabricDelRtn)
       : ""
     );
@@ -584,14 +573,14 @@ export default function YarnToFabricPage() {
     let fabricBal = openingFabricBalance;
     autoTable(doc, {
       startY: 36,
-      head: [[groupLabel, "Rows", "Qty", "Fabric Production", "Fabric Delivery", "Wastage Wt", "Fab Del Return", "Run Fabric Bal."]],
+      head: [[groupLabel, "Rows", "Qty", "Fabric Production", "Fabric Delivery", "Fab Del Return", "Run Fabric Bal."]],
       body: [
-        ["Opening Balance", "", "", "", "", "", "", fmt(openingFabricBalance)],
+        ["Opening Balance", "", "", "", "", "", fmt(openingFabricBalance)],
         ...sortedGrouped.map((r) => {
           fabricBal += r.fabricDelta;
-          return [r.label, r.count, fmt(r.qty), fmt(r.fabricProduction), fmt(r.fabricDelivery), fmt(r.wastageWt), fmt(r.fabricDeliveryReturn), fmt(fabricBal)];
+          return [r.label, r.count, fmt(r.qty), fmt(r.fabricProduction), fmt(r.fabricDelivery), fmt(r.fabricDeliveryReturn), fmt(fabricBal)];
         }),
-        ["Total", rows.length, fmt(totalQty), fmt(totalFabricProd), fmt(totalFabricDelivery), fmt(totalWastageWt), fmt(totalFabricDelRtn), ""],
+        ["Total", rows.length, fmt(totalQty), fmt(totalFabricProd), fmt(totalFabricDelivery), fmt(totalFabricDelRtn), ""],
       ],
       styles: { fontSize: 8 },
       headStyles: { fillColor: [37, 99, 235] },
@@ -600,10 +589,10 @@ export default function YarnToFabricPage() {
   }
 
   function exportPartyBalanceCSV() {
-    const headers = ["Party", "Fabric Delivered", "Wastage Wt", "Fab Del Return", "Net Outstanding"];
+    const headers = ["Party", "Fabric Delivered", "Fab Del Return", "Net Outstanding"];
     const data: (string | number)[][] = [
-      ...sortedPartyBalance.map((r) => [r.party, fmt(r.fabricDelivery), fmt(r.wastage), fmt(r.fabricReturn), fmt(r.netOutstanding)]),
-      ["Total", fmt(partyBalanceTotals.fabricDelivery), fmt(partyBalanceTotals.wastage), fmt(partyBalanceTotals.fabricReturn), fmt(partyBalanceTotals.netOutstanding)],
+      ...sortedPartyBalance.map((r) => [r.party, fmt(r.fabricDelivery), fmt(r.fabricReturn), fmt(r.netOutstanding)]),
+      ["Total", fmt(partyBalanceTotals.fabricDelivery), fmt(partyBalanceTotals.fabricReturn), fmt(partyBalanceTotals.netOutstanding)],
     ];
     downloadBlob(csvHeading() + toCSV(headers, data), "ytf-party-balance.csv", "text/csv;charset=utf-8;");
   }
@@ -617,14 +606,14 @@ export default function YarnToFabricPage() {
     doc.setFontSize(10); doc.text("Party Balance Report", 14, 30);
     autoTable(doc, {
       startY: 36,
-      head: [["Party", "Fabric Delivered", "Wastage Wt", "Fab Del Return", "Net Outstanding"]],
+      head: [["Party", "Fabric Delivered", "Fab Del Return", "Net Outstanding"]],
       body: [
-        ...sortedPartyBalance.map((r) => [r.party, fmt(r.fabricDelivery), fmt(r.wastage), fmt(r.fabricReturn), fmt(r.netOutstanding)]),
-        ["Total", fmt(partyBalanceTotals.fabricDelivery), fmt(partyBalanceTotals.wastage), fmt(partyBalanceTotals.fabricReturn), fmt(partyBalanceTotals.netOutstanding)],
+        ...sortedPartyBalance.map((r) => [r.party, fmt(r.fabricDelivery), fmt(r.fabricReturn), fmt(r.netOutstanding)]),
+        ["Total", fmt(partyBalanceTotals.fabricDelivery), fmt(partyBalanceTotals.fabricReturn), fmt(partyBalanceTotals.netOutstanding)],
       ],
       styles: { fontSize: 9 },
       headStyles: { fillColor: [37, 99, 235] },
-      columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" } },
+      columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" } },
       didParseCell: (data) => {
         if (data.section === "body" && Array.isArray(data.row.raw) && data.row.raw[0] === "Total") {
           data.cell.styles.fontStyle = "bold";
@@ -651,7 +640,6 @@ export default function YarnToFabricPage() {
     const bodyRows: string[][] = [];
     for (const item of detailRenderRows) {
       const { r, fabricBal } = item;
-      const wWt = wastageWt(r);
       bodyRows.push(visibleColsList.map((c) => {
         switch (c.key) {
           case "date":                  return r.date;
@@ -673,7 +661,6 @@ export default function YarnToFabricPage() {
           case "quantity":              return r.quantity != null ? fmt(signedQty(r)) : "—";
           case "fabricProduction":      { const v = signedNetWtIfType(r, "Fabric Production");      return v != null ? fmt(v) : "—"; }
           case "fabricDelivery":        { const v = signedNetWtIfType(r, "Fabric Delivery");        return v != null ? fmt(v) : "—"; }
-          case "wastageWt":             return wWt !== 0 ? fmt(wWt) : "—";
           case "fabricDeliveryReturn":  { const v = signedNetWtIfType(r, "Fabric Delivery Return"); return v != null ? fmt(v) : "—"; }
           case "runningFabricBalance":  return fmt(fabricBal);
           default:                      return "";
@@ -684,7 +671,6 @@ export default function YarnToFabricPage() {
       ci === 0                           ? "Grand Total"
       : c.key === "fabricProduction"     ? fmt(totalFabricProd)
       : c.key === "fabricDelivery"       ? fmt(totalFabricDelivery)
-      : c.key === "wastageWt"            ? fmt(totalWastageWt)
       : c.key === "fabricDeliveryReturn" ? fmt(totalFabricDelRtn)
       : "—"
     );
@@ -915,7 +901,6 @@ export default function YarnToFabricPage() {
                           <SortHead label="Qty"  sortKey="qty"   sort={sortSummary} onSort={handleSortSummary} right />
                           <TableHead className="text-right whitespace-nowrap">Fabric Production</TableHead>
                           <TableHead className="text-right whitespace-nowrap">Fabric Delivery</TableHead>
-                          <TableHead className="text-right whitespace-nowrap">Wastage Wt</TableHead>
                           <TableHead className="text-right whitespace-nowrap">Fab Del Return</TableHead>
                           <TableHead className="text-right whitespace-nowrap">Run Fabric Bal.</TableHead>
                         </TableRow>
@@ -924,7 +909,7 @@ export default function YarnToFabricPage() {
                         {/* Opening Balance row */}
                         <TableRow className="bg-muted/40 italic text-muted-foreground">
                           <TableCell className="whitespace-nowrap">Opening Balance</TableCell>
-                          <TableCell /><TableCell /><TableCell /><TableCell /><TableCell /><TableCell /><TableCell />
+                          <TableCell /><TableCell /><TableCell /><TableCell /><TableCell /><TableCell />
                           <TableCell className={`text-right whitespace-nowrap font-semibold not-italic ${openingFabricBalance < 0 ? "text-red-600" : "text-emerald-700"}`}>{fmt(openingFabricBalance)}</TableCell>
                         </TableRow>
 
@@ -936,7 +921,6 @@ export default function YarnToFabricPage() {
                             <TableCell className="text-right">{fmt(r.qty)}</TableCell>
                             <TableCell className="text-right">{r.fabricProduction !== 0 ? fmt(r.fabricProduction) : "—"}</TableCell>
                             <TableCell className={`text-right${r.fabricDelivery < 0 ? " text-red-600" : ""}`}>{r.fabricDelivery !== 0 ? fmt(r.fabricDelivery) : "—"}</TableCell>
-                            <TableCell className={`text-right ${r.wastageWt !== 0 ? "text-amber-700" : ""}`}>{r.wastageWt !== 0 ? fmt(r.wastageWt) : "—"}</TableCell>
                             <TableCell className={`text-right${r.fabricDeliveryReturn > 0 ? " text-green-700" : ""}`}>{r.fabricDeliveryReturn !== 0 ? fmt(r.fabricDeliveryReturn) : "—"}</TableCell>
                             <TableCell className={`text-right whitespace-nowrap font-semibold ${summaryFabricRunning[i] < 0 ? "text-red-600" : "text-emerald-700"}`}>{fmt(summaryFabricRunning[i])}</TableCell>
                           </TableRow>
@@ -948,7 +932,6 @@ export default function YarnToFabricPage() {
                           <TableCell className="text-right">{fmt(totalQty)}</TableCell>
                           <TableCell className="text-right">{fmt(totalFabricProd)}</TableCell>
                           <TableCell className={`text-right${totalFabricDelivery < 0 ? " text-red-600" : ""}`}>{fmt(totalFabricDelivery)}</TableCell>
-                          <TableCell className="text-right text-amber-700">{fmt(totalWastageWt)}</TableCell>
                           <TableCell className="text-right">{fmt(totalFabricDelRtn)}</TableCell>
                           <TableCell />
                         </TableRow>
@@ -1015,7 +998,6 @@ export default function YarnToFabricPage() {
 
                         {detailRenderRows.map((item) => {
                           const { r, fabricBal } = item;
-                          const wWt = wastageWt(r);
 
                           return (
                             <TableRow key={r.detailId}>
@@ -1046,8 +1028,6 @@ export default function YarnToFabricPage() {
                                     const v = signedNetWtIfType(r, "Fabric Delivery");
                                     return <TableCell key={c.key} className={`text-right whitespace-nowrap${v != null && v < 0 ? " text-red-600" : " text-orange-600"}`}>{v != null ? fmt(v) : "—"}</TableCell>;
                                   }
-                                  case "wastageWt":
-                                    return <TableCell key={c.key} className={`text-right whitespace-nowrap${wWt < 0 ? " text-red-500" : wWt > 0 ? " text-amber-700" : ""}`}>{wWt !== 0 ? fmt(wWt) : "—"}</TableCell>;
                                   case "fabricDeliveryReturn": {
                                     const v = signedNetWtIfType(r, "Fabric Delivery Return");
                                     return <TableCell key={c.key} className="text-right whitespace-nowrap text-green-600">{v != null ? fmt(v) : "—"}</TableCell>;
@@ -1068,7 +1048,6 @@ export default function YarnToFabricPage() {
                             if (ci === 0)                           return <TableCell key={c.key} className="whitespace-nowrap">Grand Total</TableCell>;
                             if (c.key === "fabricProduction")       return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(totalFabricProd)}</TableCell>;
                             if (c.key === "fabricDelivery")         return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(totalFabricDelivery)}</TableCell>;
-                            if (c.key === "wastageWt")              return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(totalWastageWt)}</TableCell>;
                             if (c.key === "fabricDeliveryReturn")   return <TableCell key={c.key} className="text-right whitespace-nowrap">{fmt(totalFabricDelRtn)}</TableCell>;
                             return <TableCell key={c.key} />;
                           })}
@@ -1083,7 +1062,6 @@ export default function YarnToFabricPage() {
                   <div className="flex items-start gap-2">
                     <p className="text-xs text-muted-foreground">
                       Cumulative fabric balance per party — includes all data up to the selected end date.
-                      <span className="ml-1 font-medium text-amber-700">Wastage</span> is included in the net outstanding.
                     </p>
                   </div>
                   {partyBalanceRows.length === 0 ? (
@@ -1095,7 +1073,6 @@ export default function YarnToFabricPage() {
                           <TableRow>
                             <SortHead label="Party"            sortKey="party"          sort={sortPartyBalance} onSort={handleSortPartyBalance} />
                             <SortHead label="Fabric Delivered" sortKey="fabricDelivery" sort={sortPartyBalance} onSort={handleSortPartyBalance} right />
-                            <SortHead label="Wastage Wt"       sortKey="wastage"        sort={sortPartyBalance} onSort={handleSortPartyBalance} right />
                             <SortHead label="Fab Del Return"   sortKey="fabricReturn"   sort={sortPartyBalance} onSort={handleSortPartyBalance} right />
                             <SortHead label="Net Outstanding"  sortKey="netOutstanding" sort={sortPartyBalance} onSort={handleSortPartyBalance} right />
                           </TableRow>
@@ -1105,7 +1082,6 @@ export default function YarnToFabricPage() {
                             <TableRow key={r.party}>
                               <TableCell className="font-medium whitespace-nowrap">{r.party}</TableCell>
                               <TableCell className={`text-right whitespace-nowrap${r.fabricDelivery < 0 ? " text-red-600" : ""}`}>{fmt(r.fabricDelivery)}</TableCell>
-                              <TableCell className={`text-right whitespace-nowrap${r.wastage !== 0 ? " text-amber-700" : ""}`}>{r.wastage !== 0 ? fmt(r.wastage) : "—"}</TableCell>
                               <TableCell className={`text-right whitespace-nowrap${r.fabricReturn > 0 ? " text-green-700" : ""}`}>{r.fabricReturn !== 0 ? fmt(r.fabricReturn) : "—"}</TableCell>
                               <TableCell className={`text-right whitespace-nowrap font-semibold${r.netOutstanding < 0 ? " text-red-600" : " text-emerald-700"}`}>{fmt(r.netOutstanding)}</TableCell>
                             </TableRow>
@@ -1113,7 +1089,6 @@ export default function YarnToFabricPage() {
                           <TableRow className="bg-blue-50 font-bold border-t-2 text-blue-900">
                             <TableCell className="whitespace-nowrap">Total</TableCell>
                             <TableCell className="text-right whitespace-nowrap">{fmt(partyBalanceTotals.fabricDelivery)}</TableCell>
-                            <TableCell className="text-right whitespace-nowrap">{fmt(partyBalanceTotals.wastage)}</TableCell>
                             <TableCell className="text-right whitespace-nowrap">{fmt(partyBalanceTotals.fabricReturn)}</TableCell>
                             <TableCell className={`text-right whitespace-nowrap${partyBalanceTotals.netOutstanding < 0 ? " text-red-600" : " text-emerald-700"}`}>{fmt(partyBalanceTotals.netOutstanding)}</TableCell>
                           </TableRow>
@@ -1175,21 +1150,6 @@ function YtfChartSection({
       .map(([month, v]) => ({ month, "Fabric Production": +v.production.toFixed(NUM_DECIMALS), "Fabric Delivery": +v.delivery.toFixed(NUM_DECIMALS) }));
   }, [rows]);
 
-  // Wastage Wt by Party
-  const wastageByParty = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const r of rows) {
-      const wWt = wastageWt(r);
-      if (wWt === 0) continue;
-      const k = r.partyName ?? "Unknown";
-      map.set(k, (map.get(k) ?? 0) + Math.abs(wWt));
-    }
-    return Array.from(map.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 15)
-      .map(([name, val]) => ({ name, "Wastage Wt": +val.toFixed(NUM_DECIMALS) }));
-  }, [rows]);
-
   // Running Fabric Balance over time (by date)
   const fabricBalanceOverTime = useMemo(() => {
     const dateMap = new Map<string, number>();
@@ -1226,25 +1186,6 @@ function YtfChartSection({
                 <Legend />
                 <Bar dataKey="Fabric Production" fill={CHART_COLORS[1]} />
                 <Bar dataKey="Fabric Delivery"   fill={CHART_COLORS[3]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
-
-      {wastageByParty.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Wastage Wt by Party</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={wastageByParty} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => v.toLocaleString("en-US", { minimumFractionDigits: 3 })} />
-                <Bar dataKey="Wastage Wt" fill={CHART_COLORS[3]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
