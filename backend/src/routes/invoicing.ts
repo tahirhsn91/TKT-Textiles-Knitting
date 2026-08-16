@@ -1,29 +1,37 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db } from "../db/index.js";
 import {
   invoiceTable,
   invoiceItemTable,
   invoiceTransactionTable,
+  invoicePaymentTable,
   companyInfoMasterTable,
   partyMasterTable,
   yarnTypeMasterTable,
   yarnCountMasterTable,
+  configurationTable,
 } from "../db/index.js";
 import {
   getUninvoicedPreview,
   listUninvoicedParties,
   computeItemAmounts,
 } from "../lib/invoice-engine.js";
+import {
+  computePaymentState,
+  toISODate,
+  daysBetween,
+  toNum,
+} from "../lib/invoice-payments.js";
 import { isFbrSandboxEnabled } from "../lib/fbr/config.js";
 import { buildFbrInvoicePayload, postInvoiceToFbr } from "../lib/fbr/client.js";
 import { validateBody } from "../lib/validate.js";
 
 const router: IRouter = Router();
 
-function idParam(req: { params: Record<string, string> }) {
-  const id = parseInt(req.params.id, 10);
+function idParam(req: { params: Record<string, unknown> }) {
+  const id = parseInt(String(req.params.id ?? ""), 10);
   return isNaN(id) ? null : id;
 }
 
@@ -237,6 +245,8 @@ async function loadInvoiceDetail(id: number) {
       partyProvince: partyMasterTable.province,
       partyRegistrationType: partyMasterTable.registrationType,
       status: invoiceTable.status,
+      origin: invoiceTable.origin,
+      dueDays: invoiceTable.dueDays,
       fbrInvoiceNumber: invoiceTable.fbrInvoiceNumber,
       fbrStatusCode: invoiceTable.fbrStatusCode,
       totalValue: invoiceTable.totalValue,
@@ -279,7 +289,51 @@ async function loadInvoiceDetail(id: number) {
     .from(invoiceTransactionTable)
     .where(eq(invoiceTransactionTable.invoiceId, id));
 
-  return { ...inv, items, transactionHeaderIds: transactions.map((t) => t.transactionHeaderId) };
+  const payments = await loadInvoicePayments(id);
+
+  // Posted date for due-date math: use the postedAt date when available, else
+  // the invoice date (drafts have no due/overdue state but keep it safe).
+  const postedIso = toISODate(inv.postedAt ?? new Date(inv.invoiceDate));
+  const payState = computePaymentState({
+    grandTotal: inv.grandTotal,
+    dueDays: inv.dueDays,
+    postedDateIso: postedIso,
+    payments,
+  });
+
+  return {
+    ...inv,
+    items,
+    transactionHeaderIds: transactions.map((t) => t.transactionHeaderId),
+    payments,
+    paidAmount: payState.paidAmount,
+    outstanding: payState.outstanding,
+    dueDate: payState.dueDateIso,
+    overdue: payState.overdue,
+    paid: payState.paid,
+    overpaid: payState.overpaid,
+    totalTaxDeduction: payState.totalTaxDeduction,
+  };
+}
+
+/** Load payments for an invoice (oldest first). */
+async function loadInvoicePayments(invoiceId: number) {
+  return await db
+    .select({
+      id: invoicePaymentTable.id,
+      invoiceId: invoicePaymentTable.invoiceId,
+      amount: invoicePaymentTable.amount,
+      taxDeduction: invoicePaymentTable.taxDeduction,
+      paymentDate: invoicePaymentTable.paymentDate,
+      method: invoicePaymentTable.method,
+      reference: invoicePaymentTable.reference,
+      notes: invoicePaymentTable.notes,
+      paidBy: invoicePaymentTable.paidBy,
+      createdAt: invoicePaymentTable.createdAt,
+    })
+    .from(invoicePaymentTable)
+    .where(eq(invoicePaymentTable.invoiceId, invoiceId))
+    .orderBy(invoicePaymentTable.paymentDate, invoicePaymentTable.id);
 }
 
 router.get("/invoicing/:id", async (req, res): Promise<void> => {
@@ -323,6 +377,28 @@ router.post("/invoicing/:id/post", async (req, res): Promise<void> => {
     return;
   }
 
+  // Snapshot the party's credit terms at post time (issue #189). A later edit
+  // to the party's creditDays must not rewrite past invoices.
+  const dueDays = (party.creditDays ?? 0) > 0 ? party.creditDays ?? 0 : null;
+
+  // Unregistered parties are never sent to FBR: mark posted locally only.
+  if ((party.registrationType ?? "Unregistered") === "Unregistered") {
+    const [updated] = await db
+      .update(invoiceTable)
+      .set({
+        status: "posted",
+        origin: "local",
+        dueDays,
+        postedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(invoiceTable.id, inv.id))
+      .returning();
+    const detail = await loadInvoiceDetail(updated.id);
+    res.json({ message: "Invoice marked posted (unregistered party — not sent to FBR)", invoice: detail });
+    return;
+  }
+
   const sandbox = await isFbrSandboxEnabled();
   const token = sandbox ? company.fbrSandboxToken : company.fbrProductionToken;
 
@@ -349,6 +425,8 @@ router.post("/invoicing/:id/post", async (req, res): Promise<void> => {
   const [updated] = await db
     .update(invoiceTable)
     .set({
+      origin: "fbr",
+      dueDays,
       fbrInvoiceNumber: fbrNumber,
       fbrStatusCode: vr?.statusCode ?? null,
       fbrRawResponse: result.raw,
@@ -393,5 +471,309 @@ router.delete("/invoicing/:id", async (req, res): Promise<void> => {
   await db.delete(invoiceTable).where(eq(invoiceTable.id, id));
   res.sendStatus(204);
 });
+
+// ─── Config: allow backdated invoices (issue #189) ─────────────────────────
+async function isAllowBackdatedInvoices(): Promise<boolean> {
+  const [cfg] = await db
+    .select({ enabled: configurationTable.enabled })
+    .from(configurationTable)
+    .where(eq(configurationTable.code, "0003"));
+  return cfg?.enabled ?? false;
+}
+
+// ─── Record a payment against an invoice ───────────────────────────────────
+const paymentSchema = z.object({
+  amount: z.coerce.number().positive("Amount must be positive"),
+  taxDeduction: z.coerce.number().min(0, "Tax deduction cannot be negative").optional().default(0),
+  paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date"),
+  method: z.string().optional().nullable(),
+  reference: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
+});
+
+router.post("/invoicing/:id/payments", validateBody(paymentSchema), async (req, res): Promise<void> => {
+  const id = idParam(req);
+  if (!id) { res.status(400).json({ error: "Invalid invoice id" }); return; }
+
+  const [inv] = await db
+    .select().from(invoiceTable).where(eq(invoiceTable.id, id));
+  if (!inv) { res.status(404).json({ error: "Invoice not found" }); return; }
+  if (inv.status !== "posted") {
+    res.status(409).json({ error: "Payments can only be recorded against posted invoices." });
+    return;
+  }
+
+  const body = req.body as unknown as z.infer<typeof paymentSchema>;
+  if (body.taxDeduction > body.amount) {
+    res.status(400).json({ error: "Tax deduction cannot exceed the payment amount." });
+    return;
+  }
+
+  const paidBy = (req.auth?.username) ?? "system";
+  const [payment] = await db
+    .insert(invoicePaymentTable)
+    .values({
+      invoiceId: id,
+      amount: body.amount.toFixed(2),
+      taxDeduction: body.taxDeduction.toFixed(2),
+      paymentDate: body.paymentDate,
+      method: body.method || null,
+      reference: body.reference || null,
+      notes: body.notes || null,
+      paidBy,
+    })
+    .returning();
+
+  const detail = await loadInvoiceDetail(id);
+  res.status(201).json({ payment, invoice: detail });
+});
+
+// ─── Delete a payment ─────────────────────────────────────────────────────
+router.delete("/invoicing/:id/payments/:paymentId", async (req, res): Promise<void> => {
+  const id = idParam(req);
+  const paymentId = parseInt(req.params.paymentId, 10);
+  if (!id || isNaN(paymentId)) { res.status(400).json({ error: "Invalid ids" }); return; }
+
+  const [inv] = await db
+    .select().from(invoiceTable).where(eq(invoiceTable.id, id));
+  if (!inv) { res.status(404).json({ error: "Invoice not found" }); return; }
+
+  const [existing] = await db
+    .select().from(invoicePaymentTable).where(eq(invoicePaymentTable.id, paymentId));
+  if (!existing || existing.invoiceId !== id) {
+    res.status(404).json({ error: "Payment not found" });
+    return;
+  }
+
+  await db.delete(invoicePaymentTable).where(eq(invoicePaymentTable.id, paymentId));
+  const detail = await loadInvoiceDetail(id);
+  res.json({ message: "Payment deleted", invoice: detail });
+});
+
+// ─── Backdated invoice (manual, from another system) ───────────────────────
+// Only available when the "allow backdated invoices" toggle (0003) is enabled.
+// Records an existing invoice: user enters the id (becomes the PK), FBR number,
+// party, backdated invoice date, and line items. Standalone — no transaction
+// junction, no FBR call. Created directly as posted (origin='manual').
+const backdatedItemSchema = z.object({
+  yarnTypeId: z.coerce.number().int().positive(),
+  yarnCountId: z.coerce.number().int().positive().optional().nullable(),
+  hsCode: z.string().optional().nullable(),
+  uoM: z.string().optional().nullable(),
+  productDescription: z.string().optional().nullable(),
+  quantity: z.coerce.number().positive("Net weight must be positive"),
+  ratePerKg: z.coerce.number().positive("Rate per kg must be positive"),
+});
+
+const backdatedSchema = z.object({
+  id: z.coerce.number().int().positive("Manual invoice id is required"),
+  partyId: z.coerce.number().int().positive("Party is required"),
+  invoiceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid invoice date"),
+  fbrInvoiceNumber: z.string().optional().nullable(),
+  items: z.array(backdatedItemSchema).min(1, "At least one item is required"),
+});
+
+router.post("/invoicing/backdated", validateBody(backdatedSchema), async (req, res): Promise<void> => {
+  if (!(await isAllowBackdatedInvoices())) {
+    res.status(403).json({ error: "Backdated invoices are not enabled." });
+    return;
+  }
+
+  const body = req.body as unknown as z.infer<typeof backdatedSchema>;
+
+  // The manually-entered id becomes the actual PK — guard against existing rows
+  // (the DB PK unique constraint is the backstop for races/concurrency).
+  const [existing] = await db
+    .select({ id: invoiceTable.id }).from(invoiceTable).where(eq(invoiceTable.id, body.id));
+  if (existing) {
+    res.status(400).json({ error: `An invoice with ID ${body.id} already exists.` });
+    return;
+  }
+
+  const [defaultCompany] = await db
+    .select().from(companyInfoMasterTable).where(eq(companyInfoMasterTable.isDefault, true));
+  if (!defaultCompany) {
+    res.status(409).json({ error: "No default company is configured. Set a default company in Company Info first." });
+    return;
+  }
+
+  const [party] = await db
+    .select().from(partyMasterTable).where(eq(partyMasterTable.id, body.partyId));
+  if (!party) { res.status(404).json({ error: "Party not found" }); return; }
+
+  const dueDays = (party.creditDays ?? 0) > 0 ? party.creditDays ?? 0 : null;
+  const createdBy = (req.auth?.username) ?? "system";
+
+  let invoice;
+  try {
+    await db.transaction(async (tx) => {
+      let totalValue = 0;
+      let totalTax = 0;
+      let grandTotal = 0;
+      const itemRows: (typeof invoiceItemTable.$inferInsert)[] = [];
+
+      for (const it of body.items) {
+        const amounts = computeItemAmounts(String(it.quantity), it.ratePerKg);
+        totalValue += parseFloat(amounts.valueExcludingTax);
+        totalTax += parseFloat(amounts.taxAmount);
+        grandTotal += parseFloat(amounts.totalValue);
+        itemRows.push({
+          invoiceId: body.id,
+          yarnTypeId: it.yarnTypeId,
+          yarnCountId: it.yarnCountId ?? null,
+          hsCode: it.hsCode ?? null,
+          uoM: it.uoM ?? null,
+          productDescription: it.productDescription ?? null,
+          quantity: String(it.quantity),
+          ratePerKg: String(it.ratePerKg),
+          valueExcludingTax: amounts.valueExcludingTax,
+          taxAmount: amounts.taxAmount,
+          totalValue: amounts.totalValue,
+        });
+      }
+
+      if (itemRows.length === 0) {
+        throw Object.assign(new Error("No valid items"), { code: "NO_ITEMS" });
+      }
+
+      const [ins] = await tx
+        .insert(invoiceTable)
+        .values({
+          id: body.id,
+          invoiceDate: body.invoiceDate,
+          companyId: defaultCompany.id,
+          partyId: body.partyId,
+          status: "posted",
+          origin: "manual",
+          dueDays,
+          fbrInvoiceNumber: body.fbrInvoiceNumber || null,
+          totalValue: totalValue.toFixed(2),
+          totalTax: totalTax.toFixed(2),
+          grandTotal: grandTotal.toFixed(2),
+          createdBy,
+          postedAt: new Date(body.invoiceDate + "T00:00:00"),
+        })
+        .returning();
+
+      await tx.insert(invoiceItemTable).values(itemRows);
+      invoice = ins;
+    });
+  } catch (err) {
+    if ((err as { code?: string }).code === "23505") {
+      res.status(400).json({ error: `An invoice with ID ${body.id} already exists.` });
+      return;
+    }
+    if ((err as { code?: string }).code === "NO_ITEMS") {
+      res.status(400).json({ error: "No valid items were provided." });
+      return;
+    }
+    throw err;
+  }
+
+  const detail = await loadInvoiceDetail(invoice!.id);
+  res.status(201).json({ message: "Backdated invoice created", invoice: detail });
+});
+
+// ─── Receivables: per-party outstanding + aging ────────────────────────────
+router.get("/invoicing/receivables", async (_req, res): Promise<void> => {
+  const invoices = await db
+    .select({
+      id: invoiceTable.id,
+      invoiceDate: invoiceTable.invoiceDate,
+      partyId: invoiceTable.partyId,
+      partyName: partyMasterTable.name,
+      grandTotal: invoiceTable.grandTotal,
+      dueDays: invoiceTable.dueDays,
+      postedAt: invoiceTable.postedAt,
+      origin: invoiceTable.origin,
+    })
+    .from(invoiceTable)
+    .leftJoin(partyMasterTable, eq(invoiceTable.partyId, partyMasterTable.id))
+    .where(eq(invoiceTable.status, "posted"));
+
+  const payments = await db
+    .select({
+      invoiceId: invoicePaymentTable.invoiceId,
+      amount: invoicePaymentTable.amount,
+      taxDeduction: invoicePaymentTable.taxDeduction,
+    })
+    .from(invoicePaymentTable);
+
+  const payByInvoice = new Map<number, typeof payments>();
+  for (const p of payments) {
+    const arr = payByInvoice.get(p.invoiceId) ?? [];
+    arr.push(p);
+    payByInvoice.set(p.invoiceId, arr);
+  }
+
+  const today = toISODate(new Date());
+  const partyMap = new Map<number, {
+    partyName: string;
+    totalInvoiced: number;
+    totalPaid: number;
+    outstanding: number;
+    totalWht: number;
+    buckets: { current: number; b1_30: number; b31_60: number; b60: number };
+  }>();
+
+  for (const inv of invoices) {
+    const p = payByInvoice.get(inv.id) ?? [];
+    const state = computePaymentState({
+      grandTotal: inv.grandTotal,
+      dueDays: inv.dueDays,
+      postedDateIso: toISODate(inv.postedAt ?? new Date(inv.invoiceDate ?? "")),
+      payments: p,
+    });
+
+    const e = partyMap.get(inv.partyId) ?? {
+      partyName: inv.partyName ?? `Party #${inv.partyId}`,
+      totalInvoiced: 0,
+      totalPaid: 0,
+      outstanding: 0,
+      totalWht: 0,
+      buckets: { current: 0, b1_30: 0, b31_60: 0, b60: 0 },
+    };
+    e.totalInvoiced += toNum(inv.grandTotal);
+    e.totalPaid += state.paidAmount;
+    e.totalWht += state.totalTaxDeduction;
+
+    if (state.outstanding > 0) {
+      e.outstanding += state.outstanding;
+      if (state.overdue && state.dueDateIso) {
+        const days = daysBetween(today, state.dueDateIso);
+        if (days > 60) e.buckets.b60 += state.outstanding;
+        else if (days > 30) e.buckets.b31_60 += state.outstanding;
+        else if (days > 0) e.buckets.b1_30 += state.outstanding;
+        else e.buckets.current += state.outstanding;
+      } else {
+        e.buckets.current += state.outstanding;
+      }
+    }
+    partyMap.set(inv.partyId, e);
+  }
+
+  const rows = Array.from(partyMap.entries())
+    .map(([partyId, v]) => ({
+      partyId,
+      partyName: v.partyName,
+      totalInvoiced: round2(v.totalInvoiced),
+      totalPaid: round2(v.totalPaid),
+      outstanding: round2(v.outstanding),
+      totalTaxDeduction: round2(v.totalWht),
+      aging: {
+        current: round2(v.buckets.current),
+        b1_30: round2(v.buckets.b1_30),
+        b31_60: round2(v.buckets.b31_60),
+        b60: round2(v.buckets.b60),
+      },
+    }))
+    .sort((a, b) => a.partyName.localeCompare(b.partyName));
+
+  res.json({ today, parties: rows });
+});
+
+function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
 
 export default router;
