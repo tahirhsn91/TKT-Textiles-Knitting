@@ -5,7 +5,7 @@ import { format } from "date-fns";
 
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -76,8 +76,17 @@ import {
 } from "@/hooks/use-fbr-invoicing";
 import { useListYarnTypeMaster, useListYarnCountMaster } from "@workspace/api-client-react";
 import { downloadInvoicePdf, amountInWords } from "@/lib/invoice-pdf";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer,
+} from "recharts";
 
 const SALES_TAX_PERCENT = 18;
+
+const CHART_COLORS = [
+  "#2563eb", "#16a34a", "#dc2626", "#d97706", "#7c3aed",
+  "#0891b2", "#be185d", "#65a30d", "#ea580c", "#6d28d9",
+];
 
 function money(n: number): string {
   return n.toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -116,7 +125,7 @@ export default function InvoicingPage() {
   const [rates, setRates] = useState<Record<string, string>>({});
   const [pendingDelete, setPendingDelete] = useState<InvoiceListItem | null>(null);
   const [viewingId, setViewingId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<"invoices" | "receivables">("invoices");
+  const [activeTab, setActiveTab] = useState<"invoices" | "receivables" | "analytics">("invoices");
 
   // Invoice table filters: multi-select Party, Status, and Due Status, each
   // defaulting to show everything (empty selection = no restriction).
@@ -373,11 +382,12 @@ export default function InvoicingPage() {
         </div>
 
         {/* Tabs: Invoices + Receivables (issue #189) */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "invoices" | "receivables")}>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "invoices" | "receivables" | "analytics")}>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <TabsList>
               <TabsTrigger value="invoices">Invoices</TabsTrigger>
               <TabsTrigger value="receivables">Receivables</TabsTrigger>
+              <TabsTrigger value="analytics">Analytics</TabsTrigger>
             </TabsList>
             {activeTab === "receivables" && (
               <Button variant="outline" size="sm" className="gap-1.5" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/invoicing/receivables"] })}>
@@ -645,6 +655,11 @@ export default function InvoicingPage() {
           <TabsContent value="receivables" className="mt-3 space-y-4">
             <ReceivablesView data={receivables} loading={!receivables} />
           </TabsContent>
+
+          {/* Analytics tab */}
+          <TabsContent value="analytics" className="mt-3 space-y-4">
+            <AnalyticsView invoices={invoices ?? []} loading={!invoices} />
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -898,6 +913,216 @@ function ReceivablesView({ data, loading }: { data: import("@/hooks/use-fbr-invo
       </CardContent>
     </Card>
   );
+}
+
+// ─── Analytics tab ─────────────────────────────────────────────────────────
+function AnalyticsView({ invoices, loading }: { invoices: InvoiceListItem[]; loading: boolean }) {
+  const monthLabel = (iso: string) => {
+    try {
+      const d = new Date(iso + "T00:00:00");
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    } catch {
+      return iso;
+    }
+  };
+
+  // KPIs
+  const kpis = useMemo(() => {
+    let totalInvoiced = 0;
+    let totalCollected = 0;
+    let outstanding = 0;
+    let open = 0;
+    let overdue = 0;
+    for (const inv of invoices) {
+      const g = parseFloat(inv.grandTotal) || 0;
+      const paid = inv.paidAmount ?? 0;
+      const oust = inv.outstanding ?? g;
+      totalInvoiced += g;
+      totalCollected += paid;
+      outstanding += oust;
+      if (inv.status === "posted" && !inv.paid) {
+        open += 1;
+        if (inv.overdue) overdue += 1;
+      }
+    }
+    return { totalInvoiced, totalCollected, outstanding, open, overdue };
+  }, [invoices]);
+
+  // KPI cards config
+  const kpiCards = [
+    { label: "Total Invoiced", value: money(kpis.totalInvoiced), tone: "" },
+    { label: "Total Collected", value: money(kpis.totalCollected), tone: "text-emerald-700" },
+    { label: "Outstanding", value: money(kpis.outstanding), tone: kpis.outstanding > 0 ? "text-red-600" : "text-emerald-700" },
+    { label: "Open Invoices", value: String(kpis.open), tone: "" },
+    { label: "Overdue Invoices", value: String(kpis.overdue), tone: kpis.overdue > 0 ? "text-red-600" : "" },
+  ];
+
+  // Monthly invoiced vs collected
+  const byMonth = useMemo(() => {
+    const map = new Map<string, { invoiced: number; collected: number }>();
+    for (const inv of invoices) {
+      const k = monthLabel(inv.invoiceDate);
+      const e = map.get(k) ?? { invoiced: 0, collected: 0 };
+      e.invoiced += parseFloat(inv.grandTotal) || 0;
+      e.collected += inv.paidAmount ?? 0;
+      map.set(k, e);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([month, v]) => ({ month, "Invoiced": round2(v.invoiced), "Collected": round2(v.collected) }));
+  }, [invoices]);
+
+  // Invoiced by status (draft vs posted)
+  const byStatus = useMemo(() => {
+    let draft = 0;
+    let posted = 0;
+    for (const inv of invoices) {
+      const g = parseFloat(inv.grandTotal) || 0;
+      if (inv.status === "posted") posted += g; else draft += g;
+    }
+    return [
+      { name: "Draft", value: round2(draft) },
+      { name: "Posted", value: round2(posted) },
+    ].filter((d) => d.value > 0);
+  }, [invoices]);
+
+  // Outstanding by party (top 10)
+  const byParty = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const inv of invoices) {
+      if (inv.status !== "posted") continue;
+      const oust = inv.outstanding ?? ((parseFloat(inv.grandTotal) || 0));
+      if (oust <= 0) continue;
+      const name = inv.partyName ?? `Party #${inv.partyId}`;
+      map.set(name, (map.get(name) ?? 0) + oust);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, value]) => ({ name, "Outstanding": round2(value) }));
+  }, [invoices]);
+
+  // Payment mix (paid/overdue/pending counts)
+  const paymentMix = useMemo(() => {
+    let paid = 0, overdue = 0, pending = 0, overpaid = 0;
+    for (const inv of invoices) {
+      if (inv.status !== "posted") continue;
+      const ds = dueStatusOf(inv);
+      if (ds === "paid") paid += 1;
+      else if (ds === "overpaid") overpaid += 1;
+      else if (ds === "overdue") overdue += 1;
+      else pending += 1;
+    }
+    return [
+      { name: "Paid", value: paid },
+      { name: "Overdue", value: overdue },
+      { name: "Pending", value: pending },
+      { name: "Overpaid", value: overpaid },
+    ].filter((d) => d.value > 0);
+  }, [invoices]);
+
+  if (loading) {
+    return (
+      <Card className="overflow-hidden">
+        <CardContent className="p-5 space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {kpiCards.map((c) => (
+          <Card key={c.label}>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs text-muted-foreground">{c.label}</p>
+              <p className={`mt-1 text-xl font-semibold tabular-nums ${c.tone}`}>{c.value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Monthly trend */}
+      {byMonth.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Invoiced vs Collected by Month</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={byMonth} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v: number) => money(v)} />
+                <Legend />
+                <Bar dataKey="Invoiced" fill={CHART_COLORS[0]} />
+                <Bar dataKey="Collected" fill={CHART_COLORS[1]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* By status */}
+        {byStatus.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Invoiced Value by Status</CardTitle></CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie data={byStatus} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                    {byStatus.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                  </Pie>
+                  <Legend />
+                  <Tooltip formatter={(v: number) => money(v)} />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Payment mix (counts) */}
+        {paymentMix.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Posted Invoices by Payment Status</CardTitle></CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie data={paymentMix} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                    {paymentMix.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                  </Pie>
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Outstanding by party */}
+      {byParty.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Outstanding by Party (top 10)</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={byParty} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" tick={{ fontSize: 11 }} />
+                <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v: number) => money(v)} />
+                <Bar dataKey="Outstanding" fill={CHART_COLORS[2]} radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
 // ─── Backdated invoice dialog ─────────────────────────────────────────────
