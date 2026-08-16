@@ -205,6 +205,31 @@ export function useLatestRates(partyId: number | null) {
   });
 }
 
+export interface FutureInvoiceRow {
+  partyId: number;
+  partyName: string;
+  yarnTypeId: number;
+  yarnTypeName: string | null;
+  yarnCountId: number | null;
+  yarnCountName: string | null;
+  hsCode: string | null;
+  uoM: string | null;
+  productDescription: string | null;
+  quantity: string;
+  ratePerKg: number | null;
+  rateDate: string | null;
+  value: number | null;
+}
+
+/** All parties' un-invoiced deliveries valued at the latest rate. */
+export function useFutureInvoices() {
+  return useQuery<FutureInvoiceRow[], ErrorType<unknown>>({
+    queryKey: [`${invoicingKey}/future`] as unknown as QueryKey,
+    queryFn: () => customFetch<FutureInvoiceRow[]>(`${invoicingKey}/future`, { method: "GET" }),
+    staleTime: 15_000,
+  });
+}
+
 export function useListInvoices() {
   return useQuery<InvoiceListItem[], ErrorType<unknown>>({
     queryKey: [invoicingKey] as unknown as QueryKey,

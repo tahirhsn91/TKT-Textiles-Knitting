@@ -377,10 +377,24 @@ router.get("/invoicing/rates/:partyId", async (req, res): Promise<void> => {
   const partyId = parseInt(req.params.partyId ?? "", 10);
   if (isNaN(partyId)) { res.status(400).json({ error: "Invalid party id" }); return; }
 
+  const rates = await loadLatestRates(partyId);
+  // Keys from loadLatestRates carry a `partyId|` prefix; strip it for the
+  // single-party consumer (frontend expects `${yarnTypeId}|${yarnCountId}`).
+  res.json(Array.from(rates.entries()).map(([key, v]) => ({ key: key.slice(String(partyId).length + 1), ...v })));
+});
+
+/**
+ * Latest rate per (party, yarn type, yarn count): the ratePerKg of the most
+ * recent invoice item for that combination, across all parties (when
+ * `partyId` is undefined) or for one party. Key = `${yarnTypeId}|${yarnCountId}`.
+ */
+async function loadLatestRates(partyId: number | undefined): Promise<Map<string, { ratePerKg: string; invoiceDate: string }>> {
+  const conditions = partyId != null ? eq(invoiceTable.partyId, partyId) : undefined;
   const rows = await db
     .selectDistinctOn(
-      [invoiceItemTable.yarnTypeId, invoiceItemTable.yarnCountId],
+      [invoiceTable.partyId, invoiceItemTable.yarnTypeId, invoiceItemTable.yarnCountId],
       {
+        partyId: invoiceTable.partyId,
         yarnTypeId: invoiceItemTable.yarnTypeId,
         yarnCountId: invoiceItemTable.yarnCountId,
         ratePerKg: invoiceItemTable.ratePerKg,
@@ -390,8 +404,11 @@ router.get("/invoicing/rates/:partyId", async (req, res): Promise<void> => {
     )
     .from(invoiceItemTable)
     .innerJoin(invoiceTable, eq(invoiceItemTable.invoiceId, invoiceTable.id))
-    .where(eq(invoiceTable.partyId, partyId))
+    .where(conditions)
     .orderBy(
+      ...(partyId == null
+        ? [invoiceTable.partyId]
+        : []),
       invoiceItemTable.yarnTypeId,
       invoiceItemTable.yarnCountId,
       desc(invoiceTable.invoiceDate),
@@ -400,12 +417,53 @@ router.get("/invoicing/rates/:partyId", async (req, res): Promise<void> => {
 
   const byKey = new Map<string, { ratePerKg: string; invoiceDate: string }>();
   for (const r of rows) {
-    const key = `${r.yarnTypeId}|${r.yarnCountId ?? ""}`;
+    const key = `${r.partyId}|${r.yarnTypeId}|${r.yarnCountId ?? ""}`;
     if (!byKey.has(key)) {
       byKey.set(key, { ratePerKg: r.ratePerKg, invoiceDate: r.invoiceDate });
     }
   }
-  res.json(Array.from(byKey.entries()).map(([key, v]) => ({ key, ...v })));
+  return byKey;
+}
+
+// ─── Future invoices: un-invoiced deliveries valued at the latest rate ────
+// For every party with un-invoiced Fabric_Dispatch transactions, list each
+// (party, yarn type, yarn count) group with the summed net weight and, when
+// a prior invoice exists for that same combination, the latest rate and
+// projected value (quantity × rate). Groups with no prior rate are returned
+// with a null rate (unvalued).
+router.get("/invoicing/future", async (_req, res): Promise<void> => {
+  const parties = await listUninvoicedParties();
+  if (parties.length === 0) { res.json([]); return; }
+
+  const rates = await loadLatestRates(undefined);
+  const rows = [];
+
+  for (const p of parties) {
+    const preview = await getUninvoicedPreview(p.partyId);
+    for (const g of preview.groups) {
+      const rateKey = `${p.partyId}|${g.yarnTypeId}|${g.yarnCountId ?? ""}`;
+      const rateInfo = rates.get(rateKey);
+      const qty = parseFloat(g.quantity) || 0;
+      const ratePerKg = rateInfo ? parseFloat(rateInfo.ratePerKg) : null;
+      rows.push({
+        partyId: p.partyId,
+        partyName: p.partyName,
+        yarnTypeId: g.yarnTypeId,
+        yarnTypeName: g.yarnTypeName,
+        yarnCountId: g.yarnCountId,
+        yarnCountName: g.yarnCountName,
+        hsCode: g.hsCode,
+        uoM: g.uoM,
+        productDescription: g.productDescription,
+        quantity: g.quantity,
+        ratePerKg,
+        rateDate: rateInfo?.invoiceDate ?? null,
+        value: ratePerKg != null ? round2(qty * ratePerKg) : null,
+      });
+    }
+  }
+
+  res.json(rows);
 });
 
 
