@@ -138,12 +138,14 @@ addMasterCrud(router, {
   validate: (body) => validateRequired(insertPartyMasterSchema, ["name", "code"], body) as unknown as Record<string, unknown>,
   buildRow: (body) => {
     const { name, code } = body;
-    const { wastePercent, ntnCnic, province, address, registrationType } = body;
+    const { wastePercent, ntnCnic, province, address, registrationType, creditDays } = body;
     const waste = wastePercent !== undefined && wastePercent !== "" ? String(parseFloat(String(wastePercent))) : "1.00";
+    const credit = creditDays !== undefined && creditDays !== "" ? Math.max(0, parseInt(String(creditDays), 10) || 0) : 0;
     return {
       name,
       code,
       wastePercent: waste,
+      creditDays: credit,
       ntnCnic: ntnCnic || null,
       province: province || null,
       address: address || null,
