@@ -30,6 +30,9 @@ import { validateBody } from "../lib/validate.js";
 
 const router: IRouter = Router();
 
+/** Sales tax percent used when deriving amounts (matches the app-wide 18% FBR rate). */
+const SALES_TAX_DERIVED_PERCENT = 18;
+
 function idParam(req: { params: Record<string, unknown> }) {
   const id = parseInt(String(req.params.id ?? ""), 10);
   return isNaN(id) ? null : id;
@@ -445,6 +448,7 @@ router.get("/invoicing/future", async (_req, res): Promise<void> => {
       const rateInfo = rates.get(rateKey);
       const qty = parseFloat(g.quantity) || 0;
       const ratePerKg = rateInfo ? parseFloat(rateInfo.ratePerKg) : null;
+      const value = ratePerKg != null ? qty * ratePerKg : null;
       rows.push({
         partyId: p.partyId,
         partyName: p.partyName,
@@ -458,7 +462,9 @@ router.get("/invoicing/future", async (_req, res): Promise<void> => {
         quantity: g.quantity,
         ratePerKg,
         rateDate: rateInfo?.invoiceDate ?? null,
-        value: ratePerKg != null ? round2(qty * ratePerKg) : null,
+        value: value != null ? round2(value) : null,
+        tax: value != null ? round2(value * SALES_TAX_DERIVED_PERCENT / 100) : null,
+        total: value != null ? round2(value * (1 + SALES_TAX_DERIVED_PERCENT / 100)) : null,
       });
     }
   }
