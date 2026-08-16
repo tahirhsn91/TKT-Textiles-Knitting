@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SortableHead as SortHead } from "@/components/sortable-head";
+import { useSort } from "@/hooks/use-sort";
 import {
   Tabs,
   TabsContent,
@@ -105,6 +107,9 @@ export default function InvoicingPage() {
   const [viewingId, setViewingId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"invoices" | "receivables">("invoices");
 
+  // Invoice table: party filter (default All) + sort.
+  const [partyFilter, setPartyFilter] = useState<string>("all");
+
   // Payment dialog state
   const [payFor, setPayFor] = useState<InvoiceListItem | null>(null);
   const [payAmount, setPayAmount] = useState("");
@@ -132,6 +137,46 @@ export default function InvoicingPage() {
   const addPayment = useCreatePayment();
   const removePayment = useDeletePayment();
   const createBackdated = useCreateBackdatedInvoice();
+
+  // Distinct parties present in the invoices, for the Party filter.
+  const invoiceParties = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const inv of invoices ?? []) {
+      if (inv.partyId != null && inv.partyName) map.set(inv.partyId, inv.partyName);
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [invoices]);
+
+  // Filter by the selected party.
+  const filteredInvoices = useMemo(
+    () =>
+      partyFilter === "all"
+        ? (invoices ?? [])
+        : (invoices ?? []).filter((inv) => String(inv.partyId) === partyFilter),
+    [invoices, partyFilter],
+  );
+
+  // Client-side sorting (all list endpoints here return the full set).
+  // Default: newest invoice first.
+  const { sorted: sortedInvoices, sort: sortState, toggleSort } = useSort<
+    InvoiceListItem,
+    "id" | "invoiceDate" | "partyName" | "companyName" | "grandTotal" | "status" | "fbrInvoiceNumber"
+  >(
+    filteredInvoices,
+    {
+      id: (inv) => inv.id,
+      invoiceDate: (inv) => inv.invoiceDate,
+      partyName: (inv) => inv.partyName ?? "",
+      companyName: (inv) => inv.companyName ?? "",
+      grandTotal: (inv) => parseFloat(inv.grandTotal) || 0,
+      status: (inv) => inv.status,
+      fbrInvoiceNumber: (inv) => inv.fbrInvoiceNumber ?? "",
+    },
+    { key: "invoiceDate", dir: "desc" },
+  );
+  const handleSortInvoice = (key: string) => toggleSort(key);
 
   // Reset per-party state when the selected party changes.
   const selectParty = (v: string) => {
@@ -439,31 +484,47 @@ export default function InvoicingPage() {
 
             {/* Invoice list */}
             <Card className="overflow-hidden">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-5 py-3">
                 <h2 className="text-sm font-semibold text-foreground">Invoices</h2>
-                <span className="eyebrow">Draft · Posted</span>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    Party
+                    <Select value={partyFilter} onValueChange={setPartyFilter}>
+                      <SelectTrigger className="h-8 w-48 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        {invoiceParties.map((p) => (
+                          <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </label>
+                  <span className="eyebrow">Draft · Posted</span>
+                </div>
               </div>
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>#</TableHead>
-                      <TableHead>Invoice Date</TableHead>
-                      <TableHead>Party</TableHead>
-                      <TableHead>Company</TableHead>
-                      <TableHead className="text-right">Grand Total</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>FBR No.</TableHead>
+                      <SortHead label="#" sortKey="id" sort={sortState} onSort={handleSortInvoice} />
+                      <SortHead label="Invoice Date" sortKey="invoiceDate" sort={sortState} onSort={handleSortInvoice} />
+                      <SortHead label="Party" sortKey="partyName" sort={sortState} onSort={handleSortInvoice} />
+                      <SortHead label="Company" sortKey="companyName" sort={sortState} onSort={handleSortInvoice} />
+                      <SortHead label="Grand Total" sortKey="grandTotal" sort={sortState} onSort={handleSortInvoice} right />
+                      <SortHead label="Status" sortKey="status" sort={sortState} onSort={handleSortInvoice} />
+                      <SortHead label="FBR No." sortKey="fbrInvoiceNumber" sort={sortState} onSort={handleSortInvoice} />
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(invoices ?? []).length === 0 ? (
+                    {sortedInvoices.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">No invoices yet.</TableCell>
+                        <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                          {partyFilter !== "all" ? "No invoices for this party." : "No invoices yet."}
+                        </TableCell>
                       </TableRow>
                     ) : (
-                      (invoices ?? []).map((inv) => (
+                      sortedInvoices.map((inv) => (
                         <TableRow key={inv.id}>
                           <TableCell className="font-medium">#{inv.id}</TableCell>
                           <TableCell>{format(new Date(inv.invoiceDate), "dd MMM yyyy")}</TableCell>
