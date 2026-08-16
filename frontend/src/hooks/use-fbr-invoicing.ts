@@ -57,6 +57,14 @@ export interface InvoiceListItem {
   partyId: number;
   partyName: string | null;
   status: "draft" | "posted";
+  origin?: "fbr" | "local" | "manual";
+  dueDays?: number | null;
+  dueDate?: string | null;
+  paidAmount?: number;
+  outstanding?: number;
+  overdue?: boolean;
+  paid?: boolean;
+  overpaid?: number;
   fbrInvoiceNumber: string | null;
   totalValue: string;
   totalTax: string;
@@ -83,6 +91,19 @@ export interface InvoiceItemView {
   saleType: string;
 }
 
+export interface InvoicePayment {
+  id: number;
+  invoiceId: number;
+  amount: string;
+  taxDeduction: string;
+  paymentDate: string;
+  method: string | null;
+  reference: string | null;
+  notes: string | null;
+  paidBy: string;
+  createdAt: string;
+}
+
 export interface InvoiceDetail extends InvoiceListItem {
   companyNtnCnic: string | null;
   companyAddress: string | null;
@@ -93,6 +114,14 @@ export interface InvoiceDetail extends InvoiceListItem {
   partyRegistrationType: string | null;
   items: InvoiceItemView[];
   transactionHeaderIds: number[];
+  payments: InvoicePayment[];
+  paidAmount: number;
+  outstanding: number;
+  dueDate: string | null;
+  overdue: boolean;
+  paid: boolean;
+  overpaid: number;
+  totalTaxDeduction: number;
 }
 
 // ─── Company info ────────────────────────────────────────────────────────
@@ -215,5 +244,141 @@ export function useDeleteInvoice() {
       qc.invalidateQueries({ queryKey: [invoicingKey] });
       qc.invalidateQueries({ queryKey: [`${invoicingKey}/parties`] });
     },
+  });
+}
+
+// ─── Payments (issue #189) ────────────────────────────────────────────────
+
+export interface CreatePaymentBody {
+  amount: number;
+  taxDeduction: number;
+  paymentDate: string;
+  method?: string | null;
+  reference?: string | null;
+  notes?: string | null;
+}
+
+export function useCreatePayment() {
+  const qc = useQueryClient();
+  return useMutation<{ payment: InvoicePayment; invoice: InvoiceDetail }, ErrorType<unknown>, { id: number; body: CreatePaymentBody }>({
+    mutationFn: ({ id, body }) =>
+      customFetch<{ payment: InvoicePayment; invoice: InvoiceDetail }>(`${invoicingKey}/${id}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [invoicingKey] });
+      qc.invalidateQueries({ queryKey: [`${invoicingKey}/receivables`] });
+    },
+  });
+}
+
+export function useDeletePayment() {
+  const qc = useQueryClient();
+  return useMutation<{ message: string; invoice: InvoiceDetail }, ErrorType<unknown>, { id: number; paymentId: number }>({
+    mutationFn: ({ id, paymentId }) =>
+      customFetch<{ message: string; invoice: InvoiceDetail }>(`${invoicingKey}/${id}/payments/${paymentId}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [invoicingKey] });
+      qc.invalidateQueries({ queryKey: [`${invoicingKey}/receivables`] });
+    },
+  });
+}
+
+// ─── Receivables (issue #189) ─────────────────────────────────────────────
+
+export interface ReceivablesParty {
+  partyId: number;
+  partyName: string;
+  totalInvoiced: number;
+  totalPaid: number;
+  outstanding: number;
+  totalTaxDeduction: number;
+  aging: { current: number; b1_30: number; b31_60: number; b60: number };
+}
+
+export interface ReceivablesData {
+  today: string;
+  parties: ReceivablesParty[];
+}
+
+export function useReceivables() {
+  return useQuery<ReceivablesData, ErrorType<unknown>>({
+    queryKey: [`${invoicingKey}/receivables`] as unknown as QueryKey,
+    queryFn: () => customFetch<ReceivablesData>(`${invoicingKey}/receivables`, { method: "GET" }),
+    staleTime: 15_000,
+  });
+}
+
+// ─── Backdated invoice (issue #189) ───────────────────────────────────────
+
+export interface ConfigurationItem {
+  id: number;
+  name: string;
+  code: string;
+  description: string | null;
+  enabled: boolean;
+}
+
+/** Whether the allow-backdated-invoices toggle (0003) is enabled. */
+export function useAllowBackdatedInvoices() {
+  return useQuery<boolean, ErrorType<unknown>>({
+    queryKey: ["config", "allow-backdated"] as unknown as QueryKey,
+    queryFn: async () => {
+      const rows = await customFetch<ConfigurationItem[]>("/api/masters/configuration", { method: "GET" });
+      return rows.some((c) => c.code === "0003" && c.enabled);
+    },
+    staleTime: 30_000,
+  });
+}
+
+export interface BackdatedItem {
+  yarnTypeId: number;
+  yarnCountId?: number | null;
+  hsCode?: string | null;
+  uoM?: string | null;
+  productDescription?: string | null;
+  quantity: number;
+  ratePerKg: number;
+}
+
+export interface CreateBackdatedInvoiceBody {
+  id: number;
+  partyId: number;
+  invoiceDate: string;
+  fbrInvoiceNumber?: string | null;
+  items: BackdatedItem[];
+}
+
+export function useCreateBackdatedInvoice() {
+  const qc = useQueryClient();
+  return useMutation<{ message: string; invoice: InvoiceDetail }, ErrorType<unknown>, CreateBackdatedInvoiceBody>({
+    mutationFn: (body) =>
+      customFetch<{ message: string; invoice: InvoiceDetail }>(`${invoicingKey}/backdated`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [invoicingKey] });
+      qc.invalidateQueries({ queryKey: [`${invoicingKey}/receivables`] });
+    },
+  });
+}
+
+// ─── Party master (for backdated picker) ──────────────────────────────────
+export interface PartyOption {
+  id: number;
+  name: string;
+}
+
+export function useListPartiesForInvoicing() {
+  return useQuery<PartyOption[], ErrorType<unknown>>({
+    queryKey: ["/api/masters/party"] as unknown as QueryKey,
+    queryFn: () => customFetch<PartyOption[]>("/api/masters/party", { method: "GET" }),
+    staleTime: 60_000,
   });
 }
