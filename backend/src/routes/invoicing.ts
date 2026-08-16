@@ -409,9 +409,9 @@ async function loadLatestRates(partyId: number | undefined): Promise<Map<string,
     .innerJoin(invoiceTable, eq(invoiceItemTable.invoiceId, invoiceTable.id))
     .where(conditions)
     .orderBy(
-      ...(partyId == null
-        ? [invoiceTable.partyId]
-        : []),
+      // DISTINCT ON (party, yt, yc) requires ORDER BY to start with exactly
+      // those columns. Party is always first (constant when filtered to one).
+      invoiceTable.partyId,
       invoiceItemTable.yarnTypeId,
       invoiceItemTable.yarnCountId,
       desc(invoiceTable.invoiceDate),
