@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "compound-eng-nodejs-backend",
+  "installedVersion": "4.3.3",
+  "installedAt": 1786952418333,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "0407fea8b73e0df26571be926097378f585541a80e42b409baee67b95f4259ab",
+    "integrity": "sha256-BAf+qLc+DfJlcb6SYJc3j1hVQagOQrQJuu5nuV9CWas="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "308d3d8fb162b575117a0d4c727802cfb523674fe2ee6dacd2945ce7de6eee96"
+  }
+}
