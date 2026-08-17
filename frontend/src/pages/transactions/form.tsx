@@ -170,6 +170,19 @@ export default function TransactionForm() {
   const isFabricDelivery =
     transactionTypeMaster?.find((t) => t.id === watchedTypeId)?.code === "Fabric_Dispatch";
 
+  // Set to true once Yarn Receipt / Fabric Delivery auto-fill has written the
+  // concatenated doc numbers into Document Number + Reference. The next-doc
+  // suggestion effect must not overwrite that with the generic next number.
+  const autoFilledDocRef = useRef(false);
+
+  // When the selected type is not one that auto-fills doc numbers, allow the
+  // generic next-doc suggestion to apply again (e.g. after switching type).
+  useEffect(() => {
+    if (!isYarnReceipt && !isFabricDelivery) {
+      autoFilledDocRef.current = false;
+    }
+  }, [isYarnReceipt, isFabricDelivery]);
+
   const productionDateIso = watchedDate ? format(watchedDate, "yyyy-MM-dd") : "";
 
   const { data: unreconciled, isFetching: loadingProduction } = useUnreconciledProduction(
@@ -256,6 +269,19 @@ export default function TransactionForm() {
       return;
     }
 
+    // Concatenate the distinct receipt doc numbers (e.g. "YR-5,YR-6") and put
+    // them into BOTH the Document Number and Reference of the new transaction,
+    // as requested — the transaction's doc/reference mirrors the receipts it
+    // books. A multi-line receipt repeats its docNumber across its lines, so
+    // dedupe by value while preserving first-seen order.
+    const docNumbers = [...new Set(unreconciledReceipts.rows.map((r) => r.docNumber).filter(Boolean))];
+    if (docNumbers.length > 0) {
+      const joined = docNumbers.join(",");
+      form.setValue("docNumber", joined, { shouldDirty: true });
+      form.setValue("reference", joined, { shouldDirty: true });
+      autoFilledDocRef.current = true;
+    }
+
     form.setValue(
       "details",
       unreconciledReceipts.rows.map((r) => ({
@@ -301,6 +327,18 @@ export default function TransactionForm() {
     if (unreconciledDeliveries.rows.length === 0) {
       setReconcileDeliveryIds([]);
       return;
+    }
+
+    // Concatenate the distinct delivery challan numbers (e.g. "D-5,D-6") and
+    // put them into BOTH the Document Number and Reference of the new
+    // transaction — the transaction's doc/reference mirrors the deliveries it
+    // books. Dedupe by value, preserving first-seen order.
+    const challanNos = [...new Set(unreconciledDeliveries.rows.map((d) => d.challanNo).filter(Boolean))];
+    if (challanNos.length > 0) {
+      const joined = challanNos.join(",");
+      form.setValue("docNumber", joined, { shouldDirty: true });
+      form.setValue("reference", joined, { shouldDirty: true });
+      autoFilledDocRef.current = true;
     }
 
     form.setValue(
@@ -384,6 +422,10 @@ export default function TransactionForm() {
   );
 
   useEffect(() => {
+    // For Yarn Receipt / Fabric Delivery the auto-fill already wrote the
+    // concatenated doc numbers into Document Number + Reference; the generic
+    // next-doc suggestion must not clobber that.
+    if (autoFilledDocRef.current) return;
     if (!isEditing && suggestions) {
       form.setValue("docNumber", suggestions.nextDocNumber);
       if (suggestions.lastReference) {
