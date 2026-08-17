@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+// Type-only: the runtime modules are fetched lazily inside exportPDF() so the
+// ~420 kB jsPDF bundle only loads when the user clicks Export (issue: bundle).
+import type jsPDF from "jspdf";
+import type autoTable from "jspdf-autotable";
 import { Trash2, Download } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -350,12 +352,23 @@ function PayrollSummaryTab() {
     netPayable: (s: PayrollSummaryItem) => s.netPayable,
   });
 
-  function exportPDF() {
+  async function exportPDF() {
     if (summary.length === 0) {
       toast({ variant: "destructive", title: "No data", description: "Run the summary first." });
       return;
     }
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    let JsPDF: typeof import("jspdf").default;
+    let autoTable: typeof import("jspdf-autotable").default;
+    try {
+      [{ default: JsPDF }, { default: autoTable }] = await Promise.all([
+        import("jspdf"),
+        import("jspdf-autotable"),
+      ]);
+    } catch {
+      toast({ variant: "destructive", title: "Could not export PDF", description: "The PDF module failed to load. Try again." });
+      return;
+    }
+    const doc = new JsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const monthName = MONTHS[parseInt(month) - 1];
     const title = `Payroll Summary — ${monthName} ${year}`;
     doc.setFontSize(16);

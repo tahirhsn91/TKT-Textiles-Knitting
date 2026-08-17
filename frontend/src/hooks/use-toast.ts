@@ -172,6 +172,10 @@ function useToast() {
   const [state, setState] = React.useState<State>(memoryState)
 
   React.useEffect(() => {
+    // setState from useState is stable for the lifetime of the component, so
+    // subscribe once. (The shadcn default lists `[state]`, which pushes and
+    // splices the listener on every toast transition — churn that buys
+    // nothing since the setter identity never changes.)
     listeners.push(setState)
     return () => {
       const index = listeners.indexOf(setState)
@@ -179,7 +183,7 @@ function useToast() {
         listeners.splice(index, 1)
       }
     }
-  }, [state])
+  }, [])
 
   return {
     ...state,

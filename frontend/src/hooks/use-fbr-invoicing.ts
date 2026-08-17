@@ -7,8 +7,9 @@
  *   aggregated items → enter per-KG rates → generate (draft) → post to FBR
  *   (manual) or delete (draft only).
  */
-import { useQuery, useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, type QueryKey, type UseQueryOptions } from "@tanstack/react-query";
 import { customFetch, type ErrorType } from "@/vendor/api-client-react/custom-fetch";
+import { getListPartyMasterQueryKey } from "@workspace/api-client-react";
 
 // ─── Types (mirror the backend responses) ────────────────────────────────
 
@@ -131,7 +132,7 @@ export const companyInfoQueryKey = "/api/masters/company-info" as const;
 export function useListCompanyInfo() {
   return useQuery<CompanyInfo[], ErrorType<unknown>>({
     queryKey: [companyInfoQueryKey] as unknown as QueryKey,
-    queryFn: () => customFetch<CompanyInfo[]>(companyInfoQueryKey, { method: "GET" }),
+    queryFn: ({ signal }) => customFetch<CompanyInfo[]>(companyInfoQueryKey, { method: "GET", signal }),
     staleTime: 30_000,
   });
 }
@@ -175,7 +176,7 @@ export const invoicingKey = "/api/invoicing" as const;
 export function useUninvoicedParties() {
   return useQuery<UninvoicedParty[], ErrorType<unknown>>({
     queryKey: [`${invoicingKey}/parties`] as unknown as QueryKey,
-    queryFn: () => customFetch<UninvoicedParty[]>(`${invoicingKey}/parties`, { method: "GET" }),
+    queryFn: ({ signal }) => customFetch<UninvoicedParty[]>(`${invoicingKey}/parties`, { method: "GET", signal }),
     staleTime: 15_000,
   });
 }
@@ -183,7 +184,7 @@ export function useUninvoicedParties() {
 export function useInvoicePreview(partyId: number | null) {
   return useQuery<InvoicePreview, ErrorType<unknown>>({
     queryKey: [`${invoicingKey}/preview`, partyId] as unknown as QueryKey,
-    queryFn: () => customFetch<InvoicePreview>(`${invoicingKey}/preview/${partyId}`, { method: "GET" }),
+    queryFn: ({ signal }) => customFetch<InvoicePreview>(`${invoicingKey}/preview/${partyId}`, { method: "GET", signal }),
     enabled: partyId != null,
     staleTime: 15_000,
   });
@@ -200,7 +201,7 @@ export interface LatestRate {
 export function useLatestRates(partyId: number | null) {
   return useQuery<LatestRate[], ErrorType<unknown>>({
     queryKey: [`${invoicingKey}/rates`, partyId] as unknown as QueryKey,
-    queryFn: () => customFetch<LatestRate[]>(`${invoicingKey}/rates/${partyId}`, { method: "GET" }),
+    queryFn: ({ signal }) => customFetch<LatestRate[]>(`${invoicingKey}/rates/${partyId}`, { method: "GET", signal }),
     enabled: partyId != null,
     staleTime: 30_000,
   });
@@ -225,18 +226,19 @@ export interface FutureInvoiceRow {
 }
 
 /** All parties' un-invoiced deliveries valued at the latest rate. */
-export function useFutureInvoices() {
+export function useFutureInvoices(options?: { query?: Partial<UseQueryOptions<FutureInvoiceRow[], ErrorType<unknown>>> }) {
   return useQuery<FutureInvoiceRow[], ErrorType<unknown>>({
     queryKey: [`${invoicingKey}/future`] as unknown as QueryKey,
-    queryFn: () => customFetch<FutureInvoiceRow[]>(`${invoicingKey}/future`, { method: "GET" }),
+    queryFn: ({ signal }) => customFetch<FutureInvoiceRow[]>(`${invoicingKey}/future`, { method: "GET", signal }),
     staleTime: 15_000,
+    ...options?.query,
   });
 }
 
 export function useListInvoices() {
   return useQuery<InvoiceListItem[], ErrorType<unknown>>({
     queryKey: [invoicingKey] as unknown as QueryKey,
-    queryFn: () => customFetch<InvoiceListItem[]>(invoicingKey, { method: "GET" }),
+    queryFn: ({ signal }) => customFetch<InvoiceListItem[]>(invoicingKey, { method: "GET", signal }),
     staleTime: 15_000,
   });
 }
@@ -244,7 +246,7 @@ export function useListInvoices() {
 export function useInvoiceDetail(invoiceId: number | null) {
   return useQuery<InvoiceDetail, ErrorType<unknown>>({
     queryKey: [`${invoicingKey}/detail`, invoiceId] as unknown as QueryKey,
-    queryFn: () => customFetch<InvoiceDetail>(`${invoicingKey}/${invoiceId}`, { method: "GET" }),
+    queryFn: ({ signal }) => customFetch<InvoiceDetail>(`${invoicingKey}/${invoiceId}`, { method: "GET", signal }),
     enabled: invoiceId != null,
     staleTime: 15_000,
   });
@@ -349,11 +351,12 @@ export interface ReceivablesData {
   parties: ReceivablesParty[];
 }
 
-export function useReceivables() {
+export function useReceivables(options?: { query?: Partial<UseQueryOptions<ReceivablesData, ErrorType<unknown>>> }) {
   return useQuery<ReceivablesData, ErrorType<unknown>>({
     queryKey: [`${invoicingKey}/receivables`] as unknown as QueryKey,
-    queryFn: () => customFetch<ReceivablesData>(`${invoicingKey}/receivables`, { method: "GET" }),
+    queryFn: ({ signal }) => customFetch<ReceivablesData>(`${invoicingKey}/receivables`, { method: "GET", signal }),
     staleTime: 15_000,
+    ...options?.query,
   });
 }
 
@@ -371,8 +374,8 @@ export interface ConfigurationItem {
 export function useAllowBackdatedInvoices() {
   return useQuery<boolean, ErrorType<unknown>>({
     queryKey: ["config", "allow-backdated"] as unknown as QueryKey,
-    queryFn: async () => {
-      const rows = await customFetch<ConfigurationItem[]>("/api/masters/configuration", { method: "GET" });
+    queryFn: async ({ signal }) => {
+      const rows = await customFetch<ConfigurationItem[]>("/api/masters/configuration", { method: "GET", signal });
       return rows.some((c) => c.code === "0003" && c.enabled);
     },
     staleTime: 30_000,
@@ -414,15 +417,22 @@ export function useCreateBackdatedInvoice() {
 }
 
 // ─── Party master (for backdated picker) ──────────────────────────────────
+// NOTE: this intentionally reuses the generated party-master lookup key and
+// endpoint. The old target (GET /api/masters/party) no longer exists in the
+// backend — lookups were consolidated under /api/lookups/* — so the picker
+// was silently empty (404). Reusing getListPartyMasterQueryKey() also makes
+// this query resolve from the cache seeded by useSeedAllLookups, so the
+// backdated dialog costs zero extra requests.
 export interface PartyOption {
   id: number;
   name: string;
 }
 
-export function useListPartiesForInvoicing() {
+export function useListPartiesForInvoicing(options?: { query?: Partial<UseQueryOptions<PartyOption[], ErrorType<unknown>>> }) {
   return useQuery<PartyOption[], ErrorType<unknown>>({
-    queryKey: ["/api/masters/party"] as unknown as QueryKey,
-    queryFn: () => customFetch<PartyOption[]>("/api/masters/party", { method: "GET" }),
+    queryKey: getListPartyMasterQueryKey() as unknown as QueryKey,
+    queryFn: ({ signal }) => customFetch<PartyOption[]>("/api/lookups/party-master", { method: "GET", signal }),
     staleTime: 60_000,
+    ...options?.query,
   });
 }

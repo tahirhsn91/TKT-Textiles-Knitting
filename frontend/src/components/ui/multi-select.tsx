@@ -83,9 +83,12 @@ export function MultiSelect({
               <span
                 role="button"
                 tabIndex={0}
-                className="rounded-sm hover:bg-muted p-0.5"
+                aria-label="Clear all selections"
+                className="rounded-sm p-0.5 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={(e) => { e.stopPropagation(); clearAll(); }}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); clearAll(); }}}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); clearAll(); }
+                }}
               >
                 <X className="h-3 w-3 text-muted-foreground" />
               </span>
@@ -98,28 +101,40 @@ export function MultiSelect({
         <div className="max-h-60 overflow-y-auto py-1">
           {/* Select All row */}
           <div
-            className="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-accent rounded-sm mx-1 border-b border-border/50 mb-1 pb-2"
+            role="checkbox"
+            aria-checked={allSelected ? true : someSelected ? "mixed" : false}
+            tabIndex={0}
+            className="flex cursor-pointer items-center gap-2 rounded-sm mx-1 border-b border-border/50 px-3 py-1.5 pb-2 mb-1 text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onClick={toggleAll}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleAll(); } }}
           >
             <Checkbox
               checked={allSelected ? true : someSelected ? "indeterminate" : false}
               onCheckedChange={toggleAll}
               className="pointer-events-none"
+              aria-hidden="true"
+              tabIndex={-1}
             />
-            <span className="font-medium">Select All</span>
+            <span>Select All</span>
           </div>
           {options.map((option) => {
             const checked = selected.includes(option.value);
             return (
               <div
                 key={option.value}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-accent rounded-sm mx-1"
+                role="checkbox"
+                aria-checked={checked}
+                tabIndex={0}
+                className="flex cursor-pointer items-center gap-2 rounded-sm mx-1 px-3 py-1.5 text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={() => toggle(option.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(option.value); } }}
               >
                 <Checkbox
                   checked={checked}
                   onCheckedChange={() => toggle(option.value)}
                   className="pointer-events-none"
+                  aria-hidden="true"
+                  tabIndex={-1}
                 />
                 <span className="truncate">{option.label}</span>
               </div>

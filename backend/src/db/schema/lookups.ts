@@ -1,4 +1,4 @@
-import { pgTable, text, serial, unique, numeric, integer, timestamp, boolean, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, unique, numeric, integer, timestamp, boolean, date, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -176,7 +176,12 @@ export const employeeAdvancesTable = pgTable("employee_advances", {
   amount: numeric("amount").notNull(),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => [
+  // Serves the advances list + payroll summary, both of which filter by
+  // employee + date range (per-employee month/year windows). No other index
+  // existed on this table besides the PK.
+  index("employee_advances_employee_date_idx").on(t.employeeId, t.date),
+]);
 export const insertEmployeeAdvancesSchema = createInsertSchema(employeeAdvancesTable).omit({ id: true, createdAt: true });
 export type InsertEmployeeAdvance = z.infer<typeof insertEmployeeAdvancesSchema>;
 export type EmployeeAdvance = typeof employeeAdvancesTable.$inferSelect;
@@ -190,7 +195,12 @@ export const salaryHeaderTable = pgTable("salary_header", {
   posted: boolean("posted").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => [
+  // The salary list screen filters by (year, month) in SQL (and orders by
+  // year, month) — one index row per payroll run, so this is tiny but
+  // keeps the filter from seq-scanning the header history.
+  index("salary_header_month_year_idx").on(t.year, t.month),
+]);
 export type SalaryHeader = typeof salaryHeaderTable.$inferSelect;
 
 // ─── Salary Detail ─────────────────────────────────────────────────────────
@@ -220,5 +230,8 @@ export const salaryDetailTable = pgTable("salary_detail", {
 }, (t) => [
   unique("salary_detail_header_employee_unique").on(t.headerId, t.employeeId),
   unique("salary_detail_emp_month_year_unique").on(t.employeeId, t.month, t.year),
+  // FK column — Postgres doesn't auto-index it; serves the header→details
+  // lookups (detail page, delete-then-reinsert on update).
+  index("salary_detail_header_idx").on(t.headerId),
 ]);
 export type SalaryDetail = typeof salaryDetailTable.$inferSelect;

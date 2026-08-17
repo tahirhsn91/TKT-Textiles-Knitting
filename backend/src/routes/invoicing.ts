@@ -16,6 +16,7 @@ import {
 import {
   getUninvoicedPreview,
   listUninvoicedParties,
+  getAllUninvoicedPreviews,
   computeItemAmounts,
 } from "../lib/invoice-engine.js";
 import {
@@ -229,7 +230,9 @@ router.get("/invoicing", async (_req, res): Promise<void> => {
     .leftJoin(partyMasterTable, eq(invoiceTable.partyId, partyMasterTable.id))
     .orderBy(desc(invoiceTable.id));
 
-  // Attach derived payment state per invoice (issue #189).
+  // Attach derived payment state per invoice (issue #189). The as-of date is
+  // resolved once per request instead of once per row (each computePaymentState
+  // call used to construct a fresh `new Date()`).
   const ids = rows.map((r) => r.id);
   const payments = ids.length > 0
     ? await db
@@ -248,12 +251,14 @@ router.get("/invoicing", async (_req, res): Promise<void> => {
     payByInvoice.set(p.invoiceId, arr);
   }
 
+  const asOfIso = toISODate(new Date());
   const out = rows.map((r) => {
     const state = computePaymentState({
       grandTotal: r.grandTotal,
       dueDays: r.dueDays,
       postedDateIso: toISODate(r.postedAt ?? new Date(r.invoiceDate)),
       payments: payByInvoice.get(r.id) ?? [],
+      asOfIso,
     });
     return {
       ...r,
@@ -287,13 +292,21 @@ router.get("/invoicing/receivables", async (_req, res): Promise<void> => {
     .leftJoin(partyMasterTable, eq(invoiceTable.partyId, partyMasterTable.id))
     .where(eq(invoiceTable.status, "posted"));
 
-  const payments = await db
-    .select({
-      invoiceId: invoicePaymentTable.invoiceId,
-      amount: invoicePaymentTable.amount,
-      taxDeduction: invoicePaymentTable.taxDeduction,
-    })
-    .from(invoicePaymentTable);
+  // Only payments against the posted invoices matter (payments can only be
+  // recorded against posted invoices anyway) — filtering by the posted ids
+  // lets Postgres use the invoice_payment_invoice_idx index instead of a full
+  // table scan.
+  const postedIds = invoices.map((i) => i.id);
+  const payments = postedIds.length > 0
+    ? await db
+        .select({
+          invoiceId: invoicePaymentTable.invoiceId,
+          amount: invoicePaymentTable.amount,
+          taxDeduction: invoicePaymentTable.taxDeduction,
+        })
+        .from(invoicePaymentTable)
+        .where(inArray(invoicePaymentTable.invoiceId, postedIds))
+    : [];
 
   const payByInvoice = new Map<number, typeof payments>();
   for (const p of payments) {
@@ -319,6 +332,7 @@ router.get("/invoicing/receivables", async (_req, res): Promise<void> => {
       dueDays: inv.dueDays,
       postedDateIso: toISODate(inv.postedAt ?? new Date(inv.invoiceDate ?? "")),
       payments: p,
+      asOfIso: today,
     });
 
     const e = partyMap.get(inv.partyId) ?? {
@@ -435,23 +449,25 @@ async function loadLatestRates(partyId: number | undefined): Promise<Map<string,
 // projected value (quantity × rate). Groups with no prior rate are returned
 // with a null rate (unvalued).
 router.get("/invoicing/future", async (_req, res): Promise<void> => {
-  const parties = await listUninvoicedParties();
-  if (parties.length === 0) { res.json([]); return; }
+  // Batch-load every party's un-invoiced preview in 2 queries instead of
+  // looping per-party previews (~2N round-trips).
+  const previews = await getAllUninvoicedPreviews();
+  if (previews.size === 0) { res.json([]); return; }
 
   const rates = await loadLatestRates(undefined);
   const rows = [];
 
-  for (const p of parties) {
-    const preview = await getUninvoicedPreview(p.partyId);
+  const parties = [...previews.entries()].sort((a, b) => a[1].partyName.localeCompare(b[1].partyName));
+  for (const [partyId, preview] of parties) {
     for (const g of preview.groups) {
-      const rateKey = `${p.partyId}|${g.yarnTypeId}|${g.yarnCountId ?? ""}`;
+      const rateKey = `${partyId}|${g.yarnTypeId}|${g.yarnCountId ?? ""}`;
       const rateInfo = rates.get(rateKey);
       const qty = parseFloat(g.quantity) || 0;
       const ratePerKg = rateInfo ? parseFloat(rateInfo.ratePerKg) : null;
       const value = ratePerKg != null ? qty * ratePerKg : null;
       rows.push({
-        partyId: p.partyId,
-        partyName: p.partyName,
+        partyId,
+        partyName: preview.partyName,
         yarnTypeId: g.yarnTypeId,
         yarnTypeName: g.yarnTypeName,
         yarnCountId: g.yarnCountId,

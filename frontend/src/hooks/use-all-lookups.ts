@@ -57,6 +57,32 @@ export function useSeedAllLookups(enabled = true) {
     gcTime: 60 * 60 * 1000,
   });
 
+  // The aggregate is cached for 30 minutes, so the individual per-list queries
+  // it seeds get the same freshness window. Without this, a seeded list query
+  // goes stale after the global 5-minute default and a screen that mounts
+  // several useList*Master hooks fires N parallel refetches on navigation even
+  // though the aggregate is still fresh. Mutations already invalidate the
+  // affected keys, so edits still show up immediately. (issue #19)
+  useEffect(() => {
+    const seededKeys = [
+      getListTransactionTypeMasterQueryKey(),
+      getListJobMasterQueryKey(),
+      getListPartyMasterQueryKey(),
+      getListMachineMasterQueryKey(),
+      getListLocationMasterQueryKey(),
+      getListYarnTypeMasterQueryKey(),
+      getListYarnCountMasterQueryKey(),
+      getListYarnBrandMasterQueryKey(),
+      getListUomMasterQueryKey(),
+      getListFabricTypeMasterQueryKey(),
+      getListEmployeeMasterQueryKey(),
+      getListDepartmentMasterQueryKey(),
+    ];
+    for (const key of seededKeys) {
+      queryClient.setQueryDefaults(key, { staleTime: 30 * 60 * 1000 });
+    }
+  }, [queryClient]);
+
   // Seed each individual lookup cache from the single aggregate response so the
   // existing generated useList*Master hooks resolve from cache (no N requests).
   useEffect(() => {

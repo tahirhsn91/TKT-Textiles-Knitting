@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { TableHead } from "@/components/ui/table";
 import type { SortDir } from "@/hooks/use-sort";
@@ -14,8 +15,14 @@ import type { SortDir } from "@/hooks/use-sort";
  * <th>: the previous implementations were mouse-only, so no column could be
  * sorted from the keyboard. `aria-sort` on the cell reports current state to
  * screen readers.
+ *
+ * Memoized: every prop is a primitive, the `sort` state object, or the stable
+ * `onSort`/drag handlers, so a header cell skips re-rendering when only the
+ * table body (or unrelated page state) changes. Pages that pass inline drag
+ * handlers (transactions) simply never hit the memo fast path — no behaviour
+ * change, just no win there.
  */
-export function SortableHead({
+function SortableHead({
   label,
   sortKey,
   sort,
@@ -81,3 +88,6 @@ export function SortableHead({
     </TableHead>
   );
 }
+
+const SortableHeadMemo = memo(SortableHead);
+export { SortableHeadMemo as SortableHead };

@@ -60,7 +60,7 @@ export function usePartyAnalytics(
 
   return useQuery<PartyAnalyticsResponse, ErrorType<unknown>>({
     queryKey: getPartyAnalyticsQueryKey(filters) as QueryKey,
-    queryFn: () => customFetch<PartyAnalyticsResponse>(`/api/party-analytics?${params.toString()}`),
+    queryFn: ({ signal }) => customFetch<PartyAnalyticsResponse>(`/api/party-analytics?${params.toString()}`, { signal }),
     ...options?.query,
   });
 }
