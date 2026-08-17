@@ -45,9 +45,10 @@ export function useMachineAnalytics(
 ) {
   return useQuery<MachineAnalyticsResponse, ErrorType<unknown>>({
     queryKey: getMachineAnalyticsQueryKey(baseline) as QueryKey,
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       customFetch<MachineAnalyticsResponse>(
         `/api/machine-analytics?baseline=${encodeURIComponent(baseline)}`,
+        { signal },
       ),
     ...options?.query,
   });

@@ -455,20 +455,39 @@ router.post("/transactions", validateBody(CreateTransactionBody), async (req, re
 });
 
 router.get("/transactions/suggestions", async (_req, res): Promise<void> => {
-  const rows = await db
-    .select({ docNumber: transactionHeaderTable.docNumber, reference: transactionHeaderTable.reference })
+  // Previously this pulled the ENTIRE transaction table (every doc number +
+  // reference) into Node just to compute a max + last reference. Do both in
+  // SQL: `regexp_match` extracts the leading integer exactly like the old
+  // parseInt(docNumber) did (non-numeric prefixes are ignored), and the
+  // last-reference query uses the PK index with LIMIT 1.
+  const [maxRow] = await db
+    .select({
+      // `::bigint` (not `::int`) so 10+ digit doc/challan numbers don't overflow
+      // the int4 range and 500 the endpoint; pg returns bigint as a string, so
+      // wrap in Number() below (QA finding M1).
+      maxNumeric: sql<string>`coalesce(max((regexp_match(${transactionHeaderTable.docNumber}, '^\\s*\\d+'))[1]::bigint), 0)::text`,
+    })
+    .from(transactionHeaderTable);
+
+  const [lastRefRow] = await db
+    .select({ reference: transactionHeaderTable.reference })
     .from(transactionHeaderTable)
-    .orderBy(desc(transactionHeaderTable.id));
+    .where(and(
+      sql`${transactionHeaderTable.reference} is not null`,
+      // btrim matches the old JS `reference.trim() !== ''` check (QA finding L1):
+      // a whitespace-only reference must not be returned as lastReference.
+      sql`btrim(${transactionHeaderTable.reference}) <> ''`,
+    ))
+    .orderBy(desc(transactionHeaderTable.id))
+    .limit(1);
 
-  let maxNumeric = 0;
-  for (const r of rows) {
-    const n = parseInt(r.docNumber ?? "", 10);
-    if (!isNaN(n) && n > maxNumeric) maxNumeric = n;
-  }
-
-  const lastReference = rows.find((r) => r.reference != null && r.reference.trim() !== "")?.reference ?? null;
-
-  res.json({ nextDocNumber: String(maxNumeric + 1), lastReference });
+  // maxNumeric comes back as a string (bigint::text); Number() keeps
+  // behaviour identical to the old `parseInt` result including huge values.
+  const maxNumeric = Number(maxRow?.maxNumeric ?? 0);
+  res.json({
+    nextDocNumber: String(maxNumeric + 1),
+    lastReference: lastRefRow?.reference ?? null,
+  });
 });
 
 // ─── CSV Import endpoints (must be before /:id) ───────────────────────────────

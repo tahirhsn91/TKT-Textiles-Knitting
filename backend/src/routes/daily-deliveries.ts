@@ -140,17 +140,19 @@ router.get("/daily-deliveries", async (req, res): Promise<void> => {
 // numeric so it sorts naturally on the delivery sheet.
 
 router.get("/daily-deliveries/suggestions", async (_req, res): Promise<void> => {
-  const rows = await db
-    .select({ challanNo: dailyDeliveryTable.challanNo })
-    .from(dailyDeliveryTable)
-    .orderBy(dailyDeliveryTable.id);
+  // Smallest unused integer-based challan number (e.g. "D-1", "D-2"…). The
+  // whole-table load is replaced with a single SQL aggregate: strip the
+  // optional "D-" prefix (case-insensitive, as the old /^D-\s*/i did) and
+  // extract the leading integer, exactly matching the old parseInt behaviour.
+  const [row] = await db
+    .select({
+      maxNumeric: sql<string>`coalesce(max((regexp_match(regexp_replace(${dailyDeliveryTable.challanNo}, '^[Dd]-\\s*', ''), '^\\s*\\d+'))[1]::bigint), 0)::text`,
+    })
+    .from(dailyDeliveryTable);
 
-  let maxNumeric = 0;
-  for (const r of rows) {
-    const n = parseInt((r.challanNo ?? "").replace(/^D-\s*/i, ""), 10);
-    if (!isNaN(n) && n > maxNumeric) maxNumeric = n;
-  }
-
+  // bigint comes back as a string; Number() preserves the old parseInt maths
+  // including 10+ digit values (QA finding M1).
+  const maxNumeric = Number(row?.maxNumeric ?? 0);
   res.json({ nextChallanNo: `D-${maxNumeric + 1}` });
 });
 

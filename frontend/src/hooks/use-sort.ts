@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 export type SortDir = "asc" | "desc";
 
@@ -37,11 +37,14 @@ export function compareValues(a: unknown, b: unknown): number {
 
   const as = String(a);
   const bs = String(b);
-
-  const an = Number(as);
-  const bn = Number(bs);
-  if (as.trim() !== "" && bs.trim() !== "" && !Number.isNaN(an) && !Number.isNaN(bn)) {
-    return an - bn;
+  // Number() already ignores surrounding whitespace, so trim once up-front
+  // rather than re-checking the raw strings on every comparison.
+  const aTrim = as.trim();
+  const bTrim = bs.trim();
+  if (aTrim !== "" && bTrim !== "") {
+    const an = Number(aTrim);
+    const bn = Number(bTrim);
+    if (!Number.isNaN(an) && !Number.isNaN(bn)) return an - bn;
   }
 
   return as.localeCompare(bs, undefined, { numeric: true, sensitivity: "base" });
@@ -62,27 +65,37 @@ export function useSort<T, K extends string = string>(
 ) {
   const [sort, setSort] = useState<SortState<K>>(initial);
 
+  // Accessor maps are recreated by callers as inline literals every render
+  // (e.g. `useSort(rows, { partyName: (r) => r.partyName })`), so the maps
+  // themselves are cheap to replace. Keeping the latest one in a ref means
+  // `toggleSort` keeps a single stable identity for the lifetime of the hook
+  // (no fresh handler per render), and the sorted memo below always reads the
+  // latest accessors even though it only re-runs when rows or sort change.
+  const accessorsRef = useRef(accessors);
+  accessorsRef.current = accessors;
+
   // Typed as `string` rather than `K` on purpose. SortableHead's onSort is
   // `(key: string) => void` so that it stays a drop-in replacement for the
   // SortHead components the report pages already had; a `(key: K) => void`
   // handler is not assignable to that. Unknown keys are ignored instead of
   // being trusted, so a typo in a sortKey leaves the grid unsorted rather
   // than throwing.
-  const toggleSort = (key: string) => {
-    if (!(key in accessors)) return;
+  const toggleSort = useCallback((key: string) => {
+    if (!(key in accessorsRef.current)) return;
     const k = key as K;
     setSort((prev) =>
       prev.key === k
         ? { key: k, dir: prev.dir === "asc" ? "desc" : "asc" }
         : { key: k, dir: "asc" },
     );
-  };
+  }, []);
 
   const sorted = useMemo(() => {
     const list = rows ?? [];
-    if (!sort.key) return list;
+    const key = sort.key;
+    if (!key) return list;
 
-    const accessor = accessors[sort.key];
+    const accessor = accessorsRef.current[key];
     if (!accessor) return list;
 
     // Array.prototype.sort is stable per spec, so rows that tie keep the
@@ -103,7 +116,6 @@ export function useSort<T, K extends string = string>(
 
       return sort.dir === "asc" ? compareValues(a, b) : compareValues(b, a);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, sort]);
 
   return { sorted, sort, toggleSort, setSort };

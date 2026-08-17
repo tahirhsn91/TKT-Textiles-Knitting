@@ -82,9 +82,10 @@ export function useGetDailyDeliveriesSummary(
 ) {
   return useQuery<DailyDeliverySummaryResponse, ErrorType<unknown>>({
     queryKey: getDailyDeliveriesSummaryQueryKey(date) as QueryKey,
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       customFetch<DailyDeliverySummaryResponse>(
         `/api/daily-deliveries?date=${encodeURIComponent(date)}`,
+        { signal },
       ),
     ...options?.query,
   });
@@ -112,9 +113,10 @@ export function useUnreconciledDailyDeliveries(
 ) {
   return useQuery<{ deliveryDate: string; partyId: number; rows: UnreconciledDeliveryRow[] }, ErrorType<unknown>>({
     queryKey: [`/api/daily-deliveries/unreconciled`, { date, partyId }] as QueryKey,
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       customFetch<{ deliveryDate: string; partyId: number; rows: UnreconciledDeliveryRow[] }>(
         `/api/daily-deliveries/unreconciled?date=${encodeURIComponent(date)}&partyId=${partyId}`,
+        { signal },
       ),
     enabled: Boolean(date && partyId),
   });
@@ -128,7 +130,7 @@ export function useGetDailyDelivery(
 ) {
   return useQuery<DailyDeliveryDetail, ErrorType<unknown>>({
     queryKey: [`/api/daily-deliveries/${id}`] as QueryKey,
-    queryFn: () => customFetch<DailyDeliveryDetail>(`/api/daily-deliveries/${id}`),
+    queryFn: ({ signal }) => customFetch<DailyDeliveryDetail>(`/api/daily-deliveries/${id}`, { signal }),
     enabled: id != null,
     ...options?.query,
   });

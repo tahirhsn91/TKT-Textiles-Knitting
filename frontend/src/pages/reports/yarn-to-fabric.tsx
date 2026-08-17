@@ -2,8 +2,11 @@ import { NUM_DECIMALS } from "@/lib/format";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "@/vendor/api-client-react/custom-fetch";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+// Type-only: jsPDF / autotable / html2canvas are loaded lazily inside each
+// export handler so the ~600 kB they add only downloads when the user clicks
+// Export.
+import type jsPDF from "jspdf";
+import type autoTable from "jspdf-autotable";
 import {
   useListTransactionTypeMaster,
   useListJobMaster,
@@ -21,7 +24,6 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   LineChart, Line, ResponsiveContainer,
 } from "recharts";
-import html2canvas from "html2canvas";
 import { Printer, Download, FileText, FileSpreadsheet, Upload, Image, Loader2, ClipboardCopy } from "lucide-react";
 import { SortableHead as SortHead } from "@/components/sortable-head";
 import { Layout } from "@/components/layout";
@@ -415,12 +417,14 @@ export default function YarnToFabricPage() {
     if (!el) return;
     setPngLoading(true);
     try {
-      const canvas = await html2canvas(el, { backgroundColor: "#ffffff", scale: 2, useCORS: true });
+      const canvas = await (await import("html2canvas")).default(el, { backgroundColor: "#ffffff", scale: 2, useCORS: true });
       const url = canvas.toDataURL("image/png");
       const a = Object.assign(document.createElement("a"), { href: url, download: "yarn-to-fabric-charts.png" });
       document.body.appendChild(a);
       a.click();
       a.remove();
+    } catch {
+      toast({ variant: "destructive", title: "Could not export charts", description: "The chart image module failed to load. Try again." });
     } finally {
       setPngLoading(false);
     }
@@ -431,7 +435,7 @@ export default function YarnToFabricPage() {
     if (!el) return;
     setCopyLoading(true);
     try {
-      const canvas = await html2canvas(el, { backgroundColor: "#ffffff", scale: 2, useCORS: true });
+      const canvas = await (await import("html2canvas")).default(el, { backgroundColor: "#ffffff", scale: 2, useCORS: true });
       const blob = await new Promise<Blob>((resolve, reject) =>
         canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Failed to create blob"))), "image/png")
       );
@@ -561,8 +565,19 @@ export default function YarnToFabricPage() {
     downloadBlob(csvHeading() + toCSV(headers, [obRow, ...bodyRows, grandRow]), "ytf-detail.csv", "text/csv;charset=utf-8;");
   }
 
-  function exportSummaryPDF() {
-    const doc        = new jsPDF({ orientation: "landscape" });
+  async function exportSummaryPDF() {
+    let JsPDF: typeof import("jspdf").default;
+    let autoTable: typeof import("jspdf-autotable").default;
+    try {
+      [{ default: JsPDF }, { default: autoTable }] = await Promise.all([
+        import("jspdf"),
+        import("jspdf-autotable"),
+      ]);
+    } catch {
+      toast({ variant: "destructive", title: "Could not export PDF", description: "The PDF module failed to load. Try again." });
+      return;
+    }
+    const doc        = new JsPDF({ orientation: "landscape" });
     const groupLabel = GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? groupBy;
     doc.setFontSize(16); doc.setFont("helvetica", "bold");
     doc.text("TKT Textiles (Knitting) — Yarn to Fabric Movement", 14, 14);
@@ -597,8 +612,19 @@ export default function YarnToFabricPage() {
     downloadBlob(csvHeading() + toCSV(headers, data), "ytf-party-balance.csv", "text/csv;charset=utf-8;");
   }
 
-  function exportPartyBalancePDF() {
-    const doc = new jsPDF({ orientation: "landscape" });
+  async function exportPartyBalancePDF() {
+    let JsPDF: typeof import("jspdf").default;
+    let autoTable: typeof import("jspdf-autotable").default;
+    try {
+      [{ default: JsPDF }, { default: autoTable }] = await Promise.all([
+        import("jspdf"),
+        import("jspdf-autotable"),
+      ]);
+    } catch {
+      toast({ variant: "destructive", title: "Could not export PDF", description: "The PDF module failed to load. Try again." });
+      return;
+    }
+    const doc = new JsPDF({ orientation: "landscape" });
     doc.setFontSize(16); doc.setFont("helvetica", "bold");
     doc.text("TKT Textiles (Knitting) — Yarn to Fabric Movement", 14, 14);
     doc.setFontSize(11); doc.setFont("helvetica", "normal");
@@ -624,8 +650,19 @@ export default function YarnToFabricPage() {
     doc.save("ytf-party-balance.pdf");
   }
 
-  function exportDetailPDF() {
-    const doc     = new jsPDF({ orientation: "landscape" });
+  async function exportDetailPDF() {
+    let JsPDF: typeof import("jspdf").default;
+    let autoTable: typeof import("jspdf-autotable").default;
+    try {
+      [{ default: JsPDF }, { default: autoTable }] = await Promise.all([
+        import("jspdf"),
+        import("jspdf-autotable"),
+      ]);
+    } catch {
+      toast({ variant: "destructive", title: "Could not export PDF", description: "The PDF module failed to load. Try again." });
+      return;
+    }
+    const doc     = new JsPDF({ orientation: "landscape" });
     const headers = visibleColsList.map((c) => c.label);
     doc.setFontSize(16); doc.setFont("helvetica", "bold");
     doc.text("TKT Textiles (Knitting) — Yarn to Fabric Movement", 14, 14);

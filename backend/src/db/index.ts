@@ -40,7 +40,19 @@ if (
   );
 }
 
-export const pool = new Pool({ connectionString });
+// Pool sizing: the app runs a handful of concurrent request handlers, each
+// issuing a few queries — 10 idle clients (node-postgres default) is enough,
+// but cap the client count and fail fast on a busy DB instead of queueing
+// forever. statement_timeout is a safety net so a pathological query can't
+// pin a connection for minutes (all queries here are short OLTP reads/writes;
+// the longest is the dashboard aggregate, well under 30s).
+export const pool = new Pool({
+  connectionString,
+  max: 10,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+  statement_timeout: 30_000,
+});
 
 // An error raised on an idle client is emitted on the pool itself. With no
 // listener attached, Node treats it as an unhandled "error" event and takes

@@ -61,9 +61,10 @@ export function useGetFactoryMaintenanceList(
 ) {
   return useQuery<FactoryMaintenanceListResponse, ErrorType<unknown>>({
     queryKey: getFactoryMaintenanceListQueryKey(date, status, page) as QueryKey,
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       customFetch<FactoryMaintenanceListResponse>(
         `/api/maintenance/factory?date=${encodeURIComponent(date)}&status=${status}&page=${page}&pageSize=50`,
+        { signal },
       ),
     ...options?.query,
   });
@@ -77,7 +78,7 @@ export function useGetFactoryMaintenance(
 ) {
   return useQuery<FactoryMaintenanceDetail, ErrorType<unknown>>({
     queryKey: [`/api/maintenance/factory/${id}`] as QueryKey,
-    queryFn: () => customFetch<FactoryMaintenanceDetail>(`/api/maintenance/factory/${id}`),
+    queryFn: ({ signal }) => customFetch<FactoryMaintenanceDetail>(`/api/maintenance/factory/${id}`, { signal }),
     enabled: id != null,
     ...options?.query,
   });

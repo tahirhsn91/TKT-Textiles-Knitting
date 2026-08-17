@@ -81,9 +81,10 @@ export function useGetYarnReceiptsSummary(
 ) {
   return useQuery<YarnReceiptSummaryResponse, ErrorType<unknown>>({
     queryKey: getYarnReceiptsSummaryQueryKey(date) as QueryKey,
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       customFetch<YarnReceiptSummaryResponse>(
         `/api/yarn-receipts?date=${encodeURIComponent(date)}`,
+        { signal },
       ),
     ...options?.query,
   });
@@ -121,9 +122,10 @@ export function useYarnReceiptsAnalytics(
 ) {
   return useQuery<YarnReceiptAnalyticsResponse, ErrorType<unknown>>({
     queryKey: [`/api/yarn-receipts/analytics`, { date }] as QueryKey,
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       customFetch<YarnReceiptAnalyticsResponse>(
         `/api/yarn-receipts/analytics?date=${encodeURIComponent(date)}`,
+        { signal },
       ),
     ...options?.query,
   });
@@ -159,9 +161,10 @@ export function useUnreconciledYarnReceipts(
 ) {
   return useQuery<UnreconciledYarnReceiptResponse, ErrorType<unknown>>({
     queryKey: [`/api/yarn-receipts/unreconciled`, { date, partyId }] as QueryKey,
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       customFetch<UnreconciledYarnReceiptResponse>(
         `/api/yarn-receipts/unreconciled?date=${encodeURIComponent(date)}&partyId=${partyId}`,
+        { signal },
       ),
     enabled: Boolean(date && partyId),
   });
@@ -175,7 +178,7 @@ export function useGetYarnReceipt(
 ) {
   return useQuery<YarnReceiptDetail, ErrorType<unknown>>({
     queryKey: [`/api/yarn-receipts/${id}`] as QueryKey,
-    queryFn: () => customFetch<YarnReceiptDetail>(`/api/yarn-receipts/${id}`),
+    queryFn: ({ signal }) => customFetch<YarnReceiptDetail>(`/api/yarn-receipts/${id}`, { signal }),
     enabled: id != null,
     ...options?.query,
   });

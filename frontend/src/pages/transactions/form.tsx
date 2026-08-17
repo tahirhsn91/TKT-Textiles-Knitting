@@ -612,7 +612,13 @@ export default function TransactionForm() {
   }
 
   if (isEditing && isLoadingTx) {
-    return <Layout><div className="p-8 text-center text-muted-foreground">Loading...</div></Layout>;
+    return (
+      <Layout>
+        <div className="flex items-center justify-center gap-2 p-8 text-center text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+        </div>
+      </Layout>
+    );
   }
 
   return (

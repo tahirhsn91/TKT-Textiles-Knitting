@@ -47,144 +47,65 @@ export interface UninvoicedParty {
   totalNetWeight: string;
 }
 
+/** The per-party preview payload (groups + source txs + summed weight). */
+export interface UninvoicedPreview {
+  groups: InvoiceGroup[];
+  transactionHeaderIds: number[];
+  totalNetWeight: string;
+}
+
 /** Round to 3 decimal places (net-weight precision). */
 function round3(n: number): number {
   return Math.round((n + Number.EPSILON) * 1000) / 1000;
 }
 
-/** Resolve the Fabric Delivery transaction type id by code. */
+// ─── Fabric Delivery transaction type id (memoized, 60s TTL) ───────────────
+// Resolving the type id is a tiny indexed lookup, but it used to run once per
+// preview/party — the "Future Invoices" screen called it N+2 times per load.
+// The master row only changes through admin edits (rare), so a short TTL cache
+// (same pattern as the dashboard cache) turns that into one query per minute.
+const TYPE_ID_CACHE_TTL_MS = 60_000;
+let cachedFabricDeliveryTypeId: { id: number | null; expiresAt: number } | null = null;
+
+/** Resolve the Fabric Delivery transaction type id by code (cached, 60s TTL). */
 async function findFabricDeliveryTypeId(): Promise<number | null> {
+  const now = Date.now();
+  if (cachedFabricDeliveryTypeId && cachedFabricDeliveryTypeId.expiresAt > now) {
+    return cachedFabricDeliveryTypeId.id;
+  }
   const [row] = await db
     .select({ id: transactionTypeMasterTable.id })
     .from(transactionTypeMasterTable)
     .where(eq(transactionTypeMasterTable.code, FABRIC_DELIVERY_TRANSACTION_TYPE_CODE));
-  return row?.id ?? null;
+  const id = row?.id ?? null;
+  // Cache only a found id, not a null miss, so a Fabric_Delivery row created
+  // within the TTL window is picked up immediately instead of showing empty
+  // previews for up to 60s (QA finding L3).
+  if (id !== null) {
+    cachedFabricDeliveryTypeId = { id, expiresAt: now + TYPE_ID_CACHE_TTL_MS };
+  }
+  return id;
 }
 
-/** Un-invoiced Fabric_Dispatch header rows for a party. */
-async function findUninvoicedHeaders(partyId: number): Promise<{ id: number; date: string }[]> {
-  const typeId = await findFabricDeliveryTypeId();
-  if (!typeId) return [];
-
-  // Fabric_Dispatch headers for the party whose transaction is NOT consumed:
-  // an anti-join on invoice_transaction. `isNull` on the junction fk surfaces
-  // headers with no junction row (LEFT JOIN + NULL filter = NOT EXISTS).
-  const rows = await db
-    .select({
-      id: transactionHeaderTable.id,
-      date: transactionHeaderTable.date,
-      consumed: invoiceTransactionTable.id,
-    })
-    .from(transactionHeaderTable)
-    .leftJoin(invoiceTransactionTable, eq(invoiceTransactionTable.transactionHeaderId, transactionHeaderTable.id))
-    .where(and(
-      eq(transactionHeaderTable.transactionTypeId, typeId),
-      eq(transactionHeaderTable.partyId, partyId),
-      isNull(invoiceTransactionTable.id),
-    ))
-    .orderBy(transactionHeaderTable.date);
-
-  return rows.map((r) => ({ id: r.id, date: r.date }));
+/** A detail row as selected by the preview queries below. */
+interface PreviewDetailRow {
+  headerId: number;
+  yarnTypeId: number | null;
+  yarnCountId: number | null;
+  uomId: number | null;
+  netWt: string | null;
+  yarnTypeName: string | null;
+  hsCode: string | null;
+  yarnCountName: string | null;
+  uomName: string | null;
 }
 
 /**
- * List parties that have at least one un-invoiced Fabric_Dispatch transaction.
- * Used by the Invoicing screen's party selector.
+ * Group detail rows by (yarnTypeId, yarnCountId), summing net weight and
+ * collecting the source header ids (deduped). Shared by the single-party
+ * preview and the batched all-parties loader so both stay identical.
  */
-export async function listUninvoicedParties(): Promise<UninvoicedParty[]> {
-  const typeId = await findFabricDeliveryTypeId();
-  if (!typeId) return [];
-
-  // Un-invoiced Fabric_Dispatch headers (anti-join on invoice_transaction),
-  // aggregated per party for count + total net weight (via their details).
-  const uninvoiced = await db
-    .select({
-      id: transactionHeaderTable.id,
-      partyId: transactionHeaderTable.partyId,
-      partyName: partyMasterTable.name,
-    })
-    .from(transactionHeaderTable)
-    .innerJoin(partyMasterTable, eq(transactionHeaderTable.partyId, partyMasterTable.id))
-    .leftJoin(invoiceTransactionTable, eq(invoiceTransactionTable.transactionHeaderId, transactionHeaderTable.id))
-    .where(and(
-      eq(transactionHeaderTable.transactionTypeId, typeId),
-      isNull(invoiceTransactionTable.id),
-    ));
-
-  if (uninvoiced.length === 0) return [];
-
-  const headerIds = uninvoiced.map((h) => h.id).filter((x): x is number => x != null);
-  const detailSums = await db
-    .select({
-      headerId: transactionDetailTable.headerId,
-      netWt: transactionDetailTable.netWt,
-    })
-    .from(transactionDetailTable)
-    .where(inArray(transactionDetailTable.headerId, headerIds));
-
-  const weightByHeader = new Map<number, number>();
-  for (const d of detailSums) {
-    const hdrId = d.headerId as number;
-    weightByHeader.set(hdrId, (weightByHeader.get(hdrId) ?? 0) + (parseFloat(d.netWt ?? "0") || 0));
-  }
-
-  // Aggregate per party (party_id on a Fabric_Dispatch header is always set).
-  const byParty = new Map<number, { partyName: string; count: number; weight: number }>();
-  for (const h of uninvoiced) {
-    const partyId = h.partyId as number;
-    let p = byParty.get(partyId);
-    if (!p) { p = { partyName: h.partyName, count: 0, weight: 0 }; byParty.set(partyId, p); }
-    p.count += 1;
-    p.weight += weightByHeader.get(h.id as number) ?? 0;
-  }
-
-  return [...byParty.entries()]
-    .map(([partyId, p]) => ({
-      partyId,
-      partyName: p.partyName,
-      transactionCount: p.count,
-      totalNetWeight: round3(p.weight).toFixed(3),
-    }))
-    .sort((a, b) => a.partyName.localeCompare(b.partyName));
-}
-
-/**
- * Fetch the aggregation preview (items) for a party's un-invoiced
- * Fabric_Dispatch transactions. Returns the item groups plus the source
- * transaction header ids so generation can claim exactly those.
- */
-export async function getUninvoicedPreview(partyId: number): Promise<{
-  groups: InvoiceGroup[];
-  transactionHeaderIds: number[];
-  totalNetWeight: string;
-}> {
-  const headers = await findUninvoicedHeaders(partyId);
-  const transactionHeaderIds = headers.map((h) => h.id);
-
-  if (transactionHeaderIds.length === 0) {
-    return { groups: [], transactionHeaderIds, totalNetWeight: "0.000" };
-  }
-
-  // Detail rows for those headers, joined with yarn type / count / uom.
-  const details = await db
-    .select({
-      headerId: transactionDetailTable.headerId,
-      yarnTypeId: transactionDetailTable.yarnTypeId,
-      yarnCountId: transactionDetailTable.yarnCountId,
-      uomId: transactionDetailTable.uomId,
-      netWt: transactionDetailTable.netWt,
-      yarnTypeName: yarnTypeMasterTable.name,
-      hsCode: yarnTypeMasterTable.hsCode,
-      yarnCountName: yarnCountMasterTable.count,
-      uomName: uomMasterTable.name,
-    })
-    .from(transactionDetailTable)
-    .leftJoin(yarnTypeMasterTable, eq(transactionDetailTable.yarnTypeId, yarnTypeMasterTable.id))
-    .leftJoin(yarnCountMasterTable, eq(transactionDetailTable.yarnCountId, yarnCountMasterTable.id))
-    .leftJoin(uomMasterTable, eq(transactionDetailTable.uomId, uomMasterTable.id))
-    .where(inArray(transactionDetailTable.headerId, transactionHeaderIds));
-
-  // Group by (yarnTypeId, yarnCountId), sum net weight, collect header ids.
+function groupDetails(details: PreviewDetailRow[]): InvoiceGroup[] {
   const map = new Map<string, InvoiceGroup & { sum: number; uomId: number | null }>();
   for (const d of details) {
     const key = `${d.yarnTypeId ?? "null"}|${d.yarnCountId ?? "null"}`;
@@ -211,7 +132,7 @@ export async function getUninvoicedPreview(partyId: number): Promise<{
     if (g.uoM == null) g.uoM = d.uomName;
   }
 
-  const groups: InvoiceGroup[] = [...map.values()].map((g) => ({
+  return [...map.values()].map((g) => ({
     yarnTypeId: g.yarnTypeId,
     yarnTypeName: g.yarnTypeName,
     yarnCountId: g.yarnCountId,
@@ -222,10 +143,159 @@ export async function getUninvoicedPreview(partyId: number): Promise<{
     quantity: round3(g.sum).toFixed(3),
     transactionHeaderIds: g.transactionHeaderIds,
   }));
+}
 
-  const totalNetWeight = round3(groups.reduce((a, g) => a + parseFloat(g.quantity), 0)).toFixed(3);
+/**
+ * Batched un-invoiced preview loader.
+ *
+ * Previously every party preview ran its own type lookup + header query +
+ * detail query (3 round-trips per party). This does the whole job in 2
+ * queries for ALL parties at once and groups in memory: the "Future Invoices"
+ * screen went from ~3N+3 queries to 2.
+ *
+ * Returns a map keyed by party id. Each entry carries both the preview
+ * payload and the raw summed weight so `listUninvoicedParties` keeps its
+ * historical raw-sum total while the preview keeps its group-rounded total
+ * (they can differ by 0.001 in rare rounding cases — preserved on purpose).
+ */
+async function loadUninvoicedPreviews(partyIds?: number[]): Promise<
+  Map<number, UninvoicedPreview & { partyName: string; totalNetWeightRaw: string }>
+> {
+  const previews = new Map<number, UninvoicedPreview & { partyName: string; totalNetWeightRaw: string }>();
+  const typeId = await findFabricDeliveryTypeId();
+  if (!typeId) return previews;
 
-  return { groups, transactionHeaderIds, totalNetWeight };
+  // Un-invoiced Fabric_Dispatch headers for the requested parties (or all):
+  // anti-join on invoice_transaction (LEFT JOIN + NULL filter = NOT EXISTS).
+  const headerWhere = and(
+    eq(transactionHeaderTable.transactionTypeId, typeId),
+    isNull(invoiceTransactionTable.id),
+    partyIds != null ? inArray(transactionHeaderTable.partyId, partyIds) : undefined,
+  );
+  const headerRows = await db
+    .select({
+      id: transactionHeaderTable.id,
+      partyId: transactionHeaderTable.partyId,
+      partyName: partyMasterTable.name,
+    })
+    .from(transactionHeaderTable)
+    .innerJoin(partyMasterTable, eq(transactionHeaderTable.partyId, partyMasterTable.id))
+    .leftJoin(invoiceTransactionTable, eq(invoiceTransactionTable.transactionHeaderId, transactionHeaderTable.id))
+    .where(headerWhere)
+    .orderBy(transactionHeaderTable.date, transactionHeaderTable.id);
+
+  if (headerRows.length === 0) return previews;
+
+  const headerIds = headerRows.map((h) => h.id);
+
+  // Detail rows for all those headers, joined with yarn type / count / uom.
+  // ORDER BY detail id makes group order deterministic across calls.
+  const details = await db
+    .select({
+      headerId: transactionDetailTable.headerId,
+      yarnTypeId: transactionDetailTable.yarnTypeId,
+      yarnCountId: transactionDetailTable.yarnCountId,
+      uomId: transactionDetailTable.uomId,
+      netWt: transactionDetailTable.netWt,
+      yarnTypeName: yarnTypeMasterTable.name,
+      hsCode: yarnTypeMasterTable.hsCode,
+      yarnCountName: yarnCountMasterTable.count,
+      uomName: uomMasterTable.name,
+    })
+    .from(transactionDetailTable)
+    .leftJoin(yarnTypeMasterTable, eq(transactionDetailTable.yarnTypeId, yarnTypeMasterTable.id))
+    .leftJoin(yarnCountMasterTable, eq(transactionDetailTable.yarnCountId, yarnCountMasterTable.id))
+    .leftJoin(uomMasterTable, eq(transactionDetailTable.uomId, uomMasterTable.id))
+    .where(inArray(transactionDetailTable.headerId, headerIds))
+    .orderBy(transactionDetailTable.id);
+
+  // Index the detail rows by their header so each party's slice is a cheap
+  // look-up instead of repeated filtering.
+  const detailsByHeader = new Map<number, PreviewDetailRow[]>();
+  for (const d of details) {
+    const arr = detailsByHeader.get(d.headerId);
+    if (arr) arr.push(d);
+    else detailsByHeader.set(d.headerId, [d]);
+  }
+
+  const partyNameByParty = new Map<number, string>();
+  const headersByParty = new Map<number, number[]>();
+  for (const h of headerRows) {
+    const pid = h.partyId as number; // party_id on a Fabric_Dispatch header is always set
+    partyNameByParty.set(pid, h.partyName ?? `Party #${pid}`);
+    const arr = headersByParty.get(pid);
+    if (arr) arr.push(h.id);
+    else headersByParty.set(pid, [h.id]);
+  }
+
+  for (const [pid, hids] of headersByParty) {
+    const partyDetails: PreviewDetailRow[] = [];
+    let rawWeight = 0;
+    for (const hid of hids) {
+      const ds = detailsByHeader.get(hid);
+      if (!ds) continue;
+      for (const d of ds) {
+        partyDetails.push(d);
+        rawWeight += parseFloat(d.netWt ?? "0") || 0;
+      }
+    }
+    const groups = groupDetails(partyDetails);
+    // Preview total: summed from the ROUNDED group quantities (historical
+    // getUninvoicedPreview semantics).
+    const totalNetWeight = round3(groups.reduce((a, g) => a + parseFloat(g.quantity), 0)).toFixed(3);
+    previews.set(pid, {
+      partyName: partyNameByParty.get(pid) ?? `Party #${pid}`,
+      groups,
+      transactionHeaderIds: hids,
+      totalNetWeight,
+      totalNetWeightRaw: round3(rawWeight).toFixed(3),
+    });
+  }
+
+  return previews;
+}
+
+/**
+ * List parties that have at least one un-invoiced Fabric_Dispatch transaction.
+ * Used by the Invoicing screen's party selector.
+ */
+export async function listUninvoicedParties(): Promise<UninvoicedParty[]> {
+  const map = await loadUninvoicedPreviews();
+  return [...map.entries()]
+    .map(([partyId, p]) => ({
+      partyId,
+      partyName: p.partyName,
+      transactionCount: p.transactionHeaderIds.length,
+      totalNetWeight: p.totalNetWeightRaw,
+    }))
+    .sort((a, b) => a.partyName.localeCompare(b.partyName));
+}
+
+/**
+ * Fetch the aggregation preview (items) for a party's un-invoiced
+ * Fabric_Dispatch transactions. Returns the item groups plus the source
+ * transaction header ids so generation can claim exactly those.
+ */
+export async function getUninvoicedPreview(partyId: number): Promise<UninvoicedPreview> {
+  const map = await loadUninvoicedPreviews([partyId]);
+  const p = map.get(partyId);
+  if (!p) return { groups: [], transactionHeaderIds: [], totalNetWeight: "0.000" };
+  return {
+    groups: p.groups,
+    transactionHeaderIds: p.transactionHeaderIds,
+    totalNetWeight: p.totalNetWeight,
+  };
+}
+
+/**
+ * Batch previews for every party with un-invoiced transactions — the
+ * "Future Invoices" projection loads all of them at once instead of looping
+ * per-party previews (2 queries total vs ~2N).
+ */
+export async function getAllUninvoicedPreviews(): Promise<
+  Map<number, UninvoicedPreview & { partyName: string }>
+> {
+  return loadUninvoicedPreviews();
 }
 
 // Re-export the amount computation for the route layer / tests.

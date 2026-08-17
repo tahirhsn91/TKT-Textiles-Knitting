@@ -78,7 +78,7 @@ import {
   type InvoicePayment,
 } from "@/hooks/use-fbr-invoicing";
 import { useListYarnTypeMaster, useListYarnCountMaster } from "@workspace/api-client-react";
-import { downloadInvoicePdf, amountInWords } from "@/lib/invoice-pdf";
+import { amountInWords } from "@/lib/invoice-amount";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer,
@@ -157,9 +157,9 @@ export default function InvoicingPage() {
   const { data: latestRates } = useLatestRates(partyId);
   const { data: invoices } = useListInvoices();
   const { data: viewing, isLoading: viewingLoading } = useInvoiceDetail(viewingId);
-  const { data: receivables } = useReceivables();
-  const { data: futureInvoices } = useFutureInvoices();
-  const { data: allParties } = useListPartiesForInvoicing();
+  const { data: receivables } = useReceivables({ query: { enabled: activeTab === "receivables" } });
+  const { data: futureInvoices } = useFutureInvoices({ query: { enabled: activeTab === "future" } });
+  const { data: allParties } = useListPartiesForInvoicing({ query: { enabled: backdatedOpen } });
 
   const generate = useGenerateInvoice();
   const post = usePostInvoice();
@@ -178,6 +178,17 @@ export default function InvoicingPage() {
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [invoices]);
+
+  // True when the Status/Due Status filters are at their defaults; the
+  // card header's "Draft · Posted" eyebrow only describes that state, so it
+  // is hidden once the user changes the filters to avoid stale labelling.
+  const filtersAtDefault =
+    statusSel.length === 2 &&
+    statusSel.includes("draft") &&
+    statusSel.includes("posted") &&
+    dueSel.length === 2 &&
+    dueSel.includes("pending") &&
+    dueSel.includes("overdue");
 
   // Filter by party, status, and due status (multi-select; empty = all).
   const filteredInvoices = useMemo(() => {
@@ -219,7 +230,10 @@ export default function InvoicingPage() {
     },
     { key: "invoiceDate", dir: "asc" },
   );
-  const handleSortInvoice = (key: string) => toggleSort(key);
+  // toggleSort (from useSort) is stable and already `(key: string) => void`, so
+  // it can be passed straight to SortableHead — no per-render wrapper, which
+  // lets the memoized header cells skip re-renders.
+  const handleSortInvoice = toggleSort;
 
   // Reset per-party state when the selected party changes.
   const selectParty = (v: string) => {
@@ -384,17 +398,33 @@ export default function InvoicingPage() {
   };
 
   // One detail query drives both the View dialog and the PDF download.
+  // jsPDF + qrcode (~550 KB of shared chunks) are fetched only when a PDF is
+  // actually downloaded, not together with the page.
   const [downloadTarget, setDownloadTarget] = useState<number | null>(null);
   useEffect(() => {
-    if (downloadTarget != null && viewing && viewing.id === downloadTarget && !viewingLoading) {
-      downloadInvoicePdf(viewing);
-      setDownloadTarget(null);
-    }
+    if (downloadTarget == null || !viewing || viewing.id !== downloadTarget || viewingLoading) return;
+    let cancelled = false;
+    import("@/lib/invoice-pdf")
+      .then(({ downloadInvoicePdf }) => downloadInvoicePdf(viewing))
+      .catch(() => toast({ title: "Could not download PDF", variant: "destructive" }))
+      .finally(() => {
+        if (!cancelled) setDownloadTarget(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [downloadTarget, viewing, viewingLoading]);
 
   const handleDownloadPdf = (invoiceId: number) => {
     setViewingId(invoiceId);
     setDownloadTarget(invoiceId);
+  };
+
+  // Download from the View dialog (detail already loaded) without re-fetching.
+  const handleDownloadInvoice = (inv: InvoiceDetail) => {
+    import("@/lib/invoice-pdf")
+      .then(({ downloadInvoicePdf }) => downloadInvoicePdf(inv))
+      .catch(() => toast({ title: "Could not download PDF", variant: "destructive" }));
   };
 
   const handleView = (invoiceId: number) => setViewingId(invoiceId);
@@ -453,9 +483,9 @@ export default function InvoicingPage() {
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label>Party</Label>
+                    <Label htmlFor="party-select">Party</Label>
                     <Select value={partyId != null ? String(partyId) : undefined} onValueChange={selectParty}>
-                      <SelectTrigger className="w-full"><SelectValue placeholder="Select party with un-invoiced deliveries" /></SelectTrigger>
+                      <SelectTrigger id="party-select" className="w-full"><SelectValue placeholder="Select party with un-invoiced deliveries" /></SelectTrigger>
                       <SelectContent>
                         {(parties ?? []).map((p) => (
                           <SelectItem key={p.partyId} value={String(p.partyId)}>
@@ -469,8 +499,8 @@ export default function InvoicingPage() {
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Entered by</Label>
-                    <Input placeholder="Your name" value={enteredBy} disabled />
+                    <Label htmlFor="entered-by">Entered by</Label>
+                    <Input id="entered-by" placeholder="Your name" value={enteredBy} disabled />
                   </div>
                 </div>
 
@@ -526,6 +556,7 @@ export default function InvoicingPage() {
                                       step="0.01"
                                       className="h-8 w-28 text-right"
                                       placeholder="Rate"
+                                      aria-label={`Rate per kg for ${r.group.yarnTypeName ?? "this yarn"}${r.group.yarnCountName ? ` (count ${r.group.yarnCountName})` : ""}`}
                                       value={rates[r.key] ?? ""}
                                       onChange={(e) => {
                                         touchedRates.current.add(r.key);
@@ -537,6 +568,7 @@ export default function InvoicingPage() {
                                       size="icon"
                                       className={`h-8 w-8 ${rateSourceByKey.has(r.key) ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/40 cursor-not-allowed"}`}
                                       title={rateSourceByKey.has(r.key) ? `View invoice #${rateSourceByKey.get(r.key)} this rate came from` : "No previous rate found for this party/yarn"}
+                                      aria-label={rateSourceByKey.has(r.key) ? `View source invoice #${rateSourceByKey.get(r.key)}` : "No previous rate for this party and yarn"}
                                       disabled={!rateSourceByKey.has(r.key)}
                                       onClick={() => handleView(rateSourceByKey.get(r.key)!)}
                                     >
@@ -620,7 +652,7 @@ export default function InvoicingPage() {
                       className="w-36"
                     />
                   </label>
-                  <span className="eyebrow">Draft · Posted</span>
+                  <span className="eyebrow">{filtersAtDefault ? "Draft · Posted" : "Filtered"}</span>
                 </div>
               </div>
               <CardContent className="p-0">
@@ -673,16 +705,16 @@ export default function InvoicingPage() {
                                 <Button variant="outline" size="sm" className="gap-1.5" onClick={() => handlePost(inv)} disabled={post.isPending}>
                                   <Send className="h-4 w-4" /> Post
                                 </Button>
-                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setPendingDelete(inv)} title="Delete">
+                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setPendingDelete(inv)} title="Delete draft invoice" aria-label="Delete draft invoice">
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
                             ) : (
                               <div className="flex justify-end gap-1">
-                                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8" title="View" onClick={() => handleView(inv.id)}>
+                                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8" title="View invoice" aria-label="View invoice" onClick={() => handleView(inv.id)}>
                                   <Eye className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8" title="Download PDF" onClick={() => handleDownloadPdf(inv.id)}>
+                                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8" title="Download invoice PDF" aria-label="Download invoice PDF" onClick={() => handleDownloadPdf(inv.id)}>
                                   <Download className="h-4 w-4" />
                                 </Button>
                                 <Button variant="outline" size="sm" className="gap-1.5" onClick={() => openPayment(inv)} disabled={addPayment.isPending}>
@@ -772,21 +804,21 @@ export default function InvoicingPage() {
               <span className="font-semibold">{payFor ? money(payFor.outstanding ?? parseFloat(payFor.grandTotal)) : ""}</span>
             </div>
             <div className="space-y-1.5">
-              <Label>Amount (gross)</Label>
-              <Input type="number" min="0" step="0.01" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder="0.00" />
+              <Label htmlFor="pay-amount">Amount (gross)</Label>
+              <Input id="pay-amount" type="number" min="0" step="0.01" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder="0.00" />
             </div>
             <div className="space-y-1.5">
-              <Label>Tax Deduction (WHT)</Label>
-              <Input type="number" min="0" step="0.01" value={payTax} onChange={(e) => setPayTax(e.target.value)} placeholder="0.00" />
+              <Label htmlFor="pay-tax">Tax Deduction (WHT)</Label>
+              <Input id="pay-tax" type="number" min="0" step="0.01" value={payTax} onChange={(e) => setPayTax(e.target.value)} placeholder="0.00" />
             </div>
             <div className="space-y-1.5">
-              <Label>Payment Date</Label>
-              <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+              <Label htmlFor="pay-date">Payment Date</Label>
+              <Input id="pay-date" type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>Method</Label>
+              <Label htmlFor="pay-method">Method</Label>
               <Select value={payMethod} onValueChange={setPayMethod}>
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="pay-method" className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {["Bank Transfer", "Cash", "Cheque", "Other"].map((m) => (
                     <SelectItem key={m} value={m}>{m}</SelectItem>
@@ -795,12 +827,12 @@ export default function InvoicingPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Reference</Label>
-              <Input value={payRef} onChange={(e) => setPayRef(e.target.value)} placeholder="Cheque no. / bank ref" />
+              <Label htmlFor="pay-reference">Reference</Label>
+              <Input id="pay-reference" value={payRef} onChange={(e) => setPayRef(e.target.value)} placeholder="Cheque no. / bank ref" />
             </div>
             <div className="space-y-1.5">
-              <Label>Notes</Label>
-              <Textarea rows={2} value={payNotes} onChange={(e) => setPayNotes(e.target.value)} />
+              <Label htmlFor="pay-notes">Notes</Label>
+              <Textarea id="pay-notes" rows={2} value={payNotes} onChange={(e) => setPayNotes(e.target.value)} />
             </div>
             {(parseFloat(payAmount) > 0) && (
               <p className="text-xs text-muted-foreground">
@@ -852,7 +884,7 @@ export default function InvoicingPage() {
           ) : viewing ? (
             <InvoiceView
               inv={viewing}
-              onDownload={() => downloadInvoicePdf(viewing)}
+              onDownload={() => handleDownloadInvoice(viewing)}
               onAddPayment={() => openPayment(viewing)}
               onDeletePayment={(p) => setDeletePayment({ inv: viewing, payment: p })}
             />
@@ -1182,6 +1214,17 @@ function AnalyticsView({ invoices, loading }: { invoices: InvoiceListItem[]; loa
     );
   }
 
+  // No data at all: show a clear empty state instead of a row of zero KPIs.
+  if (invoices.length === 0) {
+    return (
+      <Card className="overflow-hidden">
+        <CardContent className="py-12 text-center text-sm text-muted-foreground">
+          No invoices yet — generate and post an invoice to see analytics.
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* KPI cards */}
@@ -1201,8 +1244,9 @@ function AnalyticsView({ invoices, loading }: { invoices: InvoiceListItem[]; loa
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Invoiced vs Collected by Month</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={byMonth} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
+            <div role="img" aria-label="Bar chart of invoiced versus collected amounts by month">
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={byMonth} margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
@@ -1212,6 +1256,7 @@ function AnalyticsView({ invoices, loading }: { invoices: InvoiceListItem[]; loa
                 <Bar dataKey="Collected" fill={CHART_COLORS[1]} />
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -1222,15 +1267,17 @@ function AnalyticsView({ invoices, loading }: { invoices: InvoiceListItem[]; loa
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Invoiced Value by Status</CardTitle></CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie data={byStatus} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                    {byStatus.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                  </Pie>
-                  <Legend />
-                  <Tooltip formatter={(v: number) => money(v)} />
-                </PieChart>
-              </ResponsiveContainer>
+              <div role="img" aria-label="Pie chart of invoiced value by status, draft versus posted">
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={byStatus} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                      {byStatus.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                    </Pie>
+                    <Legend />
+                    <Tooltip formatter={(v: number) => money(v)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -1240,14 +1287,16 @@ function AnalyticsView({ invoices, loading }: { invoices: InvoiceListItem[]; loa
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Posted Invoices by Payment Status</CardTitle></CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie data={paymentMix} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                    {paymentMix.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                  </Pie>
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+              <div role="img" aria-label="Pie chart of posted invoices by payment status">
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={paymentMix} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                      {paymentMix.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                    </Pie>
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -1258,8 +1307,9 @@ function AnalyticsView({ invoices, loading }: { invoices: InvoiceListItem[]; loa
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Outstanding by Party (top 10)</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={byParty} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+            <div role="img" aria-label="Bar chart of outstanding amounts by party, top ten parties">
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={byParty} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" tick={{ fontSize: 11 }} />
                 <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
@@ -1267,6 +1317,7 @@ function AnalyticsView({ invoices, loading }: { invoices: InvoiceListItem[]; loa
                 <Bar dataKey="Outstanding" fill={CHART_COLORS[2]} radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -1296,6 +1347,7 @@ function BackdatedInvoiceDialog({
 }) {
   const { data: yarnTypes } = useListYarnTypeMaster();
   const { data: yarnCounts } = useListYarnCountMaster();
+  const { toast } = useToast();
 
   const [form, setForm] = useState({
     id: "",
@@ -1333,8 +1385,8 @@ function BackdatedInvoiceDialog({
   const submit = () => {
     const id = parseInt(form.id, 10);
     const partyId = parseInt(form.partyId, 10);
-    if (!Number.isInteger(id) || id <= 0) { alert("Enter a valid invoice ID"); return; }
-    if (!Number.isInteger(partyId) || partyId <= 0) { alert("Select a party"); return; }
+    if (!Number.isInteger(id) || id <= 0) { toast({ title: "Enter a valid invoice ID", variant: "destructive" }); return; }
+    if (!Number.isInteger(partyId) || partyId <= 0) { toast({ title: "Select a party", variant: "destructive" }); return; }
     const items = form.items
       .map((it) => ({
         yarnTypeId: parseInt(it.yarnTypeId, 10),
@@ -1343,7 +1395,7 @@ function BackdatedInvoiceDialog({
         ratePerKg: parseFloat(it.ratePerKg) || 0,
       }))
       .filter((it) => Number.isInteger(it.yarnTypeId) && it.yarnTypeId > 0 && it.quantity > 0 && it.ratePerKg > 0);
-    if (items.length === 0) { alert("Add at least one valid item (yarn type, quantity, rate)"); return; }
+    if (items.length === 0) { toast({ title: "Add at least one valid item (yarn type, quantity, rate)", variant: "destructive" }); return; }
     onCreate({
       id,
       partyId,
@@ -1365,25 +1417,25 @@ function BackdatedInvoiceDialog({
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Invoice ID (manual)</Label>
-              <Input type="number" min="1" value={form.id} onChange={(e) => setForm({ ...form, id: e.target.value })} placeholder="e.g. 500" />
+              <Label htmlFor="bd-id">Invoice ID (manual)</Label>
+              <Input id="bd-id" type="number" min="1" value={form.id} onChange={(e) => setForm({ ...form, id: e.target.value })} placeholder="e.g. 500" />
             </div>
             <div className="space-y-1.5">
-              <Label>Invoice Date</Label>
-              <Input type="date" value={form.invoiceDate} onChange={(e) => setForm({ ...form, invoiceDate: e.target.value })} />
+              <Label htmlFor="bd-date">Invoice Date</Label>
+              <Input id="bd-date" type="date" value={form.invoiceDate} onChange={(e) => setForm({ ...form, invoiceDate: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label>Party</Label>
+              <Label htmlFor="bd-party">Party</Label>
               <Select value={form.partyId || undefined} onValueChange={(v) => setForm({ ...form, partyId: v })}>
-                <SelectTrigger className="w-full"><SelectValue placeholder="Select party" /></SelectTrigger>
+                <SelectTrigger id="bd-party" className="w-full"><SelectValue placeholder="Select party" /></SelectTrigger>
                 <SelectContent>
                   {parties.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>FBR Invoice No. (optional)</Label>
-              <Input value={form.fbrInvoiceNumber} onChange={(e) => setForm({ ...form, fbrInvoiceNumber: e.target.value })} placeholder="From the old system" />
+              <Label htmlFor="bd-fbr">FBR Invoice No. (optional)</Label>
+              <Input id="bd-fbr" value={form.fbrInvoiceNumber} onChange={(e) => setForm({ ...form, fbrInvoiceNumber: e.target.value })} placeholder="From the old system" />
             </div>
           </div>
 
@@ -1395,33 +1447,33 @@ function BackdatedInvoiceDialog({
             {form.items.map((it, idx) => (
               <div key={idx} className="grid grid-cols-2 gap-2 rounded-md border border-border p-3 sm:grid-cols-5">
                 <div className="space-y-1">
-                  <Label className="text-xs">Yarn Type</Label>
+                  <Label htmlFor={`bd-item-${idx}-type`} className="text-xs">Yarn Type</Label>
                   <Select value={it.yarnTypeId || undefined} onValueChange={(v) => setItem(idx, "yarnTypeId", v)}>
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Type" /></SelectTrigger>
+                    <SelectTrigger id={`bd-item-${idx}-type`} className="h-8 text-sm"><SelectValue placeholder="Type" /></SelectTrigger>
                     <SelectContent>
                       {(yarnTypes ?? []).map((y) => <SelectItem key={y.id} value={String(y.id)}>{y.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Count</Label>
+                  <Label htmlFor={`bd-item-${idx}-count`} className="text-xs">Count</Label>
                   <Select value={it.yarnCountId || undefined} onValueChange={(v) => setItem(idx, "yarnCountId", v)}>
-                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Count" /></SelectTrigger>
+                    <SelectTrigger id={`bd-item-${idx}-count`} className="h-8 text-sm"><SelectValue placeholder="Count" /></SelectTrigger>
                     <SelectContent>
                       {(yarnCounts ?? []).map((y) => <SelectItem key={y.id} value={String(y.id)}>{y.count}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Qty (kg)</Label>
-                  <Input type="number" min="0" step="0.001" className="h-8 text-sm" value={it.quantity} onChange={(e) => setItem(idx, "quantity", e.target.value)} />
+                  <Label htmlFor={`bd-item-${idx}-qty`} className="text-xs">Qty (kg)</Label>
+                  <Input id={`bd-item-${idx}-qty`} type="number" min="0" step="0.001" className="h-8 text-sm" value={it.quantity} onChange={(e) => setItem(idx, "quantity", e.target.value)} />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Rate/kg</Label>
-                  <Input type="number" min="0" step="0.01" className="h-8 text-sm" value={it.ratePerKg} onChange={(e) => setItem(idx, "ratePerKg", e.target.value)} />
+                  <Label htmlFor={`bd-item-${idx}-rate`} className="text-xs">Rate/kg</Label>
+                  <Input id={`bd-item-${idx}-rate`} type="number" min="0" step="0.01" className="h-8 text-sm" value={it.ratePerKg} onChange={(e) => setItem(idx, "ratePerKg", e.target.value)} />
                 </div>
                 <div className="flex items-end justify-end">
-                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeItem(idx)} title="Remove item">
+                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeItem(idx)} title="Remove line item" aria-label="Remove line item">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -1655,7 +1707,7 @@ function InvoiceView({
                         <TableCell>{p.reference ?? "—"}</TableCell>
                         <TableCell>{p.paidBy}</TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDeletePayment(p)} title="Delete payment">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDeletePayment(p)} title="Delete payment" aria-label="Delete payment">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </TableCell>

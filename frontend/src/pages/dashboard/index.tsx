@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Layout } from "@/components/layout";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { customFetch } from "@/vendor/api-client-react/custom-fetch";
@@ -114,6 +115,7 @@ function ChartCard({
   isError,
   isEmpty,
   height = 220,
+  onRetry,
   children,
 }: {
   title: string;
@@ -122,6 +124,7 @@ function ChartCard({
   isError: boolean;
   isEmpty?: boolean;
   height?: number;
+  onRetry?: () => void;
   children: React.ReactNode;
 }) {
   return (
@@ -134,8 +137,13 @@ function ChartCard({
         {isLoading ? (
           <Skeleton className="w-full" style={{ height }} />
         ) : isError ? (
-          <div className="flex items-center justify-center px-2 text-sm text-destructive" style={{ height }}>
-            Couldn't load this chart. Reload the page to try again.
+          <div className="flex flex-col items-center justify-center gap-2 px-2 text-sm text-destructive" style={{ height }}>
+            <span>Couldn't load this chart.</span>
+            {onRetry && (
+              <Button variant="outline" size="sm" onClick={onRetry}>
+                Retry
+              </Button>
+            )}
           </div>
         ) : isEmpty ? (
           <div className="flex items-center justify-center px-2 text-sm text-muted-foreground" style={{ height }}>
@@ -151,7 +159,7 @@ function ChartCard({
 
 // ── KPI row widget ───────────────────────────────────────────────────────────
 function ReadingPanel() {
-  const { data, isLoading, isError } = useWidget<Kpis>("kpis");
+  const { data, isLoading, isError, refetch } = useWidget<Kpis>("kpis");
 
   if (isLoading) {
     return (
@@ -167,8 +175,11 @@ function ReadingPanel() {
   if (isError || !data) {
     return (
       <Card>
-        <CardContent className="px-6 py-5 text-sm text-destructive">
-          Couldn't load the headline figures. Reload the page to try again.
+        <CardContent className="flex flex-col items-center gap-2 px-6 py-5 text-sm text-destructive">
+          <span>Couldn't load the headline figures.</span>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            Retry
+          </Button>
         </CardContent>
       </Card>
     );
@@ -203,7 +214,7 @@ function ReadingPanel() {
 
 // ── Monthly trend widget ─────────────────────────────────────────────────────
 function MonthlyTrendWidget() {
-  const { data, isLoading, isError } = useWidget<TrendPoint[]>("monthly-trend");
+  const { data, isLoading, isError, refetch } = useWidget<TrendPoint[]>("monthly-trend");
   return (
     <ChartCard
       title="Production trend"
@@ -211,8 +222,10 @@ function MonthlyTrendWidget() {
       isLoading={isLoading}
       isError={isError}
       isEmpty={data?.length === 0}
+      onRetry={() => refetch()}
       height={240}
     >
+      <div role="img" aria-label="Area chart of net weight produced per month, last twelve months">
       <ResponsiveContainer width="100%" height={240}>
         <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <defs>
@@ -232,13 +245,14 @@ function MonthlyTrendWidget() {
           <Area type="monotone" dataKey="netWeight" stroke={DYE[0]} strokeWidth={2} fill="url(#gradNW)" name="Net weight (kg)" />
         </AreaChart>
       </ResponsiveContainer>
+      </div>
     </ChartCard>
   );
 }
 
 // ── Daily production widget ──────────────────────────────────────────────────
 function DailyProductionWidget() {
-  const { data, isLoading, isError } = useWidget<DailyPoint[]>("daily-production");
+  const { data, isLoading, isError, refetch } = useWidget<DailyPoint[]>("daily-production");
   return (
     <ChartCard
       title="Daily volume"
@@ -246,7 +260,9 @@ function DailyProductionWidget() {
       isLoading={isLoading}
       isError={isError}
       isEmpty={data?.length === 0}
+      onRetry={() => refetch()}
     >
+      <div role="img" aria-label="Bar chart of quantity and net weight per day, last thirty days">
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={data} barSize={6} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke={TOKEN.rule} vertical={false} />
@@ -272,13 +288,14 @@ function DailyProductionWidget() {
           <Bar dataKey="netWeight" fill={DYE[0]} name="Net weight (kg)" radius={[1, 1, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
+      </div>
     </ChartCard>
   );
 }
 
 // ── Fabric breakdown widget ──────────────────────────────────────────────────
 function FabricBreakdownWidget() {
-  const { data, isLoading, isError } = useWidget<NameValue[]>("fabric-breakdown");
+  const { data, isLoading, isError, refetch } = useWidget<NameValue[]>("fabric-breakdown");
   return (
     <ChartCard
       title="Production by fabric type"
@@ -286,7 +303,9 @@ function FabricBreakdownWidget() {
       isLoading={isLoading}
       isError={isError}
       isEmpty={data?.length === 0}
+      onRetry={() => refetch()}
     >
+      <div role="img" aria-label="Pie chart of production share by fabric type, this month">
       <ResponsiveContainer width="100%" height={220}>
         <PieChart>
           <Pie
@@ -310,13 +329,14 @@ function FabricBreakdownWidget() {
           <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v.toFixed(NUM_DECIMALS)} kg`, "Net weight"]} />
         </PieChart>
       </ResponsiveContainer>
+      </div>
     </ChartCard>
   );
 }
 
 // ── Ranked horizontal bar, shared by the three "top N" widgets ───────────────
 function RankedBars<T extends Record<string, unknown>>({
-  title, scope, data, isLoading, isError, dataKey, seriesName, color, formatter, numeric,
+  title, scope, data, isLoading, isError, dataKey, seriesName, color, formatter, numeric, onRetry,
 }: {
   title: string;
   scope: string;
@@ -328,6 +348,7 @@ function RankedBars<T extends Record<string, unknown>>({
   color: string;
   formatter: (v: number) => [string, string];
   numeric?: boolean;
+  onRetry: () => void;
 }) {
   const height = Math.max(180, (data?.length ?? 6) * 28 + 30);
   return (
@@ -337,8 +358,10 @@ function RankedBars<T extends Record<string, unknown>>({
       isLoading={isLoading}
       isError={isError}
       isEmpty={data?.length === 0}
+      onRetry={onRetry}
       height={height}
     >
+      <div role="img" aria-label={`Horizontal bar chart of ${title.toLowerCase()}`}>
       <ResponsiveContainer width="100%" height={Math.max(180, (data?.length ?? 0) * 28 + 30)}>
         <BarChart data={data} layout="vertical" margin={{ left: 8, right: 28, top: 4, bottom: 4 }}>
           <CartesianGrid stroke={TOKEN.rule} horizontal={false} />
@@ -362,12 +385,13 @@ function RankedBars<T extends Record<string, unknown>>({
           <Bar dataKey={dataKey} fill={color} name={seriesName} radius={[0, 1, 1, 0]} barSize={14} />
         </BarChart>
       </ResponsiveContainer>
+      </div>
     </ChartCard>
   );
 }
 
 function TopPartiesWidget() {
-  const { data, isLoading, isError } = useWidget<NameCount[]>("top-parties");
+  const { data, isLoading, isError, refetch } = useWidget<NameCount[]>("top-parties");
   return (
     <RankedBars
       title="Top parties"
@@ -379,12 +403,13 @@ function TopPartiesWidget() {
       seriesName="Transactions"
       color={DYE[1]}
       formatter={(v: number) => [String(v), "Transactions"]}
+      onRetry={() => refetch()}
     />
   );
 }
 
 function MachineUtilizationWidget() {
-  const { data, isLoading, isError } = useWidget<NameLines[]>("machine-utilization");
+  const { data, isLoading, isError, refetch } = useWidget<NameLines[]>("machine-utilization");
   return (
     <RankedBars
       title="Machine utilisation"
@@ -396,12 +421,13 @@ function MachineUtilizationWidget() {
       seriesName="Lines"
       color={DYE[0]}
       formatter={(v: number) => [String(v), "Transaction lines"]}
+      onRetry={() => refetch()}
     />
   );
 }
 
 function EmployeeOutputWidget() {
-  const { data, isLoading, isError } = useWidget<NameNetWeight[]>("employee-output");
+  const { data, isLoading, isError, refetch } = useWidget<NameNetWeight[]>("employee-output");
   return (
     <RankedBars
       title="Top employees"
@@ -414,6 +440,7 @@ function EmployeeOutputWidget() {
       color={DYE[3]}
       formatter={(v: number) => [`${v.toFixed(NUM_DECIMALS)} kg`, "Net weight"]}
       numeric
+      onRetry={() => refetch()}
     />
   );
 }
