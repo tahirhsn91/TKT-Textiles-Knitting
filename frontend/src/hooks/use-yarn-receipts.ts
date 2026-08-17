@@ -135,6 +135,8 @@ export function useYarnReceiptsAnalytics(
 
 export interface UnreconciledYarnReceiptRow {
   id: number;
+  /** Receipt header doc number (e.g. YR-5); one per header, repeated across its lines. */
+  docNumber: string;
   receiptDate: string;
   partyId: number;
   partyName: string | null;
