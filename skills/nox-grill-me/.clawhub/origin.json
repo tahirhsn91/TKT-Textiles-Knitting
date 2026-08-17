@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registry": "https://clawhub.ai",
+  "slug": "nox-grill-me",
+  "installedVersion": "1.0.0",
+  "installedAt": 1785948530437,
+  "artifact": {
+    "kind": "archive",
+    "sha256": "8a00f576a7ee50805569abecb2265b624c0fb2f88398d3e60bd128154977dc6a",
+    "integrity": "sha256-igD1dqfuUIBVaavssiZbYkwPsviDmNPmC9EoFUl33Go="
+  },
+  "skillFile": {
+    "path": "SKILL.md",
+    "sha256": "a9f2912c0f532176b109e9db52161304cc9d7b2624bee49c70bfa95f0afe35a6"
+  }
+}
