@@ -206,6 +206,7 @@ router.get("/yarn-receipts/unreconciled", async (req, res): Promise<void> => {
   const rows = await db
     .select({
       id: yarnReceiptHeaderTable.id,
+      docNumber: yarnReceiptHeaderTable.docNumber,
       receiptDate: yarnReceiptHeaderTable.receiptDate,
       partyId: yarnReceiptHeaderTable.partyId,
       partyName: partyMasterTable.name,
