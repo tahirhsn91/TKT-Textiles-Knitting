@@ -113,6 +113,9 @@ export const dailyProductionDetailTable = pgTable("daily_production_detail", {
 }, (t) => [
   unique("daily_production_detail_header_roll_unique").on(t.headerId, t.rollNumber),
   check("daily_production_detail_roll_weight_check", sql`${t.rollWeight} > 0`),
+  // FK column — Postgres doesn't auto-index it; serves the header→rolls
+  // lookups (summary counts/sums, edit, delete, plausibility).
+  index("daily_production_detail_header_idx").on(t.headerId),
 ]);
 
 export const insertDailyProductionDetailSchema = createInsertSchema(dailyProductionDetailTable).omit({

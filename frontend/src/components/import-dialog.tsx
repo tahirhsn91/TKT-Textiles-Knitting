@@ -1,5 +1,4 @@
 import { useState, useRef } from "react";
-import * as XLSX from "xlsx";
 import { customFetch } from "@/vendor/api-client-react/custom-fetch";
 import { Upload, AlertCircle, CheckCircle2, SkipForward, XCircle, FileText, Download } from "lucide-react";
 import {
@@ -138,6 +137,9 @@ function normalizeExcelDate(raw: string): string {
 }
 
 async function parseXlsx(file: File): Promise<CsvRow[]> {
+  // xlsx (~350 kB min) is loaded on demand so the import dialog only pays for
+  // it when the user actually picks an .xlsx file (CSV imports never need it).
+  const XLSX = await import("xlsx");
   const arrayBuffer = await file.arrayBuffer();
   // cellDates: false keeps dates as numeric serials so we can reformat them
   // via dateNF after detecting which cells are dates.

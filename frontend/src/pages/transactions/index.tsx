@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { Plus, Edit, Trash2, X, Loader2 } from "lucide-react";
 import { SortableHead } from "@/components/sortable-head";
@@ -164,8 +164,20 @@ export default function TransactionList() {
   const setFilter = (key: keyof typeof EMPTY_FILTERS, value: string | string[]) =>
     setFilters((f) => ({ ...f, [key]: value }));
 
-  const lookupName = (list: { id: number; name: string }[] | undefined, id: number | null | undefined) =>
-    id != null ? (list?.find((x) => x.id === id)?.name ?? String(id)) : "-";
+  // Name resolution is the hottest per-cell work in this grid (two lookups per
+  // row, every render, plus inside the sort). A Map is O(1) where the old
+  // list.find() was O(n) per cell, and the maps are memoized so typing in the
+  // filters doesn't rebuild them. Masters change rarely and their mutations
+  // invalidate these queries, so a stale-while-revalidate window is fine.
+  const masterMaps = useMemo(
+    () => ({
+      transactionType: new Map((transactionTypeMaster ?? []).map((x) => [x.id, x.name])),
+      party: new Map((partyMaster ?? []).map((x) => [x.id, x.name])),
+    }),
+    [transactionTypeMaster, partyMaster],
+  );
+  const lookupName = (map: Map<number, string>, id: number | null | undefined) =>
+    id != null ? (map.get(id) ?? String(id)) : "-";
 
   // Jobs filtered by selected party
   const filteredJobOptions = useMemo(
@@ -216,8 +228,8 @@ export default function TransactionList() {
       switch (sort.key) {
         case "docNumber":         av = a.docNumber ?? "";                              bv = b.docNumber ?? "";                              break;
         case "date":              av = a.date ?? "";                                   bv = b.date ?? "";                                   break;
-        case "transactionType":   av = lookupName(transactionTypeMaster, a.transactionTypeId); bv = lookupName(transactionTypeMaster, b.transactionTypeId); break;
-        case "party":             av = lookupName(partyMaster, a.partyId);             bv = lookupName(partyMaster, b.partyId);             break;
+        case "transactionType":   av = lookupName(masterMaps.transactionType, a.transactionTypeId); bv = lookupName(masterMaps.transactionType, b.transactionTypeId); break;
+        case "party":             av = lookupName(masterMaps.party, a.partyId);             bv = lookupName(masterMaps.party, b.partyId);             break;
         case "netWt":             av = (a as { netWt?: string | null }).netWt ?? "";          bv = (b as { netWt?: string | null }).netWt ?? "";          break;
         case "reference":         av = (a as { reference?: string | null }).reference ?? ""; bv = (b as { reference?: string | null }).reference ?? ""; break;
       }
@@ -228,14 +240,21 @@ export default function TransactionList() {
       return sort.dir === "asc" ? compareValues(av, bv) : compareValues(bv, av);
     });
     return arr;
-  }, [filtered, sort, transactionTypeMaster, partyMaster]);
+  }, [filtered, sort, masterMaps]);
 
   // ── Sort handlers ──────────────────────────────────────────────────────────
-  function handleSort(key: ColKey) {
-    setSort((prev) =>
-      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }
-    );
-  }
+  // Stable handler (useCallback) so memoized SortableHead columns skip
+  // re-renders when unrelated state (filters, drag state) changes. Accepts a
+  // generic string per SortableHead's contract; the header only ever emits its
+  // own sortKey, so the cast is safe.
+  const handleSort = useCallback((key: string) => {
+    setSort((prev) => {
+      const k = key as ColKey;
+      return prev.key === k
+        ? { key: k, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key: k, dir: "asc" };
+    });
+  }, []);
 
   // SortIcon and the hand-rolled <TableHead> it lived in were replaced by the
   // shared SortableHead, which also makes these columns keyboard-sortable.
@@ -457,7 +476,7 @@ export default function TransactionList() {
                     label={c.label}
                     sortKey={c.key}
                     sort={sort}
-                    onSort={(k) => handleSort(k as ColKey)}
+                    onSort={handleSort}
                     draggable
                     isDragging={dragCol === c.key}
                     onDragStart={(e) => handleDragStart(e, c.key)}
@@ -499,9 +518,9 @@ export default function TransactionList() {
                       {orderedCols.map((c) => {
                         switch (c.key) {
                           case "docNumber":       return <TableCell key={c.key} className="font-medium whitespace-nowrap">{t.docNumber}</TableCell>;
-                          case "transactionType": return <TableCell key={c.key} className="whitespace-nowrap">{lookupName(transactionTypeMaster, t.transactionTypeId)}</TableCell>;
+                          case "transactionType": return <TableCell key={c.key} className="whitespace-nowrap">{lookupName(masterMaps.transactionType, t.transactionTypeId)}</TableCell>;
                           case "date":            return <TableCell key={c.key} className="whitespace-nowrap">{new Date(t.date + "T00:00:00").toLocaleDateString()}</TableCell>;
-                          case "party":           return <TableCell key={c.key} className="whitespace-nowrap">{lookupName(partyMaster, t.partyId)}</TableCell>;
+                          case "party":           return <TableCell key={c.key} className="whitespace-nowrap">{lookupName(masterMaps.party, t.partyId)}</TableCell>;
                           case "netWt":            return <TableCell key={c.key} className="whitespace-nowrap text-right">{t.netWt ?? "-"}</TableCell>;
                           case "reference":       return <TableCell key={c.key} className="whitespace-nowrap text-muted-foreground">{ref ?? "-"}</TableCell>;
                           default:                return <TableCell key={c.key} />;
@@ -528,10 +547,10 @@ export default function TransactionList() {
                                 <AlertDialogTitle>Delete Transaction?</AlertDialogTitle>
                                 <AlertDialogDescription>
                                   <span className="font-medium text-foreground">
-                                    {t.docNumber} · {lookupName(transactionTypeMaster, t.transactionTypeId)}
+                                    {t.docNumber} · {lookupName(masterMaps.transactionType, t.transactionTypeId)}
                                   </span>
                                   {" — "}
-                                  {lookupName(partyMaster, t.partyId)}
+                                  {lookupName(masterMaps.party, t.partyId)}
                                   {ref ? ` · ${ref}` : ""}
                                   {" on "}
                                   {new Date(t.date + "T00:00:00").toLocaleDateString()}

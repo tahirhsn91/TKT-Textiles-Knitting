@@ -89,6 +89,9 @@ export const yarnReceiptDetailTable = pgTable("yarn_receipt_detail", {
 }, (t) => [
   check("yarn_receipt_detail_quantity_check", sql`${t.quantity} > 0`),
   check("yarn_receipt_detail_net_weight_check", sql`${t.netWeight} > 0`),
+  // FK column — Postgres doesn't auto-index it; serves the header→lines
+  // lookups (list/analytics/update/delete).
+  index("yarn_receipt_detail_header_idx").on(t.headerId),
 ]);
 
 export const insertYarnReceiptDetailSchema = createInsertSchema(yarnReceiptDetailTable).omit({

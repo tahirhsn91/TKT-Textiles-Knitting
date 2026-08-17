@@ -71,9 +71,10 @@ export function useGetMachineMaintenanceList(
 ) {
   return useQuery<MachineMaintenanceListResponse, ErrorType<unknown>>({
     queryKey: getMachineMaintenanceListQueryKey(date, status, page) as QueryKey,
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       customFetch<MachineMaintenanceListResponse>(
         `/api/maintenance/machine?date=${encodeURIComponent(date)}&status=${status}&page=${page}&pageSize=50`,
+        { signal },
       ),
     ...options?.query,
   });
@@ -87,7 +88,7 @@ export function useGetMachineMaintenance(
 ) {
   return useQuery<MachineMaintenanceDetail, ErrorType<unknown>>({
     queryKey: [`/api/maintenance/machine/${id}`] as QueryKey,
-    queryFn: () => customFetch<MachineMaintenanceDetail>(`/api/maintenance/machine/${id}`),
+    queryFn: ({ signal }) => customFetch<MachineMaintenanceDetail>(`/api/maintenance/machine/${id}`, { signal }),
     enabled: id != null,
     ...options?.query,
   });

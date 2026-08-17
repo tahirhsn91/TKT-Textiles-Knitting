@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
+import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db } from "../db/index.js";
 import {
@@ -243,19 +243,20 @@ router.get("/yarn-receipts/unreconciled", async (req, res): Promise<void> => {
 // /transactions/suggestions, so receipt docs stay human-friendly (YR-1, YR-2…).
 
 router.get("/yarn-receipts/suggestions", async (_req, res): Promise<void> => {
-  const rows = await db
-    .select({ docNumber: yarnReceiptHeaderTable.docNumber })
-    .from(yarnReceiptHeaderTable)
-    .orderBy(desc(yarnReceiptHeaderTable.id));
-
   // Doc numbers look like "YR-5"; extract the numeric tail so the next
-  // suggestion is YR-6, not a re-suggested 1.
-  let maxNumeric = 0;
-  for (const r of rows) {
-    const n = parseInt((r.docNumber ?? "").replace(/^YR-\s*/i, ""), 10);
-    if (!isNaN(n) && n > maxNumeric) maxNumeric = n;
-  }
+  // suggestion is YR-6, not a re-suggested 1. Done in SQL (one row back)
+  // instead of loading every receipt: strips the optional "YR-" prefix
+  // case-insensitively (as the old /^YR-\s*/i did) and takes the leading
+  // integer, exactly matching the old parseInt behaviour.
+  const [row] = await db
+    .select({
+      maxNumeric: sql<string>`coalesce(max((regexp_match(regexp_replace(${yarnReceiptHeaderTable.docNumber}, '^[Yy][Rr]-\\s*', ''), '^\\s*\\d+'))[1]::bigint), 0)::text`,
+    })
+    .from(yarnReceiptHeaderTable);
 
+  // bigint comes back as a string; Number() preserves the old parseInt maths
+  // including 10+ digit values (QA finding M1).
+  const maxNumeric = Number(row?.maxNumeric ?? 0);
   res.json({ nextDocNumber: `YR-${maxNumeric + 1}` });
 });
 

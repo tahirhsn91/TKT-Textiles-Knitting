@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, inArray, gte, lte } from "drizzle-orm";
+import { eq, and, inArray, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   salaryHeaderTable,
@@ -38,23 +38,35 @@ function toNum(val: unknown): number {
 router.get("/salary-entries", async (req, res): Promise<void> => {
   const { month, year, departmentId } = req.query as Record<string, string | undefined>;
 
-  const allHeaders = await db
+  // Push the filters into SQL instead of loading every header ever saved and
+  // filtering in JS (the list screen would otherwise grow unbounded). The
+  // `sql false` branches preserve the old in-memory behaviour for malformed
+  // query params: a NaN month/year (or an unknown department) matched nothing.
+  const conditions = [];
+  if (month) {
+    const m = parseInt(month, 10);
+    conditions.push(Number.isNaN(m) ? sql`false` : eq(salaryHeaderTable.month, m));
+  }
+  if (year) {
+    const y = parseInt(year, 10);
+    conditions.push(Number.isNaN(y) ? sql`false` : eq(salaryHeaderTable.year, y));
+  }
+  if (departmentId) {
+    const did = parseInt(departmentId, 10);
+    // department_ids is an int[] column; @> is the "array contains" test.
+    conditions.push(Number.isNaN(did) ? sql`false` : sql`${salaryHeaderTable.departmentIds} @> ARRAY[${did}]::int[]`);
+  }
+
+  const headers = await db
     .select()
     .from(salaryHeaderTable)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(salaryHeaderTable.year, salaryHeaderTable.month);
 
   const depts = await db.select().from(departmentMasterTable);
   const deptMap = Object.fromEntries(depts.map((d) => [d.id, d.name]));
 
-  let filtered = allHeaders;
-  if (month) filtered = filtered.filter((h) => h.month === parseInt(month));
-  if (year) filtered = filtered.filter((h) => h.year === parseInt(year));
-  if (departmentId) {
-    const did = parseInt(departmentId);
-    filtered = filtered.filter((h) => (h.departmentIds ?? []).includes(did));
-  }
-
-  const result = filtered.map((h) => ({
+  const result = headers.map((h) => ({
     ...h,
     departmentNames: (h.departmentIds ?? []).map((id) => deptMap[id] ?? String(id)),
   }));

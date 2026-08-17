@@ -56,6 +56,12 @@ export interface InvoicePaymentStateInput {
   /** Posted date (ISO). For backdated invoices this is the entered date. */
   postedDateIso: string;
   payments: Pick<InvoicePayment, "amount" | "taxDeduction">[];
+  /**
+   * As-of date (ISO) for the overdue computation. Defaults to today; callers
+   * that process many invoices in one request should pass a single shared
+   * value instead of forcing a fresh `new Date()` per invoice.
+   */
+  asOfIso?: string;
 }
 
 export interface InvoicePaymentState {
@@ -83,7 +89,7 @@ export function computePaymentState(input: InvoicePaymentStateInput): InvoicePay
   const tracked = (input.dueDays ?? 0) > 0;
   const dueDateIso = tracked ? addDays(input.postedDateIso, input.dueDays ?? 0) : null;
 
-  const asOfIso = toISODate(new Date());
+  const asOfIso = input.asOfIso ?? toISODate(new Date());
   const overdue = tracked && outstanding > 0 && (input.dueDays ?? 0) > 0 && daysBetween(asOfIso, dueDateIso!) > 0;
 
   return {
