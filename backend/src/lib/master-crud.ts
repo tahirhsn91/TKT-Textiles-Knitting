@@ -2,6 +2,7 @@ import { Router, type IRouter, type Response } from "express";
 import { eq } from "drizzle-orm";
 import type { AnyPgTable, PgColumn } from "drizzle-orm/pg-core";
 import { db } from "../db/index.js";
+import { isUniqueViolation } from "./db-errors.js";
 
 /**
  * Generic CRUD factory for master tables (issue #9).
@@ -20,15 +21,6 @@ import { db } from "../db/index.js";
  * concrete table/column at runtime via narrow casts, mirroring how the
  * original hand-written handlers used the same Drizzle methods.
  */
-
-function isUniqueViolation(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code: string }).code === "23505"
-  );
-}
 
 /** Loose view of a table exposing its columns — safe at runtime, narrow for types. */
 type LooseTable = AnyPgTable & { id: PgColumn; name: PgColumn; [k: string]: unknown };

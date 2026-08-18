@@ -26,6 +26,7 @@ import {
   toNum,
 } from "../lib/invoice-payments.js";
 import { isFbrSandboxEnabled } from "../lib/fbr/config.js";
+import { isUniqueViolation } from "../lib/db-errors.js";
 import { buildFbrInvoicePayload, postInvoiceToFbr } from "../lib/fbr/client.js";
 import { validateBody } from "../lib/validate.js";
 
@@ -188,8 +189,8 @@ router.post("/invoicing/generate", validateBody(generateBodySchema), async (req,
       .returning();
     return updated;
   }).catch((err) => {
+    if (isUniqueViolation(err)) { conflict = true; }
     if (err && (err as { code?: string }).code === "NO_ITEMS") { conflict = true; }
-    if (err && (err as { code?: string }).code === "23505") { conflict = true; }
     if (conflict) return null;
     throw err;
   });
@@ -922,7 +923,7 @@ router.post("/invoicing/backdated", validateBody(backdatedSchema), async (req, r
       invoice = ins;
     });
   } catch (err) {
-    if ((err as { code?: string }).code === "23505") {
+    if (isUniqueViolation(err)) {
       res.status(400).json({ error: `An invoice with ID ${body.id} already exists.` });
       return;
     }
