@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and, inArray, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
+import { isUniqueViolation } from "../lib/db-errors.js";
 import {
   salaryHeaderTable,
   salaryDetailTable,
@@ -19,14 +20,6 @@ function idParam(req: { params: Record<string, string> }) {
   return isNaN(id) ? null : id;
 }
 
-function isUniqueViolation(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code: string }).code === "23505"
-  );
-}
 
 function toNum(val: unknown): number {
   const n = parseFloat(String(val ?? ""));

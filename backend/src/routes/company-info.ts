@@ -8,21 +8,13 @@ import {
 } from "../db/index.js";
 import { FBR_PROVINCES } from "../lib/fbr/constants.js";
 import { validateBody } from "../lib/validate.js";
+import { isUniqueViolation } from "../lib/db-errors.js";
 
 const router: IRouter = Router();
 
 function idParam(req: { params: Record<string, string | string[] | undefined> }) {
   const id = parseInt(String(req.params.id), 10);
   return isNaN(id) ? null : id;
-}
-
-function isUniqueViolation(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code: string }).code === "23505"
-  );
 }
 
 const provinceSchema = z.string().refine(
