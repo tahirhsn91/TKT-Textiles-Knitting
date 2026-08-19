@@ -6,6 +6,8 @@ import {
   type ReactNode,
 } from "react";
 import { customFetch, setAuthTokenGetter } from "@/vendor/api-client-react/custom-fetch";
+import { setUnauthorizedHandler } from "@/lib/http-client";
+import { useLocation } from "wouter";
 
 // ─── Auth API shapes (mirror the backend responses, issue #135) ─────────────
 
@@ -71,12 +73,37 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [loading, setLoading] = useState(true);
+  const [, setLocation] = useLocation();
 
   // Keep the customFetch bearer getter in sync whenever the token changes.
   useEffect(() => {
     setAuthTokenGetter(() => getStoredToken());
     return () => setAuthTokenGetter(null);
   }, []);
+
+  // App-wide auth middleware: when an API call returns 401 Unauthorized (an
+  // expired/invalid bearer token), log the user out and redirect to /login.
+  // The Axios interceptor in src/lib/http-client.ts invokes this handler via
+  // setUnauthorizedHandler (and skips the /api/auth/login call itself, so
+  // invalid credentials still surface as a normal login-page error).
+  useEffect(() => {
+    const runLogoutAndRedirect = () => {
+      // Drop the stored token + in-memory session (logout).
+      storeToken(null);
+      setSession(null);
+      // Remember where the user was so login can return there.
+      try {
+        sessionStorage.setItem(
+          "tkt_redirect",
+          window.location.pathname + window.location.search,
+        );
+      } catch {
+        /* ignore */
+      }
+      setLocation("/login");
+    };
+    return setUnauthorizedHandler(runLogoutAndRedirect);
+  }, [setLocation]);
 
   // Restore the session on boot (and when the token changes).
   useEffect(() => {
