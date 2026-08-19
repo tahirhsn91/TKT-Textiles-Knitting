@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS "machine_history" (
 --> statement-breakpoint
 
 ALTER TABLE "machine_history" ADD CONSTRAINT "machine_history_machine_id_machine_master_id_fk"
-	FOREIGN KEY ("machine_id") REFERENCES "public"."machine_master"("id") ON DELETE "set null" ON UPDATE no action;
+	FOREIGN KEY ("machine_id") REFERENCES "public"."machine_master"("id") ON DELETE set null ON UPDATE no action;
 --> statement-breakpoint
 
 ALTER TABLE "machine_history" ADD CONSTRAINT "machine_history_action_check"
