@@ -25,6 +25,21 @@ import { isUniqueViolation } from "./db-errors.js";
 /** Loose view of a table exposing its columns — safe at runtime, narrow for types. */
 type LooseTable = AnyPgTable & { id: PgColumn; name: PgColumn; [k: string]: unknown };
 
+/** Metadata describing a write the factory just performed (used by optional hooks). */
+export interface MasterWriteEvent {
+  action: "created" | "updated" | "deleted";
+  /** The authenticated actor (req.auth?.username), or 'system' when absent. */
+  actor: string;
+  /** The row state after the write (create/update) or before the delete. */
+  row: Record<string, unknown>;
+}
+
+/**
+ * A DB client compatible with a single write (the transaction handle is
+ * passed to hooks so side effects share the same transaction as the row write).
+ */
+export type MasterDbClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 /** Configuration for one master table's generic CRUD factory. */
 export interface MasterConfig {
   /** Route path segment, e.g. "transaction-type" → /masters/transaction-type. */
@@ -43,6 +58,13 @@ export interface MasterConfig {
   listQuery?: () => Promise<unknown>;
   /** Re-fetch a single row after a write (for joined shapes). */
   fetchOne?: (id: number) => Promise<unknown>;
+  /**
+   * Optional per-table write hook (e.g. auditing). Runs inside the SAME
+   * transaction as the CRUD write, so a hook failure rolls the write back. Use
+   * it for side effects that must stay consistent with the row (e.g. machine
+   * history). When unset, no hook runs and the write is a single statement.
+   */
+  afterWrite?: (tx: MasterDbClient, event: MasterWriteEvent) => Promise<void>;
 }
 
 /**
@@ -79,13 +101,24 @@ export function addMasterCrud(
       return;
     }
     try {
-      const [created] = await db
-        .insert(table)
-        .values(cfg.buildRow(req.body as Record<string, unknown>) as never)
-        .returning();
+      const actor = (req.auth?.username as string | undefined) ?? "system";
+      const result = await db.transaction(async (tx) => {
+        const [created] = await tx
+          .insert(table)
+          .values(cfg.buildRow(req.body as Record<string, unknown>) as never)
+          .returning();
+        if (cfg.afterWrite) {
+          await cfg.afterWrite(tx, {
+            action: "created",
+            actor,
+            row: created as Record<string, unknown>,
+          });
+        }
+        return created;
+      });
       const out = cfg.fetchOne
-        ? await cfg.fetchOne(Number((created as { id: unknown }).id))
-        : created;
+        ? await cfg.fetchOne(Number((result as { id: unknown }).id))
+        : result;
       res.status(201).json(out);
     } catch (err) {
       if (isUniqueViolation(err)) { res.status(409).json({ error: cfg.uniqueError }); return; }
@@ -103,13 +136,25 @@ export function addMasterCrud(
       return;
     }
     try {
-      const [updated] = await db
-        .update(table)
-        .set(cfg.buildRow(req.body as Record<string, unknown>) as never)
-        .where(eq(idCol, id))
-        .returning();
-      if (!updated) { res.status(404).json({ error: "Not found" }); return; }
-      const out = cfg.fetchOne ? await cfg.fetchOne(id) : updated;
+      const actor = (req.auth?.username as string | undefined) ?? "system";
+      const result = await db.transaction(async (tx) => {
+        const [updated] = await tx
+          .update(table)
+          .set(cfg.buildRow(req.body as Record<string, unknown>) as never)
+          .where(eq(idCol, id))
+          .returning();
+        if (!updated) { return null; }
+        if (cfg.afterWrite) {
+          await cfg.afterWrite(tx, {
+            action: "updated",
+            actor,
+            row: updated as Record<string, unknown>,
+          });
+        }
+        return updated;
+      });
+      if (!result) { res.status(404).json({ error: "Not found" }); return; }
+      const out = cfg.fetchOne ? await cfg.fetchOne(id) : result;
       res.json(out);
     } catch (err) {
       if (isUniqueViolation(err)) { res.status(409).json({ error: cfg.uniqueError }); return; }
@@ -121,11 +166,25 @@ export function addMasterCrud(
   router.delete(`${base}/:id`, async (req, res): Promise<void> => {
     const id = Number(req.params.id);
     if (!id || Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
-    const [deleted] = await db
-      .delete(table)
-      .where(eq(idCol, id))
-      .returning();
-    if (!deleted) { res.status(404).json({ error: "Not found" }); return; }
-    res.status(204).send();
+    try {
+      const actor = (req.auth?.username as string | undefined) ?? "system";
+      const deleted = await db.transaction(async (tx) => {
+        const [row] = await tx.delete(table).where(eq(idCol, id)).returning();
+        if (!row) { return null; }
+        if (cfg.afterWrite) {
+          await cfg.afterWrite(tx, {
+            action: "deleted",
+            actor,
+            row: row as Record<string, unknown>,
+          });
+        }
+        return row;
+      });
+      if (!deleted) { res.status(404).json({ error: "Not found" }); return; }
+      res.status(204).send();
+    } catch (err) {
+      // Re-raise (delete has no unique-violation path to translate).
+      throw err;
+    }
   });
 }

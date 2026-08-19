@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useListTransactionTypeMasterCrud,
@@ -81,8 +81,20 @@ import { Layout } from "@/components/layout";
 import { MasterTable } from "@/components/master-table";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { MachineAnalyticsView } from "./machine-analytics";
 import { PartyAnalyticsView } from "./party-analytics";
+import { useMachineHistory, machineHistoryQueryKey } from "@/hooks/use-machine-history";
+import { format } from "date-fns";
 import { CompanyInfoSection } from "@/pages/company-info";
 import { PartySection } from "./party-section";
 import { cn } from "@/lib/utils";
@@ -389,17 +401,24 @@ function PartyTab() {
 
 // ─── Machine ────────────────────────────────────────────────────────────────
 function MachineTab() {
+  const qc = useQueryClient();
   const invalidateBoth = useInvalidateBoth();
   const { data, isLoading } = useListMachineMasterCrud();
   const create = useCreateMachineMaster();
   const update = useUpdateMachineMaster();
   const remove = useDeleteMachineMaster();
-  const done = () => invalidateBoth(getListMachineMasterCrudQueryKey(), getListMachineMasterQueryKey());
+  const done = () => {
+    invalidateBoth(getListMachineMasterCrudQueryKey(), getListMachineMasterQueryKey());
+    // History is a timeline of machine writes — keep it in sync so the History
+    // tab reflects create/edit/delete immediately.
+    qc.invalidateQueries({ queryKey: [machineHistoryQueryKey] });
+  };
 
   return (
     <Tabs defaultValue="list">
       <TabsList>
         <TabsTrigger value="list">List</TabsTrigger>
+        <TabsTrigger value="history">History</TabsTrigger>
         <TabsTrigger value="analytics">Analytics</TabsTrigger>
       </TabsList>
       <TabsContent value="list" className="mt-4">
@@ -422,10 +441,130 @@ function MachineTab() {
           onDelete={(id) => new Promise((res, rej) => remove.mutate({ id }, { onSuccess: () => { done(); res(); }, onError: rej }))}
         />
       </TabsContent>
+      <TabsContent value="history" className="mt-4">
+        <MachineHistoryView />
+      </TabsContent>
       <TabsContent value="analytics" className="mt-4">
         <MachineAnalyticsView />
       </TabsContent>
     </Tabs>
+  );
+}
+
+// ─── Machine History (read-only timeline) ───────────────────────────────────
+// Shows the audit trail of machine create/update/delete snapshots, newest
+// first, with a machine filter dropdown derived from the history rows
+// themselves (so deleted machines' history stays reachable). Read-only — no
+// actions column; rows are written only by the backend CRUD hook / seed.
+function MachineHistoryView() {
+  const { data, isLoading } = useMachineHistory();
+  const [machineFilter, setMachineFilter] = useState<string>(""); // "" = all
+
+  // Distinct machines present in the history (by denormalized number + name),
+  // sorted by number, including deleted machines.
+  const machineOptions = useMemo(() => {
+    const map = new Map<string, { number: string; name: string }>();
+    for (const h of data ?? []) {
+      const key = h.machineNumber;
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, { number: key, name: h.name });
+    }
+    return Array.from(map.values()).sort((a, b) => a.number.localeCompare(b.number));
+  }, [data]);
+
+  const filtered = useMemo(
+    () => (machineFilter ? (data ?? []).filter((h) => h.machineNumber === machineFilter) : (data ?? [])),
+    [data, machineFilter],
+  );
+
+  const actionStyles: Record<string, string> = {
+    created: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+    updated: "bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300",
+    deleted: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300",
+  };
+
+  const fmtDate = (iso: string | null) =>
+    iso ? format(new Date(iso + "T00:00:00"), "dd MMM yyyy") : "—";
+  const fmtDateTime = (iso: string) => {
+    try {
+      return format(new Date(iso), "dd MMM yyyy, HH:mm");
+    } catch {
+      return iso;
+    }
+  };
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-5 py-3">
+        <h2 className="text-sm font-semibold text-foreground">Machine History</h2>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          Machine
+          <Select value={machineFilter || "__all__"} onValueChange={(v) => setMachineFilter(v === "__all__" ? "" : v)}>
+            <SelectTrigger className="h-9 w-56">
+              <SelectValue placeholder="All Machines" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All Machines</SelectItem>
+              {machineOptions.map((m) => (
+                <SelectItem key={m.number} value={m.number}>{m.number} · {m.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {machineFilter && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => setMachineFilter("")} title="Clear filter">
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </label>
+      </div>
+      <CardContent className="p-0">
+        {isLoading ? (
+          <div className="space-y-2 p-5"><Skeleton className="h-8 w-full" /><Skeleton className="h-8 w-full" /></div>
+        ) : filtered.length === 0 ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">
+            {machineFilter ? "No history for this machine yet." : "No machine history yet."}
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Machine</TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead>Needle Change Date</TableHead>
+                  <TableHead>Needle Brand</TableHead>
+                  <TableHead>Sinker Change Date</TableHead>
+                  <TableHead>Sinker Brand</TableHead>
+                  <TableHead>Changed By</TableHead>
+                  <TableHead>Changed At</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((h) => (
+                  <TableRow key={h.id}>
+                    <TableCell className="font-medium whitespace-nowrap">
+                      <span className="block">{h.machineNumber}</span>
+                      <span className="block text-xs text-muted-foreground">{h.name}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${actionStyles[h.action] ?? ""}`}>
+                        {h.action}
+                      </span>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap tabular-nums">{fmtDate(h.needleChangeDate)}</TableCell>
+                    <TableCell>{h.needleBrand ?? "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap tabular-nums">{fmtDate(h.sinkerChangeDate)}</TableCell>
+                    <TableCell>{h.sinkerBrand ?? "—"}</TableCell>
+                    <TableCell>{h.changedBy}</TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">{fmtDateTime(h.changedAt)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
