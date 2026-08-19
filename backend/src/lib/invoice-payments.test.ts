@@ -4,6 +4,7 @@ import {
   computePaymentState,
   paymentNetApplied,
   sumNetApplied,
+  sumGrossApplied,
   addDays,
   daysBetween,
 } from "./invoice-payments.js";
@@ -30,6 +31,14 @@ test("sumNetApplied: sums net amounts across payments", () => {
     { amount: "50", taxDeduction: "0.5" },
   ];
   assert.equal(sumNetApplied(payments), 148.5);
+});
+
+test("sumGrossApplied: sums gross amounts across payments", () => {
+  const payments = [
+    { amount: "100", taxDeduction: "1" },
+    { amount: "50", taxDeduction: "0.5" },
+  ];
+  assert.equal(sumGrossApplied(payments), 150);
 });
 
 test("computePaymentState: untracked (dueDays 0/null) never overdue", () => {
@@ -68,15 +77,29 @@ test("computePaymentState: tracked, overdue", () => {
   assert.equal(s.overdue, true);
 });
 
-test("computePaymentState: paid via net applied", () => {
+test("computePaymentState: outstanding reduces by gross amount", () => {
+  // Gross 1000 (net 990 + WHT 10) clears a 1000 balance fully.
   const s = computePaymentState({
     grandTotal: "1000",
     dueDays: 30,
     postedDateIso: daysFromNowIso(-40),
-    payments: [{ amount: "1000", taxDeduction: "10" }], // net 990 < 1000
+    payments: [{ amount: "1000", taxDeduction: "10" }],
+  });
+  assert.equal(s.paid, true);
+  assert.equal(s.outstanding, 0);
+  assert.equal(s.totalTaxDeduction, 10);
+});
+
+test("computePaymentState: partial gross payment leaves correct outstanding", () => {
+  // Grand total 10000, received gross 1000 (net 990 + WHT 10) → balance 9000.
+  const s = computePaymentState({
+    grandTotal: "10000",
+    dueDays: 30,
+    postedDateIso: daysFromNowIso(-40),
+    payments: [{ amount: "1000", taxDeduction: "10" }],
   });
   assert.equal(s.paid, false);
-  assert.equal(s.outstanding, 10);
+  assert.equal(s.outstanding, 9000);
 });
 
 test("computePaymentState: overpaid shows surplus", () => {
