@@ -79,6 +79,7 @@ import {
 } from "@/hooks/use-fbr-invoicing";
 import { useListYarnTypeMaster, useListYarnCountMaster } from "@workspace/api-client-react";
 import { amountInWords } from "@/lib/invoice-amount";
+import { derivePayment, maxNetForBalance, DEFAULT_WHT_RATE } from "@/lib/payment-wht";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer,
@@ -140,8 +141,8 @@ export default function InvoicingPage() {
 
   // Payment dialog state
   const [payFor, setPayFor] = useState<InvoiceListItem | null>(null);
-  const [payAmount, setPayAmount] = useState("");
-  const [payTax, setPayTax] = useState("");
+  const [payNet, setPayNet] = useState("");
+  const [payRate, setPayRate] = useState("1");
   const [payDate, setPayDate] = useState("");
   const [payMethod, setPayMethod] = useState("Bank Transfer");
   const [payRef, setPayRef] = useState("");
@@ -342,31 +343,56 @@ export default function InvoicingPage() {
     });
   };
 
-  // Open the Record Payment dialog pre-filled for an invoice.
-  const openPayment = (inv: InvoiceListItem) => {
+  // Open the Record Payment dialog pre-filled for an invoice. Net is
+  // pre-filled to the full remaining settlement (max net at the default rate)
+  // so one click settles — the user lowers it for partial payments. (issue: net + 1% WHT)
+  const openPayment = (inv: InvoiceListItem | InvoiceDetail) => {
+    const outstanding = inv.outstanding ?? parseFloat(inv.grandTotal);
     setPayFor(inv);
-    setPayAmount("");
-    setPayTax("0");
+    setPayRate(String(DEFAULT_WHT_RATE * 100)); // "1"
+    setPayNet("");
     setPayDate(new Date().toISOString().slice(0, 10));
     setPayMethod("Bank Transfer");
     setPayRef("");
     setPayNotes("");
+    // Pre-fill net with the max settle-able net for the remaining balance.
+    const rate = DEFAULT_WHT_RATE;
+    const max = maxNetForBalance(Math.max(outstanding, 0), rate);
+    setPayNet(max > 0 ? String(max) : "");
   };
 
   const submitPayment = () => {
     if (!payFor) return;
-    const amount = parseFloat(payAmount);
-    const tax = parseFloat(payTax) || 0;
-    if (!Number.isFinite(amount) || amount <= 0) {
-      toast({ title: "Enter a valid amount", variant: "destructive" });
+
+    const net = parseFloat(payNet);
+    const ratePct = parseFloat(payRate);
+    const rate = Number.isFinite(ratePct) ? ratePct / 100 : DEFAULT_WHT_RATE;
+
+    if (!Number.isFinite(net) || net <= 0) {
+      toast({ title: "Enter a valid net amount", variant: "destructive" });
       return;
     }
+    // WHT rate must be in [0, 100); at 100%, gross = net / 0 (undefined).
+    if (!Number.isFinite(ratePct) || ratePct < 0 || ratePct >= 100) {
+      toast({ title: "WHT rate must be between 0% and 100%", variant: "destructive" });
+      return;
+    }
+
+    // Outstanding reduces by GROSS; cap net so the payment never overpays.
+    const outstanding = payFor.outstanding ?? parseFloat(payFor.grandTotal);
+    const maxNet = maxNetForBalance(Math.max(outstanding, 0), rate);
+    if (net > maxNet + 0.005) {
+      toast({ title: "Payment would exceed the outstanding balance", variant: "destructive" });
+      return;
+    }
+
+    const { tax, gross } = derivePayment(net, rate);
     addPayment.mutate(
       {
         id: payFor.id,
         body: {
-          amount,
-          taxDeduction: Math.max(0, Math.min(tax, amount)),
+          amount: gross,
+          taxDeduction: tax,
           paymentDate: payDate || new Date().toISOString().slice(0, 10),
           method: payMethod,
           reference: payRef || null,
@@ -428,6 +454,19 @@ export default function InvoicingPage() {
   };
 
   const handleView = (invoiceId: number) => setViewingId(invoiceId);
+
+  // ── Derived values for the Record Payment dialog (net + rate → gross + tax) ──
+  const payNetNum = parseFloat(payNet);
+  const payRatePct = parseFloat(payRate);
+  const payRateFrac = Number.isFinite(payRatePct) ? payRatePct / 100 : DEFAULT_WHT_RATE;
+  const payOutstanding = payFor ? (payFor.outstanding ?? parseFloat(payFor.grandTotal)) : 0;
+  const payMaxNet = maxNetForBalance(Math.max(payOutstanding, 0), payRateFrac);
+  const payDerived = Number.isFinite(payNetNum) && payNetNum > 0
+    ? derivePayment(payNetNum, payRateFrac)
+    : { tax: 0, gross: 0 };
+  const payNetValid = Number.isFinite(payNetNum) && payNetNum > 0 && payNetNum <= payMaxNet + 0.005;
+  const payRateValid = Number.isFinite(payRatePct) && payRatePct >= 0 && payRatePct < 100;
+  const paySubmitDisabled = !payNetValid || !payRateValid || addPayment.isPending;
 
   return (
     <Layout>
@@ -717,9 +756,11 @@ export default function InvoicingPage() {
                                 <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8" title="Download invoice PDF" aria-label="Download invoice PDF" onClick={() => handleDownloadPdf(inv.id)}>
                                   <Download className="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => openPayment(inv)} disabled={addPayment.isPending}>
-                                  <Banknote className="h-4 w-4" /> Record Payment
-                                </Button>
+                                {(inv.outstanding ?? parseFloat(inv.grandTotal)) > 0 && (
+                                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => openPayment(inv)} disabled={addPayment.isPending}>
+                                    <Banknote className="h-4 w-4" /> Record Payment
+                                  </Button>
+                                )}
                               </div>
                             )}
                           </TableCell>
@@ -793,7 +834,7 @@ export default function InvoicingPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Record Payment — Invoice #{payFor?.id}</DialogTitle>
-            <DialogDescription>Record a payment received against this invoice. Amount is gross; tax deduction is withholding tax (net = amount − tax).</DialogDescription>
+            <DialogDescription>Record a net payment received against this invoice. The WHT rate (default 1%) applies to the gross; net = gross − tax.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
@@ -801,15 +842,36 @@ export default function InvoicingPage() {
               <span className="font-semibold">{payFor ? money(parseFloat(payFor.grandTotal)) : ""}</span>
               <span className="mx-2 text-muted-foreground">·</span>
               <span className="text-muted-foreground">Outstanding </span>
-              <span className="font-semibold">{payFor ? money(payFor.outstanding ?? parseFloat(payFor.grandTotal)) : ""}</span>
+              <span className="font-semibold">{money(payOutstanding)}</span>
+              <span className="mx-2 text-muted-foreground">·</span>
+              <span className="text-muted-foreground">Max net </span>
+              <span className="font-semibold">{money(payMaxNet)}</span>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="pay-amount">Amount (gross)</Label>
-              <Input id="pay-amount" type="number" min="0" step="0.01" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder="0.00" />
+              <Label htmlFor="pay-net">Net Amount</Label>
+              <Input id="pay-net" type="number" min="0" step="0.01" value={payNet} onChange={(e) => setPayNet(e.target.value)} placeholder="0.00" aria-describedby="pay-max-hint" />
+              <p id="pay-max-hint" className="text-xs text-muted-foreground">
+                Max net for the remaining balance: {money(payMaxNet)}
+                {payNetNum > payMaxNet + 0.005 ? " — exceeds outstanding." : ""}
+              </p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="pay-tax">Tax Deduction (WHT)</Label>
-              <Input id="pay-tax" type="number" min="0" step="0.01" value={payTax} onChange={(e) => setPayTax(e.target.value)} placeholder="0.00" />
+              <Label htmlFor="pay-rate">WHT Rate (%)</Label>
+              <div className="flex items-center gap-2">
+                <Input id="pay-rate" type="number" min="0" step="0.01" max="100" value={payRate} onChange={(e) => setPayRate(e.target.value)} placeholder="1" className="w-32" />
+                <span className="text-xs text-muted-foreground">default 1%</span>
+              </div>
+              {!payRateValid && <p className="text-xs text-destructive">Rate must be between 0% and 100%.</p>}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Gross Amount</Label>
+                <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm font-semibold tabular-nums">{money(payDerived.gross)}</div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Tax Deduction (WHT)</Label>
+                <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm font-semibold tabular-nums">{money(payDerived.tax)}</div>
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pay-date">Payment Date</Label>
@@ -834,15 +896,15 @@ export default function InvoicingPage() {
               <Label htmlFor="pay-notes">Notes</Label>
               <Textarea id="pay-notes" rows={2} value={payNotes} onChange={(e) => setPayNotes(e.target.value)} />
             </div>
-            {(parseFloat(payAmount) > 0) && (
+            {Number.isFinite(payNetNum) && payNetNum > 0 && (
               <p className="text-xs text-muted-foreground">
-                Net applied: <span className="font-semibold">{money((parseFloat(payAmount) || 0) - (parseFloat(payTax) || 0))}</span>
+                Gross applied to balance: <span className="font-semibold">{money(payDerived.gross)}</span> · Tax: <span className="font-semibold">{money(payDerived.tax)}</span>
               </p>
             )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setPayFor(null)}>Cancel</Button>
-            <Button type="button" onClick={submitPayment} disabled={addPayment.isPending} className="gap-2">
+            <Button type="button" onClick={submitPayment} disabled={paySubmitDisabled} className="gap-2">
               {addPayment.isPending ? <Spinner className="h-4 w-4" /> : <Banknote className="h-4 w-4" />}
               Record Payment
             </Button>
@@ -1687,7 +1749,7 @@ function InvoiceView({
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Gross</TableHead>
                       <TableHead className="text-right">WHT</TableHead>
                       <TableHead className="text-right">Net Applied</TableHead>
                       <TableHead>Method</TableHead>
