@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Response } from "express";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db } from "../db/index.js";
 import {
@@ -7,6 +7,7 @@ import {
   jobMasterTable,
   partyMasterTable,
   machineMasterTable,
+  machineHistoryTable,
   locationMasterTable,
   yarnTypeMasterTable,
   yarnCountMasterTable,
@@ -34,6 +35,7 @@ import {
   DEFAULT_SINKER_BRAND,
   normaliseMakingRate,
 } from "../lib/factory-defaults.js";
+import { machineHistoryValues } from "../lib/machine-history.js";
 import { addMasterCrud } from "../lib/master-crud.js";
 
 const router: IRouter = Router();
@@ -175,6 +177,26 @@ addMasterCrud(router, {
     };
   },
   uniqueError: "Machine number already exists",
+  // Audit trail: every create/update/delete against machine_master writes a
+  // snapshot row into machine_history, inside the SAME transaction as the write
+  // (atomic — a machine change never happens without its history row).
+  afterWrite: async (tx, { action, actor, row }) => {
+    await tx.insert(machineHistoryTable).values(
+      machineHistoryValues(row, action, actor) as never,
+    );
+  },
+});
+
+// ─── Machine History (read-only) ────────────────────────────────────────────
+// Timeline of machine create/update/delete snapshots, newest first. Read-only
+// by design — rows are written only by the machine afterWrite hook (and the
+// seed backfill). The History tab filters by machine client-side.
+router.get("/masters/machine-history", async (_req, res): Promise<void> => {
+  const rows = await db
+    .select()
+    .from(machineHistoryTable)
+    .orderBy(desc(machineHistoryTable.changedAt), desc(machineHistoryTable.id));
+  res.json(rows);
 });
 
 // Location
