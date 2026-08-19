@@ -22,6 +22,67 @@ export const httpClient: AxiosInstance = axios.create({
   timeout: 0, // no client-side timeout — server controls it
 });
 
+// ---------------------------------------------------------------------------
+// 401 Unauthorized handler (auth middleware)
+//
+// The Axios response interceptor below is deliberately framework-agnostic
+// (a plain module has no access to React context), so unauthenticated (401)
+// responses are surfaced to the rest of the app through a single registered
+// callback. The auth layer (AuthProvider) registers this callback and, when
+// invoked, clears the stored session (logout) and redirects to /login.
+//
+// Endpoints that are *expected* to return 401 and must NOT trigger logout are
+// excluded here:
+//   - /api/auth/login       → invalid credentials (user must see the error)
+// ---------------------------------------------------------------------------
+
+const LOGIN_URLS = new Set(["/api/auth/login"]);
+
+/** Returns true when a 401 should trigger the app-wide logout + redirect. */
+export function shouldHandleUnauthorized(pathname: string | undefined): boolean {
+  if (!pathname) return false;
+  // Normalise: ignore query/hash, compare against the request path only.
+  const path = pathname.split(/[?#]/)[0];
+  return !LOGIN_URLS.has(path);
+}
+
+type UnauthorizedHandler = () => void;
+
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+let unauthorizedFired = false;
+
+/**
+ * Register the callback that runs when an API 401 is detected. Only one
+ * handler may be active at a time; registering again replaces the previous
+ * one. Returns a cleanup function that unregisters and resets the fired flag.
+ */
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): () => void {
+  unauthorizedHandler = handler;
+  unauthorizedFired = false;
+  return () => {
+    if (unauthorizedHandler === handler) {
+      unauthorizedHandler = null;
+    }
+    unauthorizedFired = false;
+  };
+}
+
+/**
+ * Invoke the registered 401 handler exactly once per auth-zone event. Guards
+ * against several in-flight requests all returning 401 at once (parallel
+ * queries) triggering repeated logouts/redirects.
+ */
+function fireUnauthorizedHandler(): void {
+  if (unauthorizedFired) return;
+  unauthorizedFired = true;
+  unauthorizedHandler?.();
+}
+
+/** @internal exported for tests. */
+export function _resetUnauthorizedState(): void {
+  unauthorizedFired = false;
+}
+
 // ── Request middleware: attach the bearer token from localStorage ───────────
 httpClient.interceptors.request.use((config) => {
   const token = getStoredToken();
@@ -48,10 +109,23 @@ httpClient.interceptors.request.use((config) => {
 
 // ── Response middleware: surface server errors consistently ─────────────────
 // Keeps the error contract callers rely on (a normal Error whose message
-// reflects the server's error body).
+// reflects the server's error body). Additionally, a 401 Unauthorized from any
+// endpoint except the login call is treated as an expired/invalid session: the
+// registered auth handler (logout + redirect to /login) is invoked.
 httpClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
+    // Session-expiry detection: 401 with a locally-stored token means the
+    // server rejected our now-invalid bearer token. Log the user out and send
+    // them to the login page (unless this is the login request itself).
+    if (
+      error.response?.status === 401 &&
+      getStoredToken() &&
+      shouldHandleUnauthorized(error.config?.url)
+    ) {
+      fireUnauthorizedHandler();
+    }
+
     // If the network/server didn't give us a body, promote the status reason.
     const serverData =
       error.response?.data && typeof error.response.data === "object"
