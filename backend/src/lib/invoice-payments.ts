@@ -18,6 +18,18 @@ export function sumNetApplied(payments: { amount: string | number; taxDeduction:
   return payments.reduce((s, p) => s + paymentNetApplied(p), 0);
 }
 
+/**
+ * Sum of the gross amounts for a set of payments.
+ *
+ * The outstanding balance is reduced by the gross payment amount (issue:
+ * payments are entered as net with WHT deducted, but the receivable balance
+ * drops by the full gross settled). See
+ * {@link computePaymentState}.
+ */
+export function sumGrossApplied(payments: { amount: string | number }[]): number {
+  return payments.reduce((s, p) => s + toNum(p.amount), 0);
+}
+
 /** Sum of tax deductions (WHT) across payments. */
 export function sumTaxDeduction(payments: { taxDeduction: string | number }[]): number {
   return payments.reduce((s, p) => s + toNum(p.taxDeduction), 0);
@@ -82,7 +94,10 @@ export interface InvoicePaymentState {
  */
 export function computePaymentState(input: InvoicePaymentStateInput): InvoicePaymentState {
   const grandTotal = toNum(input.grandTotal);
-  const paidAmount = sumNetApplied(input.payments);
+  // Outstanding reduces by the *gross* amount settled (net + WHT) — a recorded
+  // payment of gross 1000 (net 990 + tax 10) clears 1000 of the balance,
+  // not just the 990 that was actually received.
+  const paidAmount = sumGrossApplied(input.payments);
   const outstanding = grandTotal - paidAmount;
   const totalTaxDeduction = sumTaxDeduction(input.payments);
 
