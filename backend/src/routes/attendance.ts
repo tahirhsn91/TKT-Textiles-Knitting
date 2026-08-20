@@ -1,0 +1,189 @@
+import { Router, type IRouter } from "express";
+import { eq, and, inArray, gte, lte } from "drizzle-orm";
+import { db } from "../db/index.js";
+import {
+  attendanceTable,
+  employeeMasterTable,
+  departmentMasterTable,
+  salaryDetailTable,
+  salaryHeaderTable,
+  transactionHeaderTable,
+  transactionDetailTable,
+  transactionTypeMasterTable,
+  machineMasterTable,
+} from "../db/index.js";
+
+const router: IRouter = Router();
+
+function toNum(val: unknown): number {
+  const n = parseFloat(String(val ?? ""));
+  return isNaN(n) ? 0 : n;
+}
+
+// Inclusive first day of a month, e.g. "2026-08-01".
+function monthStart(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, "0")}-01`;
+}
+// Inclusive last day of a month, e.g. "2026-08-31".
+function monthEnd(year: number, month: number): string {
+  const lastDay = new Date(year, month, 0).getDate();
+  return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+}
+// Number of days in a month.
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
+// Whether ANY payroll salary detail exists for the given month+year. Used to
+// (a) lock attendance editing once a payroll entry exists for the month, and
+// (b) flag the payroll gate from the attendance side.
+async function payrollExistsForMonth(month: number, year: number): Promise<boolean> {
+  const rows = await db
+    .select({ id: salaryDetailTable.id })
+    .from(salaryDetailTable)
+    .where(and(eq(salaryDetailTable.month, month), eq(salaryDetailTable.year, year)))
+    .limit(1);
+  return rows.length > 0;
+}
+
+// The Operator department (code 0002). Operators are paid on production in
+// payroll; this attendance endpoint just needs to know who they are so the
+// frontend can decide Sunday auto-check (non-operators only).
+async function operatorDeptId(): Promise<number | null> {
+  const [dept] = await db
+    .select({ id: departmentMasterTable.id })
+    .from(departmentMasterTable)
+    .where(eq(departmentMasterTable.code, "0002"));
+  return dept?.id ?? null;
+}
+
+// ─── Get attendance for a month ────────────────────────────────────────────
+// Returns the attendance rows for the month plus the active employees (so the
+// grid can render employee rows and pre-check Sundays for non-operators only)
+// and whether a payroll entry already exists for that month (which locks
+// editing).
+router.get("/attendance", async (req, res): Promise<void> => {
+  const { month, year } = req.query as Record<string, string>;
+  if (!month || !year) {
+    res.status(400).json({ error: "month and year are required" });
+    return;
+  }
+  const m = parseInt(month);
+  const y = parseInt(year);
+  if (isNaN(m) || isNaN(y)) {
+    res.status(400).json({ error: "month and year must be numbers" });
+    return;
+  }
+
+  const from = monthStart(y, m);
+  const to = monthEnd(y, m);
+
+  const [records, deptId, payrollExists] = await Promise.all([
+    db
+      .select()
+      .from(attendanceTable)
+      .where(and(gte(attendanceTable.attendanceDate, from), lte(attendanceTable.attendanceDate, to))),
+    operatorDeptId(),
+    payrollExistsForMonth(m, y),
+  ]);
+
+  res.json({
+    month: m,
+    year: y,
+    daysInMonth: daysInMonth(y, m),
+    operatorDepartmentId: deptId,
+    payrollExists: payrollExists,
+    records: records.map((r) => ({
+      employeeId: r.employeeId,
+      attendanceDate: r.attendanceDate,
+      present: r.present,
+    })),
+  });
+});
+
+// ─── Save (upsert) attendance for a month ──────────────────────────────────
+// Replaces the month's attendance rows with the submitted set. Accepts an
+// array of { employeeId, attendanceDate, present }. Idempotent upsert by
+// (employee_id, attendance_date). Blocked with 409 if a payroll entry already
+// exists for the month (attendance is locked once payroll exists — spec Q10B).
+router.put("/attendance", async (req, res): Promise<void> => {
+  const { month, year, records } = req.body as {
+    month: number;
+    year: number;
+    records: Array<{ employeeId: number; attendanceDate: string; present: boolean }>;
+  };
+
+  if (!month || !year || !Array.isArray(records)) {
+    res.status(400).json({ error: "month, year, and records are required" });
+    return;
+  }
+  const m = parseInt(String(month));
+  const y = parseInt(String(year));
+  if (isNaN(m) || isNaN(y)) {
+    res.status(400).json({ error: "month and year must be numbers" });
+    return;
+  }
+  // Do not allow saving attendance for a future month (spec Q9A: future months
+  // not selectable).
+  const now = new Date();
+  if (y > now.getFullYear() || (y === now.getFullYear() && m > now.getMonth() + 1)) {
+    res.status(400).json({ error: "Cannot save attendance for a future month" });
+    return;
+  }
+
+  // Lock: once a payroll entry exists for the month, attendance can't change.
+  const [payrollExists] = await Promise.all([payrollExistsForMonth(m, y)]);
+  if (payrollExists) {
+    res.status(409).json({
+      error: "Attendance for this month is locked because a payroll entry already exists.",
+    });
+    return;
+  }
+
+  // Validate: only active employees, no future dates within the month.
+  const empIds = [...new Set(records.map((r) => r.employeeId))];
+  const employees = empIds.length
+    ? await db
+        .select({ id: employeeMasterTable.id })
+        .from(employeeMasterTable)
+        .where(inArray(employeeMasterTable.id, empIds))
+    : [];
+  const validIdSet = new Set(employees.map((e) => e.id));
+
+  const from = monthStart(y, m);
+  const to = monthEnd(y, m);
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  const rows = records
+    .filter((r) => validIdSet.has(r.employeeId))
+    .filter((r) => r.attendanceDate >= from && r.attendanceDate <= to && r.attendanceDate <= todayIso)
+    .map((r) => ({
+      employeeId: r.employeeId,
+      attendanceDate: r.attendanceDate,
+      present: Boolean(r.present),
+    }));
+
+  await db.transaction(async (tx) => {
+    // Delete the month's existing rows for the touched employees, then insert
+    // the fresh set (idempotent whole-month replacement).
+    const touchedEmpIds = [...new Set(rows.map((r) => r.employeeId))];
+    if (touchedEmpIds.length) {
+      await tx
+        .delete(attendanceTable)
+        .where(
+          and(
+            inArray(attendanceTable.employeeId, touchedEmpIds),
+            gte(attendanceTable.attendanceDate, from),
+            lte(attendanceTable.attendanceDate, to)
+          )
+        );
+    }
+    if (rows.length) {
+      await tx.insert(attendanceTable).values(rows).onConflictDoNothing();
+    }
+  });
+
+  res.json({ saved: rows.length });
+});
+
+export default router;

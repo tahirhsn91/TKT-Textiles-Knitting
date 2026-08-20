@@ -1,4 +1,5 @@
 export * from "./lookups.js";
+export * from "./attendance.js";
 export * from "./machine-history.js";
 export * from "./transactions.js";
 export * from "./daily-production.js";
