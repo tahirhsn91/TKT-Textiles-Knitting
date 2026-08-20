@@ -83,7 +83,7 @@ router.use("/invoicing", requirePermission("invoicing"));
 router.use(invoicingRouter);
 // Users/RBAC admin — admin-only enforced inside the router (users.ts).
 router.use("/users", requirePermission("users"));
-router.use(usersRouter);
+router.use("/users", usersRouter);
 // Attendance — lives under Daily Operations and feeds payroll.
 router.use("/attendance", requirePermission("dailyProduction"));
 router.use(attendanceRouter);
