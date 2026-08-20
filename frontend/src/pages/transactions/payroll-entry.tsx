@@ -90,6 +90,25 @@ function daysInMonthFn(month: number, year: number): number {
   return new Date(year, month, 0).getDate();
 }
 
+// Number of Sundays that count as automatically-present for a non-operator in
+// the selected month. For the current (in-progress) month this is the Sundays
+// up to and including today; for any other (complete) month it is every Sunday
+// in that month. Operators are excluded — their present days come from
+// production, so this floor never applies to them (callers guard on !isOperator).
+function sundaysPresent(month: number, year: number): number {
+  const now = new Date();
+  const isCurrent =
+    year === now.getFullYear() && month === now.getMonth() + 1;
+  const lastDay = daysInMonthFn(month, year);
+  const limitDay = isCurrent ? now.getDate() : lastDay;
+  let count = 0;
+  for (let d = 1; d <= limitDay; d++) {
+    // getDay()===0 is Sunday.
+    if (new Date(year, month - 1, d).getDay() === 0) count++;
+  }
+  return count;
+}
+
 async function apiFetch<T = unknown>(path: string, opts?: RequestInit): Promise<T> {
   try {
     return await customFetch<T>(path, opts ?? { method: "GET" });
@@ -200,10 +219,18 @@ function attendanceExceedsMonth(row: DetailRow, totalDays: number): boolean {
   return toNum(row.presentDays) + toNum(row.absentDays) > totalDays;
 }
 
-function recomputeAll(row: DetailRow, totalDays: number): DetailRow {
+// Recompute a non-operator row's formula fields. `sundayFloor` is the number of
+// automatically-present Sundays for the selected month: present days can never
+// sit below that floor, so Sundays can't be marked absent (this never applies
+// to operators, whose present days come from production — they use
+// recomputeOperatorAll instead).
+function recomputeAll(row: DetailRow, totalDays: number, sundayFloor = 0): DetailRow {
+  // Present is floored at the Sunday count (Sundays are always present) and
+  // capped at the days in the month.
+  const present = clampNum(toNum(row.presentDays), sundayFloor, totalDays);
   // Total Attendance = Present + Holidays (derived, not hand-entered), kept
   // as a whole number to match the other attendance fields.
-  const totalAttendance = roundToWhole(toNum(row.presentDays) + toNum(row.holidays));
+  const totalAttendance = roundToWhole(present + toNum(row.holidays));
   // OT Amount = OT Hrs × the employee's OT rate (from the master table). If no
   // OT rate is set for the employee (rate ≤ 0), OT Amount is zero.
   const otRate = toNum(row.otRateHr);
@@ -212,9 +239,13 @@ function recomputeAll(row: DetailRow, totalDays: number): DetailRow {
   const baseSalary =
     totalDays > 0 ? (toNum(row.basicSalary) / totalDays) * totalAttendance : 0;
   const totalSalary = baseSalary + otAmount;
+  // Absent keeps the present+absent invariant (present + absent = days in month).
+  const absent = clampNum(totalDays - present, 0, totalDays);
   return recomputePayable(
     {
       ...row,
+      presentDays: String(present),
+      absentDays: String(absent),
       totalAttendance: totalAttendance.toFixed(TOTAL_ATTENDANCE_DECIMALS),
       totalSalary: totalSalary.toFixed(NUM_DECIMALS),
       otAmount: otAmount.toFixed(NUM_DECIMALS),
@@ -252,7 +283,7 @@ function recomputeOperatorAll(row: DetailRow, totalDays: number): DetailRow {
   );
 }
 
-function rowFromEmployee(op: Employee, totalDays: number, advanceSum = 0, defaultPresent?: number): DetailRow {
+function rowFromEmployee(op: Employee, totalDays: number, advanceSum = 0, defaultPresent?: number, sundayFloor = 0): DetailRow {
   const base: DetailRow = {
     employeeId: op.id,
     departmentId: op.departmentId,
@@ -261,7 +292,9 @@ function rowFromEmployee(op: Employee, totalDays: number, advanceSum = 0, defaul
     otRateHr: toNum(op.overtimeRateHr).toFixed(NUM_DECIMALS),
     attAllowance: toNum(op.attAllowance).toFixed(NUM_DECIMALS),
     othAllowance: toNum(op.othAllowance).toFixed(NUM_DECIMALS),
-    presentDays: String(defaultPresent ?? totalDays),
+    // Present is floored at the Sunday count (Sundays are always present),
+    // capped at the days in the month.
+    presentDays: String(clampNum(defaultPresent ?? totalDays, sundayFloor, totalDays)),
     absentDays: "0",
     holidays: "0",
     totalAttendance: "0",
@@ -273,7 +306,7 @@ function rowFromEmployee(op: Employee, totalDays: number, advanceSum = 0, defaul
     otherDeduction: "0.00",
     payableSalary: "0.00",
   };
-  return recomputeAll(base, totalDays);
+  return recomputeAll(base, totalDays, sundayFloor);
 }
 
 // Builds a row for an Operator (dept 0002) employee whose salary is derived
@@ -405,9 +438,11 @@ export default function PayrollEntryPage() {
     setMonth(String(existingEntry.month));
     setYear(String(existingEntry.year));
     setSelectedDeptIds(existingEntry.departmentIds ?? []);
+    const td = daysInMonthFn(Number(existingEntry.month) || 1, Number(existingEntry.year) || CURRENT_YEAR);
+    const sundayFloor = sundaysPresent(Number(existingEntry.month) || 1, Number(existingEntry.year) || CURRENT_YEAR);
     setRows(existingEntry.details.map((d) => {
       const isOperator = operatorDeptId !== null && d.departmentId === operatorDeptId;
-      return {
+      const base = {
         ...d,
         // Operator present/total come from transactions (read-only).
         ...(isOperator ? { isOperator: true } : {}),
@@ -417,6 +452,8 @@ export default function PayrollEntryPage() {
         totalAttendance: String(roundToWhole(toNum(d.totalAttendance))),
         otHours: String(roundToWhole(toNum(d.otHours))),
       };
+      // Non-operators: enforce the Sunday-as-present floor on load too.
+      return isOperator ? base : recomputeAll(base, td, sundayFloor);
     }));
     setInitialized(true);
   }, [isEdit, existingEntry, initialized, operatorDeptId]);
@@ -488,11 +525,13 @@ export default function PayrollEntryPage() {
         }
         // For non-operators on the current month, default Present to the number
         // of days elapsed so far this month; otherwise the full days in month.
+        // Either way it can't go below the automatic Sunday count.
         const isCurrentMonth =
           parseInt(month) === new Date().getMonth() + 1 &&
           parseInt(year) === new Date().getFullYear();
         const defaultPresent = isCurrentMonth ? new Date().getDate() : td;
-        return rowFromEmployee(op, td, rowAdvanceSum(op.id), defaultPresent);
+        const sundayFloor = sundaysPresent(parseInt(month) || 1, parseInt(year) || CURRENT_YEAR);
+        return rowFromEmployee(op, td, rowAdvanceSum(op.id), defaultPresent, sundayFloor);
       })
     );
   }, [isEdit, deptKey, allEmployees.length, advanceLoadToken, advanceByEmployee, operatorDeptId, operatorByEmployee, month, year]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -542,11 +581,15 @@ export default function PayrollEntryPage() {
         if (SALARY_SOURCE_FIELDS.has(field) || OT_SOURCE_FIELDS.has(field)) {
           // Source or OT field changed → recompute salary/OT fields and payable.
           // Operator rows use their own formula (production + present adjustment).
-          next[idx] = updated.isOperator ? recomputeOperatorAll(updated, td) : recomputeAll(updated, td);
+          // Non-operator Present is floored at the automatic Sunday count.
+          const sundayFloor = updated.isOperator ? 0 : sundaysPresent(parseInt(month) || 1, parseInt(year) || CURRENT_YEAR);
+          next[idx] = updated.isOperator ? recomputeOperatorAll(updated, td) : recomputeAll(updated, td, sundayFloor);
         } else {
           // User is editing a directly-entered value (holidays, loan/other
-          // deductions) → only recompute payableSalary (operator-aware)
-          next[idx] = updated.isOperator ? recomputeOperatorAll(updated, td) : recomputePayable(updated, td);
+          // deductions) → also enforce the Sunday floor for non-operators.
+          const sundayFloor = updated.isOperator ? 0 : sundaysPresent(parseInt(month) || 1, parseInt(year) || CURRENT_YEAR);
+          const floored = updated.isOperator ? updated : { ...updated, presentDays: String(clampNum(toNum(updated.presentDays), sundayFloor, td)) };
+          next[idx] = updated.isOperator ? recomputeOperatorAll(updated, td) : recomputePayable(floored, td);
         }
         return next;
       });
@@ -562,7 +605,7 @@ export default function PayrollEntryPage() {
       setRows((prev) =>
         prev.map((r) => {
           const rr = { ...r, advanceDeduction: rowAdvanceSum(r.employeeId).toFixed(NUM_DECIMALS) };
-          return rr.isOperator ? recomputeOperatorAll(rr, td) : recomputeAll(rr, td);
+          return rr.isOperator ? recomputeOperatorAll(rr, td) : recomputeAll(rr, td, sundaysPresent(parseInt(m) || 1, parseInt(year) || CURRENT_YEAR));
         })
       );
     },
@@ -577,7 +620,7 @@ export default function PayrollEntryPage() {
       setRows((prev) =>
         prev.map((r) => {
           const rr = { ...r, advanceDeduction: rowAdvanceSum(r.employeeId).toFixed(NUM_DECIMALS) };
-          return rr.isOperator ? recomputeOperatorAll(rr, td) : recomputeAll(rr, td);
+          return rr.isOperator ? recomputeOperatorAll(rr, td) : recomputeAll(rr, td, sundaysPresent(parseInt(month) || 1, parseInt(y) || CURRENT_YEAR));
         })
       );
     },
