@@ -88,6 +88,8 @@ interface AttendanceMonth {
   month: number; year: number; daysInMonth: number;
   operatorDepartmentId: number | null;
   payrollExists: boolean;
+  // operator employeeId -> sorted production transaction dates (auto-present).
+  productionDaysByEmployee?: Record<string, string[]>;
   records: AttendanceRecord[];
 }
 // Cell state keyed by `${employeeId}:${date}` → present boolean.
@@ -138,6 +140,14 @@ export default function AttendancePage() {
 
   // operatorDepartmentId from the server; used to decide Sunday auto-check.
   const operatorDeptId = att?.operatorDepartmentId ?? null;
+  // Operator production transaction dates per employee (auto-present + locked).
+  const productionDatesByEmp = useMemo(() => {
+    const map = new Map<number, Set<string>>();
+    for (const [empId, dates] of Object.entries(att?.productionDaysByEmployee ?? {})) {
+      map.set(Number(empId), new Set(dates));
+    }
+    return map;
+  }, [att?.productionDaysByEmployee]);
   // Active employees, grouped by department for the department filter.
   const activeEmployees = useMemo(
     () => employees.filter((e) => e.active),
@@ -158,10 +168,12 @@ export default function AttendancePage() {
 
   const isEditDisabled = att?.payrollExists === true;
 
-  // Toggle a single day cell (present <-> absent). Disabled for future dates.
+  // Toggle a single day cell (present <-> absent). Disabled for future dates
+  // and for operator production days (those are always present).
   const toggleCell = useCallback(
     (employeeId: number, date: string) => {
       if (isEditDisabled || date > tIso) return;
+      if (productionDatesByEmp.get(employeeId)?.has(date)) return; // locked present
       setCells((prev) => {
         const key = `${employeeId}:${date}`;
         const next = new Map(prev);
@@ -169,7 +181,7 @@ export default function AttendancePage() {
         return next;
       });
     },
-    [isEditDisabled, tIso]
+    [isEditDisabled, tIso, productionDatesByEmp]
   );
 
   const saveMutation = useMutation({
@@ -196,10 +208,16 @@ export default function AttendancePage() {
       return;
     }
     // Build the whole-month record set (saved Sundays included, per spec only
-    // the disabled future days are excluded).
+    // the disabled future days are excluded). Operator production-days are NOT
+    // written here — they auto-count as present via production and payroll owns
+    // that resolution (spec Option A: attendance stores manual state only).
     const records: Array<{ employeeId: number; attendanceDate: string; present: boolean }> = [];
     for (const emp of activeEmployees) {
+      const isOperator = operatorDeptId !== null && emp.departmentId === operatorDeptId;
+      const prodDates = productionDatesByEmp.get(emp.id);
       for (const date of dayList) {
+        // Skip operator production days — never write a manual value for them.
+        if (isOperator && prodDates?.has(date)) continue;
         const key = `${emp.id}:${date}`;
         records.push({ employeeId: emp.id, attendanceDate: date, present: cells.get(key) ?? false });
       }
@@ -372,7 +390,13 @@ export default function AttendancePage() {
                   const isOperator = operatorDeptId !== null && emp.departmentId === operatorDeptId;
                   const striped = i % 2 === 0;
                   const rowBg = striped ? "bg-[hsl(var(--muted))]" : "bg-card";
-                  const presentCount = dayList.filter((d) => cells.get(`${emp.id}:${d}`)).length;
+                  const prodDates = productionDatesByEmp.get(emp.id);
+                  // Present count = saved/manual present cells + operator
+                  // production days (which always count as present).
+                  const presentCount = dayList.filter((d) => {
+                    if (cells.get(`${emp.id}:${d}`)) return true;
+                    return prodDates?.has(d) === true;
+                  }).length;
                   return (
                     <TableRow key={emp.id} className={rowBg}>
                       <TableCell className={`sticky left-0 z-10 ${rowBg} border-r border-border/60 font-medium text-sm py-1`}>
@@ -389,14 +413,22 @@ export default function AttendancePage() {
                         const sun = isOperator ? false : isSunday(y, m, dayNum);
                         const checked = cells.get(`${emp.id}:${date}`) ?? false;
                         const isFuture = date > tIso;
-                        // Pre-check Sundays for non-operators even when not yet saved
-                        // (visual default; saved only on Save). Use saved value if a
-                        // record already exists for the cell.
-                        const effective = cells.has(`${emp.id}:${date}`)
-                          ? checked
-                          : isEditDisabled
+                        // Operator production-day: auto-present and locked (can't
+                        // be unchecked) — spec: mark operators present if there is
+                        // a transaction for that date+operator.
+                        const isProdDay = prodDates?.has(date) === true;
+                        const lockedPresent = isOperator && isProdDay;
+                        // Pre-check Sundays for non-operators even when not yet
+                        // saved (visual default; saved only on Save). Use saved
+                        // value if a record already exists for the cell.
+                        const effective = lockedPresent
+                          ? true
+                          : cells.has(`${emp.id}:${date}`)
                             ? checked
-                            : sun ? true : false;
+                            : isEditDisabled
+                              ? checked
+                              : sun ? true : false;
+                        const locked = lockedPresent || isEditDisabled || isFuture;
                         const cellCls = cn(
                           // Swell the tap target on touch devices for accurate toggles.
                           "flex items-center justify-center rounded transition-colors select-none",
@@ -408,20 +440,20 @@ export default function AttendancePage() {
                             : "bg-muted/60 text-muted-foreground hover:bg-muted",
                           sun && !effective && !isFuture && "ring-1 ring-amber-400 bg-amber-50",
                           isFuture && "opacity-30 cursor-not-allowed hover:bg-muted/60",
-                          isEditDisabled && "opacity-70 cursor-not-allowed"
+                          (isEditDisabled || lockedPresent) && "opacity-70 cursor-not-allowed"
                         );
                         return (
                           <TableCell key={date} className="py-1 px-0.5 md:px-1 text-center">
                             <button
                               type="button"
-                              disabled={isEditDisabled || isFuture}
+                              disabled={locked}
                               onClick={() => toggleCell(emp.id, date)}
                               aria-pressed={effective}
-                              aria-label={`${emp.name}, ${MONTHS[m - 1]} ${dayNum}${sun ? " (Sunday)" : ""}: ${effective ? "Present" : "Absent"}`}
+                              aria-label={`${emp.name}, ${MONTHS[m - 1]} ${dayNum}${sun ? " (Sunday)" : ""}${lockedPresent ? " (produced)" : ""}: ${effective ? "Present" : "Absent"}`}
                               className={cellCls}
-                              title={effective ? "Present" : "Absent"}
+                              title={effective ? (lockedPresent ? "Present (production)" : "Present") : "Absent"}
                             >
-                              {effective ? "✓" : sun ? "" : ""}
+                              {effective ? "✓" : ""}
                             </button>
                           </TableCell>
                         );

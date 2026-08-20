@@ -6,11 +6,9 @@ import {
   employeeMasterTable,
   departmentMasterTable,
   salaryDetailTable,
-  salaryHeaderTable,
   transactionHeaderTable,
   transactionDetailTable,
   transactionTypeMasterTable,
-  machineMasterTable,
 } from "../db/index.js";
 
 const router: IRouter = Router();
@@ -57,6 +55,64 @@ async function operatorDeptId(): Promise<number | null> {
   return dept?.id ?? null;
 }
 
+// Distinct calendar dates in [dateFrom, dateTo] on which each Operator (dept
+// 0002) has >=1 Fabric Production transaction detail row with net weight > 0.
+// Same definition the operator-production salary endpoint uses, so the
+// attendance grid marks exactly the same days as "produced" (auto-present for
+// operators). Returns employeeId -> sorted date list.
+async function operatorProductionDays(
+  dateFrom: string,
+  dateTo: string
+): Promise<Map<number, string[]>> {
+  const [fabricProd, operatorDept] = await Promise.all([
+    db
+      .select({ id: transactionTypeMasterTable.id })
+      .from(transactionTypeMasterTable)
+      .where(eq(transactionTypeMasterTable.code, "Fabric_Production"))
+      .limit(1),
+    db
+      .select({ id: departmentMasterTable.id })
+      .from(departmentMasterTable)
+      .where(eq(departmentMasterTable.code, "0002"))
+      .limit(1),
+  ]);
+  if (!fabricProd[0] || !operatorDept[0]) return new Map();
+
+  const headers = await db
+    .select({ id: transactionHeaderTable.id, date: transactionHeaderTable.date })
+    .from(transactionHeaderTable)
+    .where(
+      and(
+        eq(transactionHeaderTable.transactionTypeId, fabricProd[0].id),
+        gte(transactionHeaderTable.date, dateFrom),
+        lte(transactionHeaderTable.date, dateTo)
+      )
+    );
+  const headerIds = headers.map((h) => h.id);
+  const dateById = new Map(headers.map((h) => [h.id, h.date]));
+  if (headerIds.length === 0) return new Map();
+
+  const details = await db
+    .select({ employeeId: transactionDetailTable.employeeId, headerId: transactionDetailTable.headerId, netWt: transactionDetailTable.netWt })
+    .from(transactionDetailTable)
+    .where(inArray(transactionDetailTable.headerId, headerIds));
+
+  const byEmp = new Map<number, Set<string>>();
+  for (const d of details) {
+    if (!d.employeeId || toNum(d.netWt) <= 0) continue;
+    const date = dateById.get(d.headerId);
+    if (!date) continue;
+    let set = byEmp.get(d.employeeId);
+    if (!set) { set = new Set(); byEmp.set(d.employeeId, set); }
+    set.add(date);
+  }
+  const out = new Map<number, string[]>();
+  for (const [empId, set] of byEmp) {
+    out.set(empId, [...set].sort());
+  }
+  return out;
+}
+
 // ─── Get attendance for a month ────────────────────────────────────────────
 // Returns the attendance rows for the month plus the active employees (so the
 // grid can render employee rows and pre-check Sundays for non-operators only)
@@ -78,13 +134,14 @@ router.get("/attendance", async (req, res): Promise<void> => {
   const from = monthStart(y, m);
   const to = monthEnd(y, m);
 
-  const [records, deptId, payrollExists] = await Promise.all([
+  const [records, deptId, payrollExists, productionDays] = await Promise.all([
     db
       .select()
       .from(attendanceTable)
       .where(and(gte(attendanceTable.attendanceDate, from), lte(attendanceTable.attendanceDate, to))),
     operatorDeptId(),
     payrollExistsForMonth(m, y),
+    operatorProductionDays(from, to),
   ]);
 
   res.json({
@@ -93,6 +150,9 @@ router.get("/attendance", async (req, res): Promise<void> => {
     daysInMonth: daysInMonth(y, m),
     operatorDepartmentId: deptId,
     payrollExists: payrollExists,
+    // Operator production-days (distinct transaction dates), used by the grid
+    // to auto-mark operators Present and lock those cells.
+    productionDaysByEmployee: Object.fromEntries(productionDays),
     records: records.map((r) => ({
       employeeId: r.employeeId,
       attendanceDate: r.attendanceDate,
