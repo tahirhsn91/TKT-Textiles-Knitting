@@ -213,6 +213,8 @@ function recomputeAll(row: DetailRow, totalDays: number): DetailRow {
   // Total Attendance = Present + Holidays (derived, not hand-entered), kept
   // as a whole number to match the other attendance fields.
   const totalAttendance = roundToWhole(toNum(row.presentDays) + toNum(row.holidays));
+  // Absent is derived as the days in the month not present (never below 0).
+  const absentDays = Math.max(totalDays - toNum(row.presentDays), 0);
   // OT Amount = OT Hrs × the employee's OT rate (from the master table). If no
   // OT rate is set for the employee (rate ≤ 0), OT Amount is zero.
   const otRate = toNum(row.otRateHr);
@@ -224,6 +226,8 @@ function recomputeAll(row: DetailRow, totalDays: number): DetailRow {
   return recomputePayable(
     {
       ...row,
+      presentDays: String(toNum(row.presentDays)),
+      absentDays: String(absentDays),
       totalAttendance: totalAttendance.toFixed(TOTAL_ATTENDANCE_DECIMALS),
       totalSalary: totalSalary.toFixed(NUM_DECIMALS),
       otAmount: otAmount.toFixed(NUM_DECIMALS),
