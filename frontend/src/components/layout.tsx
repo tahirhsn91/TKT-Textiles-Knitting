@@ -33,8 +33,8 @@ const navItems = [
 // the drawer. Mirrors the "Daily Work" group in the desktop sidebar.
 const bottomNavItems = [
   { href: "/dashboard",        label: "Dashboard",        icon: LayoutDashboard, module: "dashboard" },
-  { href: "/daily-production", label: "Daily Production", icon: Factory,        module: "dailyProduction" },
   { href: "/attendance",       label: "Attendance",       icon: CalendarCheck,   module: "dailyProduction" },
+  { href: "/daily-production", label: "Daily Production", icon: Factory,        module: "dailyProduction" },
   { href: "/yarn-receipts",    label: "Yarn Receipt",     icon: PackageCheck,   module: "yarnReceipts" },
   { href: "/daily-deliveries", label: "Delivery",         icon: Truck,          module: "dailyDeliveries" },
 ];
@@ -68,10 +68,10 @@ const mobileGroups = [
     icon: ClipboardList,
     activeFn: (loc: string) => loc.startsWith("/daily-production") || loc.startsWith("/yarn-receipts") || loc.startsWith("/daily-deliveries") || loc.startsWith("/attendance"),
     items: [
+      { href: "/attendance",       label: "Attendance",         icon: CalendarCheck, module: "dailyProduction" },
       { href: "/daily-production", label: "Daily Production", icon: Factory,      module: "dailyProduction" },
       { href: "/yarn-receipts",    label: "Daily Yarn Receipt", icon: PackageCheck, module: "yarnReceipts" },
       { href: "/daily-deliveries", label: "Daily Delivery",    icon: Truck,        module: "dailyDeliveries" },
-      { href: "/attendance",       label: "Attendance",         icon: CalendarCheck, module: "dailyProduction" },
     ],
   },
   {
@@ -247,16 +247,16 @@ export function Layout({ children }: { children: ReactNode }) {
             >
               {can("dailyProduction") && (
               <SubItem
-                href="/daily-production"
-                label="Daily Production"
-                active={isSubItemActive(location, "/daily-production")}
+                href="/attendance"
+                label="Attendance"
+                active={isSubItemActive(location, "/attendance")}
               />
               )}
               {can("dailyProduction") && (
               <SubItem
-                href="/attendance"
-                label="Attendance"
-                active={isSubItemActive(location, "/attendance")}
+                href="/daily-production"
+                label="Daily Production"
+                active={isSubItemActive(location, "/daily-production")}
               />
               )}
               {can("yarnReceipts") && (
