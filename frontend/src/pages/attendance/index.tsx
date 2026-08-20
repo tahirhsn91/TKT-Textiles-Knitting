@@ -168,6 +168,20 @@ export default function AttendancePage() {
 
   const isEditDisabled = att?.payrollExists === true;
 
+  // Whether the user has toggled anything vs. what's saved (drives the mobile
+  // save bar's state so it reads "Save" vs "Saved"). Only explicit cell
+  // changes count — the Sunday auto-default isn't part of the saved set.
+  const hasChanges = useMemo(() => {
+    const saved = new Map(
+      (att?.records ?? []).map((r) => [`${r.employeeId}:${r.attendanceDate}`, r.present])
+    );
+    if (cells.size !== saved.size) return true;
+    for (const [key, val] of saved) {
+      if (cells.get(key) !== val) return true;
+    }
+    return false;
+  }, [cells, att?.records]);
+
   // Toggle a single day cell (present <-> absent). Disabled for future dates
   // and for operator production days (those are always present).
   const toggleCell = useCallback(
@@ -345,8 +359,14 @@ export default function AttendancePage() {
                 disabled={isEditDisabled || saveMutation.isPending}
                 className="hidden md:inline-flex"
               >
-                <Save className="mr-2 h-4 w-4" />
-                {isEditDisabled ? "Locked" : "Save Attendance"}
+                <Save className="h-4 w-4" />
+                {saveMutation.isPending
+                  ? "Saving…"
+                  : isEditDisabled
+                    ? "Locked"
+                    : hasChanges
+                      ? "Save Attendance"
+                      : "Attendance Saved"}
               </Button>
             </div>
             {isEditDisabled && (
@@ -487,17 +507,39 @@ export default function AttendancePage() {
         </Card>
 
         {/* Mobile save bar — floats ABOVE the app's mobile bottom nav (which is
-            fixed at the bottom edge, z-30). z-40 + bottom offset clears it so
-            the Save button is always visible and reachable on phones. */}
-        <div className="fixed inset-x-0 bottom-[4.5rem] z-40 border-t border-border bg-background/95 backdrop-blur p-3 md:hidden shadow-[0_-4px_16px_rgba(0,0,0,0.08)]">
-          <Button
-            onClick={handleSave}
-            disabled={isEditDisabled || saveMutation.isPending}
-            className="w-full"
-          >
-            <Save className="mr-2 h-4 w-4" />
-            {isEditDisabled ? "Attendance Locked" : "Save Attendance"}
-          </Button>
+            fixed at the bottom edge, z-30). Fixed + upper offset + z-40 keeps
+            it always visible over the scrolled grid; visual language matches
+            the app's sticky action bars (bg/backdrop-blur/border). Content is
+            constrained to the same max-width as the page and honours the home
+            indicator safe-area. */}
+        <div
+          className="fixed inset-x-0 bottom-[4.25rem] z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.25)] md:hidden"
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        >
+          <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
+            {!isEditDisabled && hasChanges && (
+              <span
+                className="h-2 w-2 shrink-0 rounded-full bg-amber-500"
+                aria-hidden="true"
+                title="Unsaved changes"
+              />
+            )}
+            <Button
+              onClick={handleSave}
+              disabled={isEditDisabled || saveMutation.isPending}
+              size="lg"
+              className="flex-1"
+            >
+              <Save className="h-5 w-5 shrink-0" />
+              {saveMutation.isPending
+                ? "Saving…"
+                : isEditDisabled
+                  ? "Attendance Locked"
+                  : hasChanges
+                    ? "Save Attendance"
+                    : "Attendance Saved"}
+            </Button>
+          </div>
         </div>
       </div>
     </Layout>
