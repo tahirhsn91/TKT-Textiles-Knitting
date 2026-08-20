@@ -34,6 +34,7 @@ const navItems = [
 const bottomNavItems = [
   { href: "/dashboard",        label: "Dashboard",        icon: LayoutDashboard, module: "dashboard" },
   { href: "/daily-production", label: "Daily Production", icon: Factory,        module: "dailyProduction" },
+  { href: "/attendance",       label: "Attendance",       icon: CalendarCheck,   module: "dailyProduction" },
   { href: "/yarn-receipts",    label: "Yarn Receipt",     icon: PackageCheck,   module: "yarnReceipts" },
   { href: "/daily-deliveries", label: "Delivery",         icon: Truck,          module: "dailyDeliveries" },
 ];
@@ -473,16 +474,20 @@ export function Layout({ children }: { children: ReactNode }) {
 
 // ── Mobile bottom navigation bar ────────────────────────────
 function BottomNav({ location, can }: { location: string; can: (moduleId: string) => boolean }) {
+  const visible = bottomNavItems.filter((item) => can(item.module));
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-30 border-t border-sidebar-border bg-sidebar text-sidebar-foreground md:hidden print:hidden"
       aria-label="Main navigation"
     >
       <div
-        className="mx-auto grid max-w-7xl grid-cols-4"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        className="mx-auto grid max-w-7xl"
+        style={{
+          gridTemplateColumns: `repeat(${visible.length}, 1fr)`,
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
       >
-        {bottomNavItems.filter((item) => can(item.module)).map(({ href, label, icon: Icon }) => {
+        {visible.map(({ href, label, icon: Icon }) => {
           const active = isItemActive(location, href);
           return (
             <Link key={href} href={href}>
