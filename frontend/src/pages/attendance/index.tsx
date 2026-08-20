@@ -513,8 +513,13 @@ export default function AttendancePage() {
             constrained to the same max-width as the page and honours the home
             indicator safe-area. */}
         <div
-          className="fixed inset-x-0 bottom-[4.25rem] z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.25)] md:hidden"
-          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+          className="fixed inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.25)] md:hidden"
+          style={{
+            // Sit flush above the app's mobile bottom nav. The nav is ~61px
+            // tall plus the safe-area inset; using calc() keeps the bars
+            // touching edge-to-edge with no visible gap on any device.
+            bottom: "calc(env(safe-area-inset-bottom) + 61px)",
+          }}
         >
           <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
             {!isEditDisabled && hasChanges && (
