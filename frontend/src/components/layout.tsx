@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   FileText, Database, BarChart2, LayoutDashboard, ClipboardList, Wallet,
   ChevronDown, PanelLeftClose, PanelLeftOpen, Search, Settings,
-  Factory, PackageCheck, Truck, HardHat, Wrench, Receipt,
+  Factory, PackageCheck, Truck, HardHat, Wrench, Receipt, CalendarCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
@@ -65,11 +65,12 @@ const mobileGroups = [
     key: "daily",
     label: "Daily Work",
     icon: ClipboardList,
-    activeFn: (loc: string) => loc.startsWith("/daily-production") || loc.startsWith("/yarn-receipts") || loc.startsWith("/daily-deliveries"),
+    activeFn: (loc: string) => loc.startsWith("/daily-production") || loc.startsWith("/yarn-receipts") || loc.startsWith("/daily-deliveries") || loc.startsWith("/attendance"),
     items: [
       { href: "/daily-production", label: "Daily Production", icon: Factory,      module: "dailyProduction" },
       { href: "/yarn-receipts",    label: "Daily Yarn Receipt", icon: PackageCheck, module: "yarnReceipts" },
       { href: "/daily-deliveries", label: "Daily Delivery",    icon: Truck,        module: "dailyDeliveries" },
+      { href: "/attendance",       label: "Attendance",         icon: CalendarCheck, module: "dailyProduction" },
     ],
   },
   {
@@ -169,6 +170,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const transactionsActive = location.startsWith("/transactions") && !payrollActive;
   const reportsActive = location.startsWith("/reports");
   const dailyProductionActive = location.startsWith("/daily-production");
+  const attendanceActive = location.startsWith("/attendance");
   const yarnReceiptsActive = location.startsWith("/yarn-receipts");
   const dailyDeliveriesActive = location.startsWith("/daily-deliveries");
   const maintenanceActive = location.startsWith("/maintenance");
@@ -239,7 +241,7 @@ export function Layout({ children }: { children: ReactNode }) {
               label="Daily Operations"
               icon={ClipboardList}
               primary="/daily-production"
-              active={dailyProductionActive || yarnReceiptsActive || dailyDeliveriesActive}
+              active={dailyProductionActive || attendanceActive || yarnReceiptsActive || dailyDeliveriesActive}
               collapsed={collapsed}
             >
               {can("dailyProduction") && (
@@ -247,6 +249,13 @@ export function Layout({ children }: { children: ReactNode }) {
                 href="/daily-production"
                 label="Daily Production"
                 active={isSubItemActive(location, "/daily-production")}
+              />
+              )}
+              {can("dailyProduction") && (
+              <SubItem
+                href="/attendance"
+                label="Attendance"
+                active={isSubItemActive(location, "/attendance")}
               />
               )}
               {can("yarnReceipts") && (

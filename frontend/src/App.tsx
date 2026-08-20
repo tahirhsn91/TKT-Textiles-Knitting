@@ -31,6 +31,7 @@ const YarnBalancePage = lazyRetry(() => import("@/pages/reports/index"));
 const YarnToFabricPage = lazyRetry(() => import("@/pages/reports/yarn-to-fabric"));
 const MachineMaintenancePage = lazyRetry(() => import("@/pages/maintenance/machine-maintenance"));
 const FactoryMaintenancePage = lazyRetry(() => import("@/pages/maintenance/factory-maintenance"));
+const AttendancePage = lazyRetry(() => import("@/pages/attendance"));
 const InvoicingPage = lazyRetry(() => import("@/pages/invoicing"));
 const SettingsPage = lazyRetry(() => import("@/pages/settings"));
 
@@ -73,6 +74,9 @@ function Router() {
           </Route>
           <Route path="/daily-production">
             <ProtectedRoute moduleId="dailyProduction"><DailyProductionList /></ProtectedRoute>
+          </Route>
+          <Route path="/attendance">
+            <ProtectedRoute moduleId="dailyProduction"><AttendancePage /></ProtectedRoute>
           </Route>
           <Route path="/yarn-receipts">
             <ProtectedRoute moduleId="yarnReceipts"><YarnReceiptList /></ProtectedRoute>

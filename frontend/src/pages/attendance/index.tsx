@@ -1,0 +1,385 @@
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Save, Lock } from "lucide-react";
+import { Layout } from "@/components/layout";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { customFetch } from "@/vendor/api-client-react/custom-fetch";
+import { cn } from "@/lib/utils";
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+const CURRENT_YEAR = new Date().getFullYear();
+const CURRENT_MONTH = new Date().getMonth() + 1; // 1-12
+// Years offered in the dropdown: a few past years up to the current year
+// (future years are excluded) — same range as Payroll Maintenance.
+const SELECTABLE_YEARS = Array.from({ length: 4 }, (_, i) => CURRENT_YEAR - 3 + i);
+
+function toNum(v: unknown): number {
+  const n = parseFloat(String(v ?? ""));
+  return isNaN(n) ? 0 : n;
+}
+
+// YYYY-MM-DD formatted date for the nth day of a month (1-based).
+function dateForDay(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+// True when the given day is a Sunday.
+function isSunday(year: number, month: number, day: number): boolean {
+  return new Date(year, month - 1, day).getDay() === 0;
+}
+// Today as YYYY-MM-DD (used to disable future dates within a month).
+function todayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+// Days in a month.
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
+async function apiFetch<T = unknown>(path: string, opts?: RequestInit): Promise<T> {
+  try {
+    return await customFetch<T>(path, opts ?? { method: "GET" });
+  } catch (err) {
+    throw err instanceof Error ? err : new Error(`HTTP request failed`);
+  }
+}
+
+interface Department { id: number; name: string; code: string; }
+interface Employee {
+  id: number; name: string; code: string; active: boolean;
+  departmentId: number | null; baseSalary: string | null;
+}
+interface AttendanceRecord {
+  employeeId: number;
+  attendanceDate: string;
+  present: boolean;
+}
+interface AttendanceMonth {
+  month: number; year: number; daysInMonth: number;
+  operatorDepartmentId: number | null;
+  payrollExists: boolean;
+  records: AttendanceRecord[];
+}
+// Cell state keyed by `${employeeId}:${date}` → present boolean.
+type CellMap = Map<string, boolean>;
+
+export default function AttendancePage() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [month, setMonth] = useState(String(CURRENT_MONTH));
+  const [year, setYear] = useState(String(CURRENT_YEAR));
+
+  const { data: employees = [] } = useQuery<Employee[]>({
+    queryKey: ["employee-full-lookup"],
+    queryFn: () => apiFetch("/api/lookups/employee-master"),
+  });
+  const { data: departments = [] } = useQuery<Department[]>({
+    queryKey: ["dept-lookup"],
+    queryFn: () => apiFetch("/api/lookups/department-master"),
+  });
+  const deptNameById = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const d of departments) m.set(d.id, d.name);
+    return m;
+  }, [departments]);
+
+  const m = parseInt(month) || 1;
+  const y = parseInt(year) || CURRENT_YEAR;
+  const daysInThisMonth = daysInMonth(y, m);
+  const tIso = todayIso();
+  // days 1..daysInThisMonth as "YYYY-MM-DD"; future (after today) excluded.
+  const dayList = useMemo(() => {
+    const out: string[] = [];
+    for (let d = 1; d <= daysInThisMonth; d++) {
+      const iso = dateForDay(y, m, d);
+      if (iso > tIso) break;
+      out.push(iso);
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [m, y, daysInThisMonth, tIso]);
+
+  // Loaded attendance for the month (from server).
+  const { data: att, isLoading, refetch } = useQuery<AttendanceMonth>({
+    queryKey: ["attendance", month, year],
+    queryFn: () => apiFetch(`/api/attendance?month=${month}&year=${year}`),
+  });
+
+  // operatorDepartmentId from the server; used to decide Sunday auto-check.
+  const operatorDeptId = att?.operatorDepartmentId ?? null;
+  // Active employees, grouped by department for the department filter.
+  const activeEmployees = useMemo(
+    () => employees.filter((e) => e.active),
+    [employees]
+  );
+  const [deptFilter, setDeptFilter] = useState<string>("all");
+
+  // Local cell state seeded from server records once they load.
+  const [cells, setCells] = useState<CellMap>(new Map());
+  useEffect(() => {
+    if (!att) return;
+    const map = new Map<string, boolean>();
+    for (const r of att.records) {
+      map.set(`${r.employeeId}:${r.attendanceDate}`, r.present);
+    }
+    setCells(map);
+  }, [att]);
+
+  const isEditDisabled = att?.payrollExists === true;
+
+  // Toggle a single day cell (present <-> absent). Disabled for future dates.
+  const toggleCell = useCallback(
+    (employeeId: number, date: string) => {
+      if (isEditDisabled || date > tIso) return;
+      setCells((prev) => {
+        const key = `${employeeId}:${date}`;
+        const next = new Map(prev);
+        next.set(key, !(prev.get(key) ?? false));
+        return next;
+      });
+    },
+    [isEditDisabled, tIso]
+  );
+
+  const saveMutation = useMutation({
+    mutationFn: (body: object) =>
+      apiFetch("/api/attendance", { method: "PUT", body: JSON.stringify(body) }),
+    onSuccess: async () => {
+      toast({ title: "Attendance saved." });
+      await queryClient.invalidateQueries({ queryKey: ["attendance", month, year] });
+      await refetch();
+    },
+    onError: (e: Error) =>
+      toast({ variant: "destructive", title: "Error", description: e.message }),
+  });
+
+  function handleSave() {
+    if (isEditDisabled) {
+      toast({ variant: "destructive", title: "Error", description: "Attendance for this month is locked because a payroll entry exists." });
+      return;
+    }
+    const selY = parseInt(year);
+    const selM = parseInt(month);
+    if (selY > CURRENT_YEAR || (selY === CURRENT_YEAR && selM > CURRENT_MONTH)) {
+      toast({ variant: "destructive", title: "Validation", description: "Future month/year cannot be selected." });
+      return;
+    }
+    // Build the whole-month record set (saved Sundays included, per spec only
+    // the disabled future days are excluded).
+    const records: Array<{ employeeId: number; attendanceDate: string; present: boolean }> = [];
+    for (const emp of activeEmployees) {
+      for (const date of dayList) {
+        const key = `${emp.id}:${date}`;
+        records.push({ employeeId: emp.id, attendanceDate: date, present: cells.get(key) ?? false });
+      }
+    }
+    saveMutation.mutate({ month: selM, year: selY, records });
+  }
+
+  // Filtered rows: only active employees, plus the department filter.
+  const rows = useMemo(() => {
+    return deptFilter === "all"
+      ? activeEmployees
+      : activeEmployees.filter((e) => e.departmentId !== null && String(e.departmentId) === deptFilter);
+  }, [activeEmployees, deptFilter]);
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Attendance</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              Mark daily presence. Sundays auto-check as Present for non-operators.
+              Operators are shown for manual attendance only.
+            </p>
+          </div>
+        </div>
+
+        {/* Controls: month, year, department filter, save */}
+        <Card>
+          <CardHeader><CardTitle>Attendance Period</CardTitle></CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-4 items-end">
+              <div className="flex flex-col gap-1">
+                <Label>Month</Label>
+                <Select value={month} onValueChange={setMonth}>
+                  <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {MONTHS.map((name, i) => {
+                      const mm = i + 1;
+                      const isFutureMon = parseInt(year) === CURRENT_YEAR && mm > CURRENT_MONTH;
+                      return (
+                        <SelectItem key={mm} value={String(mm)} disabled={isFutureMon}>{name}</SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label>Year</Label>
+                <Select value={year} onValueChange={setYear}>
+                  <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {SELECTABLE_YEARS.map((yy) => (
+                      <SelectItem key={yy} value={String(yy)}>{yy}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label>Department</Label>
+                <Select value={deptFilter} onValueChange={setDeptFilter}>
+                  <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    {departments.map((d) => (
+                      <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex-1" />
+              <Button onClick={handleSave} disabled={isEditDisabled || saveMutation.isPending}>
+                <Save className="mr-2 h-4 w-4" />
+                {isEditDisabled ? "Locked (payroll exists)" : "Save Attendance"}
+              </Button>
+            </div>
+            {isEditDisabled && (
+              <p className="mt-2 text-xs text-amber-600 flex items-center gap-1">
+                <Lock className="h-3 w-3" />
+                A payroll entry exists for {MONTHS[month ? parseInt(month) - 1 : 0]} {year}, so attendance is locked.
+              </p>
+            )}
+            <p className="mt-2 text-xs text-muted-foreground">
+              Days shown: <span className="font-semibold">{dayList.length}</span> of {daysInThisMonth} (future dates disabled)
+              · Sunday auto-check applies to non-operators only
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Attendance grid: employees as rows, one column per day */}
+        <Card>
+          <CardContent className="p-0 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="text-xs">
+                  <TableHead className="sticky left-0 z-10 bg-card min-w-[160px] border-r border-border/60">Employee</TableHead>
+                  {dayList.map((date) => {
+                    const dayNum = parseInt(date.slice(8, 10), 10);
+                    const sun = isSunday(y, m, dayNum);
+                    return (
+                      <TableHead key={date} className={cn("text-center min-w-[34px] px-0", sun && "text-amber-600")}>
+                        {dayNum}
+                        {sun && <span className="block text-[9px] font-normal">S</span>}
+                      </TableHead>
+                    );
+                  })}
+                  <TableHead className="text-right min-w-[90px]">Present</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((emp, i) => {
+                  const isOperator = operatorDeptId !== null && emp.departmentId === operatorDeptId;
+                  const striped = i % 2 === 0;
+                  const presentCount = dayList.filter((d) => cells.get(`${emp.id}:${d}`)).length;
+                  return (
+                    <TableRow key={emp.id} className={striped ? "bg-[hsl(var(--muted))]" : "bg-card"}>
+                      <TableCell className="sticky left-0 z-10 bg-inherit border-r border-border/60 font-medium text-sm py-1">
+                        <span className="truncate">{emp.name}</span>
+                        <span className="ml-1 text-[10px] text-muted-foreground">
+                          {isOperator
+                            ? deptNameById.get(emp.departmentId ?? -1) ?? "Operator"
+                            : deptNameById.get(emp.departmentId ?? -1) ?? ""}
+                        </span>
+                      </TableCell>
+                      {dayList.map((date) => {
+                        const dayNum = parseInt(date.slice(8, 10), 10);
+                        const sun = isOperator ? false : isSunday(y, m, dayNum);
+                        const checked = cells.get(`${emp.id}:${date}`) ?? false;
+                        const isFuture = date > tIso;
+                        // Pre-check Sundays for non-operators even when not yet saved
+                        // (visual default; saved only on Save). If a record exists for
+                        // the cell, use its saved value instead.
+                        const effective = cells.has(`${emp.id}:${date}`)
+                          ? checked
+                          : isEditDisabled
+                            ? checked
+                            : sun ? true : false;
+                        const cellCls = cn(
+                          "h-5 w-5 rounded cursor-pointer transition-colors flex items-center justify-center text-xs",
+                          effective
+                            ? "bg-green-600 text-white"
+                            : "bg-muted/60 text-muted-foreground",
+                          sun && !effective && "ring-1 ring-amber-400",
+                          isFuture && "opacity-40 cursor-not-allowed"
+                        );
+                        return (
+                          <TableCell key={date} className="py-1 px-0 text-center">
+                            <button
+                              type="button"
+                              disabled={isEditDisabled || isFuture}
+                              onClick={() => toggleCell(emp.id, date)}
+                              className={cellCls}
+                              title={effective ? "Present" : "Absent"}
+                            >
+                              {effective ? "✓" : ""}
+                            </button>
+                          </TableCell>
+                        );
+                      })}
+                      <TableCell className="py-1 text-right font-mono text-sm font-semibold">
+                        {presentCount}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {rows.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={dayList.length + 2} className="text-center text-muted-foreground py-6">
+                      No active employees for the selected filter.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    </Layout>
+  );
+}
