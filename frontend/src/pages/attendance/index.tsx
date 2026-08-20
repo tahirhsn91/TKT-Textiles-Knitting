@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Save, Lock } from "lucide-react";
+import { Save, Lock, CalendarDays, Users, Sun } from "lucide-react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -20,10 +20,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { customFetch } from "@/vendor/api-client-react/custom-fetch";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 const MONTHS = [
@@ -59,6 +60,12 @@ function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
 
+// Weekday short label for a day of a month (0=Sun ... 6=Sat).
+const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
+function weekdayOf(year: number, month: number, day: number): string {
+  return WEEKDAYS[new Date(year, month - 1, day).getDay()];
+}
+
 async function apiFetch<T = unknown>(path: string, opts?: RequestInit): Promise<T> {
   try {
     return await customFetch<T>(path, opts ?? { method: "GET" });
@@ -89,6 +96,7 @@ type CellMap = Map<string, boolean>;
 export default function AttendancePage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const [month, setMonth] = useState(String(CURRENT_MONTH));
   const [year, setYear] = useState(String(CURRENT_YEAR));
 
@@ -219,8 +227,9 @@ export default function AttendancePage() {
 
   return (
     <Layout>
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-4 pb-16 md:pb-0">
+        {/* Header with period context */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Attendance</h1>
             <p className="text-muted-foreground text-sm mt-0.5">
@@ -228,104 +237,152 @@ export default function AttendancePage() {
               Operators are shown for manual attendance only.
             </p>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary" className="gap-1.5 text-xs">
+              <CalendarDays className="h-3.5 w-3.5" />
+              {MONTHS[m - 1]} {y}
+            </Badge>
+            <Badge variant="secondary" className="gap-1.5 text-xs">
+              <Users className="h-3.5 w-3.5" />
+              {rows.length} emp
+            </Badge>
+            <Badge variant="secondary" className="gap-1.5 text-xs">
+              <Sun className="h-3.5 w-3.5 text-amber-500" />
+              {dayList.length}/{daysInThisMonth} days
+            </Badge>
+            {isEditDisabled && (
+              <Badge variant="outline" className="gap-1.5 text-xs text-amber-600 border-amber-300">
+                <Lock className="h-3.5 w-3.5" /> Payroll exists
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Controls: month, year, department filter, save */}
         <Card>
-          <CardHeader><CardTitle>Attendance Period</CardTitle></CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-4 items-end">
-              <div className="flex flex-col gap-1">
-                <Label>Month</Label>
-                <Select value={month} onValueChange={setMonth}>
-                  <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {MONTHS.map((name, i) => {
-                      const mm = i + 1;
-                      const isFutureMon = parseInt(year) === CURRENT_YEAR && mm > CURRENT_MONTH;
-                      return (
-                        <SelectItem key={mm} value={String(mm)} disabled={isFutureMon}>{name}</SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
+          <CardContent className="pt-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:flex-wrap">
+              <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-end sm:gap-4 grow">
+                <div className="flex flex-col gap-1">
+                  <Label>Month</Label>
+                  <Select value={month} onValueChange={setMonth}>
+                    <SelectTrigger className="w-full sm:w-40"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {MONTHS.map((name, i) => {
+                        const mm = i + 1;
+                        const isFutureMon = parseInt(year) === CURRENT_YEAR && mm > CURRENT_MONTH;
+                        return (
+                          <SelectItem key={mm} value={String(mm)} disabled={isFutureMon}>{name}</SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label>Year</Label>
+                  <Select value={year} onValueChange={setYear}>
+                    <SelectTrigger className="w-full sm:w-28"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SELECTABLE_YEARS.map((yy) => (
+                        <SelectItem key={yy} value={String(yy)}>{yy}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1 col-span-2 sm:col-span-1">
+                  <Label>Department</Label>
+                  <Select value={deptFilter} onValueChange={setDeptFilter}>
+                    <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Departments</SelectItem>
+                      {departments.map((d) => (
+                        <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <Label>Year</Label>
-                <Select value={year} onValueChange={setYear}>
-                  <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {SELECTABLE_YEARS.map((yy) => (
-                      <SelectItem key={yy} value={String(yy)}>{yy}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label>Department</Label>
-                <Select value={deptFilter} onValueChange={setDeptFilter}>
-                  <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Departments</SelectItem>
-                    {departments.map((d) => (
-                      <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex-1" />
-              <Button onClick={handleSave} disabled={isEditDisabled || saveMutation.isPending}>
+              {/* Desktop save */}
+              <Button
+                onClick={handleSave}
+                disabled={isEditDisabled || saveMutation.isPending}
+                className="hidden md:inline-flex"
+              >
                 <Save className="mr-2 h-4 w-4" />
-                {isEditDisabled ? "Locked (payroll exists)" : "Save Attendance"}
+                {isEditDisabled ? "Locked" : "Save Attendance"}
               </Button>
             </div>
             {isEditDisabled && (
-              <p className="mt-2 text-xs text-amber-600 flex items-center gap-1">
-                <Lock className="h-3 w-3" />
+              <p className="mt-3 text-xs text-amber-600 flex items-center gap-1.5">
+                <Lock className="h-3.5 w-3.5" />
                 A payroll entry exists for {MONTHS[month ? parseInt(month) - 1 : 0]} {year}, so attendance is locked.
               </p>
             )}
-            <p className="mt-2 text-xs text-muted-foreground">
-              Days shown: <span className="font-semibold">{dayList.length}</span> of {daysInThisMonth} (future dates disabled)
-              · Sunday auto-check applies to non-operators only
-            </p>
+
+            {/* Legend */}
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-3.5 w-3.5 rounded bg-green-600"></span> Present
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-3.5 w-3.5 rounded bg-muted/60 border border-border"></span> Absent
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-3.5 w-3.5 rounded bg-amber-100 ring-1 ring-amber-400"></span> Sunday (auto)
+              </span>
+              <span className="inline-flex items-center gap-1 text-muted-foreground/70">
+                Days shown: <span className="font-semibold">{dayList.length}</span> of {daysInThisMonth} (future disabled)
+              </span>
+            </div>
           </CardContent>
         </Card>
 
         {/* Attendance grid: employees as rows, one column per day */}
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="p-0 overflow-x-auto">
-            <Table>
+            <Table className="border-collapse">
               <TableHeader>
-                <TableRow className="text-xs">
-                  <TableHead className="sticky left-0 z-10 bg-card min-w-[160px] border-r border-border/60">Employee</TableHead>
+                {/* Weekday + day-number header */}
+                <TableRow className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <TableHead className="sticky left-0 z-20 bg-card min-w-[150px] md:min-w-[170px] border-r border-border/60">Employee</TableHead>
                   {dayList.map((date) => {
                     const dayNum = parseInt(date.slice(8, 10), 10);
                     const sun = isSunday(y, m, dayNum);
+                    const wd = weekdayOf(y, m, dayNum);
                     return (
-                      <TableHead key={date} className={cn("text-center min-w-[34px] px-0", sun && "text-amber-600")}>
-                        {dayNum}
-                        {sun && <span className="block text-[9px] font-normal">S</span>}
+                      <TableHead
+                        key={date}
+                        className={cn("text-center min-w-[34px] md:min-w-[38px] px-0 py-1", sun && "text-amber-600")}
+                      >
+                        <span className="block text-[9px] font-semibold">{wd}</span>
+                        <span className="block">{dayNum}</span>
                       </TableHead>
                     );
                   })}
-                  <TableHead className="text-right min-w-[90px]">Present</TableHead>
+                  <TableHead
+                    className="sticky right-0 z-20 bg-card min-w-[72px] border-l border-border/60 text-right"
+                    title="Total present days for the month"
+                  >
+                    Present
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((emp, i) => {
                   const isOperator = operatorDeptId !== null && emp.departmentId === operatorDeptId;
                   const striped = i % 2 === 0;
+                  const rowBg = striped ? "bg-[hsl(var(--muted))]" : "bg-card";
                   const presentCount = dayList.filter((d) => cells.get(`${emp.id}:${d}`)).length;
                   return (
-                    <TableRow key={emp.id} className={striped ? "bg-[hsl(var(--muted))]" : "bg-card"}>
-                      <TableCell className="sticky left-0 z-10 bg-inherit border-r border-border/60 font-medium text-sm py-1">
-                        <span className="truncate">{emp.name}</span>
-                        <span className="ml-1 text-[10px] text-muted-foreground">
-                          {isOperator
-                            ? deptNameById.get(emp.departmentId ?? -1) ?? "Operator"
-                            : deptNameById.get(emp.departmentId ?? -1) ?? ""}
-                        </span>
+                    <TableRow key={emp.id} className={rowBg}>
+                      <TableCell className={`sticky left-0 z-10 ${rowBg} border-r border-border/60 font-medium text-sm py-1`}>
+                        <div className="flex flex-col leading-tight">
+                          <span className="truncate">{emp.name}</span>
+                          <span className="text-[10px] text-muted-foreground font-normal">
+                            {deptNameById.get(emp.departmentId ?? -1) ?? "No Dept"}
+                            {isOperator && <span className="text-amber-600"> · Operator</span>}
+                          </span>
+                        </div>
                       </TableCell>
                       {dayList.map((date) => {
                         const dayNum = parseInt(date.slice(8, 10), 10);
@@ -333,36 +390,43 @@ export default function AttendancePage() {
                         const checked = cells.get(`${emp.id}:${date}`) ?? false;
                         const isFuture = date > tIso;
                         // Pre-check Sundays for non-operators even when not yet saved
-                        // (visual default; saved only on Save). If a record exists for
-                        // the cell, use its saved value instead.
+                        // (visual default; saved only on Save). Use saved value if a
+                        // record already exists for the cell.
                         const effective = cells.has(`${emp.id}:${date}`)
                           ? checked
                           : isEditDisabled
                             ? checked
                             : sun ? true : false;
                         const cellCls = cn(
-                          "h-5 w-5 rounded cursor-pointer transition-colors flex items-center justify-center text-xs",
+                          // Swell the tap target on touch devices for accurate toggles.
+                          "flex items-center justify-center rounded transition-colors select-none",
+                          isMobile
+                            ? "h-9 w-9 text-sm"
+                            : "h-7 w-7 text-xs",
                           effective
-                            ? "bg-green-600 text-white"
-                            : "bg-muted/60 text-muted-foreground",
-                          sun && !effective && "ring-1 ring-amber-400",
-                          isFuture && "opacity-40 cursor-not-allowed"
+                            ? "bg-green-600 text-white hover:bg-green-700"
+                            : "bg-muted/60 text-muted-foreground hover:bg-muted",
+                          sun && !effective && !isFuture && "ring-1 ring-amber-400 bg-amber-50",
+                          isFuture && "opacity-30 cursor-not-allowed hover:bg-muted/60",
+                          isEditDisabled && "opacity-70 cursor-not-allowed"
                         );
                         return (
-                          <TableCell key={date} className="py-1 px-0 text-center">
+                          <TableCell key={date} className="py-1 px-0.5 md:px-1 text-center">
                             <button
                               type="button"
                               disabled={isEditDisabled || isFuture}
                               onClick={() => toggleCell(emp.id, date)}
+                              aria-pressed={effective}
+                              aria-label={`${emp.name}, ${MONTHS[m - 1]} ${dayNum}${sun ? " (Sunday)" : ""}: ${effective ? "Present" : "Absent"}`}
                               className={cellCls}
                               title={effective ? "Present" : "Absent"}
                             >
-                              {effective ? "✓" : ""}
+                              {effective ? "✓" : sun ? "" : ""}
                             </button>
                           </TableCell>
                         );
                       })}
-                      <TableCell className="py-1 text-right font-mono text-sm font-semibold">
+                      <TableCell className={`sticky right-0 z-10 ${rowBg} border-l border-border/60 py-1 px-2 text-right font-mono text-sm font-semibold`}>
                         {presentCount}
                       </TableCell>
                     </TableRow>
@@ -379,6 +443,18 @@ export default function AttendancePage() {
             </Table>
           </CardContent>
         </Card>
+
+        {/* Mobile sticky save bar */}
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur p-3 md:hidden">
+          <Button
+            onClick={handleSave}
+            disabled={isEditDisabled || saveMutation.isPending}
+            className="w-full"
+          >
+            <Save className="mr-2 h-4 w-4" />
+            {isEditDisabled ? "Attendance Locked" : "Save Attendance"}
+          </Button>
+        </div>
       </div>
     </Layout>
   );
