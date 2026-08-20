@@ -101,6 +101,19 @@ export default function AttendancePage() {
   const isMobile = useIsMobile();
   const [month, setMonth] = useState(String(CURRENT_MONTH));
   const [year, setYear] = useState(String(CURRENT_YEAR));
+  // Measured height of the app's mobile bottom nav, so the save bar can sit
+  // flush against it with no gap regardless of device / safe-area inset.
+  // Fallback ~57px until the first measure lands to avoid a jump.
+  const [navHeight, setNavHeight] = useState(57);
+  useEffect(() => {
+    const nav = document.querySelector("nav[aria-label='Main navigation']");
+    if (!nav) return;
+    const update = () => setNavHeight(nav.getBoundingClientRect().height);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(nav);
+    return () => ro.disconnect();
+  }, []);
 
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["employee-full-lookup"],
@@ -514,12 +527,7 @@ export default function AttendancePage() {
             indicator safe-area. */}
         <div
           className="fixed inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.25)] md:hidden"
-          style={{
-            // Sit flush above the app's mobile bottom nav. The nav is ~61px
-            // tall plus the safe-area inset; using calc() keeps the bars
-            // touching edge-to-edge with no visible gap on any device.
-            bottom: "calc(env(safe-area-inset-bottom) + 61px)",
-          }}
+          style={{ bottom: `${navHeight}px` }}
         >
           <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
             {!isEditDisabled && hasChanges && (
