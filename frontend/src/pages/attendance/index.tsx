@@ -196,6 +196,25 @@ export default function AttendancePage() {
       toast({ variant: "destructive", title: "Error", description: e.message }),
   });
 
+  // Effective present value for an (employee, date) cell: saved value wins;
+  // otherwise non-operator Sundays auto-count as present; otherwise absent.
+  // Operator production days are handled separately (locked present) — this
+  // helper intentionally does NOT fold those in so the manual Save never writes
+  // them (payroll owns that resolution).
+  const cellPresent = useCallback(
+    (employeeId: number, date: string): boolean => {
+      const checked = cells.get(`${employeeId}:${date}`);
+      if (checked !== undefined) return checked;
+      const emp = employees.find((e) => e.id === employeeId);
+      const isOp = operatorDeptId !== null && emp?.departmentId === operatorDeptId;
+      if (isOp) return false;
+      const dayNum = parseInt(date.slice(8, 10), 10);
+      if (isSunday(y, m, dayNum)) return true; // Sunday auto-present (non-operator)
+      return false;
+    },
+    [cells, employees, operatorDeptId, y, m]
+  );
+
   function handleSave() {
     if (isEditDisabled) {
       toast({ variant: "destructive", title: "Error", description: "Attendance for this month is locked because a payroll entry exists." });
@@ -218,8 +237,8 @@ export default function AttendancePage() {
       for (const date of dayList) {
         // Skip operator production days — never write a manual value for them.
         if (isOperator && prodDates?.has(date)) continue;
-        const key = `${emp.id}:${date}`;
-        records.push({ employeeId: emp.id, attendanceDate: date, present: cells.get(key) ?? false });
+        // Effective present (includes the auto-checked Sunday default).
+        records.push({ employeeId: emp.id, attendanceDate: date, present: cellPresent(emp.id, date) });
       }
     }
     saveMutation.mutate({ month: selM, year: selY, records });
@@ -394,7 +413,7 @@ export default function AttendancePage() {
                   // Present count = saved/manual present cells + operator
                   // production days (which always count as present).
                   const presentCount = dayList.filter((d) => {
-                    if (cells.get(`${emp.id}:${d}`)) return true;
+                    if (cellPresent(emp.id, d)) return true;
                     return prodDates?.has(d) === true;
                   }).length;
                   return (
@@ -411,23 +430,14 @@ export default function AttendancePage() {
                       {dayList.map((date) => {
                         const dayNum = parseInt(date.slice(8, 10), 10);
                         const sun = isOperator ? false : isSunday(y, m, dayNum);
-                        const checked = cells.get(`${emp.id}:${date}`) ?? false;
                         const isFuture = date > tIso;
                         // Operator production-day: auto-present and locked (can't
                         // be unchecked) — spec: mark operators present if there is
-                        // a transaction for that date+operator.
+                        // a transaction for that date+operator. Other cells use the
+                        // shared effective-present helper (saved > Sunday-auto).
                         const isProdDay = prodDates?.has(date) === true;
                         const lockedPresent = isOperator && isProdDay;
-                        // Pre-check Sundays for non-operators even when not yet
-                        // saved (visual default; saved only on Save). Use saved
-                        // value if a record already exists for the cell.
-                        const effective = lockedPresent
-                          ? true
-                          : cells.has(`${emp.id}:${date}`)
-                            ? checked
-                            : isEditDisabled
-                              ? checked
-                              : sun ? true : false;
+                        const effective = lockedPresent ? true : cellPresent(emp.id, date);
                         const locked = lockedPresent || isEditDisabled || isFuture;
                         const cellCls = cn(
                           // Swell the tap target on touch devices for accurate toggles.
