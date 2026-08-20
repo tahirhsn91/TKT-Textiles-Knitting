@@ -245,7 +245,7 @@ export default function AttendancePage() {
 
   return (
     <Layout>
-      <div className="flex flex-col gap-4 pb-16 md:pb-0">
+      <div className="flex flex-col gap-4 pb-32 md:pb-0">
         {/* Header with period context */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -476,8 +476,10 @@ export default function AttendancePage() {
           </CardContent>
         </Card>
 
-        {/* Mobile sticky save bar */}
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur p-3 md:hidden">
+        {/* Mobile save bar — floats ABOVE the app's mobile bottom nav (which is
+            fixed at the bottom edge, z-30). z-40 + bottom offset clears it so
+            the Save button is always visible and reachable on phones. */}
+        <div className="fixed inset-x-0 bottom-[4.5rem] z-40 border-t border-border bg-background/95 backdrop-blur p-3 md:hidden shadow-[0_-4px_16px_rgba(0,0,0,0.08)]">
           <Button
             onClick={handleSave}
             disabled={isEditDisabled || saveMutation.isPending}
