@@ -134,6 +134,15 @@ interface Employee {
   othAllowance: string | null;
 }
 
+// Attendance for a month (from the Attendance module). Used to pre-fill
+// Present days for non-operators and to gate payroll save.
+interface AttendanceMonthResponse {
+  month: number; year: number; daysInMonth: number;
+  operatorDepartmentId: number | null;
+  payrollExists: boolean;
+  records: Array<{ employeeId: number; attendanceDate: string; present: boolean }>;
+}
+
 interface DetailRow {
   employeeId: number;
   departmentId: number | null;
@@ -370,6 +379,27 @@ export default function PayrollEntryPage() {
     [advanceByEmployee]
   );
 
+  // Attendance for the selected month (from the Attendance module). Non-operator
+  // Present days are prefilled from here; payroll save is blocked when no
+  // attendance exists for the month (operators still resolve max(attendance,
+  // production) live via operator-production).
+  const attParams = new URLSearchParams({ month, year });
+  const { data: attendanceMonth } = useQuery<AttendanceMonthResponse>({
+    queryKey: ["attendance-month", month, year],
+    queryFn: () => apiFetch(`/api/attendance?${attParams.toString()}`),
+    enabled: (!isEdit || initialized),
+  });
+  // present days per employee from attendance records (count of present rows).
+  const attendancePresentByEmployee = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const r of attendanceMonth?.records ?? []) {
+      if (r.present) map.set(r.employeeId, (map.get(r.employeeId) ?? 0) + 1);
+    }
+    return map;
+  }, [attendanceMonth]);
+  // Whether any attendance record exists for the month at all.
+  const attendanceExists = ((attendanceMonth?.records?.length ?? 0) > 0);
+
   // Operator (dept 0002) production-based salary for the selected month.
   const opParams = new URLSearchParams({ month, year });
   const { data: operatorProductions = [] } = useQuery<OperatorProduction[]>({
@@ -465,9 +495,9 @@ export default function PayrollEntryPage() {
   const [builtForKey, setBuiltForKey] = useState<string | null>(null);
   const [builtForOpCount, setBuiltForOpCount] = useState(-1);
   const [builtForLoadState, setBuiltForLoadState] = useState<string>("");
-  // Rebuild when the selected dept, the loaded advance batch, or the loaded
-  // operator-production batch changes (all fetch async).
-  const advanceLoadToken = `${deptKey}:${advances.length}:${operatorByEmployee.size}:${month}:${year}`;
+  // Rebuild when the selected dept, the loaded advance batch, the loaded
+  // operator-production batch, or the loaded attendance changes (all fetch async).
+  const advanceLoadToken = `${deptKey}:${advances.length}:${operatorByEmployee.size}:${attendanceExists}:${attendancePresentByEmployee.size}:${month}:${year}`;
 
   useEffect(() => {
     if (isEdit) return;
@@ -486,16 +516,16 @@ export default function PayrollEntryPage() {
           const prod = operatorByEmployee.get(op.id);
           if (prod) return rowFromOperator(op, td, prod, rowAdvanceSum(op.id));
         }
-        // For non-operators on the current month, default Present to the number
-        // of days elapsed so far this month; otherwise the full days in month.
-        const isCurrentMonth =
-          parseInt(month) === new Date().getMonth() + 1 &&
-          parseInt(year) === new Date().getFullYear();
-        const defaultPresent = isCurrentMonth ? new Date().getDate() : td;
+        // For non-operators: Present comes from the Attendance module. When
+        // attendance exists for the month, prefill the employee's present-day
+        // count from it; when it does NOT exist, Present defaults to 0 and
+        // payroll save is blocked until attendance is entered.
+        const attPresent = attendancePresentByEmployee.get(op.id);
+        const defaultPresent = attendanceExists && attPresent !== undefined ? attPresent : 0;
         return rowFromEmployee(op, td, rowAdvanceSum(op.id), defaultPresent);
       })
     );
-  }, [isEdit, deptKey, allEmployees.length, advanceLoadToken, advanceByEmployee, operatorDeptId, operatorByEmployee, month, year]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isEdit, deptKey, allEmployees.length, advanceLoadToken, advanceByEmployee, operatorDeptId, operatorByEmployee, attendancePresentByEmployee, attendanceExists, month, year]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Row update with field-aware formula logic ──
   const updateRow = useCallback(
@@ -616,6 +646,16 @@ export default function PayrollEntryPage() {
     }
     if (rows.length === 0) {
       toast({ variant: "destructive", title: "Validation", description: "No employees for selected department(s)." });
+      return;
+    }
+    // Attendance is the source of present days: payroll cannot be saved until
+    // attendance has been saved for the month (spec: block-on-save).
+    if (!attendanceExists) {
+      toast({
+        variant: "destructive",
+        title: "Attendance Required",
+        description: `Attendance has not been entered for ${MONTHS[selM - 1]} ${selY}. Save attendance first.`,
+      });
       return;
     }
     // Present + Absent can't exceed the days in the selected month.

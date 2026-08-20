@@ -20,6 +20,7 @@ import partyAnalyticsRouter from "./party-analytics.js";
 import companyInfoRouter from "./company-info.js";
 import invoicingRouter from "./invoicing.js";
 import usersRouter from "./users.js";
+import attendanceRouter from "./attendance.js";
 
 const router: IRouter = Router();
 
@@ -83,5 +84,8 @@ router.use(invoicingRouter);
 // Users/RBAC admin — admin-only enforced inside the router (users.ts).
 router.use("/users", requirePermission("users"));
 router.use(usersRouter);
+// Attendance — lives under Daily Operations and feeds payroll.
+router.use("/attendance", requirePermission("dailyProduction"));
+router.use(attendanceRouter);
 
 export default router;
