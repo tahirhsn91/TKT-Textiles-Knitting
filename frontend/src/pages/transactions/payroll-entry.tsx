@@ -286,11 +286,16 @@ function rowFromEmployee(op: Employee, totalDays: number, advanceSum = 0, defaul
 }
 
 // Builds a row for an Operator (dept 0002) employee whose salary is derived
-// from production: Present days and Total Salary come from the transactions
-// (read-only), while Absent / Holidays / OT / Deductions stay user-entered.
-function rowFromOperator(op: Employee, totalDays: number, prod: OperatorProduction, advanceSum = 0): DetailRow {
+// from production: Present days = max(attendance manual present, transaction
+// production days), read-only from attendance. Total Salary comes from the
+// transactions plus the present-day adjustment; Absent / Holidays / OT /
+// Deductions stay user-entered.
+function rowFromOperator(op: Employee, totalDays: number, prod: OperatorProduction, advanceSum = 0, manualPresent = 0): DetailRow {
   const dailyBasic = toNum(op.baseSalary);
   const transactionPresent = prod.presentDays;
+  // Operator present = whichever is greater between the attendance manual
+  // present and the production days; cannot be reduced below production.
+  const present = Math.max(manualPresent, transactionPresent);
   // Base total = production-derived salary. Present-day adjustment adds one
   // daily basic for each present day above the transaction-present floor.
   const baseTotal = prod.totalSalary;
@@ -302,7 +307,7 @@ function rowFromOperator(op: Employee, totalDays: number, prod: OperatorProducti
     otRateHr: toNum(op.overtimeRateHr).toFixed(NUM_DECIMALS),
     attAllowance: toNum(op.attAllowance).toFixed(NUM_DECIMALS),
     othAllowance: toNum(op.othAllowance).toFixed(NUM_DECIMALS),
-    presentDays: String(transactionPresent),
+    presentDays: String(present),
     absentDays: "0",
     holidays: "0",
     totalAttendance: "0",
@@ -329,6 +334,9 @@ export default function PayrollEntryPage() {
   const params = useParams<{ id?: string }>();
   const headerId = params.id ? parseInt(params.id) : NaN;
   const isEdit = !isNaN(headerId);
+  // New salary entry: Present/Absent are derived from attendance (disabled).
+  // Edit mode keeps the existing workflow.
+  const isNewMode = !isEdit;
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -514,7 +522,11 @@ export default function PayrollEntryPage() {
       filtered.map((op) => {
         if (operatorDeptId !== null && op.departmentId === operatorDeptId) {
           const prod = operatorByEmployee.get(op.id);
-          if (prod) return rowFromOperator(op, td, prod, rowAdvanceSum(op.id));
+          if (prod) {
+            // Operator present = max(attendance manual present, production days).
+            const manualAtt = attendancePresentByEmployee.get(op.id) ?? 0;
+            return rowFromOperator(op, td, prod, rowAdvanceSum(op.id), manualAtt);
+          }
         }
         // For non-operators: Present comes from the Attendance module. When
         // attendance exists for the month, prefill the employee's present-day
@@ -848,6 +860,7 @@ export default function PayrollEntryPage() {
                 <span className="text-muted-foreground/70">
                   Total Att. = Present + Holidays · Total Salary = (Basic ÷ {totalDays}) × Att. + OT ·
                   Payable = Total Salary + Att. Allow. (when Present = {totalDays}) − Deductions
+                  {isNewMode && <> · Present / Absent from Attendance</>}
                 </span>
               </div>
             </CardHeader>
@@ -915,30 +928,36 @@ export default function PayrollEntryPage() {
                         <TableCell className="py-1"><Input disabled className={ro} value={row.otRateHr} /></TableCell>
                         <TableCell className="py-1"><Input disabled className={ro} value={row.attAllowance} /></TableCell>
                         <TableCell className="py-1"><Input disabled className={ro} value={row.othAllowance} /></TableCell>
-                        {/* Attendance inputs — trigger salary formula. Operator
-                            Present is editable from the transaction-present floor
-                            up to the days in the month; each day above the floor
-                            adds one daily basic to their salary. */}
+                        {/* Attendance inputs — derived from attendance in new
+                            mode (Present & Absent read-only); editable in edit
+                            mode. Operator Present floors at transaction-present. */}
                         <TableCell className="py-1">
-                          {row.isOperator ? (
-                            <Input type="number" min={row.operatorTransactionPresent ?? 0} max={totalDays} step={STEP_ATTENDANCE} className={inp}
-                              value={row.presentDays} disabled={isPosted}
-                              onChange={(e) => updateRow(i, "presentDays", e.target.value)} />
-                          ) : (
-                            <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
-                              value={row.presentDays} disabled={isPosted}
-                              onChange={(e) => updateRow(i, "presentDays", e.target.value)} />
-                          )}
+                          <Input
+                            type="number"
+                            min={row.isOperator ? (row.operatorTransactionPresent ?? 0) : 0}
+                            max={totalDays}
+                            step={STEP_ATTENDANCE}
+                            className={cn(isNewMode ? ro : inp, attErrCls)}
+                            value={row.presentDays}
+                            disabled={isPosted || isNewMode}
+                            readOnly={isNewMode}
+                            onChange={(e) => updateRow(i, "presentDays", e.target.value)}
+                            title={isNewMode ? "Calculated from attendance" : undefined}
+                          />
                         </TableCell>
                         <TableCell className="py-1">
-                          {row.isOperator ? (
-                            <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={ro}
-                              value={row.absentDays} disabled readOnly />
-                          ) : (
-                            <Input type="number" min="0" max={totalDays} step={STEP_ATTENDANCE} className={cn(inp, attErrCls)}
-                              value={row.absentDays} disabled={isPosted}
-                              onChange={(e) => updateRow(i, "absentDays", e.target.value)} />
-                          )}
+                          <Input
+                            type="number"
+                            min="0"
+                            max={totalDays}
+                            step={STEP_ATTENDANCE}
+                            className={cn(isNewMode ? ro : inp, attErrCls)}
+                            value={row.absentDays}
+                            disabled={isPosted || isNewMode}
+                            readOnly={isNewMode}
+                            onChange={(e) => updateRow(i, "absentDays", e.target.value)}
+                            title={isNewMode ? "Calculated as days minus present" : undefined}
+                          />
                         </TableCell>
                         <TableCell className="py-1">
                           {row.isOperator ? (
