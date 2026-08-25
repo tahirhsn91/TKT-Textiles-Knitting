@@ -77,10 +77,10 @@ export const useAuth = (): UseAuthReturn => {
       setError(null);
 
       const [invitationsRes, sessionsRes, twoFactorRes, settingsRes] = await Promise.all([
-        axios.get('/api/v1/auth/invitations').catch(() => ({ data: { invitations: [] } })),
-        axios.get('/api/v1/auth/sessions').catch(() => ({ data: { sessions: [] } })),
-        axios.get('/api/v1/auth/2fa/status').catch(() => ({ data: { is_enabled: false, methods: [] } })),
-        axios.get('/api/v1/auth/session-settings').catch(() => ({ data: {} })),
+        axios.get('/api/auth/invitations').catch(() => ({ data: { invitations: [] } })),
+        axios.get('/api/auth/sessions').catch(() => ({ data: { sessions: [] } })),
+        axios.get('/api/auth/2fa/status').catch(() => ({ data: { is_enabled: false, methods: [] } })),
+        axios.get('/api/auth/session-settings').catch(() => ({ data: {} })),
       ]);
 
       setInvitations(invitationsRes.data.invitations || []);
@@ -98,7 +98,7 @@ export const useAuth = (): UseAuthReturn => {
   const createInvitation = async (email: string, roleName?: string) => {
     try {
       setLoading(true);
-      await axios.post('/api/v1/auth/invitations', { email, role_name: roleName });
+      await axios.post('/api/auth/invitations', { email, role_name: roleName });
       await fetchAuthData();
     } catch (err) {
       console.error('Error creating invitation:', err);
@@ -112,7 +112,7 @@ export const useAuth = (): UseAuthReturn => {
   const resendInvitation = async (invitationId: number) => {
     try {
       setLoading(true);
-      await axios.post(`/api/v1/auth/invitations/${invitationId}/resend`);
+      await axios.post(`/api/auth/invitations/${invitationId}/resend`);
       await fetchAuthData();
     } catch (err) {
       console.error('Error resending invitation:', err);
@@ -126,7 +126,7 @@ export const useAuth = (): UseAuthReturn => {
   const acceptInvitation = async (token: string, userId: number) => {
     try {
       setLoading(true);
-      await axios.post('/api/v1/auth/invitations/accept', { token, user_id: userId });
+      await axios.post('/api/auth/invitations/accept', { token, user_id: userId });
     } catch (err) {
       console.error('Error accepting invitation:', err);
       setError('Failed to accept invitation');
@@ -139,7 +139,7 @@ export const useAuth = (): UseAuthReturn => {
   const getSessions = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/v1/auth/sessions');
+      const response = await axios.get('/api/auth/sessions');
       setSessions(response.data.sessions);
     } catch (err) {
       console.error('Error fetching sessions:', err);
@@ -153,7 +153,7 @@ export const useAuth = (): UseAuthReturn => {
   const endSession = async (sessionId: number) => {
     try {
       setLoading(true);
-      await axios.delete(`/api/v1/auth/sessions/${sessionId}`);
+      await axios.delete(`/api/auth/sessions/${sessionId}`);
       await getSessions();
     } catch (err) {
       console.error('Error ending session:', err);
@@ -167,7 +167,7 @@ export const useAuth = (): UseAuthReturn => {
   const logoutAllDevices = async () => {
     try {
       setLoading(true);
-      await axios.post('/api/v1/auth/sessions/logout-all');
+      await axios.post('/api/auth/sessions/logout-all');
       setSessions([]);
     } catch (err) {
       console.error('Error logging out all devices:', err);
@@ -181,7 +181,7 @@ export const useAuth = (): UseAuthReturn => {
   const setupTwoFactorAuth = async (method?: string) => {
     try {
       setLoading(true);
-      const response = await axios.post('/api/v1/auth/2fa/setup', { method: method || 'totp' });
+      const response = await axios.post('/api/auth/2fa/setup', { method: method || 'totp' });
       return response.data.data;
     } catch (err) {
       console.error('Error setting up 2FA:', err);
@@ -195,7 +195,7 @@ export const useAuth = (): UseAuthReturn => {
   const enableTwoFactorAuth = async () => {
     try {
       setLoading(true);
-      await axios.post('/api/v1/auth/2fa/enable');
+      await axios.post('/api/auth/2fa/enable');
       await getTwoFactorStatus();
     } catch (err) {
       console.error('Error enabling 2FA:', err);
@@ -209,7 +209,7 @@ export const useAuth = (): UseAuthReturn => {
   const disableTwoFactorAuth = async () => {
     try {
       setLoading(true);
-      await axios.post('/api/v1/auth/2fa/disable');
+      await axios.post('/api/auth/2fa/disable');
       await getTwoFactorStatus();
     } catch (err) {
       console.error('Error disabling 2FA:', err);
@@ -222,7 +222,7 @@ export const useAuth = (): UseAuthReturn => {
 
   const getTwoFactorStatus = async () => {
     try {
-      const response = await axios.get('/api/v1/auth/2fa/status');
+      const response = await axios.get('/api/auth/2fa/status');
       setTwoFactorStatus(response.data);
     } catch (err) {
       console.error('Error fetching 2FA status:', err);
@@ -232,7 +232,7 @@ export const useAuth = (): UseAuthReturn => {
   const updateSessionSettings = async (settings: Partial<SessionSettings>) => {
     try {
       setLoading(true);
-      const response = await axios.put('/api/v1/auth/session-settings', settings);
+      const response = await axios.put('/api/auth/session-settings', settings);
       setSessionSettings(response.data.data);
     } catch (err) {
       console.error('Error updating session settings:', err);
