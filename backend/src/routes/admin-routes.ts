@@ -10,7 +10,7 @@ const router: Router = express.Router();
 router.use(tenantMiddleware);
 
 /**
- * GET /api/v1/admin/tenants
+ * GET /api/admin/tenants
  * List all tenants (super-admin only, paginated)
  */
 router.get('/tenants', requireSuperAdmin, async (req: SuperAdminRequest, res) => {
@@ -34,7 +34,7 @@ router.get('/tenants', requireSuperAdmin, async (req: SuperAdminRequest, res) =>
 });
 
 /**
- * GET /api/v1/admin/tenants/:tenantId
+ * GET /api/admin/tenants/:tenantId
  * Get detailed tenant information (super-admin only)
  */
 router.get('/tenants/:tenantId', requireSuperAdmin, async (req: SuperAdminRequest, res) => {
@@ -50,7 +50,7 @@ router.get('/tenants/:tenantId', requireSuperAdmin, async (req: SuperAdminReques
 });
 
 /**
- * POST /api/v1/admin/tenants
+ * POST /api/admin/tenants
  * Create new tenant (super-admin only)
  */
 router.post('/tenants', requireSuperAdmin, async (req: SuperAdminRequest, res) => {
@@ -88,7 +88,7 @@ router.post('/tenants', requireSuperAdmin, async (req: SuperAdminRequest, res) =
 });
 
 /**
- * PUT /api/v1/admin/tenants/:tenantId
+ * PUT /api/admin/tenants/:tenantId
  * Update tenant (super-admin only)
  */
 router.put('/tenants/:tenantId', requireSuperAdmin, async (req: SuperAdminRequest, res) => {
@@ -115,7 +115,7 @@ router.put('/tenants/:tenantId', requireSuperAdmin, async (req: SuperAdminReques
 });
 
 /**
- * PUT /api/v1/admin/tenants/:tenantId/status
+ * PUT /api/admin/tenants/:tenantId/status
  * Update tenant status (super-admin only)
  */
 router.put('/tenants/:tenantId/status', requireSuperAdmin, async (req: SuperAdminRequest, res) => {
@@ -140,7 +140,7 @@ router.put('/tenants/:tenantId/status', requireSuperAdmin, async (req: SuperAdmi
 });
 
 /**
- * GET /api/v1/admin/tenants/:tenantId/stats
+ * GET /api/admin/tenants/:tenantId/stats
  * Get tenant statistics (super-admin only)
  */
 router.get('/tenants/:tenantId/stats', requireSuperAdmin, async (req: SuperAdminRequest, res) => {
@@ -156,7 +156,7 @@ router.get('/tenants/:tenantId/stats', requireSuperAdmin, async (req: SuperAdmin
 });
 
 /**
- * POST /api/v1/admin/switch-tenant/:tenantId
+ * POST /api/admin/switch-tenant/:tenantId
  * Switch tenant context (super-admin only, returns new JWT token)
  */
 router.post('/switch-tenant/:tenantId', requireSuperAdmin, async (req: SuperAdminRequest, res) => {
@@ -195,7 +195,7 @@ router.post('/switch-tenant/:tenantId', requireSuperAdmin, async (req: SuperAdmi
 });
 
 /**
- * GET /api/v1/admin/my-tenants
+ * GET /api/admin/my-tenants
  * Get tenants managed by current super-admin
  */
 router.get('/my-tenants', requireSuperAdmin, async (req: SuperAdminRequest, res) => {
@@ -219,7 +219,7 @@ router.get('/my-tenants', requireSuperAdmin, async (req: SuperAdminRequest, res)
 });
 
 /**
- * GET /api/v1/admin/tenants/:tenantId/admins
+ * GET /api/admin/tenants/:tenantId/admins
  * Get admins for a tenant (super-admin only)
  */
 router.get('/tenants/:tenantId/admins', requireSuperAdmin, async (req: SuperAdminRequest, res) => {
@@ -238,7 +238,7 @@ router.get('/tenants/:tenantId/admins', requireSuperAdmin, async (req: SuperAdmi
 });
 
 /**
- * POST /api/v1/admin/tenants/:tenantId/assign-admin
+ * POST /api/admin/tenants/:tenantId/assign-admin
  * Assign admin to tenant (super-admin only)
  */
 router.post('/tenants/:tenantId/assign-admin', requireSuperAdmin, async (req: SuperAdminRequest, res) => {
@@ -263,7 +263,7 @@ router.post('/tenants/:tenantId/assign-admin', requireSuperAdmin, async (req: Su
 });
 
 /**
- * DELETE /api/v1/admin/tenants/:tenantId/admins/:adminUserId
+ * DELETE /api/admin/tenants/:tenantId/admins/:adminUserId
  * Remove admin from tenant (super-admin only)
  */
 router.delete('/tenants/:tenantId/admins/:adminUserId', requireSuperAdmin, async (req: SuperAdminRequest, res) => {

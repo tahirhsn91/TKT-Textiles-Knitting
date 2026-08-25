@@ -17,29 +17,29 @@ All endpoints require `super-admin` role.
 
 **List & Get Tenants:**
 ```
-GET /api/v1/admin/tenants                    # List all tenants (paginated)
-GET /api/v1/admin/tenants/:id                # Get specific tenant with configs
-GET /api/v1/admin/my-tenants                 # Get tenants managed by current admin
-GET /api/v1/admin/tenants/:id/stats          # Get tenant statistics
+GET /api/admin/tenants                    # List all tenants (paginated)
+GET /api/admin/tenants/:id                # Get specific tenant with configs
+GET /api/admin/my-tenants                 # Get tenants managed by current admin
+GET /api/admin/tenants/:id/stats          # Get tenant statistics
 ```
 
 **Create & Update:**
 ```
-POST /api/v1/admin/tenants                   # Create new tenant with auto-seeding
-PUT /api/v1/admin/tenants/:id                # Update tenant info
-PUT /api/v1/admin/tenants/:id/status         # Update tenant status (active/suspended/inactive)
+POST /api/admin/tenants                   # Create new tenant with auto-seeding
+PUT /api/admin/tenants/:id                # Update tenant info
+PUT /api/admin/tenants/:id/status         # Update tenant status (active/suspended/inactive)
 ```
 
 **Switch Tenant:**
 ```
-POST /api/v1/admin/switch-tenant/:id         # Switch tenant context (returns new JWT)
+POST /api/admin/switch-tenant/:id         # Switch tenant context (returns new JWT)
 ```
 
 **Admin Management:**
 ```
-GET /api/v1/admin/tenants/:id/admins         # List admins for tenant
-POST /api/v1/admin/tenants/:id/assign-admin  # Assign admin to tenant
-DELETE /api/v1/admin/tenants/:id/admins/:userId # Remove admin from tenant
+GET /api/admin/tenants/:id/admins         # List admins for tenant
+POST /api/admin/tenants/:id/assign-admin  # Assign admin to tenant
+DELETE /api/admin/tenants/:id/admins/:userId # Remove admin from tenant
 ```
 
 ### 3. Tenant Switcher (Navbar)
@@ -186,7 +186,7 @@ New menu option in account dropdown:
 
 ### Creating a New Tenant
 ```bash
-curl -X POST http://localhost:3000/api/v1/admin/tenants \
+curl -X POST http://localhost:3000/api/admin/tenants \
   -H "Authorization: Bearer <super-admin-jwt>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -201,7 +201,7 @@ curl -X POST http://localhost:3000/api/v1/admin/tenants \
 
 ### Switching Tenant Context
 ```bash
-curl -X POST http://localhost:3000/api/v1/admin/switch-tenant/2 \
+curl -X POST http://localhost:3000/api/admin/switch-tenant/2 \
   -H "Authorization: Bearer <super-admin-jwt>"
 ```
 Response includes new JWT:
