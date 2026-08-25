@@ -99,7 +99,8 @@ router.use("/admin", adminRouter);
 router.use("/auth", authRoutesRouter);
 
 // Branding routes — tenant-specific branding and themes
-router.use("/branding", brandingRoutesRouter);
+// TODO: Enable after multer is added to dependencies
+// router.use("/branding", brandingRoutesRouter);
 
 // Configuration routes — tenant settings, feature flags, integrations
 router.use("/configuration", configurationRoutesRouter);
