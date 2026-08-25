@@ -25,23 +25,28 @@ export const TenantSwitcher: React.FC<TenantSwitcherProps> = ({ onTenantSwitch, 
   }
 
   useEffect(() => {
+    // Load tenants on mount
     getMyTenants();
-    getCurrentTenant();
   }, []);
 
-  const getCurrentTenant = async () => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      if (token) {
-        // Decode JWT to get current tenant_id
-        const decoded = JSON.parse(atob(token.split('.')[1]));
-        const tenant = tenants.find((t) => t.id === decoded.tenantId);
-        setCurrentTenant(tenant);
+  // Update current tenant when tenants list changes
+  useEffect(() => {
+    const getCurrentTenant = async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        if (token && tenants.length > 0) {
+          // Decode JWT to get current tenant_id
+          const decoded = JSON.parse(atob(token.split('.')[1]));
+          const tenant = tenants.find((t) => t.id === decoded.tenantId);
+          setCurrentTenant(tenant || tenants[0]);
+        }
+      } catch (error) {
+        console.error('Error getting current tenant:', error);
       }
-    } catch (error) {
-      console.error('Error getting current tenant:', error);
-    }
-  };
+    };
+    
+    getCurrentTenant();
+  }, [tenants]);
 
   const handleSwitchTenant = async (tenantId: number) => {
     try {

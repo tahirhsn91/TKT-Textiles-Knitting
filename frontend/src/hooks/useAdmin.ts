@@ -55,7 +55,7 @@ export const useAdmin = (): UseAdminReturn => {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.get('/api/v1/admin/tenants');
+      const response = await axios.get('/api/admin/tenants');
       setTenants(response.data.tenants);
     } catch (err) {
       console.error('Error fetching tenants:', err);
@@ -70,7 +70,7 @@ export const useAdmin = (): UseAdminReturn => {
   const getTenantDetails = async (tenantId: number): Promise<TenantDetails> => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/v1/admin/tenants/${tenantId}`);
+      const response = await axios.get(`/api/admin/tenants/${tenantId}`);
       return response.data;
     } catch (err) {
       console.error('Error fetching tenant details:', err);
@@ -92,7 +92,7 @@ export const useAdmin = (): UseAdminReturn => {
   }): Promise<Tenant> => {
     try {
       setLoading(true);
-      const response = await axios.post('/api/v1/admin/tenants', data);
+      const response = await axios.post('/api/admin/tenants', data);
       const newTenant = response.data.data;
       setTenants([...tenants, newTenant]);
       return newTenant;
@@ -109,7 +109,7 @@ export const useAdmin = (): UseAdminReturn => {
   const updateTenant = async (tenantId: number, data: any): Promise<Tenant> => {
     try {
       setLoading(true);
-      const response = await axios.put(`/api/v1/admin/tenants/${tenantId}`, data);
+      const response = await axios.put(`/api/admin/tenants/${tenantId}`, data);
       const updated = response.data.data;
       setTenants(tenants.map((t) => (t.id === tenantId ? updated : t)));
       return updated;
@@ -126,7 +126,7 @@ export const useAdmin = (): UseAdminReturn => {
   const updateTenantStatus = async (tenantId: number, status: string): Promise<Tenant> => {
     try {
       setLoading(true);
-      const response = await axios.put(`/api/v1/admin/tenants/${tenantId}/status`, { status });
+      const response = await axios.put(`/api/admin/tenants/${tenantId}/status`, { status });
       const updated = response.data.data;
       setTenants(tenants.map((t) => (t.id === tenantId ? updated : t)));
       return updated;
@@ -143,7 +143,7 @@ export const useAdmin = (): UseAdminReturn => {
   const switchTenant = async (tenantId: number): Promise<{ new_token: string; tenant_name: string }> => {
     try {
       setLoading(true);
-      const response = await axios.post(`/api/v1/admin/switch-tenant/${tenantId}`);
+      const response = await axios.post(`/api/admin/switch-tenant/${tenantId}`);
       setCurrentTenantId(tenantId);
       return {
         new_token: response.data.new_token,
@@ -161,7 +161,7 @@ export const useAdmin = (): UseAdminReturn => {
   // Get tenant stats
   const getTenantStats = async (tenantId: number): Promise<any> => {
     try {
-      const response = await axios.get(`/api/v1/admin/tenants/${tenantId}/stats`);
+      const response = await axios.get(`/api/admin/tenants/${tenantId}/stats`);
       return response.data;
     } catch (err) {
       console.error('Error fetching tenant stats:', err);
@@ -173,7 +173,7 @@ export const useAdmin = (): UseAdminReturn => {
   const getMyTenants = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/v1/admin/my-tenants');
+      const response = await axios.get('/api/admin/my-tenants');
       setTenants(response.data.tenants);
     } catch (err) {
       console.error('Error fetching my tenants:', err);
