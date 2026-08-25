@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { db } from '../db/connection';
+import { db } from '../db/index.js';
 
 /**
  * Super Admin Middleware

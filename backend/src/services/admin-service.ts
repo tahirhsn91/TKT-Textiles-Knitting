@@ -1,7 +1,7 @@
-import { db } from '../db/connection';
-import { tenantService } from './tenant-service';
-import { brandingService } from './branding-service';
-import { configurationService } from './configuration-service';
+import { db } from '../db/index.js';
+import { tenantService } from './tenant-service.js';
+import { brandingService } from './branding-service.js';
+import { configurationService } from './configuration-service.js';
 
 /**
  * Admin Service
