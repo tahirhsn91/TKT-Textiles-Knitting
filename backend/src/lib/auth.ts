@@ -27,6 +27,7 @@ export interface AuthTokenPayload {
   roleId: number;
   role: string;
   isAdmin: boolean;
+  tenantId?: number; // tenant context (optional for backwards compatibility)
 }
 
 export function signToken(payload: AuthTokenPayload): string {

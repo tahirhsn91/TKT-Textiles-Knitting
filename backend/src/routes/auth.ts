@@ -29,6 +29,7 @@ router.post("/login", async (req, res): Promise<void> => {
       roleId: userTable.roleId,
       roleName: roleTable.name,
       isAdmin: roleTable.isAdmin,
+      tenantId: userTable.tenantId,
     })
     .from(userTable)
     .innerJoin(roleTable, eq(userTable.roleId, roleTable.id))
@@ -50,6 +51,7 @@ router.post("/login", async (req, res): Promise<void> => {
     roleId: user.roleId,
     role: user.roleName,
     isAdmin: user.isAdmin,
+    tenantId: user.tenantId,
   });
 
   res.json({
