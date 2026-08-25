@@ -21,7 +21,7 @@ export const requireSuperAdmin = async (req: SuperAdminRequest, res: Response, n
     const user = await db('app_user')
       .join('role', 'app_user.role_id', '=', 'role.id')
       .where({ 'app_user.id': req.userId })
-      .select('app_user.id', 'app_user.email', 'role.name', 'role.is_admin')
+      .select('app_user.id', 'app_user.username', 'role.name', 'role.is_admin')
       .first();
 
     if (!user) {
