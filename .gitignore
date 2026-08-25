@@ -9,6 +9,17 @@ dist/
 .DS_Store
 logs/
 
+# Media files (audio, screenshots, large files)
+audio/
+audio-simple/
+screenshots/
+screenshots-real/
+media/
+demo_video/
+
+# Database backups
+database/_restore_*/
+
 # Graphify knowledge-graph output + ClawHub skill sync metadata — local only
 .graphify/
 graphify-out/
