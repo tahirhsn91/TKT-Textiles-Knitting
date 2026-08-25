@@ -35,7 +35,7 @@ export const tenantMiddleware = (req: TenantRequest, res: Response, next: NextFu
 
     // Attach tenant context to request
     req.tenantId = decoded.tenantId;
-    req.userId = decoded.userId || decoded.id;
+    req.userId = decoded.sub || decoded.userId || decoded.id;
     req.user = decoded;
 
     next();
