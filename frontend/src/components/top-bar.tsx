@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
 import { useChangePassword } from "@/hooks/use-rbac";
 import { useToast } from "@/hooks/use-toast";
+import { TenantSwitcher } from "@/components/TenantSwitcher";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -70,8 +71,11 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
         )}
       </div>
 
-      {/* Right: account dropdown aligned to the top-right corner. */}
-      <div className="flex flex-1 items-center justify-end">
+      {/* Right: tenant switcher (super-admin only) + account dropdown aligned to the top-right corner. */}
+      <div className="flex flex-1 items-center justify-end gap-2">
+        {/* Tenant Switcher - Super Admin Only */}
+        <TenantSwitcher isSuperAdmin={session?.role?.name === 'super-admin'} />
+        
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -101,6 +105,16 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
                 <DropdownMenuItem onSelect={() => setLocation("/settings")}>
                   <Settings className="mr-2 h-4 w-4" />
                   Users &amp; Roles
+                </DropdownMenuItem>
+              </>
+            )}
+
+            {session?.role?.name === 'super-admin' && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setLocation("/admin/tenants")}>
+                  <ShieldCheck className="mr-2 h-4 w-4" />
+                  Tenant Administration
                 </DropdownMenuItem>
               </>
             )}
