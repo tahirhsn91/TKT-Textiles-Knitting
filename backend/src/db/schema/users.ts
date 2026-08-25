@@ -66,6 +66,7 @@ export const userTable = pgTable(
     // Optional link to an employee record; NULL when the user is not an employee.
     employeeId: integer("employee_id").references(() => employeeMasterTable.id),
     isActive: boolean("is_active").notNull().default(true),
+    tenantId: integer("tenant_id").notNull().default(1),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
