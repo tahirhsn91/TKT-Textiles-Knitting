@@ -1,10 +1,10 @@
-import express, { Router } from 'express';
-import { SuperAdminRequest, requireSuperAdmin } from '../middleware/super-admin';
-import { tenantMiddleware, requireTenant, TenantRequest } from '../middleware/tenant-context';
-import { adminService } from '../services/admin-service';
+import express, { Router, type IRouter } from "express";
+import { SuperAdminRequest, requireSuperAdmin } from '../middleware/super-admin.js';
+import { tenantMiddleware, requireTenant, TenantRequest } from '../middleware/tenant-context.js';
+import { adminService } from '../services/admin-service.js';
 import jwt from 'jsonwebtoken';
 
-const router: Router = express.Router();
+const router: IRouter = express.Router();
 
 // Apply tenant middleware to all admin routes
 router.use(tenantMiddleware);
@@ -280,4 +280,4 @@ router.delete('/tenants/:tenantId/admins/:adminUserId', requireSuperAdmin, async
   }
 });
 
-export default router;
+export default router as IRouter;

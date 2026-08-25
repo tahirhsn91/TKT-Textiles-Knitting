@@ -1,4 +1,4 @@
-import { db } from '../db/connection';
+import { db } from '../db/index.js';
 import path from 'path';
 import fs from 'fs/promises';
 
