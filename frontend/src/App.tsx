@@ -34,6 +34,7 @@ const FactoryMaintenancePage = lazyRetry(() => import("@/pages/maintenance/facto
 const AttendancePage = lazyRetry(() => import("@/pages/attendance"));
 const InvoicingPage = lazyRetry(() => import("@/pages/invoicing"));
 const SettingsPage = lazyRetry(() => import("@/pages/settings"));
+const AdminTenantsPage = lazyRetry(() => import("@/pages/admin/tenants"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -119,6 +120,9 @@ function Router() {
           </Route>
           <Route path="/settings">
             <ProtectedRoute moduleId="users"><SettingsPage /></ProtectedRoute>
+          </Route>
+          <Route path="/admin/tenants">
+            <ProtectedRoute><AdminTenantsPage /></ProtectedRoute>
           </Route>
           <Route component={NotFound} />
         </Switch>
