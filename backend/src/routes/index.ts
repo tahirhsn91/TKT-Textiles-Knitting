@@ -21,6 +21,7 @@ import companyInfoRouter from "./company-info.js";
 import invoicingRouter from "./invoicing.js";
 import usersRouter from "./users.js";
 import attendanceRouter from "./attendance.js";
+import adminRouter from "./admin-routes.js";
 
 const router: IRouter = Router();
 
@@ -87,5 +88,8 @@ router.use("/users", usersRouter);
 // Attendance — lives under Daily Operations and feeds payroll.
 router.use("/attendance", requirePermission("dailyProduction"));
 router.use(attendanceRouter);
+
+// Admin routes — super-admin only (requireSuperAdmin is enforced inside admin-routes.ts)
+router.use("/admin", adminRouter);
 
 export default router;
