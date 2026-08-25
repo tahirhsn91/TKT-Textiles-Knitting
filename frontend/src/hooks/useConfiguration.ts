@@ -90,10 +90,10 @@ export const useConfiguration = (): UseConfigurationReturn => {
 
       // Fetch in parallel
       const [settingsRes, featuresRes, integrationsRes, summaryRes] = await Promise.all([
-        axios.get('/api/v1/configuration/settings'),
-        axios.get('/api/v1/configuration/features'),
-        axios.get('/api/v1/configuration/integrations'),
-        axios.get('/api/v1/configuration/summary'),
+        axios.get('/api/configuration/settings'),
+        axios.get('/api/configuration/features'),
+        axios.get('/api/configuration/integrations'),
+        axios.get('/api/configuration/summary'),
       ]);
 
       setSettings(settingsRes.data);
@@ -111,7 +111,7 @@ export const useConfiguration = (): UseConfigurationReturn => {
   const updateSettings = async (newSettings: Partial<TenantSettings>) => {
     try {
       setLoading(true);
-      const response = await axios.put('/api/v1/configuration/settings', newSettings);
+      const response = await axios.put('/api/configuration/settings', newSettings);
       setSettings(response.data.data);
     } catch (err) {
       console.error('Error updating settings:', err);
@@ -125,7 +125,7 @@ export const useConfiguration = (): UseConfigurationReturn => {
   const toggleFeature = async (featureKey: string, isEnabled: boolean) => {
     try {
       setLoading(true);
-      const response = await axios.put(`/api/v1/configuration/features/${featureKey}`, {
+      const response = await axios.put(`/api/configuration/features/${featureKey}`, {
         is_enabled: isEnabled,
       });
 
@@ -145,7 +145,7 @@ export const useConfiguration = (): UseConfigurationReturn => {
   const updateIntegration = async (integrationKey: string, config: any) => {
     try {
       setLoading(true);
-      const response = await axios.put(`/api/v1/configuration/integrations/${integrationKey}`, config);
+      const response = await axios.put(`/api/configuration/integrations/${integrationKey}`, config);
 
       // Update integrations list
       setIntegrations((prev) =>

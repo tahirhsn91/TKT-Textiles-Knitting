@@ -90,7 +90,7 @@ export const useBranding = (): UseBrandingReturn => {
       setLoading(true);
       setError(null);
 
-      const response = await axios.get('/api/v1/branding/package');
+      const response = await axios.get('/api/branding/package');
       setBranding(response.data);
 
       // Update favicon if provided
@@ -113,7 +113,7 @@ export const useBranding = (): UseBrandingReturn => {
   const updateBranding = async (config: Partial<BrandingConfig>) => {
     try {
       setLoading(true);
-      await axios.put('/api/v1/branding/config', config);
+      await axios.put('/api/branding/config', config);
       await fetchBranding();
     } catch (err) {
       console.error('Error updating branding:', err);
@@ -127,7 +127,7 @@ export const useBranding = (): UseBrandingReturn => {
   const applyTheme = async (presetKey: string) => {
     try {
       setLoading(true);
-      await axios.post(`/api/v1/branding/themes/apply/${presetKey}`);
+      await axios.post(`/api/branding/themes/apply/${presetKey}`);
       await fetchBranding();
     } catch (err) {
       console.error('Error applying theme:', err);
@@ -145,7 +145,7 @@ export const useBranding = (): UseBrandingReturn => {
       formData.append('logo', file);
       formData.append('logoType', 'primary');
 
-      await axios.post('/api/v1/branding/logo', formData, {
+      await axios.post('/api/branding/logo', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
