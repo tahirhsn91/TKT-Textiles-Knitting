@@ -31,7 +31,6 @@ import {
   getListTransactionsQueryKey
 } from "@workspace/api-client-react";
 
-import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
@@ -641,7 +640,7 @@ export default function TransactionForm() {
   // message with a back action instead.
   if (isEditing && isErrorTx) {
     return (
-      <Layout>
+      <>
         <div className="flex flex-col items-center gap-3 p-8 text-center">
           <p className="text-destructive">Couldn't load this transaction.</p>
           <Button variant="outline" onClick={() => setLocation("/transactions")}>
@@ -649,22 +648,22 @@ export default function TransactionForm() {
             Back to transactions
           </Button>
         </div>
-      </Layout>
+      </>
     );
   }
 
   if (isEditing && isLoadingTx) {
     return (
-      <Layout>
+      <>
         <div className="flex items-center justify-center gap-2 p-8 text-center text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading…
         </div>
-      </Layout>
+      </>
     );
   }
 
   return (
-    <Layout>
+    <>
       <div className="flex flex-col gap-6 pb-20">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" onClick={() => setLocation("/transactions")}>
@@ -1537,6 +1536,6 @@ export default function TransactionForm() {
           </form>
         </Form>
       </div>
-    </Layout>
+    </>
   );
 }

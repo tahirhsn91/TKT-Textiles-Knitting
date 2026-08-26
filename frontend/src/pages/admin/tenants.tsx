@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/auth-context";
 import { useAdmin } from "@/hooks/useAdmin";
 import { useTenantUsage } from "@/hooks/useTenantUsage";
-import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -138,7 +137,7 @@ export default function AdminTenantsPage() {
 
   if (!isSuperAdmin) {
     return (
-      <Layout>
+      <>
         <div className="flex h-screen items-center justify-center">
           <Card className="w-full max-w-md">
             <CardHeader>
@@ -151,7 +150,7 @@ export default function AdminTenantsPage() {
             </CardContent>
           </Card>
         </div>
-      </Layout>
+      </>
     );
   }
 
@@ -188,7 +187,7 @@ export default function AdminTenantsPage() {
   };
 
   return (
-    <Layout>
+    <>
       <div className="space-y-6 p-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -557,6 +556,6 @@ export default function AdminTenantsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Layout>
+    </>
   );
 }

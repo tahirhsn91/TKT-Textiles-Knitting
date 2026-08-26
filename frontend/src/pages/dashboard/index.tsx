@@ -7,7 +7,6 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -450,7 +449,7 @@ export default function DashboardPage() {
   const { data: kpis } = useWidget<Kpis>("kpis");
 
   return (
-    <Layout>
+    <>
       <div className="space-y-6">
         <header className="border-b pb-5">
           <p className="eyebrow">Knitting operations</p>
@@ -479,6 +478,6 @@ export default function DashboardPage() {
 
         <EmployeeOutputWidget />
       </div>
-    </Layout>
+    </>
   );
 }

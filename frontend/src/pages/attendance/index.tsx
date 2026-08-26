@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Save, Lock, CalendarDays, Users, Sun } from "lucide-react";
-import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -280,17 +279,17 @@ export default function AttendancePage() {
 
   if (isLoading) {
     return (
-      <Layout>
+      <>
         <div className="flex flex-col gap-4">
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-64 w-full" />
         </div>
-      </Layout>
+      </>
     );
   }
 
   return (
-    <Layout>
+    <>
       <div className="flex flex-col gap-4 pb-32 md:pb-0">
         {/* Header with period context */}
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -555,6 +554,6 @@ export default function AttendancePage() {
           </div>
         </div>
       </div>
-    </Layout>
+    </>
   );
 }

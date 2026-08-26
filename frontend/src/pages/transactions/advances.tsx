@@ -1,7 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
-import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
@@ -182,7 +181,7 @@ export default function AdvancesPage() {
   }
 
   return (
-    <Layout>
+    <>
       <div className="flex flex-col gap-6">
         <header className="border-b pb-5">
           <p className="eyebrow">Payroll</p>
@@ -402,6 +401,6 @@ export default function AdvancesPage() {
           </Card>
         </div>
       </div>
-    </Layout>
+    </>
   );
 }

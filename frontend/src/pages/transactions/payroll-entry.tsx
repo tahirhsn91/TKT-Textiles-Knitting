@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Save, Check, ChevronsUpDown, Eye } from "lucide-react";
-import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -732,17 +731,17 @@ export default function PayrollEntryPage() {
 
   if (isEdit && loadingEntry) {
     return (
-      <Layout>
+      <>
         <div className="flex flex-col gap-4">
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-64 w-full" />
         </div>
-      </Layout>
+      </>
     );
   }
 
   return (
-    <Layout>
+    <>
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/transactions/monthly-salary-entry")}>
@@ -1084,7 +1083,7 @@ export default function PayrollEntryPage() {
         year={(parseInt(year) || 0).toString()}
         onClose={() => setOperatorDetail(null)}
       />
-    </Layout>
+    </>
   );
 }
 

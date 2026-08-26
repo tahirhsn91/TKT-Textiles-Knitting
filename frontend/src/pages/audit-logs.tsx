@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { useAuditLogs } from "@/hooks/useAuditLogs";
-import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,7 +51,7 @@ export default function AuditLogsPage() {
   const rows = result?.rows ?? [];
 
   return (
-    <Layout>
+    <>
       <div className="space-y-4 p-4 sm:space-y-6 sm:p-6">
         <div className="flex items-center justify-between">
           <div>
@@ -180,6 +179,6 @@ export default function AuditLogsPage() {
           </CardContent>
         </Card>
       </div>
-    </Layout>
+    </>
   );
 }

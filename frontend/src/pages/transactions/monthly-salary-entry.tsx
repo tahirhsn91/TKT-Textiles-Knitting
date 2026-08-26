@@ -4,7 +4,6 @@ import { useLocation, useSearch } from "wouter";
 import type jsPDF from "jspdf";
 import type autoTable from "jspdf-autotable";
 import { Trash2, Download, PlusCircle, Pencil, Lock, Unlock } from "lucide-react";
-import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
@@ -786,7 +785,7 @@ function PayrollSummaryTab() {
 
 export default function PayrollMaintenancePage() {
   return (
-    <Layout>
+    <>
       <div className="flex flex-col gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Payroll Maintenance</h1>
@@ -805,6 +804,6 @@ export default function PayrollMaintenancePage() {
           </TabsContent>
         </Tabs>
       </div>
-    </Layout>
+    </>
   );
 }
