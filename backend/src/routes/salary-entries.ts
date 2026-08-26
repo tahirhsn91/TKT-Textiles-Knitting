@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and, inArray, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { isUniqueViolation } from "../lib/db-errors.js";
+import { activeTenantId } from "../middleware/tenant-context.js";
 import {
   salaryHeaderTable,
   salaryDetailTable,
@@ -29,13 +30,10 @@ function toNum(val: unknown): number {
 // ─── List headers ─────────────────────────────────────────────────────────────
 
 router.get("/salary-entries", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const { month, year, departmentId } = req.query as Record<string, string | undefined>;
 
-  // Push the filters into SQL instead of loading every header ever saved and
-  // filtering in JS (the list screen would otherwise grow unbounded). The
-  // `sql false` branches preserve the old in-memory behaviour for malformed
-  // query params: a NaN month/year (or an unknown department) matched nothing.
-  const conditions = [];
+  const conditions = [eq(salaryHeaderTable.tenantId, tenantId)];
   if (month) {
     const m = parseInt(month, 10);
     conditions.push(Number.isNaN(m) ? sql`false` : eq(salaryHeaderTable.month, m));
@@ -46,17 +44,16 @@ router.get("/salary-entries", async (req, res): Promise<void> => {
   }
   if (departmentId) {
     const did = parseInt(departmentId, 10);
-    // department_ids is an int[] column; @> is the "array contains" test.
     conditions.push(Number.isNaN(did) ? sql`false` : sql`${salaryHeaderTable.departmentIds} @> ARRAY[${did}]::int[]`);
   }
 
   const headers = await db
     .select()
     .from(salaryHeaderTable)
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .where(and(...conditions))
     .orderBy(salaryHeaderTable.year, salaryHeaderTable.month);
 
-  const depts = await db.select().from(departmentMasterTable);
+  const depts = await db.select().from(departmentMasterTable).where(eq(departmentMasterTable.tenantId, tenantId));
   const deptMap = Object.fromEntries(depts.map((d) => [d.id, d.name]));
 
   const result = headers.map((h) => ({
@@ -82,6 +79,7 @@ router.get("/salary-entries/operator-production", async (req, res): Promise<void
     res.status(400).json({ error: "month and year are required" });
     return;
   }
+  const tenantId = activeTenantId(req);
   const m = parseInt(month);
   const y = parseInt(year);
   const dateFrom = `${y}-${String(m).padStart(2, "0")}-01`;
@@ -92,11 +90,11 @@ router.get("/salary-entries/operator-production", async (req, res): Promise<void
   const [fabricProd] = await db
     .select()
     .from(transactionTypeMasterTable)
-    .where(eq(transactionTypeMasterTable.code, "Fabric_Production"));
+    .where(and(eq(transactionTypeMasterTable.code, "Fabric_Production"), eq(transactionTypeMasterTable.tenantId, tenantId)));
   const [operatorDept] = await db
     .select()
     .from(departmentMasterTable)
-    .where(eq(departmentMasterTable.code, "0002"));
+    .where(and(eq(departmentMasterTable.code, "0002"), eq(departmentMasterTable.tenantId, tenantId)));
   if (!fabricProd || !operatorDept) {
     res.status(500).json({ error: "Fabric Production type or Operator department is not configured" });
     return;
@@ -106,7 +104,7 @@ router.get("/salary-entries/operator-production", async (req, res): Promise<void
   const operators = await db
     .select({ id: employeeMasterTable.id, name: employeeMasterTable.name, baseSalary: employeeMasterTable.baseSalary })
     .from(employeeMasterTable)
-    .where(eq(employeeMasterTable.departmentId, operatorDept.id));
+    .where(and(eq(employeeMasterTable.departmentId, operatorDept.id), eq(employeeMasterTable.tenantId, tenantId)));
 
   // Fabric Production headers within the selected month.
   const headers = await db
@@ -116,7 +114,8 @@ router.get("/salary-entries/operator-production", async (req, res): Promise<void
       and(
         eq(transactionHeaderTable.transactionTypeId, fabricProd.id),
         gte(transactionHeaderTable.date, dateFrom),
-        lte(transactionHeaderTable.date, dateTo)
+        lte(transactionHeaderTable.date, dateTo),
+        eq(transactionHeaderTable.tenantId, tenantId),
       )
     );
   const headerIds = headers.map((h) => h.id);
@@ -125,7 +124,8 @@ router.get("/salary-entries/operator-production", async (req, res): Promise<void
   // Machine making rates (netWt × makingRate per row).
   const machines = await db
     .select()
-    .from(machineMasterTable);
+    .from(machineMasterTable)
+    .where(eq(machineMasterTable.tenantId, tenantId));
   const rateByMachineId = new Map(machines.map((mc) => [mc.id, toNum(mc.makingRate)]));
   const nameByMachineId = new Map(machines.map((mc) => [mc.id, mc.name ?? mc.machineNumber]));
 
@@ -134,7 +134,7 @@ router.get("/salary-entries/operator-production", async (req, res): Promise<void
     ? await db
         .select()
         .from(transactionDetailTable)
-        .where(inArray(transactionDetailTable.headerId, headerIds))
+        .where(and(inArray(transactionDetailTable.headerId, headerIds), eq(transactionDetailTable.tenantId, tenantId)))
     : [];
 
   // Daily breakdown keyed by employeeId -> date -> { sum, machines[] }.
@@ -193,19 +193,20 @@ router.get("/salary-entries/operator-production", async (req, res): Promise<void
 // ─── Get one header + details ──────────────────────────────────────────────────
 
 router.get("/salary-entries/:id", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  const [header] = await db.select().from(salaryHeaderTable).where(eq(salaryHeaderTable.id, id));
+  const [header] = await db.select().from(salaryHeaderTable).where(and(eq(salaryHeaderTable.id, id), eq(salaryHeaderTable.tenantId, tenantId)));
   if (!header) { res.status(404).json({ error: "Not found" }); return; }
 
   const details = await db
     .select()
     .from(salaryDetailTable)
-    .where(eq(salaryDetailTable.headerId, id))
+    .where(and(eq(salaryDetailTable.headerId, id), eq(salaryDetailTable.tenantId, tenantId)))
     .orderBy(salaryDetailTable.employeeName);
 
-  const depts = await db.select().from(departmentMasterTable);
+  const depts = await db.select().from(departmentMasterTable).where(eq(departmentMasterTable.tenantId, tenantId));
   const deptMap = Object.fromEntries(depts.map((d) => [d.id, d.name]));
 
   res.json({
@@ -254,6 +255,7 @@ router.post("/salary-entries", async (req, res): Promise<void> => {
   }
 
   const employeeIds = details.map((d) => d.employeeId);
+  const tenantId = activeTenantId(req);
 
   // Enforce DB-level uniqueness inside a single transaction so two concurrent
   // saves for the same employees can't both pass the app-level check. If a
@@ -269,7 +271,8 @@ router.post("/salary-entries", async (req, res): Promise<void> => {
           and(
             eq(salaryDetailTable.month, month),
             eq(salaryDetailTable.year, year),
-            inArray(salaryDetailTable.employeeId, employeeIds)
+            inArray(salaryDetailTable.employeeId, employeeIds),
+            eq(salaryDetailTable.tenantId, tenantId),
           )
         );
 
@@ -277,18 +280,19 @@ router.post("/salary-entries", async (req, res): Promise<void> => {
         const ops = await tx
           .select({ id: employeeMasterTable.id, name: employeeMasterTable.name })
           .from(employeeMasterTable)
-          .where(inArray(employeeMasterTable.id, existingDetails.map((e) => e.employeeId)));
+          .where(and(inArray(employeeMasterTable.id, existingDetails.map((e) => e.employeeId)), eq(employeeMasterTable.tenantId, tenantId)));
         const names = ops.map((o) => o.name).join(", ");
         return { conflict: `Duplicate: salary already entered for ${names} in ${month}/${year}` } as const;
       }
 
       const [header] = await tx
         .insert(salaryHeaderTable)
-        .values({ month, year, departmentIds, posted: false })
+        .values({ month, year, departmentIds, posted: false, tenantId })
         .returning();
 
       const detailRows = details.map((d) => ({
         headerId: header.id,
+        tenantId,
         employeeId: d.employeeId,
         month,
         year,
@@ -331,7 +335,8 @@ router.post("/salary-entries", async (req, res): Promise<void> => {
           and(
             eq(salaryDetailTable.month, month),
             eq(salaryDetailTable.year, year),
-            inArray(salaryDetailTable.employeeId, employeeIds)
+            inArray(salaryDetailTable.employeeId, employeeIds),
+            eq(salaryDetailTable.tenantId, tenantId),
           )
         );
       const ops =
@@ -339,7 +344,7 @@ router.post("/salary-entries", async (req, res): Promise<void> => {
           ? await db
               .select({ id: employeeMasterTable.id, name: employeeMasterTable.name })
               .from(employeeMasterTable)
-              .where(inArray(employeeMasterTable.id, conflictRows.map((e) => e.employeeId)))
+              .where(and(inArray(employeeMasterTable.id, conflictRows.map((e) => e.employeeId)), eq(employeeMasterTable.tenantId, tenantId)))
           : [];
       const conflicting = ops.map((o) => o.name).join(", ") || "this employee(s)";
       res.status(409).json({ error: `Duplicate: salary already entered for ${conflicting} in ${month}/${year}` });
@@ -352,10 +357,11 @@ router.post("/salary-entries", async (req, res): Promise<void> => {
 // ─── Update header + details ───────────────────────────────────────────────────
 
 router.put("/salary-entries/:id", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  const [existing] = await db.select().from(salaryHeaderTable).where(eq(salaryHeaderTable.id, id));
+  const [existing] = await db.select().from(salaryHeaderTable).where(and(eq(salaryHeaderTable.id, id), eq(salaryHeaderTable.tenantId, tenantId)));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (existing.posted) { res.status(409).json({ error: "Cannot edit a posted record. Un-post it first." }); return; }
 
@@ -400,7 +406,8 @@ router.put("/salary-entries/:id", async (req, res): Promise<void> => {
       and(
         eq(salaryDetailTable.month, month),
         eq(salaryDetailTable.year, year),
-        inArray(salaryDetailTable.employeeId, employeeIds)
+        inArray(salaryDetailTable.employeeId, employeeIds),
+        eq(salaryDetailTable.tenantId, tenantId),
       )
     );
 
@@ -409,7 +416,7 @@ router.put("/salary-entries/:id", async (req, res): Promise<void> => {
     const ops = await db
       .select({ id: employeeMasterTable.id, name: employeeMasterTable.name })
       .from(employeeMasterTable)
-      .where(inArray(employeeMasterTable.id, conflicts.map((e) => e.employeeId)));
+      .where(and(inArray(employeeMasterTable.id, conflicts.map((e) => e.employeeId)), eq(employeeMasterTable.tenantId, tenantId)));
     const names = ops.map((o) => o.name).join(", ");
     res.status(409).json({ error: `Duplicate: salary already entered for ${names} in ${month}/${year}` });
     return;
@@ -418,14 +425,15 @@ router.put("/salary-entries/:id", async (req, res): Promise<void> => {
   const [updated] = await db
     .update(salaryHeaderTable)
     .set({ month, year, departmentIds, updatedAt: new Date() })
-    .where(eq(salaryHeaderTable.id, id))
+    .where(and(eq(salaryHeaderTable.id, id), eq(salaryHeaderTable.tenantId, tenantId)))
     .returning();
 
   // Delete existing details and re-insert
-  await db.delete(salaryDetailTable).where(eq(salaryDetailTable.headerId, id));
+  await db.delete(salaryDetailTable).where(and(eq(salaryDetailTable.headerId, id), eq(salaryDetailTable.tenantId, tenantId)));
 
   const detailRows = details.map((d) => ({
     headerId: id,
+    tenantId,
     employeeId: d.employeeId,
     month,
     year,
@@ -458,27 +466,29 @@ router.put("/salary-entries/:id", async (req, res): Promise<void> => {
 // ─── Delete header (cascades to details) ─────────────────────────────────────
 
 router.delete("/salary-entries/:id", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  const [existing] = await db.select().from(salaryHeaderTable).where(eq(salaryHeaderTable.id, id));
+  const [existing] = await db.select().from(salaryHeaderTable).where(and(eq(salaryHeaderTable.id, id), eq(salaryHeaderTable.tenantId, tenantId)));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (existing.posted) { res.status(409).json({ error: "Cannot delete a posted record. Un-post it first." }); return; }
 
-  await db.delete(salaryHeaderTable).where(eq(salaryHeaderTable.id, id));
+  await db.delete(salaryHeaderTable).where(and(eq(salaryHeaderTable.id, id), eq(salaryHeaderTable.tenantId, tenantId)));
   res.sendStatus(204);
 });
 
 // ─── Post ─────────────────────────────────────────────────────────────────────
 
 router.post("/salary-entries/:id/post", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const [row] = await db
     .update(salaryHeaderTable)
     .set({ posted: true, updatedAt: new Date() })
-    .where(eq(salaryHeaderTable.id, id))
+    .where(and(eq(salaryHeaderTable.id, id), eq(salaryHeaderTable.tenantId, tenantId)))
     .returning();
 
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
@@ -488,13 +498,14 @@ router.post("/salary-entries/:id/post", async (req, res): Promise<void> => {
 // ─── Unpost ───────────────────────────────────────────────────────────────────
 
 router.post("/salary-entries/:id/unpost", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const [row] = await db
     .update(salaryHeaderTable)
     .set({ posted: false, updatedAt: new Date() })
-    .where(eq(salaryHeaderTable.id, id))
+    .where(and(eq(salaryHeaderTable.id, id), eq(salaryHeaderTable.tenantId, tenantId)))
     .returning();
 
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
