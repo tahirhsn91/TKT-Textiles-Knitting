@@ -24,6 +24,7 @@ export interface BrandColors {
   sidebarText?: string | null;
   fontFamily?: string | null;
   borderRadius?: number | null;
+  buttonStyle?: string | null;
 }
 
 /** Convert a #rrggbb / #rgb hex to an HSL triplet string "H S% L%". */
@@ -147,6 +148,18 @@ export function buildThemeOverrides(colors: BrandColors): string {
   if (colors.fontFamily && colors.fontFamily !== ",") {
     set("--app-font-sans", colors.fontFamily);
     set("--brand-font", colors.fontFamily);
+  }
+  // Button style -> border-radius token consumed by <Button>. 'rounded'
+  // matches the app's current default (rounded-md), square is tighter, pill is
+  // full radius (issue #219 1.2).
+  if (colors.buttonStyle) {
+    const radius =
+      colors.buttonStyle === "pill" ? "999px"
+      : colors.buttonStyle === "square" ? "2px"
+      : "calc(var(--radius) - 2px)"; // rounded (default)
+    set("--brand-button-radius", radius);
+  } else {
+    set("--brand-button-radius", "calc(var(--radius) - 2px)");
   }
 
   // A dark primary or background should also carry a coherent dark theme, so

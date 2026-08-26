@@ -135,6 +135,7 @@ export const useBranding = (enabled = true): UseBrandingReturn => {
         sidebarText: data.config?.sidebar_text_color,
         fontFamily: data.config?.font_family,
         borderRadius: data.config?.border_radius,
+        buttonStyle: data.config?.button_style,
       });
       if (data.config?.company_name) document.title = data.config.company_name;
       updateFavicon(data.config?.favicon_url);
