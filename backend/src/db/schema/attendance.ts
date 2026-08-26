@@ -11,6 +11,7 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { employeeMasterTable } from "./lookups.js";
+import { tenantTable } from "./tenants.js";
 
 // ─── Attendance ────────────────────────────────────────────────────────────
 // One row per employee per calendar day, marking presence (present = true) or
@@ -26,6 +27,7 @@ import { employeeMasterTable } from "./lookups.js";
 export const attendanceTable = pgTable(
   "attendance",
   {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
     id: serial("id").primaryKey(),
     employeeId: integer("employee_id")
       .notNull()

@@ -1,15 +1,8 @@
-import {
-  pgTable,
-  serial,
-  date,
-  text,
-  timestamp,
-  check,
-  index,
-} from "drizzle-orm/pg-core";
+import {pgTable, serial, date, text, timestamp, check, index, integer} from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { tenantTable } from "./tenants.js";
 
 // ─── Factory Maintenance ───────────────────────────────────────────────────
 // One row per factory (site) maintenance job. History-only (issue #109): no
@@ -18,6 +11,7 @@ import { z } from "zod/v4";
 // but stored as-is so a future change to that list never orphans history.
 // Soft-delete via `status` keeps records with an undo path.
 export const factoryMaintenanceTable = pgTable("factory_maintenance", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   maintenanceDate: date("maintenance_date").notNull(),
   category: text("category").notNull().default("Other"),

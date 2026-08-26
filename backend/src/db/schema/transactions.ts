@@ -22,8 +22,10 @@ import {
   fabricTypeMasterTable,
   employeeMasterTable,
 } from "./lookups.js";
+import { tenantTable } from "./tenants.js";
 
 export const transactionHeaderTable = pgTable("transaction_header", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   transactionTypeId: integer("transaction_type_id")
     .notNull()
@@ -55,6 +57,7 @@ export type InsertTransactionHeader = z.infer<typeof insertTransactionHeaderSche
 export type TransactionHeader = typeof transactionHeaderTable.$inferSelect;
 
 export const transactionDetailTable = pgTable("transaction_detail", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   headerId: integer("header_id")
     .notNull()

@@ -79,6 +79,7 @@ test("fbrScenarioId: SN001 for registered, SN002 for unregistered", () => {
 const baseCompany = {
   id: 1,
   name: "TKT Textiles",
+  tenantId: 1,
   ntnCnic: "1234567",
   province: "Punjab",
   address: "Faisalabad",
@@ -94,6 +95,7 @@ const baseInvoice = {
   invoiceDate: "2026-08-12",
   companyId: 1,
   partyId: 7,
+  tenantId: 1,
   status: "draft" as const,
   origin: "fbr" as const,
   dueDays: null,
@@ -113,6 +115,7 @@ const baseItems = [
   {
     id: 1,
     invoiceId: 42,
+    tenantId: 1,
     yarnTypeId: 20,
     yarnCountId: null,
     hsCode: "6001.2100",
