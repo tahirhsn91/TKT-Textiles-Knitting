@@ -473,11 +473,14 @@ export function Layout({ children }: { children: ReactNode }) {
         <main className="flex-1 p-4 pb-20 md:p-8 md:pb-8 w-full max-w-7xl mx-auto print:p-0 print:max-w-none">
           {children}
         </main>
-
-        {/* ── Mobile bottom navigation — a fixed tab bar so the four most-used
-               screens are a thumb-tap away (hidden on desktop / print). ── */}
-        <BottomNav location={location} can={can} />
       </div>
+
+      {/* ── Mobile bottom navigation — a fixed tab bar so the four most-used
+             screens are a thumb-tap away (hidden on desktop / print). Rendered
+             as a direct child of the app root (NOT inside the content column
+             which carries a margin transition) so nothing can affect its
+             viewport-fixed positioning. ── */}
+      <BottomNav location={location} can={can} />
     </div>
   );
 }
