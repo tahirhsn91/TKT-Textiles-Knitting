@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Response } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db } from "../db/index.js";
 import {
@@ -37,6 +37,7 @@ import {
 } from "../lib/factory-defaults.js";
 import { machineHistoryValues } from "../lib/machine-history.js";
 import { addMasterCrud } from "../lib/master-crud.js";
+import { activeTenantId } from "../middleware/tenant-context.js";
 
 const router: IRouter = Router();
 
@@ -104,7 +105,7 @@ addMasterCrud(router, {
     return { name, code, partyId: partyId ?? null };
   },
   uniqueError: "Code already exists for this party",
-  listQuery: async () =>
+  listQuery: async (req) =>
     db
       .select({
         id: jobMasterTable.id,
@@ -115,8 +116,9 @@ addMasterCrud(router, {
       })
       .from(jobMasterTable)
       .leftJoin(partyMasterTable, eq(jobMasterTable.partyId, partyMasterTable.id))
+      .where(eq(jobMasterTable.tenantId, activeTenantId(req)))
       .orderBy(partyMasterTable.name, jobMasterTable.name),
-  fetchOne: async (id) => {
+  fetchOne: async (id, req) => {
     const [row] = await db
       .select({
         id: jobMasterTable.id,
@@ -127,7 +129,9 @@ addMasterCrud(router, {
       })
       .from(jobMasterTable)
       .leftJoin(partyMasterTable, eq(jobMasterTable.partyId, partyMasterTable.id))
-      .where(eq(jobMasterTable.id, id));
+      .where(
+        sql`(${jobMasterTable.id}) = ${id} AND (${jobMasterTable.tenantId}) = ${activeTenantId(req)}`,
+      );
     return row;
   },
 });

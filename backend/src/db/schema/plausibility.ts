@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { tenantTable } from "./tenants.js";
 
 // ─── Plausibility Baseline ─────────────────────────────────────────────────
 // The learned "memory" of the self-tuning validator. One row per
@@ -22,6 +23,7 @@ import { z } from "zod/v4";
 // stddev would be poisoned by them. Median-based bounds ignore those rows, so
 // the validator is correct from day one without cleaning the data first.
 export const plausibilityBaselineTable = pgTable("plausibility_baseline", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   // "production" | "receipt" | "delivery"
   operation: text("operation").notNull(),
@@ -51,6 +53,7 @@ export type PlausibilityBaseline = typeof plausibilityBaselineTable.$inferSelect
 // "corrected" (they changed it). Retraining reads this to down-weight values
 // operators repeatedly corrected and to keep values they stood behind.
 export const plausibilityFeedbackTable = pgTable("plausibility_feedback", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   operation: text("operation").notNull(),
   field: text("field").notNull(),

@@ -12,6 +12,7 @@ import {
 import { isReconciliationLockEnabled } from "../lib/reconciliation-lock.js";
 import { validateBody } from "../lib/validate.js";
 import { retrainAfterInsert } from "../lib/plausibility/engine.js";
+import { activeTenantId } from "../middleware/tenant-context.js";
 
 const router: IRouter = Router();
 
@@ -74,6 +75,7 @@ function clampInt(value: unknown, fallback: number, min: number, max: number): n
  */
 async function reconciliationBlock(
   id: number,
+  tenantId: number,
 ): Promise<{ error: string; reconciledTransactionId: number | null } | null> {
   if (!(await isReconciliationLockEnabled())) return null;
 
@@ -83,7 +85,7 @@ async function reconciliationBlock(
       reconciledTransactionId: dailyProductionHeaderTable.reconciledTransactionId,
     })
     .from(dailyProductionHeaderTable)
-    .where(eq(dailyProductionHeaderTable.id, id));
+    .where(and(eq(dailyProductionHeaderTable.id, id), eq(dailyProductionHeaderTable.tenantId, tenantId)));
 
   if (!row || !row.reconciled) return null;
 
@@ -113,23 +115,20 @@ async function reconciliationBlock(
 // functionally dependent on that key, so they do have to be grouped.
 
 router.get("/daily-production", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const date = typeof req.query.date === "string" && req.query.date ? req.query.date : todayIso();
 
-  // Pagination (issue #16): bound the response so a long history of headers can't
-  // grow unbounded. Defaults keep the existing behaviour for a single day, and
-  // the frontend can use page/limit/total/totalPages for controls later.
   const page = clampInt(req.query.page, 1, 1, 1_000_000);
   const limit = clampInt(req.query.limit, 100, 1, 500);
   const offset = (page - 1) * limit;
 
-  // Total number of matching headers, for pagination math. The month-to-date
-  // aggregates are over the whole month, so they're intentionally NOT limited.
   const [totalRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(dailyProductionHeaderTable)
     .where(and(
       eq(dailyProductionHeaderTable.productionDate, date),
       eq(dailyProductionHeaderTable.status, "submitted"),
+      eq(dailyProductionHeaderTable.tenantId, tenantId),
     ));
   const total = totalRow?.count ?? 0;
 
@@ -162,6 +161,7 @@ router.get("/daily-production", async (req, res): Promise<void> => {
     .where(and(
       eq(dailyProductionHeaderTable.productionDate, date),
       eq(dailyProductionHeaderTable.status, "submitted"),
+      eq(dailyProductionHeaderTable.tenantId, tenantId),
     ))
     .groupBy(
       dailyProductionHeaderTable.id,
@@ -189,6 +189,7 @@ router.get("/daily-production", async (req, res): Promise<void> => {
       gte(dailyProductionHeaderTable.productionDate, monthStart),
       lte(dailyProductionHeaderTable.productionDate, date),
       eq(dailyProductionHeaderTable.status, "submitted"),
+      eq(dailyProductionHeaderTable.tenantId, tenantId),
     ));
 
   res.json({
@@ -214,6 +215,7 @@ router.get("/daily-production", async (req, res): Promise<void> => {
 // "unreconciled" would otherwise be parsed as an id.
 
 router.get("/daily-production/unreconciled", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const date = typeof req.query.date === "string" ? req.query.date : "";
   const partyId = parseInt(String(req.query.partyId ?? ""), 10);
 
@@ -246,6 +248,7 @@ router.get("/daily-production/unreconciled", async (req, res): Promise<void> => 
       eq(dailyProductionHeaderTable.partyId, partyId),
       eq(dailyProductionHeaderTable.status, "submitted"),
       eq(dailyProductionHeaderTable.reconciled, false),
+      eq(dailyProductionHeaderTable.tenantId, tenantId),
     ))
     .groupBy(
       dailyProductionHeaderTable.id,
@@ -265,18 +268,19 @@ router.get("/daily-production/unreconciled", async (req, res): Promise<void> => 
 router.get("/daily-production/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (id == null) { res.status(400).json({ error: "Invalid id" }); return; }
+  const tenantId = activeTenantId(req);
 
   const [header] = await db
     .select()
     .from(dailyProductionHeaderTable)
-    .where(eq(dailyProductionHeaderTable.id, id));
+    .where(and(eq(dailyProductionHeaderTable.id, id), eq(dailyProductionHeaderTable.tenantId, tenantId)));
 
   if (!header) { res.status(404).json({ error: "Daily production entry not found" }); return; }
 
   const rolls = await db
     .select()
     .from(dailyProductionDetailTable)
-    .where(eq(dailyProductionDetailTable.headerId, id))
+    .where(and(eq(dailyProductionDetailTable.headerId, id), eq(dailyProductionDetailTable.tenantId, tenantId)))
     .orderBy(dailyProductionDetailTable.rollNumber);
 
   res.json({ ...header, rolls });
@@ -288,13 +292,14 @@ router.get("/daily-production/:id", async (req, res): Promise<void> => {
 // simply keeps the modal open and fires it again for the next batch.
 
 router.post("/daily-production", validateBody(createSchema), async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const { rolls, ...headerData } = req.body as unknown as z.infer<typeof createSchema>;
 
   try {
     const result = await db.transaction(async (tx) => {
       const [header] = await tx
         .insert(dailyProductionHeaderTable)
-        .values({ ...headerData, remarks: headerData.remarks || null })
+        .values({ ...headerData, remarks: headerData.remarks || null, tenantId })
         .returning();
 
       const detailRows = await tx
@@ -302,6 +307,7 @@ router.post("/daily-production", validateBody(createSchema), async (req, res): P
         .values(
           rolls.map((r, i) => ({
             headerId: header.id,
+            tenantId,
             rollNumber: i + 1,
             rollWeight: String(r.rollWeight),
             remarks: r.remarks || null,
@@ -330,8 +336,9 @@ router.post("/daily-production", validateBody(createSchema), async (req, res): P
 router.put("/daily-production/:id", validateBody(updateSchema), async (req, res): Promise<void> => {
   const id = idParam(req);
   if (id == null) { res.status(400).json({ error: "Invalid id" }); return; }
+  const tenantId = activeTenantId(req);
 
-  const blocked = await reconciliationBlock(id);
+  const blocked = await reconciliationBlock(id, tenantId);
   if (blocked) { res.status(409).json(blocked); return; }
 
   const { rolls, ...headerData } = req.body as unknown as z.infer<typeof updateSchema>;
@@ -341,18 +348,21 @@ router.put("/daily-production/:id", validateBody(updateSchema), async (req, res)
       const [header] = await tx
         .update(dailyProductionHeaderTable)
         .set({ ...headerData, remarks: headerData.remarks || null, updatedAt: new Date() })
-        .where(eq(dailyProductionHeaderTable.id, id))
+        .where(and(eq(dailyProductionHeaderTable.id, id), eq(dailyProductionHeaderTable.tenantId, tenantId)))
         .returning();
 
       if (!header) return null;
 
-      await tx.delete(dailyProductionDetailTable).where(eq(dailyProductionDetailTable.headerId, id));
+      await tx
+        .delete(dailyProductionDetailTable)
+        .where(and(eq(dailyProductionDetailTable.headerId, id), eq(dailyProductionDetailTable.tenantId, tenantId)));
 
       const detailRows = await tx
         .insert(dailyProductionDetailTable)
         .values(
           rolls.map((r, i) => ({
             headerId: header.id,
+            tenantId,
             rollNumber: i + 1,
             rollWeight: String(r.rollWeight),
             remarks: r.remarks || null,
@@ -380,13 +390,14 @@ router.put("/daily-production/:id", validateBody(updateSchema), async (req, res)
 router.post("/daily-production/:id/cancel", validateBody(z.object({ updatedBy: z.string().trim().min(1) })), async (req, res): Promise<void> => {
   const id = idParam(req);
   if (id == null) { res.status(400).json({ error: "Invalid id" }); return; }
+  const tenantId = activeTenantId(req);
 
   const { updatedBy } = req.body as unknown as { updatedBy: string };
 
   const [row] = await db
     .update(dailyProductionHeaderTable)
     .set({ status: "cancelled", updatedBy, updatedAt: new Date() })
-    .where(eq(dailyProductionHeaderTable.id, id))
+    .where(and(eq(dailyProductionHeaderTable.id, id), eq(dailyProductionHeaderTable.tenantId, tenantId)))
     .returning();
 
   if (!row) { res.status(404).json({ error: "Daily production entry not found" }); return; }
@@ -406,13 +417,14 @@ router.post("/daily-production/:id/cancel", validateBody(z.object({ updatedBy: z
 router.delete("/daily-production/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (id == null) { res.status(400).json({ error: "Invalid id" }); return; }
+  const tenantId = activeTenantId(req);
 
-  const blocked = await reconciliationBlock(id);
+  const blocked = await reconciliationBlock(id, tenantId);
   if (blocked) { res.status(409).json(blocked); return; }
 
   const [row] = await db
     .delete(dailyProductionHeaderTable)
-    .where(eq(dailyProductionHeaderTable.id, id))
+    .where(and(eq(dailyProductionHeaderTable.id, id), eq(dailyProductionHeaderTable.tenantId, tenantId)))
     .returning({ id: dailyProductionHeaderTable.id });
 
   if (!row) { res.status(404).json({ error: "Daily production entry not found" }); return; }

@@ -11,6 +11,7 @@ import {
 import { validateBody } from "../lib/validate.js";
 import { isReconciliationLockEnabled } from "../lib/reconciliation-lock.js";
 import { retrainAfterInsert } from "../lib/plausibility/engine.js";
+import { activeTenantId } from "../middleware/tenant-context.js";
 
 const router: IRouter = Router();
 
@@ -42,6 +43,7 @@ function todayIso(): string {
  */
 async function reconciliationBlock(
   id: number,
+  tenantId: number,
 ): Promise<{ error: string; reconciledTransactionId: number | null } | null> {
   if (!(await isReconciliationLockEnabled())) return null;
 
@@ -51,7 +53,7 @@ async function reconciliationBlock(
       reconciledTransactionId: dailyDeliveryTable.reconciledTransactionId,
     })
     .from(dailyDeliveryTable)
-    .where(eq(dailyDeliveryTable.id, id));
+    .where(and(eq(dailyDeliveryTable.id, id), eq(dailyDeliveryTable.tenantId, tenantId)));
 
   if (!row || !row.reconciled) return null;
 
@@ -65,6 +67,7 @@ async function reconciliationBlock(
 // ─── List deliveries for a date (summary, one row per delivery) ────────────
 
 router.get("/daily-deliveries", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const date = typeof req.query.date === "string" && req.query.date ? req.query.date : todayIso();
 
   const rows = await db
@@ -90,6 +93,7 @@ router.get("/daily-deliveries", async (req, res): Promise<void> => {
     .where(and(
       eq(dailyDeliveryTable.deliveryDate, date),
       eq(dailyDeliveryTable.status, "submitted"),
+      eq(dailyDeliveryTable.tenantId, tenantId),
     ))
     .orderBy(dailyDeliveryTable.id);
 
@@ -105,6 +109,7 @@ router.get("/daily-deliveries", async (req, res): Promise<void> => {
       gte(dailyDeliveryTable.deliveryDate, monthStart),
       lte(dailyDeliveryTable.deliveryDate, date),
       eq(dailyDeliveryTable.status, "submitted"),
+      eq(dailyDeliveryTable.tenantId, tenantId),
     ));
 
   // Per-day series from the 1st of the month through the selected date, for
@@ -120,6 +125,7 @@ router.get("/daily-deliveries", async (req, res): Promise<void> => {
       gte(dailyDeliveryTable.deliveryDate, monthStart),
       lte(dailyDeliveryTable.deliveryDate, date),
       eq(dailyDeliveryTable.status, "submitted"),
+      eq(dailyDeliveryTable.tenantId, tenantId),
     ))
     .groupBy(dailyDeliveryTable.deliveryDate)
     .orderBy(dailyDeliveryTable.deliveryDate);
@@ -139,19 +145,14 @@ router.get("/daily-deliveries", async (req, res): Promise<void> => {
 // Smallest unused integer-based challan number (e.g. "D-1", "D-2"…). Kept
 // numeric so it sorts naturally on the delivery sheet.
 
-router.get("/daily-deliveries/suggestions", async (_req, res): Promise<void> => {
-  // Smallest unused integer-based challan number (e.g. "D-1", "D-2"…). The
-  // whole-table load is replaced with a single SQL aggregate: strip the
-  // optional "D-" prefix (case-insensitive, as the old /^D-\s*/i did) and
-  // extract the leading integer, exactly matching the old parseInt behaviour.
+router.get("/daily-deliveries/suggestions", async (req, res): Promise<void> => {
   const [row] = await db
     .select({
       maxNumeric: sql<string>`coalesce(max((regexp_match(regexp_replace(${dailyDeliveryTable.challanNo}, '^[Dd]-\\s*', ''), '^\\s*\\d+'))[1]::bigint), 0)::text`,
     })
-    .from(dailyDeliveryTable);
+    .from(dailyDeliveryTable)
+    .where(eq(dailyDeliveryTable.tenantId, activeTenantId(req)));
 
-  // bigint comes back as a string; Number() preserves the old parseInt maths
-  // including 10+ digit values (QA finding M1).
   const maxNumeric = Number(row?.maxNumeric ?? 0);
   res.json({ nextChallanNo: `D-${maxNumeric + 1}` });
 });
@@ -164,6 +165,7 @@ router.get("/daily-deliveries/suggestions", async (_req, res): Promise<void> => 
 // MUST stay above "/daily-deliveries/:id" — Express matches in order.
 
 router.get("/daily-deliveries/unreconciled", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const date = typeof req.query.date === "string" ? req.query.date : "";
   const partyId = parseInt(String(req.query.partyId ?? ""), 10);
 
@@ -194,6 +196,7 @@ router.get("/daily-deliveries/unreconciled", async (req, res): Promise<void> => 
       eq(dailyDeliveryTable.partyId, partyId),
       eq(dailyDeliveryTable.status, "submitted"),
       eq(dailyDeliveryTable.reconciled, false),
+      eq(dailyDeliveryTable.tenantId, tenantId),
     ))
     .orderBy(dailyDeliveryTable.id);
 
@@ -203,6 +206,7 @@ router.get("/daily-deliveries/unreconciled", async (req, res): Promise<void> => 
 // ─── Delivery detail ───────────────────────────────────────────────────────
 
 router.get("/daily-deliveries/:id", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid delivery id" });
@@ -230,7 +234,7 @@ router.get("/daily-deliveries/:id", async (req, res): Promise<void> => {
     .from(dailyDeliveryTable)
     .leftJoin(partyMasterTable, eq(dailyDeliveryTable.partyId, partyMasterTable.id))
     .leftJoin(yarnTypeMasterTable, eq(dailyDeliveryTable.yarnTypeId, yarnTypeMasterTable.id))
-    .where(eq(dailyDeliveryTable.id, id));
+    .where(and(eq(dailyDeliveryTable.id, id), eq(dailyDeliveryTable.tenantId, tenantId)));
 
   if (!row) {
     res.status(404).json({ error: "Delivery not found" });
@@ -242,6 +246,7 @@ router.get("/daily-deliveries/:id", async (req, res): Promise<void> => {
 // ─── Create ────────────────────────────────────────────────────────────────
 
 router.post("/daily-deliveries", validateBody(deliverySchema), async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const { deliveryDate, partyId, yarnTypeId, challanNo, sl, gsm, quantity, netWeight, createdBy } = req.body as unknown as z.infer<typeof deliverySchema>;
 
   const [row] = await db
@@ -256,10 +261,10 @@ router.post("/daily-deliveries", validateBody(deliverySchema), async (req, res):
       quantity,
       netWeight: String(netWeight),
       createdBy,
+      tenantId,
     })
     .returning({ id: dailyDeliveryTable.id });
 
-  // Self-tuning: fold the new delivery into the learned baseline. Non-fatal.
   await retrainAfterInsert("delivery");
 
   res.status(201).json({ id: row.id });
@@ -275,8 +280,9 @@ router.put("/daily-deliveries/:id", validateBody(deliverySchema), async (req, re
   }
 
   const { deliveryDate, partyId, yarnTypeId, challanNo, sl, gsm, quantity, netWeight, createdBy, updatedBy } = req.body as unknown as z.infer<typeof deliverySchema>;
+  const tenantId = activeTenantId(req);
 
-  const blocked = await reconciliationBlock(id);
+  const blocked = await reconciliationBlock(id, tenantId);
   if (blocked) { res.status(409).json(blocked); return; }
 
   const [row] = await db
@@ -293,7 +299,7 @@ router.put("/daily-deliveries/:id", validateBody(deliverySchema), async (req, re
       updatedBy: updatedBy ?? createdBy,
       updatedAt: new Date(),
     })
-    .where(eq(dailyDeliveryTable.id, id))
+    .where(and(eq(dailyDeliveryTable.id, id), eq(dailyDeliveryTable.tenantId, tenantId)))
     .returning({ id: dailyDeliveryTable.id });
 
   if (!row) {
@@ -312,12 +318,14 @@ router.delete("/daily-deliveries/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  const blocked = await reconciliationBlock(id);
+  const tenantId = activeTenantId(req);
+
+  const blocked = await reconciliationBlock(id, tenantId);
   if (blocked) { res.status(409).json(blocked); return; }
 
   const [row] = await db
     .delete(dailyDeliveryTable)
-    .where(eq(dailyDeliveryTable.id, id))
+    .where(and(eq(dailyDeliveryTable.id, id), eq(dailyDeliveryTable.tenantId, tenantId)))
     .returning({ id: dailyDeliveryTable.id });
 
   if (!row) {

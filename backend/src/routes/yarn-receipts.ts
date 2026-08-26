@@ -14,6 +14,7 @@ import {
 import { validateBody } from "../lib/validate.js";
 import { isReconciliationLockEnabled } from "../lib/reconciliation-lock.js";
 import { retrainAfterInsert } from "../lib/plausibility/engine.js";
+import { activeTenantId } from "../middleware/tenant-context.js";
 
 const router: IRouter = Router();
 
@@ -53,6 +54,7 @@ function todayIso(): string {
  */
 async function reconciliationBlock(
   id: number,
+  tenantId: number,
 ): Promise<{ error: string; reconciledTransactionId: number | null } | null> {
   if (!(await isReconciliationLockEnabled())) return null;
 
@@ -62,7 +64,7 @@ async function reconciliationBlock(
       reconciledTransactionId: yarnReceiptHeaderTable.reconciledTransactionId,
     })
     .from(yarnReceiptHeaderTable)
-    .where(eq(yarnReceiptHeaderTable.id, id));
+    .where(and(eq(yarnReceiptHeaderTable.id, id), eq(yarnReceiptHeaderTable.tenantId, tenantId)));
 
   if (!row || !row.reconciled) return null;
 
@@ -76,6 +78,7 @@ async function reconciliationBlock(
 // ─── List receipts for a date (summary, one row per header) ───────────────
 
 router.get("/yarn-receipts", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const date = typeof req.query.date === "string" && req.query.date ? req.query.date : todayIso();
 
   const rows = await db
@@ -98,6 +101,7 @@ router.get("/yarn-receipts", async (req, res): Promise<void> => {
     .where(and(
       eq(yarnReceiptHeaderTable.receiptDate, date),
       eq(yarnReceiptHeaderTable.status, "submitted"),
+      eq(yarnReceiptHeaderTable.tenantId, tenantId),
     ))
     .groupBy(
       yarnReceiptHeaderTable.id,
@@ -118,6 +122,7 @@ router.get("/yarn-receipts", async (req, res): Promise<void> => {
       gte(yarnReceiptHeaderTable.receiptDate, monthStart),
       lte(yarnReceiptHeaderTable.receiptDate, date),
       eq(yarnReceiptHeaderTable.status, "submitted"),
+      eq(yarnReceiptHeaderTable.tenantId, tenantId),
     ));
 
   res.json({
@@ -139,6 +144,7 @@ router.get("/yarn-receipts", async (req, res): Promise<void> => {
 // "unreconciled".
 
 router.get("/yarn-receipts/analytics", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const date = typeof req.query.date === "string" && req.query.date ? req.query.date : todayIso();
 
   const lines = await db
@@ -161,6 +167,7 @@ router.get("/yarn-receipts/analytics", async (req, res): Promise<void> => {
     .where(and(
       eq(yarnReceiptHeaderTable.receiptDate, date),
       eq(yarnReceiptHeaderTable.status, "submitted"),
+      eq(yarnReceiptHeaderTable.tenantId, tenantId),
     ))
     .orderBy(yarnReceiptDetailTable.id);
 
@@ -179,6 +186,7 @@ router.get("/yarn-receipts/analytics", async (req, res): Promise<void> => {
       gte(yarnReceiptHeaderTable.receiptDate, monthStart),
       lte(yarnReceiptHeaderTable.receiptDate, date),
       eq(yarnReceiptHeaderTable.status, "submitted"),
+      eq(yarnReceiptHeaderTable.tenantId, tenantId),
     ))
     .groupBy(yarnReceiptHeaderTable.receiptDate)
     .orderBy(yarnReceiptHeaderTable.receiptDate);
@@ -195,6 +203,7 @@ router.get("/yarn-receipts/analytics", async (req, res): Promise<void> => {
 // "unreconciled" would otherwise be parsed as an id.
 
 router.get("/yarn-receipts/unreconciled", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const date = typeof req.query.date === "string" ? req.query.date : "";
   const partyId = parseInt(String(req.query.partyId ?? ""), 10);
 
@@ -228,6 +237,7 @@ router.get("/yarn-receipts/unreconciled", async (req, res): Promise<void> => {
       eq(yarnReceiptHeaderTable.partyId, partyId),
       eq(yarnReceiptHeaderTable.status, "submitted"),
       eq(yarnReceiptHeaderTable.reconciled, false),
+      eq(yarnReceiptHeaderTable.tenantId, tenantId),
     ))
     .orderBy(yarnReceiptHeaderTable.id, yarnReceiptDetailTable.id);
 
@@ -243,20 +253,14 @@ router.get("/yarn-receipts/unreconciled", async (req, res): Promise<void> => {
 // Smallest unused integer-based doc number — same convention as
 // /transactions/suggestions, so receipt docs stay human-friendly (YR-1, YR-2…).
 
-router.get("/yarn-receipts/suggestions", async (_req, res): Promise<void> => {
-  // Doc numbers look like "YR-5"; extract the numeric tail so the next
-  // suggestion is YR-6, not a re-suggested 1. Done in SQL (one row back)
-  // instead of loading every receipt: strips the optional "YR-" prefix
-  // case-insensitively (as the old /^YR-\s*/i did) and takes the leading
-  // integer, exactly matching the old parseInt behaviour.
+router.get("/yarn-receipts/suggestions", async (req, res): Promise<void> => {
   const [row] = await db
     .select({
       maxNumeric: sql<string>`coalesce(max((regexp_match(regexp_replace(${yarnReceiptHeaderTable.docNumber}, '^[Yy][Rr]-\\s*', ''), '^\\s*\\d+'))[1]::bigint), 0)::text`,
     })
-    .from(yarnReceiptHeaderTable);
+    .from(yarnReceiptHeaderTable)
+    .where(eq(yarnReceiptHeaderTable.tenantId, activeTenantId(req)));
 
-  // bigint comes back as a string; Number() preserves the old parseInt maths
-  // including 10+ digit values (QA finding M1).
   const maxNumeric = Number(row?.maxNumeric ?? 0);
   res.json({ nextDocNumber: `YR-${maxNumeric + 1}` });
 });
@@ -264,6 +268,7 @@ router.get("/yarn-receipts/suggestions", async (_req, res): Promise<void> => {
 // ─── Receipt detail (header + lines) ───────────────────────────────────────
 
 router.get("/yarn-receipts/:id", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid receipt id" });
@@ -284,7 +289,7 @@ router.get("/yarn-receipts/:id", async (req, res): Promise<void> => {
     })
     .from(yarnReceiptHeaderTable)
     .leftJoin(partyMasterTable, eq(yarnReceiptHeaderTable.partyId, partyMasterTable.id))
-    .where(eq(yarnReceiptHeaderTable.id, id));
+    .where(and(eq(yarnReceiptHeaderTable.id, id), eq(yarnReceiptHeaderTable.tenantId, tenantId)));
 
   if (!header) {
     res.status(404).json({ error: "Receipt not found" });
@@ -304,7 +309,7 @@ router.get("/yarn-receipts/:id", async (req, res): Promise<void> => {
     .from(yarnReceiptDetailTable)
     .leftJoin(yarnCountMasterTable, eq(yarnReceiptDetailTable.yarnCountId, yarnCountMasterTable.id))
     .leftJoin(yarnBrandMasterTable, eq(yarnReceiptDetailTable.yarnBrandId, yarnBrandMasterTable.id))
-    .where(eq(yarnReceiptDetailTable.headerId, id))
+    .where(and(eq(yarnReceiptDetailTable.headerId, id), eq(yarnReceiptDetailTable.tenantId, tenantId)))
     .orderBy(yarnReceiptDetailTable.id);
 
   res.json({ ...header, lines });
@@ -313,16 +318,18 @@ router.get("/yarn-receipts/:id", async (req, res): Promise<void> => {
 // ─── Create ────────────────────────────────────────────────────────────────
 
 router.post("/yarn-receipts", validateBody(receiptBodySchema), async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const { docNumber, receiptDate, partyId, createdBy, lines } = req.body as unknown as z.infer<typeof receiptBodySchema>;
 
   const result = await db.transaction(async (tx) => {
     const [header] = await tx
       .insert(yarnReceiptHeaderTable)
-      .values({ docNumber, receiptDate, partyId, createdBy })
+      .values({ docNumber, receiptDate, partyId, createdBy, tenantId })
       .returning({ id: yarnReceiptHeaderTable.id });
     await tx.insert(yarnReceiptDetailTable).values(
       lines.map((l) => ({
         headerId: header.id,
+        tenantId,
         yarnCountId: l.yarnCountId,
         yarnBrandId: l.yarnBrandId,
         quantity: l.quantity,
@@ -348,28 +355,32 @@ router.put("/yarn-receipts/:id", validateBody(receiptBodySchema), async (req, re
   }
 
   const { docNumber, receiptDate, partyId, createdBy, updatedBy, lines } = req.body as unknown as z.infer<typeof receiptBodySchema>;
+  const tenantId = activeTenantId(req);
 
   const [existing] = await db
     .select({ id: yarnReceiptHeaderTable.id })
     .from(yarnReceiptHeaderTable)
-    .where(eq(yarnReceiptHeaderTable.id, id));
+    .where(and(eq(yarnReceiptHeaderTable.id, id), eq(yarnReceiptHeaderTable.tenantId, tenantId)));
   if (!existing) {
     res.status(404).json({ error: "Receipt not found" });
     return;
   }
 
-  const blocked = await reconciliationBlock(id);
+  const blocked = await reconciliationBlock(id, tenantId);
   if (blocked) { res.status(409).json(blocked); return; }
 
   await db.transaction(async (tx) => {
     await tx
       .update(yarnReceiptHeaderTable)
       .set({ docNumber, receiptDate, partyId, updatedBy: updatedBy ?? createdBy, updatedAt: new Date() })
-      .where(eq(yarnReceiptHeaderTable.id, id));
-    await tx.delete(yarnReceiptDetailTable).where(eq(yarnReceiptDetailTable.headerId, id));
+      .where(and(eq(yarnReceiptHeaderTable.id, id), eq(yarnReceiptHeaderTable.tenantId, tenantId)));
+    await tx
+      .delete(yarnReceiptDetailTable)
+      .where(and(eq(yarnReceiptDetailTable.headerId, id), eq(yarnReceiptDetailTable.tenantId, tenantId)));
     await tx.insert(yarnReceiptDetailTable).values(
       lines.map((l) => ({
         headerId: id,
+        tenantId,
         yarnCountId: l.yarnCountId,
         yarnBrandId: l.yarnBrandId,
         quantity: l.quantity,
@@ -390,12 +401,14 @@ router.delete("/yarn-receipts/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  const blocked = await reconciliationBlock(id);
+  const tenantId = activeTenantId(req);
+
+  const blocked = await reconciliationBlock(id, tenantId);
   if (blocked) { res.status(409).json(blocked); return; }
 
   const result = await db
     .delete(yarnReceiptHeaderTable)
-    .where(eq(yarnReceiptHeaderTable.id, id))
+    .where(and(eq(yarnReceiptHeaderTable.id, id), eq(yarnReceiptHeaderTable.tenantId, tenantId)))
     .returning({ id: yarnReceiptHeaderTable.id });
 
   if (result.length === 0) {
