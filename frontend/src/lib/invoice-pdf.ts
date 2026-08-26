@@ -44,6 +44,15 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   const money2 = (n: string | number) =>
     Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  // Effective sales-tax rate (%) derived from the invoice's own item amounts
+  // (matches the Company Settings default_tax_rate used at generation).
+  const taxEx = inv.items.find((it) => parseFloat(it.valueExcludingTax) > 0);
+  const taxRatePercent =
+    taxEx && parseFloat(taxEx.valueExcludingTax) > 0
+      ? Math.max(0, (parseFloat(taxEx.taxAmount) / parseFloat(taxEx.valueExcludingTax)) * 100)
+      : 18;
+  const taxRateLabel = `${taxRatePercent.toFixed(Number.isInteger(taxRatePercent) ? 0 : 2)}%`;
+
   const setInk = (c: [number, number, number]) => doc.setTextColor(c[0], c[1], c[2]);
   const setDraw = (c: [number, number, number]) => doc.setDrawColor(c[0], c[1], c[2]);
   const setFill = (c: [number, number, number]) => doc.setFillColor(c[0], c[1], c[2]);
@@ -279,7 +288,7 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
     // Taxes Exclusive Value.
     text(money(it.valueExcludingTax), colX[5] + cols[5].w - cellPad, midY, { align: "right" });
     // Tax Rate.
-    text("18%", colX[6] + cols[6].w / 2, midY, { align: "center" });
+    text(taxRateLabel, colX[6] + cols[6].w / 2, midY, { align: "center" });
     // Tax Amount.
     text(money(it.taxAmount), colX[7] + cols[7].w - cellPad, midY, { align: "right" });
     // Taxes Inclusive Value.
@@ -344,7 +353,7 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   const sumLabelW = sumW - 90;
   const summary: Array<{ label: string; value: string | null; bold?: boolean }> = [
     { label: "Total Taxes Exclusive Value", value: money(inv.totalValue) },
-    { label: "Total Tax Amount @ 18%", value: money(inv.totalTax) },
+    { label: `Total Tax Amount @ ${taxRateLabel}`, value: money(inv.totalTax) },
     { label: "", value: null }, // blank spacer row (as in reference)
     { label: "Total Taxes Inclusive Value", value: money(inv.grandTotal), bold: true },
   ];
