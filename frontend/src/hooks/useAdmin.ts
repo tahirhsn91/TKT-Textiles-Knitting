@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { customFetch } from "@/vendor/api-client-react/custom-fetch";
 
 /**
@@ -53,8 +53,10 @@ export const useAdmin = (): UseAdminReturn => {
   const [error, setError] = useState<string | null>(null);
 
   // List ALL tenants (super-admin platform view). Uses the app http client so
-  // the bearer token is attached.
-  const getTenants = async () => {
+  // the bearer token is attached. Memoized so its identity is stable across
+  // renders — otherwise a caller's useEffect([... , getTenants]) refires on
+  // every render and hammers the API (infinite fetch loop).
+  const getTenants = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -67,7 +69,7 @@ export const useAdmin = (): UseAdminReturn => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const getTenantDetails = async (tenantId: number): Promise<TenantDetails> => {
     try {
