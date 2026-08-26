@@ -255,8 +255,9 @@ export default function DailyProductionList() {
             combinationFindings={plausibility.combinationFindings}
           />
         )}
-        {/* Entries */}
-        <Card className="overflow-hidden">
+        {/* Entries — desktop table (hidden on mobile); the md:hidden list below
+            is the same data rendered as tap-friendly cards. */}
+        <Card className="overflow-hidden hidden md:block">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-3.5">
             <h2 className="text-sm font-semibold text-foreground">Production entries</h2>
             <span className="eyebrow">{dateLabel}</span>
@@ -416,6 +417,129 @@ export default function DailyProductionList() {
             </Table>
           </CardContent>
         </Card>
+
+        {/* ── Mobile card list (md:hidden) — same rows, tap-to-edit ─────── */}
+        <div className="md:hidden space-y-3">
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-lg border bg-card p-4">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="mt-3 h-4 w-24" />
+                <Skeleton className="mt-3 h-9 w-full" />
+              </div>
+            ))
+          ) : rows.length === 0 ? (
+            <div className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">
+              Nothing recorded for {dateLabel} yet. Add an entry to get started.
+            </div>
+          ) : (
+            <>
+              {rows.map((r, i) => {
+                const locked = r.reconciled && reconciledLockEnabled;
+                return (
+                  <div
+                    key={r.id}
+                    className={
+                      "rounded-lg border bg-card p-4 " +
+                      (r.hasHeavyRoll
+                        ? "border-red-300 dark:border-red-800"
+                        : locked
+                          ? "border-yellow-300 dark:border-yellow-800"
+                          : "")
+                    }
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-foreground">
+                          {machineRepeats[i] ? "—" : (r.machineName ?? "-")}
+                        </p>
+                        <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                          {r.employeeName ?? "-"} · {r.partyName ?? "-"}
+                        </p>
+                      </div>
+                      {locked && (
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-yellow-300 bg-yellow-50 px-1.5 py-0.5 text-[0.6875rem] font-medium uppercase tracking-wide text-yellow-900 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-200">
+                          <Lock className="h-3 w-3" />
+                          Reconciled
+                        </span>
+                      )}
+                      {r.hasHeavyRoll && (
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-red-300 bg-red-50 px-1.5 py-0.5 text-[0.6875rem] font-medium uppercase tracking-wide text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
+                          Heavy
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-y-2 text-sm">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Shift</p>
+                        <p className="mt-0.5 font-medium">{r.shift}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Rolls</p>
+                        <p className="mt-0.5 num font-medium">{r.rollCount}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Total production</p>
+                        <p className="mt-0.5 num text-lg font-semibold text-foreground">
+                          {Number(r.totalProduction).toFixed(NUM_DECIMALS)}{" "}
+                          <span className="text-sm font-medium text-muted-foreground">kg</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center gap-2">
+                      {locked ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => openView(r.id)}
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          View
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => openEdit(r.id)}
+                          >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                            aria-label={`Delete entry for ${r.machineName ?? "machine"}, ${r.shift} shift`}
+                            onClick={() => setPendingDelete(r)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {rows.length > 0 && (
+                <div className="flex items-center justify-between rounded-lg border bg-card px-4 py-3">
+                  <span className="text-sm text-muted-foreground">Grand total</span>
+                  <span className="num text-lg font-semibold text-foreground">
+                    {grandTotal.toFixed(NUM_DECIMALS)}{" "}
+                    <span className="text-sm font-medium text-muted-foreground">kg</span>
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
 
         {isFetching && !isLoading && (
           <p className="text-xs text-muted-foreground -mt-4">Refreshing…</p>
