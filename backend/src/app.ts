@@ -114,7 +114,7 @@ app.use("/api/auth", authRouter);
 app.use("/api", (req, _res, next) => {
   // Public whitelist: health endpoints + anything under /api/auth (already
   // mounted above). Everything else requires auth.
-  if (req.path === "/health" || req.path === "/healthz" || req.path.startsWith("/auth/")) {
+  if (req.path === "/health" || req.path === "/healthz" || req.path.startsWith("/auth/") || req.path.startsWith("/docs") || req.path.startsWith("/v1/")) {
     return next();
   }
   return requireAuth(req, _res, next);
