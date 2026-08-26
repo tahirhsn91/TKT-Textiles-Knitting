@@ -471,7 +471,17 @@ export function Layout({ children }: { children: ReactNode }) {
           </SheetContent>
         </Sheet>
 
-        <main className="flex-1 p-4 pb-20 md:p-8 md:pb-8 w-full max-w-7xl mx-auto print:p-0 print:max-w-none">
+        <main
+          className={cn(
+            "flex-1 w-full max-w-7xl mx-auto print:p-0 print:max-w-none",
+            "p-4 pb-20 md:p-8 md:pb-8",
+            // Mobile top padding clears the fixed top bar (h-14 = 56px). In
+            // dev the fixed top bar sits below the dev banner (column pt-7),
+            // so the 56px here clears it correctly in both cases. Desktop keeps
+            // normal padding (top bar is sticky, in-flow).
+            "pt-14 md:pt-8"
+          )}
+        >
           {children}
         </main>
       </div>
