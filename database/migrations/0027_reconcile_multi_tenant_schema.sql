@@ -45,6 +45,11 @@ ON CONFLICT (id) DO NOTHING;
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE app_user ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE;
 ALTER TABLE role ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE;
+-- Safety: if an earlier migration (0022) already created these columns as
+-- NOT NULL DEFAULT 1, relax them to NULLABLE so the global super-admin role
+-- (tenant_id NULL) can be seeded below. No-op on a fresh DB restored at 0021.
+ALTER TABLE role ALTER COLUMN tenant_id DROP NOT NULL;
+ALTER TABLE app_user ALTER COLUMN tenant_id DROP NOT NULL;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3. tenant_id NOT NULL DEFAULT 1 on all business tables
