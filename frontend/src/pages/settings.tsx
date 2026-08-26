@@ -15,6 +15,7 @@ import { customFetch } from "@/vendor/api-client-react/custom-fetch";
 import { useAuth } from "@/context/auth-context";
 import { Layout } from "@/components/layout";
 import { CompanySettingsTab } from "@/pages/company-settings-tab";
+import { InvitationsTab } from "@/pages/invitations-tab";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -123,10 +124,12 @@ export default function SettingsPage() {
             <TabsTrigger value="users" className="gap-1.5"><UsersIcon className="h-4 w-4" /> Users</TabsTrigger>
             <TabsTrigger value="permissions" className="gap-1.5"><ShieldCheck className="h-4 w-4" /> Permissions</TabsTrigger>
             <TabsTrigger value="company" className="gap-1.5"><Building2 className="h-4 w-4" /> Company</TabsTrigger>
+            <TabsTrigger value="invitations" className="gap-1.5"><UserPlus className="h-4 w-4" /> Invitations</TabsTrigger>
           </TabsList>
           <TabsContent value="users" className="mt-4"><UsersTab /></TabsContent>
           <TabsContent value="permissions" className="mt-4"><PermissionsTab /></TabsContent>
           <TabsContent value="company" className="mt-4"><CompanySettingsTab /></TabsContent>
+          <TabsContent value="invitations" className="mt-4"><InvitationsTab /></TabsContent>
         </Tabs>
       </div>
     </Layout>
