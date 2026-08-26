@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { customFetch, type ErrorType } from "@/vendor/api-client-react/custom-fetch";
+import { buildThemeOverrides, type BrandColors } from "@/lib/branding-theme";
 
 /**
  * useBranding Hook (issue #219 1.2 white-labeling)
@@ -38,9 +39,13 @@ export interface BrandingPackage {
     id: number;
     preset_name: string;
     preset_key: string;
-    primary_color: string;
-    secondary_color: string;
-    accent_color: string;
+    description?: string | null;
+    primary_color: string | null;
+    secondary_color: string | null;
+    accent_color: string | null;
+    background_color?: string | null;
+    sidebar_color?: string | null;
+    navbar_color?: string | null;
     is_default: boolean;
   }>;
   css: string;
@@ -67,6 +72,8 @@ interface UseBrandingReturn {
   applyTheme: (presetKey: string) => Promise<void>;
   /** Upload a logo image. */
   uploadLogo: (file: File) => Promise<void>;
+  /** Upload a favicon image. */
+  uploadFavicon: (file: File) => Promise<void>;
 }
 
 export const DEFAULT_COLORS = {
@@ -91,8 +98,7 @@ function updateFavicon(url: string | null | undefined) {
 }
 
 /** Apply the branding CSS-variable string to <style id="branding-css">. */
-function applyBrandingCss(css: string | undefined) {
-  if (!css) return;
+function applyBrandingCss(css: string | undefined, colors?: BrandColors | null) {
   const styleId = "branding-css";
   let styleElement = document.getElementById(styleId) as HTMLStyleElement | null;
   if (!styleElement) {
@@ -100,7 +106,10 @@ function applyBrandingCss(css: string | undefined) {
     styleElement.id = styleId;
     document.head.appendChild(styleElement);
   }
-  styleElement.textContent = css;
+  const themeOverrides = colors ? buildThemeOverrides(colors) : "";
+  // The backend `:root{--brand-*}` first, then our derived real-token
+  // overrides last so they win for the app's Tailwind/UI-kit tokens.
+  styleElement.textContent = `${css ?? ""}\n${themeOverrides}`;
 }
 
 export const useBranding = (enabled = true): UseBrandingReturn => {
@@ -116,7 +125,20 @@ export const useBranding = (enabled = true): UseBrandingReturn => {
         method: "GET",
       });
       setBranding(data);
-      applyBrandingCss(data.css);
+      applyBrandingCss(data.css, {
+        primary: data.config?.primary_color,
+        secondary: data.config?.secondary_color,
+        accent: data.config?.accent_color,
+        text: data.config?.text_color,
+        background: data.config?.background_color,
+        navbar: data.config?.navbar_background,
+        navbarText: data.config?.navbar_text_color,
+        sidebar: data.config?.sidebar_background,
+        sidebarText: data.config?.sidebar_text_color,
+        fontFamily: data.config?.font_family,
+        borderRadius: data.config?.border_radius,
+        buttonStyle: data.config?.button_style,
+      });
       if (data.config?.company_name) document.title = data.config.company_name;
       updateFavicon(data.config?.favicon_url);
     } catch (err) {
@@ -181,6 +203,24 @@ export const useBranding = (enabled = true): UseBrandingReturn => {
     }
   };
 
+  const uploadFavicon = async (file: File) => {
+    try {
+      setLoading(true);
+      const formData = new FormData();
+      formData.append("favicon", file);
+      await customFetch("/api/branding/favicon", {
+        method: "POST",
+        body: formData,
+      });
+      await refreshBranding();
+    } catch (err) {
+      setError("Failed to upload favicon");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     branding,
     loading,
@@ -189,6 +229,7 @@ export const useBranding = (enabled = true): UseBrandingReturn => {
     updateBranding,
     applyTheme,
     uploadLogo,
+    uploadFavicon,
   };
 };
 
