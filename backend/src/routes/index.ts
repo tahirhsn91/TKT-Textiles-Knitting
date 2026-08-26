@@ -26,6 +26,7 @@ import adminRouter from "./admin-routes.js";
 import brandingRouter from "./branding-routes.js";
 import configurationRouter from "./configuration-routes.js";
 import invitationsRouter from "./invitations-routes.js";
+import auditLogsRouter from "./audit-logs-routes.js";
 // Temporarily disabled due to TypeScript compilation issues with Knex-based services
 // import adminRouter from "./admin-routes.js";
 // import authRoutesRouter from "./auth-routes.js";
@@ -73,6 +74,9 @@ router.use("/configuration", configurationRouter);
 // User invitations — tenant-scoped (issue #219 1.4). Invite people to the
 // active tenant, manage/resend/revoke invites, accept to create the user.
 router.use("/invitations", invitationsRouter);
+
+// Audit logs — tenant-scoped query of the audit trail (issue #219 2.3).
+router.use("/audit-logs", auditLogsRouter);
 
 // Protected — each router defines its own full (absolute) paths internally, so
 // each is mounted at the root (router.use(subRouter)) and its routes match their
