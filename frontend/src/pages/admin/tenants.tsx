@@ -40,9 +40,19 @@ import { Loader2, Plus, Eye, Edit2, Trash2 } from "lucide-react";
 
 export default function AdminTenantsPage() {
   const { session } = useAuth();
-  const { tenants, loading, error, getTenants, createTenant } = useAdmin();
+  const { tenants, loading, error, getTenants, createTenant, getTenantDetails, updateTenant, updateTenantStatus, deleteTenant } = useAdmin();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [selectedTenant, setSelectedTenant] = useState<any>(null);
+  const [viewTenant, setViewTenant] = useState<any>(null);
+  const [editingTenant, setEditingTenant] = useState<any>(null);
+  const [deleteTenantTarget, setDeleteTenantTarget] = useState<any>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    slug: "",
+    industry: "",
+    status: "active" as string,
+  });
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -59,7 +69,64 @@ export default function AdminTenantsPage() {
     if (isSuperAdmin) {
       getTenants();
     }
-  }, [isSuperAdmin]);
+  }, [isSuperAdmin, getTenants]);
+
+  const openView = async (tenant: any) => {
+    setViewTenant(tenant);
+    try {
+      const detail = await getTenantDetails(tenant.id);
+      setViewTenant((prev: any) => (prev && prev.id === tenant.id ? { ...prev, ...detail } : prev));
+    } catch {
+      /* fall back to list row data */
+    }
+  };
+
+  const openEdit = (tenant: any) => {
+    setEditingTenant(tenant);
+    setEditForm({
+      name: tenant.name ?? "",
+      slug: tenant.slug ?? "",
+      industry: tenant.industry ?? "",
+      status: tenant.status ?? "active",
+    });
+    setActionError(null);
+  };
+
+  const handleEditSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTenant) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await updateTenant(editingTenant.id, {
+        name: editForm.name,
+        slug: editForm.slug,
+        industry: editForm.industry,
+      });
+      await updateTenantStatus(editingTenant.id, editForm.status);
+      setEditingTenant(null);
+      await getTenants();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to update tenant");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTenantTarget) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await deleteTenant(deleteTenantTarget.id);
+      setDeleteTenantTarget(null);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to delete tenant");
+    } finally {
+      setBusy(false);
+    }
+  };
+
 
   if (!isSuperAdmin) {
     return (
@@ -184,14 +251,26 @@ export default function AdminTenantsPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => setSelectedTenant(tenant)}
+                              onClick={() => openView(tenant)}
+                              title="View tenant"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEdit(tenant)}
+                              title="Edit tenant"
+                            >
                               <Edit2 className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="text-destructive">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive"
+                              onClick={() => { setActionError(null); setDeleteTenantTarget(tenant); }}
+                              title="Delete tenant"
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
@@ -328,6 +407,89 @@ export default function AdminTenantsPage() {
               <Button type="submit">Create Tenant</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+      {/* View Tenant Dialog */}
+      <Dialog open={viewTenant != null} onOpenChange={(o) => !o && setViewTenant(null)}>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle>Tenant Details</DialogTitle>
+            <DialogDescription>View tenant information and configuration.</DialogDescription>
+          </DialogHeader>
+          {viewTenant && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-3 gap-1"><span className="text-muted-foreground">Name</span><span className="col-span-2 font-medium">{viewTenant.name}</span></div>
+              <div className="grid grid-cols-3 gap-1"><span className="text-muted-foreground">Slug</span><span className="col-span-2 font-mono">{viewTenant.slug}</span></div>
+              <div className="grid grid-cols-3 gap-1"><span className="text-muted-foreground">Industry</span><span className="col-span-2">{viewTenant.industry || "—"}</span></div>
+              <div className="grid grid-cols-3 gap-1"><span className="text-muted-foreground">Country / TZ</span><span className="col-span-2">{viewTenant.country ?? "Pakistan"} • {viewTenant.timezone ?? "Asia/Karachi"}</span></div>
+              <div className="grid grid-cols-3 gap-1"><span className="text-muted-foreground">Currency</span><span className="col-span-2">{viewTenant.currency ?? "PKR"}</span></div>
+              <div className="grid grid-cols-3 gap-1"><span className="text-muted-foreground">Status</span><span className="col-span-2">{getStatusBadge(viewTenant.status ?? "unknown")}</span></div>
+              <div className="grid grid-cols-3 gap-1"><span className="text-muted-foreground">Created</span><span className="col-span-2">{viewTenant.created_at ? new Date(viewTenant.created_at).toLocaleString() : viewTenant.createdAt ? new Date(viewTenant.createdAt).toLocaleString() : "—"}</span></div>
+              {typeof viewTenant.userCount === "number" && (
+                <div className="grid grid-cols-3 gap-1"><span className="text-muted-foreground">Users</span><span className="col-span-2">{viewTenant.userCount}</span></div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewTenant(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Tenant Dialog */}
+      <Dialog open={editingTenant != null} onOpenChange={(o) => !o && setEditingTenant(null)}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Edit Tenant</DialogTitle>
+            <DialogDescription>Update tenant details and status.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditSave} className="space-y-4">
+            {actionError && <p className="text-sm text-destructive">{actionError}</p>}
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Company Name</Label>
+              <Input id="edit-name" required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-slug">Slug</Label>
+              <Input id="edit-slug" required value={editForm.slug} onChange={(e) => setEditForm({ ...editForm, slug: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-industry">Industry</Label>
+              <Input id="edit-industry" value={editForm.industry} onChange={(e) => setEditForm({ ...editForm, industry: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={editForm.status} onValueChange={(value) => setEditForm({ ...editForm, status: value })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="suspended">Suspended</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditingTenant(null)}>Cancel</Button>
+              <Button type="submit" disabled={busy}>{busy ? "Saving…" : "Save Changes"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Tenant Dialog */}
+      <Dialog open={deleteTenantTarget != null} onOpenChange={(o) => !o && setDeleteTenantTarget(null)}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Delete Tenant</DialogTitle>
+            <DialogDescription>
+              This permanently deletes <strong>{deleteTenantTarget?.name}</strong> and all of its tenant-owned data. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {actionError && <p className="text-sm text-destructive">{actionError}</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDeleteTenantTarget(null)}>Cancel</Button>
+            <Button type="button" variant="destructive" disabled={busy} onClick={handleDelete}>{busy ? "Deleting…" : "Delete Tenant"}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </Layout>

@@ -43,6 +43,7 @@ interface UseAdminReturn {
   }) => Promise<Tenant>;
   updateTenant: (tenantId: number, data: any) => Promise<Tenant>;
   updateTenantStatus: (tenantId: number, status: string) => Promise<Tenant>;
+  deleteTenant: (tenantId: number) => Promise<void>;
   getTenantStats: (tenantId: number) => Promise<any>;
 }
 
@@ -142,6 +143,17 @@ export const useAdmin = (): UseAdminReturn => {
     }
   };
 
+  const deleteTenant = async (tenantId: number): Promise<void> => {
+    try {
+      await customFetch(`/api/admin/tenants/${tenantId}`, { method: "DELETE" });
+      setTenants((prev) => prev.filter((t) => t.id !== tenantId));
+    } catch (err) {
+      console.error("Error deleting tenant:", err);
+      setError("Failed to delete tenant");
+      throw err;
+    }
+  };
+
   return {
     tenants,
     loading,
@@ -151,6 +163,7 @@ export const useAdmin = (): UseAdminReturn => {
     createTenant,
     updateTenant,
     updateTenantStatus,
+    deleteTenant,
     getTenantStats,
   };
 };

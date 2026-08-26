@@ -342,6 +342,44 @@ export const adminService = {
     return created;
   },
 
+  /** Super-admin: delete a tenant (and its cascade of tenant-owned data). */
+  async deleteTenant(tenantId: number, actorUserId: number) {
+    // Protect the seeded TKT Textiles tenant from deletion (Q6b safeguard).
+    if (tenantId === 1) {
+      const err = new Error("Tenant 1 (TKT Textiles) cannot be deleted");
+      (err as Error & { status?: number }).status = 400;
+      throw err;
+    }
+    const [existing] = await db
+      .select({ id: tenantTable.id, name: tenantTable.name })
+      .from(tenantTable)
+      .where(eq(tenantTable.id, tenantId))
+      .limit(1);
+    if (!existing) {
+      const err = new Error("Tenant not found");
+      (err as Error & { status?: number }).status = 404;
+      throw err;
+    }
+    const deleted = await db.transaction(async (tx) => {
+      // Insert the audit entry FIRST (while the tenant still exists) so the
+      // audit_log.target_tenant_id FK is satisfied; then delete the tenant
+      // (cascade removes its tenant-owned data).
+      await tx.insert(auditLogTable).values({
+        actorUserId,
+        targetTenantId: tenantId,
+        action: "tenant.delete",
+        entityType: "tenant",
+        entityId: tenantId,
+        description: `Tenant "${existing.name}" deleted`,
+      });
+      return tx
+        .delete(tenantTable)
+        .where(eq(tenantTable.id, tenantId))
+        .returning({ id: tenantTable.id, name: tenantTable.name });
+    });
+    return deleted[0];
+  },
+
   /** List users belonging to a tenant. */
   async listTenantUsers(tenantId: number) {
     return db

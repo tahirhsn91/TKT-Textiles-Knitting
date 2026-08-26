@@ -111,6 +111,29 @@ router.put("/tenants/:id/status", async (req, res): Promise<void> => {
 });
 
 /**
+ * DELETE /api/admin/tenants/:id — delete a tenant (cascade of tenant data).
+ * Tenant 1 (TKT Textiles) is protected and cannot be deleted.
+ */
+router.delete("/tenants/:id", async (req, res): Promise<void> => {
+  const tenantId = Number(req.params.id);
+  if (!Number.isInteger(tenantId)) {
+    res.status(400).json({ error: "Invalid tenant id" });
+    return;
+  }
+  try {
+    const deleted = await adminService.deleteTenant(tenantId, req.auth!.sub);
+    res.json({ ok: true, id: deleted.id });
+  } catch (err) {
+    const e = err as Error & { status?: number };
+    if (e.status) {
+      res.status(e.status).json({ error: e.message });
+      return;
+    }
+    throw err;
+  }
+});
+
+/**
  * GET /api/admin/tenants/:id/stats — tenant statistics.
  */
 router.get("/tenants/:id/stats", async (req, res): Promise<void> => {
