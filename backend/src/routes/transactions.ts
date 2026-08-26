@@ -31,6 +31,7 @@ import {
   DeleteTransactionParams,
 } from "../api-zod/index.js";
 import { validateBody, validateParams } from "../lib/validate.js";
+import { activeTenantId } from "../middleware/tenant-context.js";
 import {
   collectReconcileSourceIds,
   deriveReconcileSets,
@@ -110,20 +111,20 @@ function parseImportNumeric(s: string | undefined): string | null {
   return String(Math.abs(n));
 }
 
-async function buildMasterMaps() {
+async function buildMasterMaps(tenantId: number) {
   const [transTypes, jobs, parties, locations, fabricTypes, yarnTypes, yarnCounts, yarnBrands, uoms, machines, employees] =
     await Promise.all([
-      db.select({ id: transactionTypeMasterTable.id, name: transactionTypeMasterTable.name }).from(transactionTypeMasterTable),
-      db.select({ id: jobMasterTable.id, name: jobMasterTable.name }).from(jobMasterTable),
-      db.select({ id: partyMasterTable.id, name: partyMasterTable.name }).from(partyMasterTable),
-      db.select({ id: locationMasterTable.id, name: locationMasterTable.name }).from(locationMasterTable),
-      db.select({ id: fabricTypeMasterTable.id, name: fabricTypeMasterTable.name }).from(fabricTypeMasterTable),
-      db.select({ id: yarnTypeMasterTable.id, name: yarnTypeMasterTable.name }).from(yarnTypeMasterTable),
-      db.select({ id: yarnCountMasterTable.id, name: yarnCountMasterTable.name }).from(yarnCountMasterTable),
-      db.select({ id: yarnBrandMasterTable.id, name: yarnBrandMasterTable.name }).from(yarnBrandMasterTable),
-      db.select({ id: uomMasterTable.id, name: uomMasterTable.name }).from(uomMasterTable),
-      db.select({ id: machineMasterTable.id, name: machineMasterTable.name }).from(machineMasterTable),
-      db.select({ id: employeeMasterTable.id, name: employeeMasterTable.name }).from(employeeMasterTable),
+      db.select({ id: transactionTypeMasterTable.id, name: transactionTypeMasterTable.name }).from(transactionTypeMasterTable).where(eq(transactionTypeMasterTable.tenantId, tenantId)),
+      db.select({ id: jobMasterTable.id, name: jobMasterTable.name }).from(jobMasterTable).where(eq(jobMasterTable.tenantId, tenantId)),
+      db.select({ id: partyMasterTable.id, name: partyMasterTable.name }).from(partyMasterTable).where(eq(partyMasterTable.tenantId, tenantId)),
+      db.select({ id: locationMasterTable.id, name: locationMasterTable.name }).from(locationMasterTable).where(eq(locationMasterTable.tenantId, tenantId)),
+      db.select({ id: fabricTypeMasterTable.id, name: fabricTypeMasterTable.name }).from(fabricTypeMasterTable).where(eq(fabricTypeMasterTable.tenantId, tenantId)),
+      db.select({ id: yarnTypeMasterTable.id, name: yarnTypeMasterTable.name }).from(yarnTypeMasterTable).where(eq(yarnTypeMasterTable.tenantId, tenantId)),
+      db.select({ id: yarnCountMasterTable.id, name: yarnCountMasterTable.name }).from(yarnCountMasterTable).where(eq(yarnCountMasterTable.tenantId, tenantId)),
+      db.select({ id: yarnBrandMasterTable.id, name: yarnBrandMasterTable.name }).from(yarnBrandMasterTable).where(eq(yarnBrandMasterTable.tenantId, tenantId)),
+      db.select({ id: uomMasterTable.id, name: uomMasterTable.name }).from(uomMasterTable).where(eq(uomMasterTable.tenantId, tenantId)),
+      db.select({ id: machineMasterTable.id, name: machineMasterTable.name }).from(machineMasterTable).where(eq(machineMasterTable.tenantId, tenantId)),
+      db.select({ id: employeeMasterTable.id, name: employeeMasterTable.name }).from(employeeMasterTable).where(eq(employeeMasterTable.tenantId, tenantId)),
     ]);
 
   const toMap = (rows: { id: number; name: string }[]) =>
@@ -144,8 +145,8 @@ async function buildMasterMaps() {
   };
 }
 
-async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
-  const maps = await buildMasterMaps();
+async function processImport(rows: ImportCsvRow[], doInsert: boolean, tenantId: number) {
+  const maps = await buildMasterMaps(tenantId);
 
   const totalRows = rows.length;
 
@@ -166,7 +167,7 @@ async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
     const existing = await db
       .select({ docNumber: transactionHeaderTable.docNumber })
       .from(transactionHeaderTable)
-      .where(inArray(transactionHeaderTable.docNumber, docNumbers));
+      .where(and(inArray(transactionHeaderTable.docNumber, docNumbers), eq(transactionHeaderTable.tenantId, tenantId)));
     existingSet = new Set(existing.map((r) => r.docNumber));
   }
 
@@ -264,6 +265,7 @@ async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
               partyId:           partyR.id,
               locationId:        locationR.id,
               fabricTypeId:      fabricTypeR.id,
+              tenantId,
             })
             .returning();
 
@@ -301,7 +303,8 @@ async function processImport(rows: ImportCsvRow[], doInsert: boolean) {
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
-router.get("/transactions", async (_req, res): Promise<void> => {
+router.get("/transactions", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const rows = await db
     .select({
       id:                transactionHeaderTable.id,
@@ -321,6 +324,7 @@ router.get("/transactions", async (_req, res): Promise<void> => {
     })
     .from(transactionHeaderTable)
     .leftJoin(transactionDetailTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
+    .where(eq(transactionHeaderTable.tenantId, tenantId))
     .groupBy(transactionHeaderTable.id)
     .orderBy(transactionHeaderTable.id);
   res.json(ListTransactionsResponse.parse(rows));
@@ -354,14 +358,14 @@ router.post("/transactions", validateBody(CreateTransactionBody), async (req, re
   const result = await db.transaction(async (tx) => {
     const [header] = await tx
       .insert(transactionHeaderTable)
-      .values(headerData)
+      .values({ ...headerData, tenantId: activeTenantId(req) })
       .returning();
 
     let detailRows: (typeof transactionDetailTable.$inferSelect)[] = [];
     if (details && details.length > 0) {
       detailRows = await tx
         .insert(transactionDetailTable)
-        .values(details.map((d) => ({ ...normalizeDetail(d), headerId: header.id })))
+        .values(details.map((d) => ({ ...normalizeDetail(d), headerId: header.id, tenantId: activeTenantId(req) })))
         .returning();
     }
 
@@ -381,6 +385,7 @@ router.post("/transactions", validateBody(CreateTransactionBody), async (req, re
         .where(and(
           inArray(dailyProductionHeaderTable.id, reconcileIds),
           eq(dailyProductionHeaderTable.reconciled, false),
+          eq(dailyProductionHeaderTable.tenantId, activeTenantId(req)),
         ))
         .returning({ id: dailyProductionHeaderTable.id });
 
@@ -406,6 +411,7 @@ router.post("/transactions", validateBody(CreateTransactionBody), async (req, re
         .where(and(
           inArray(yarnReceiptHeaderTable.id, reconcileReceiptIds),
           eq(yarnReceiptHeaderTable.reconciled, false),
+          eq(yarnReceiptHeaderTable.tenantId, activeTenantId(req)),
         ))
         .returning({ id: yarnReceiptHeaderTable.id });
 
@@ -431,6 +437,7 @@ router.post("/transactions", validateBody(CreateTransactionBody), async (req, re
         .where(and(
           inArray(dailyDeliveryTable.id, reconcileDeliveryIds),
           eq(dailyDeliveryTable.reconciled, false),
+          eq(dailyDeliveryTable.tenantId, activeTenantId(req)),
         ))
         .returning({ id: dailyDeliveryTable.id });
 
@@ -454,28 +461,21 @@ router.post("/transactions", validateBody(CreateTransactionBody), async (req, re
   res.status(201).json(GetTransactionResponse.parse(result));
 });
 
-router.get("/transactions/suggestions", async (_req, res): Promise<void> => {
-  // Previously this pulled the ENTIRE transaction table (every doc number +
-  // reference) into Node just to compute a max + last reference. Do both in
-  // SQL: `regexp_match` extracts the leading integer exactly like the old
-  // parseInt(docNumber) did (non-numeric prefixes are ignored), and the
-  // last-reference query uses the PK index with LIMIT 1.
+router.get("/transactions/suggestions", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const [maxRow] = await db
     .select({
-      // `::bigint` (not `::int`) so 10+ digit doc/challan numbers don't overflow
-      // the int4 range and 500 the endpoint; pg returns bigint as a string, so
-      // wrap in Number() below (QA finding M1).
       maxNumeric: sql<string>`coalesce(max((regexp_match(${transactionHeaderTable.docNumber}, '^\\s*\\d+'))[1]::bigint), 0)::text`,
     })
-    .from(transactionHeaderTable);
+    .from(transactionHeaderTable)
+    .where(eq(transactionHeaderTable.tenantId, tenantId));
 
   const [lastRefRow] = await db
     .select({ reference: transactionHeaderTable.reference })
     .from(transactionHeaderTable)
     .where(and(
+      eq(transactionHeaderTable.tenantId, tenantId),
       sql`${transactionHeaderTable.reference} is not null`,
-      // btrim matches the old JS `reference.trim() !== ''` check (QA finding L1):
-      // a whitespace-only reference must not be returned as lastReference.
       sql`btrim(${transactionHeaderTable.reference}) <> ''`,
     ))
     .orderBy(desc(transactionHeaderTable.id))
@@ -498,7 +498,8 @@ router.post("/transactions/import/preview", async (req, res): Promise<void> => {
     res.status(400).json({ error: "rows must be an array" });
     return;
   }
-  const result = await processImport(rows as ImportCsvRow[], false);
+  const tenantId = activeTenantId(req);
+  const result = await processImport(rows as ImportCsvRow[], false, tenantId);
   res.json({
     totalRows:   result.totalRows,
     toImport:    result.toImport,
@@ -514,7 +515,8 @@ router.post("/transactions/import", async (req, res): Promise<void> => {
     res.status(400).json({ error: "rows must be an array" });
     return;
   }
-  const result = await processImport(rows as ImportCsvRow[], true);
+  const tenantId = activeTenantId(req);
+  const result = await processImport(rows as ImportCsvRow[], true, tenantId);
   res.json({
     totalRows: result.totalRows,
     imported:  result.imported,
@@ -527,11 +529,12 @@ router.post("/transactions/import", async (req, res): Promise<void> => {
 
 router.get("/transactions/:id", validateParams(GetTransactionParams), async (req, res): Promise<void> => {
   const { id } = req.params as unknown as z.infer<typeof GetTransactionParams>;
+  const tenantId = activeTenantId(req);
 
   const [header] = await db
     .select()
     .from(transactionHeaderTable)
-    .where(eq(transactionHeaderTable.id, id));
+    .where(and(eq(transactionHeaderTable.id, id), eq(transactionHeaderTable.tenantId, tenantId)));
 
   if (!header) {
     res.status(404).json({ error: "Transaction not found" });
@@ -541,7 +544,7 @@ router.get("/transactions/:id", validateParams(GetTransactionParams), async (req
   const details = await db
     .select()
     .from(transactionDetailTable)
-    .where(eq(transactionDetailTable.headerId, id))
+    .where(and(eq(transactionDetailTable.headerId, id), eq(transactionDetailTable.tenantId, tenantId)))
     .orderBy(transactionDetailTable.id);
 
   res.json(GetTransactionResponse.parse({ ...header, details }));
@@ -549,6 +552,7 @@ router.get("/transactions/:id", validateParams(GetTransactionParams), async (req
 
 router.put("/transactions/:id", validateParams(UpdateTransactionParams), validateBody(UpdateTransactionBody), async (req, res): Promise<void> => {
   const { id } = req.params as unknown as z.infer<typeof UpdateTransactionParams>;
+  const tenantId = activeTenantId(req);
 
   const { details, ...headerData } = req.body as unknown as z.infer<typeof UpdateTransactionBody>;
 
@@ -556,20 +560,20 @@ router.put("/transactions/:id", validateParams(UpdateTransactionParams), validat
     const [header] = await tx
       .update(transactionHeaderTable)
       .set(headerData)
-      .where(eq(transactionHeaderTable.id, id))
+      .where(and(eq(transactionHeaderTable.id, id), eq(transactionHeaderTable.tenantId, tenantId)))
       .returning();
 
     if (!header) return null;
 
     await tx
       .delete(transactionDetailTable)
-      .where(eq(transactionDetailTable.headerId, id));
+      .where(and(eq(transactionDetailTable.headerId, id), eq(transactionDetailTable.tenantId, tenantId)));
 
     let detailRows: (typeof transactionDetailTable.$inferSelect)[] = [];
     if (details && details.length > 0) {
       detailRows = await tx
         .insert(transactionDetailTable)
-        .values(details.map((d) => ({ ...normalizeDetail(d), headerId: header.id })))
+        .values(details.map((d) => ({ ...normalizeDetail(d), headerId: header.id, tenantId })))
         .returning();
     }
 
@@ -586,10 +590,11 @@ router.put("/transactions/:id", validateParams(UpdateTransactionParams), validat
 
 router.delete("/transactions/:id", validateParams(DeleteTransactionParams), async (req, res): Promise<void> => {
   const { id } = req.params as unknown as z.infer<typeof DeleteTransactionParams>;
+  const tenantId = activeTenantId(req);
 
   const [deleted] = await db
     .delete(transactionHeaderTable)
-    .where(eq(transactionHeaderTable.id, id))
+    .where(and(eq(transactionHeaderTable.id, id), eq(transactionHeaderTable.tenantId, tenantId)))
     .returning();
 
   if (!deleted) {

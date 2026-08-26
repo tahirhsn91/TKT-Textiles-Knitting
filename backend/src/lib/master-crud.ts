@@ -1,8 +1,9 @@
-import { Router, type IRouter, type Response } from "express";
-import { eq } from "drizzle-orm";
+import { Router, type IRouter, type Request, type Response } from "express";
+import { eq, sql } from "drizzle-orm";
 import type { AnyPgTable, PgColumn } from "drizzle-orm/pg-core";
 import { db } from "../db/index.js";
 import { isUniqueViolation } from "./db-errors.js";
+import { activeTenantId } from "../middleware/tenant-context.js";
 
 /**
  * Generic CRUD factory for master tables (issue #9).
@@ -23,7 +24,12 @@ import { isUniqueViolation } from "./db-errors.js";
  */
 
 /** Loose view of a table exposing its columns — safe at runtime, narrow for types. */
-type LooseTable = AnyPgTable & { id: PgColumn; name: PgColumn; [k: string]: unknown };
+type LooseTable = AnyPgTable & {
+  id: PgColumn;
+  name: PgColumn;
+  tenantId: PgColumn;
+  [k: string]: unknown;
+};
 
 /** Metadata describing a write the factory just performed (used by optional hooks). */
 export interface MasterWriteEvent {
@@ -54,10 +60,10 @@ export interface MasterConfig {
   buildRow: (body: Record<string, unknown>) => unknown;
   /** 409 message on unique violation. */
   uniqueError: string;
-  /** Ordered list query (for joined shapes, e.g. job). */
-  listQuery?: () => Promise<unknown>;
-  /** Re-fetch a single row after a write (for joined shapes). */
-  fetchOne?: (id: number) => Promise<unknown>;
+  /** Ordered list query (for joined shapes, e.g. job). Receives the request. */
+  listQuery?: (req: Request) => Promise<unknown>;
+  /** Re-fetch a single row after a write (for joined shapes). Receives the request. */
+  fetchOne?: (id: number, req: Request) => Promise<unknown>;
   /**
    * Optional per-table write hook (e.g. auditing). Runs inside the SAME
    * transaction as the CRUD write, so a hook failure rolls the write back. Use
@@ -77,18 +83,20 @@ export function addMasterCrud(
   const table = cfg.table as LooseTable;
   const idCol = table.id;
   const nameCol = table.name;
+  const tenantCol = table.tenantId;
   // Masters routes carry the /masters prefix (the router is mounted at the root,
   // so each route declares its absolute path, matching the original handlers).
   const base = `/masters/${cfg.path}`;
   // ── List ──────────────────────────────────────────────────────────────────
-  router.get(base, async (_req, res): Promise<void> => {
+  router.get(base, async (req, res): Promise<void> => {
     if (cfg.listQuery) {
-      res.json(await cfg.listQuery());
+      res.json(await cfg.listQuery(req));
       return;
     }
     const rows = await db
       .select()
       .from(table)
+      .where(eq(tenantCol, activeTenantId(req)))
       .orderBy(nameCol);
     res.json(rows);
   });
@@ -102,10 +110,11 @@ export function addMasterCrud(
     }
     try {
       const actor = (req.auth?.username as string | undefined) ?? "system";
+      const tenantId = activeTenantId(req);
       const result = await db.transaction(async (tx) => {
         const [created] = await tx
           .insert(table)
-          .values(cfg.buildRow(req.body as Record<string, unknown>) as never)
+          .values({ ...(cfg.buildRow(req.body as Record<string, unknown>) as object), tenantId } as never)
           .returning();
         if (cfg.afterWrite) {
           await cfg.afterWrite(tx, {
@@ -117,7 +126,7 @@ export function addMasterCrud(
         return created;
       });
       const out = cfg.fetchOne
-        ? await cfg.fetchOne(Number((result as { id: unknown }).id))
+        ? await cfg.fetchOne(Number((result as { id: unknown }).id), req)
         : result;
       res.status(201).json(out);
     } catch (err) {
@@ -137,11 +146,14 @@ export function addMasterCrud(
     }
     try {
       const actor = (req.auth?.username as string | undefined) ?? "system";
+      const tenantId = activeTenantId(req);
       const result = await db.transaction(async (tx) => {
         const [updated] = await tx
           .update(table)
           .set(cfg.buildRow(req.body as Record<string, unknown>) as never)
-          .where(eq(idCol, id))
+          .where(
+            sql`(${idCol}) = ${id} AND (${tenantCol}) = ${tenantId}`,
+          )
           .returning();
         if (!updated) { return null; }
         if (cfg.afterWrite) {
@@ -154,7 +166,7 @@ export function addMasterCrud(
         return updated;
       });
       if (!result) { res.status(404).json({ error: "Not found" }); return; }
-      const out = cfg.fetchOne ? await cfg.fetchOne(id) : result;
+      const out = cfg.fetchOne ? await cfg.fetchOne(id, req) : result;
       res.json(out);
     } catch (err) {
       if (isUniqueViolation(err)) { res.status(409).json({ error: cfg.uniqueError }); return; }
@@ -168,8 +180,14 @@ export function addMasterCrud(
     if (!id || Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
     try {
       const actor = (req.auth?.username as string | undefined) ?? "system";
+      const tenantId = activeTenantId(req);
       const deleted = await db.transaction(async (tx) => {
-        const [row] = await tx.delete(table).where(eq(idCol, id)).returning();
+        const [row] = await tx
+          .delete(table)
+          .where(
+            sql`(${idCol}) = ${id} AND (${tenantCol}) = ${tenantId}`,
+          )
+          .returning();
         if (!row) { return null; }
         if (cfg.afterWrite) {
           await cfg.afterWrite(tx, {
