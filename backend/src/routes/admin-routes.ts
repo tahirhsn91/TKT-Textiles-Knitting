@@ -147,6 +147,28 @@ router.get("/tenants/:id/stats", async (req, res): Promise<void> => {
 });
 
 /**
+ * GET /api/admin/tenants/:id/usage — rich resource-usage snapshot for the
+ * super-admin tenant panel (issue #219 2.2).
+ */
+router.get("/tenants/:id/usage", async (req, res): Promise<void> => {
+  const tenantId = Number(req.params.id);
+  if (!Number.isInteger(tenantId)) {
+    res.status(400).json({ error: "Invalid tenant id" });
+    return;
+  }
+  try {
+    const usage = await adminService.getTenantUsage(tenantId);
+    res.json(usage);
+  } catch (e) {
+    if ((e as { status?: number }).status) {
+      res.status((e as { status: number }).status).json({ error: (e as Error).message });
+      return;
+    }
+    throw e;
+  }
+});
+
+/**
  * POST /api/admin/tenants/:id/admins — assign a user as Admin within a tenant.
  */
 router.post("/tenants/:id/admins", async (req, res): Promise<void> => {
