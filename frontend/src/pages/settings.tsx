@@ -172,43 +172,106 @@ function UsersTab() {
         {isLoading ? (
           <div className="space-y-2 p-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Username</TableHead>
-                <TableHead>Display name</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Employee</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <>
+            {/* ── Desktop table ── */}
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Display name</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(users ?? []).length === 0 ? (
+                    <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">No users yet.</TableCell></TableRow>
+                  ) : (
+                    (users ?? []).map((u) => (
+                      <TableRow key={u.id}>
+                        <TableCell className="font-medium">{u.username}</TableCell>
+                        <TableCell>{u.displayName}</TableCell>
+                        <TableCell>
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${u.roleName === "Admin" ? "bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300" : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"}`}>
+                            {u.roleName}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{employees?.find((e) => e.id === u.employeeId)?.name ?? "—"}</TableCell>
+                        <TableCell>
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${u.isActive ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"}`}>
+                            {u.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" className="gap-1" onClick={() => setEditTarget(u)}>
+                            <Pencil className="h-4 w-4" /> Edit
+                          </Button>
+                          {isAdmin && u.roleName !== "Admin" && session?.user.id !== u.id ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1 text-destructive hover:text-destructive"
+                              onClick={() => setDeleteTarget(u)}
+                            >
+                              <Trash2 className="h-4 w-4" /> Delete
+                            </Button>
+                          ) : (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex cursor-not-allowed items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground/50">
+                                  <Trash2 className="h-4 w-4" /> Delete
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" align="end">
+                                {u.roleName === "Admin"
+                                  ? "Admin accounts cannot be deleted"
+                                  : "You cannot delete your own account"}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* ── Mobile card list ── */}
+            <div className="space-y-3 p-3 md:hidden">
               {(users ?? []).length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">No users yet.</TableCell></TableRow>
+                <p className="py-8 text-center text-sm text-muted-foreground">No users yet.</p>
               ) : (
                 (users ?? []).map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.username}</TableCell>
-                    <TableCell>{u.displayName}</TableCell>
-                    <TableCell>
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${u.roleName === "Admin" ? "bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300" : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"}`}>
-                        {u.roleName}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{employees?.find((e) => e.id === u.employeeId)?.name ?? "—"}</TableCell>
-                    <TableCell>
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${u.isActive ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"}`}>
-                        {u.isActive ? "Active" : "Inactive"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" className="gap-1" onClick={() => setEditTarget(u)}>
+                  <div key={u.id} className="rounded-lg border p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{u.username}</p>
+                        <p className="truncate text-sm text-muted-foreground">{u.displayName || "—"}</p>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${u.roleName === "Admin" ? "bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300" : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"}`}>
+                          {u.roleName}
+                        </span>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${u.isActive ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"}`}>
+                          {u.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      <span className="text-muted-foreground">Employee:</span>{" "}
+                      {employees?.find((e) => e.id === u.employeeId)?.name ?? "—"}
+                    </p>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Button variant="outline" size="sm" className="gap-1" onClick={() => setEditTarget(u)}>
                         <Pencil className="h-4 w-4" /> Edit
                       </Button>
                       {isAdmin && u.roleName !== "Admin" && session?.user.id !== u.id ? (
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           className="gap-1 text-destructive hover:text-destructive"
                           onClick={() => setDeleteTarget(u)}
@@ -216,25 +279,16 @@ function UsersTab() {
                           <Trash2 className="h-4 w-4" /> Delete
                         </Button>
                       ) : (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="inline-flex cursor-not-allowed items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground/50">
-                              <Trash2 className="h-4 w-4" /> Delete
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" align="end">
-                            {u.roleName === "Admin"
-                              ? "Admin accounts cannot be deleted"
-                              : "You cannot delete your own account"}
-                          </TooltipContent>
-                        </Tooltip>
+                        <span className="inline-flex cursor-not-allowed items-center justify-center gap-1 rounded-md border px-3 py-1.5 text-sm text-muted-foreground/50">
+                          <Trash2 className="h-4 w-4" /> Delete
+                        </span>
                       )}
-                    </TableCell>
-                  </TableRow>
+                    </div>
+                  </div>
                 ))
               )}
-            </TableBody>
-          </Table>
+            </div>
+          </>
         )}
       </CardContent>
 
