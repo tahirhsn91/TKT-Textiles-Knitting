@@ -87,11 +87,9 @@ router.use(companyInfoRouter);
 router.use("/invoicing", requirePermission("invoicing"));
 router.use(invoicingRouter);
 // Users/RBAC admin — admin-only enforced inside the router (users.ts).
-router.use("/users", requirePermission("users"));
-router.use("/users", usersRouter);
+router.use("/users", requirePermission("users"), usersRouter);
 // Attendance — lives under Daily Operations and feeds payroll.
-router.use("/attendance", requirePermission("dailyProduction"));
-router.use(attendanceRouter);
+router.use("/attendance", requirePermission("dailyProduction"), attendanceRouter);
 
 // Temporarily disabled due to TypeScript compilation issues with Knex-based services
 // Admin routes — super-admin only (requireSuperAdmin is enforced inside admin-routes.ts)
