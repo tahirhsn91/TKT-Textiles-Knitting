@@ -119,17 +119,19 @@ export function BrandingTab() {
                   key={p.preset_key}
                   type="button"
                   onClick={() => applyPreset(p.preset_key)}
-                  className="group flex flex-col items-start gap-2 rounded-md border p-3 text-left hover:border-primary"
+                  className="group flex w-44 flex-col items-start gap-2 rounded-md border p-3 text-left hover:border-primary"
                 >
-                  <span className="flex h-6 w-full gap-1 overflow-hidden rounded">
-                    <span className="flex-1" style={{ background: p.primary_color }} />
-                    <span className="flex-1" style={{ background: p.secondary_color }} />
-                    <span className="flex-1" style={{ background: p.accent_color }} />
+                  <span className="flex h-7 w-full gap-1 overflow-hidden rounded">
+                    <span className="flex-1" style={{ background: p.primary_color || "#ccc" }} title="Primary" />
+                    <span className="flex-1" style={{ background: p.accent_color || "#ccc" }} title="Accent" />
+                    <span className="flex-1" style={{ background: p.background_color || "#fff" }} title="Background" />
+                    <span className="flex-1" style={{ background: p.sidebar_color || "#333" }} title="Sidebar" />
                   </span>
                   <span className="flex items-center gap-1 text-xs font-medium">
                     {p.preset_name}
                     {p.is_default && <Check className="h-3 w-3 text-green-600" />}
                   </span>
+                  {p.description && <span className="text-[11px] text-muted-foreground">{p.description}</span>}
                 </button>
               ))}
             </div>

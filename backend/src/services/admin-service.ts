@@ -15,6 +15,7 @@ import { transactionHeaderTable } from "../db/schema/transactions.js";
 import { transactionDetailTable } from "../db/schema/transactions.js";
 import argon2 from "argon2";
 import { logger } from "../lib/logger.js";
+import { DEFAULT_THEME_PRESETS } from "../lib/theme-presets.js";
 
 export interface CreateTenantInput {
   name: string;
@@ -157,11 +158,10 @@ export const adminService = {
       await tx.insert(featureFlagsTable).values(
         DEFAULT_FEATURE_FLAGS.map((f) => ({ tenantId: tenant.id, ...f })),
       );
-      // Provision default theme presets.
-      await tx.insert(themePresetsTable).values([
-        { tenantId: tenant.id, presetName: "Default", presetKey: "default", isDefault: true, backgroundColor: "#FFFFFF", textColor: "#111827" },
-        { tenantId: tenant.id, presetName: "Dark", presetKey: "dark", backgroundColor: "#111827", textColor: "#F9FAFB" },
-      ]);
+      // Provision default theme presets (issue #219 1.2 — full colour surface).
+      await tx.insert(themePresetsTable).values(
+        DEFAULT_THEME_PRESETS.map((p) => ({ tenantId: tenant.id, ...p })),
+      );
       // Provision default session settings.
       await tx.insert(sessionSettingsTable).values({ tenantId: tenant.id });
 
