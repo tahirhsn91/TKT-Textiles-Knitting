@@ -153,6 +153,13 @@ This is a starting point. Add your own conventions, style, and rules as you figu
 - **If it is NOT the dev environment**, do not auto-checkout/pull `develop`; just start the new session normally.
 - How to tell: the dev stack shows the fixed red "Development environment" banner (Vite `import.meta.env.DEV`), runs from this `develop`-tracking workspace at `~/project/TKT-Textiles-Knitting`, and uses the dev Docker compose/`.env`. When unsure whether the current environment is dev, ask before syncing.
 
+## Codebase Understanding — Use Graphify (set 2026-08-26)
+
+- Whenever a task requires understanding the codebase — its architecture, file relationships, how components/modules connect, tracing data flow, or answering a question about how something works — use the **graphify** skill FIRST (`skills/graphify/SKILL.md`).
+- If `graphify-out/graph.json` exists, treat the question as a graphify query (`graphify query "<question>"`) rather than rebuilding or manually reading files. Only build/extract fresh (`/graphify .` or `--update`) when the graph is missing, stale, or the question needs new coverage.
+- Prefer graphify to a manual file-by-file hunt: it returns nodes/edges with `source_location` citations and surfaces cross-module connections (god nodes, surprising links) a line-by-line read would miss.
+- This is a preflight habit, not ceremony: pull the graph's answer first, then go read the exact files it points to if you need details.
+
 ## Core Rules
 
 - Never work directly on `main` or `develop`. Create a feature branch from `develop` for any change before editing files.
