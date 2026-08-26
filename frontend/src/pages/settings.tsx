@@ -14,7 +14,6 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { customFetch } from "@/vendor/api-client-react/custom-fetch";
 import { useAuth } from "@/context/auth-context";
-import { Layout } from "@/components/layout";
 import { CompanySettingsTab } from "@/pages/company-settings-tab";
 import { InvitationsTab } from "@/pages/invitations-tab";
 import { ApiKeysTab } from "@/pages/api-keys-tab";
@@ -106,13 +105,13 @@ export default function SettingsPage() {
   if (!session?.role.isAdmin) {
     // Should never render (route-gated), but stay safe.
     return (
-      <Layout>
+      <>
         <p className="py-8 text-center text-sm text-muted-foreground">Access denied</p>
-      </Layout>
+      </>
     );
   }
   return (
-    <Layout>
+    <>
       <div className="flex flex-col gap-6">
         <header className="border-b pb-5">
           <p className="eyebrow">Administration</p>
@@ -139,7 +138,7 @@ export default function SettingsPage() {
           <TabsContent value="branding" className="mt-4"><BrandingTab /></TabsContent>
         </Tabs>
       </div>
-    </Layout>
+    </>
   );
 }
 

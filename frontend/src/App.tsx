@@ -1,5 +1,8 @@
 import { lazy, Suspense } from "react";
-import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
+import { Layout } from "@/components/layout";
+import { PageLoadingSkeleton } from "@/components/page-loading-skeleton";
+import { useAuth } from "@/context/auth-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,10 +11,7 @@ import { AuthProvider } from "@/context/auth-context";
 import { BrandingApplier } from "@/components/branding-applier";
 import { ProtectedRoute } from "@/components/protected-route";
 import { TenantRequired } from "@/components/tenant-required";
-import {
-  RouteErrorBoundary,
-  SuspenseFallback,
-} from "@/components/route-error-boundary";
+import { RouteErrorBoundary } from "@/components/route-error-boundary";
 import { lazyRetry } from "@/lib/lazy-retry";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
@@ -54,10 +54,21 @@ const queryClient = new QueryClient({
 });
 
 function Router() {
-  return (
-    <RouteErrorBoundary>
-      <Suspense fallback={<SuspenseFallback />}>
-        <Switch>
+  const [location] = useLocation();
+  const { isAuthenticated } = useAuth();
+
+  // Auth chrome (sidebar + top bar) is rendered ONCE here, above the routes,
+  // so navigating between pages swaps only the <main> content — the chrome
+  // never unmounts/remounts and never loses its state. /login and the brief
+  // pre-auth boot are the only exceptions: no chrome until authenticated.
+  // Only the lazy page chunk (content) suspends, so the loading skeleton
+  // appears in the content area, below the persistent sidebar/top bar,
+  // instead of blinking the whole page.
+  const showChrome = isAuthenticated && !location.startsWith("/login");
+
+  const content = (
+    <Suspense fallback={<PageLoadingSkeleton />}>
+      <Switch>
           <Route path="/login" component={LoginPage} />
           <Route path="/">
             <ProtectedRoute moduleId="dashboard">
@@ -132,8 +143,17 @@ function Router() {
             <ProtectedRoute moduleId="*"><AdminTenantsPage /></ProtectedRoute>
           </Route>
           <Route component={NotFound} />
-        </Switch>
-      </Suspense>
+      </Switch>
+    </Suspense>
+  );
+
+  if (!showChrome) {
+    return <RouteErrorBoundary>{content}</RouteErrorBoundary>;
+  }
+
+  return (
+    <RouteErrorBoundary>
+      <Layout>{content}</Layout>
     </RouteErrorBoundary>
   );
 }

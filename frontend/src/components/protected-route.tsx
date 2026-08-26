@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/context/auth-context";
-import { Layout } from "@/components/layout";
 
 /**
  * Route-level permission guard (issue #135). Wraps a wouter Route component:
@@ -12,6 +11,10 @@ import { Layout } from "@/components/layout";
  *
  * `moduleId` is the route key the admin toggles in the permissions matrix
  * (same key the backend requirePermission uses).
+ *
+ * The Layout (sidebar + top bar) is mounted once at the App/router level, NOT
+ * here — this guard only renders the CONTENT area so navigating never remounts
+ * the chrome. The loading/403 states below are therefore content-only.
  */
 export function ProtectedRoute({
   moduleId,
@@ -23,13 +26,9 @@ export function ProtectedRoute({
   const { session, loading, isAuthenticated, can } = useAuth();
   const [, setLocation] = useLocation();
 
-  // Still restoring the boot session — show nothing (or the layout skeleton).
+  // Still restoring the boot session — show a content-area pulse block.
   if (loading) {
-    return (
-      <Layout>
-        <div className="h-32 animate-pulse rounded-lg bg-muted" />
-      </Layout>
-    );
+    return <div className="h-32 animate-pulse rounded-lg bg-muted" />;
   }
 
   if (!isAuthenticated) {
@@ -44,11 +43,7 @@ export function ProtectedRoute({
   }
 
   if (!can(moduleId)) {
-    return (
-      <Layout>
-        <NotAuthorized moduleId={moduleId} />
-      </Layout>
-    );
+    return <NotAuthorized moduleId={moduleId} />;
   }
 
   return <>{children}</>;
