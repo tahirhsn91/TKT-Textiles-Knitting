@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ConfigurationProvider } from "@/context/config-context";
 import { AuthProvider } from "@/context/auth-context";
 import { ProtectedRoute } from "@/components/protected-route";
+import { TenantRequired } from "@/components/tenant-required";
 import {
   RouteErrorBoundary,
   SuspenseFallback,
@@ -62,65 +63,66 @@ function Router() {
             </ProtectedRoute>
           </Route>
           <Route path="/dashboard">
-            <ProtectedRoute moduleId="dashboard"><DashboardPage /></ProtectedRoute>
+            <ProtectedRoute moduleId="dashboard"><TenantRequired><DashboardPage /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/transactions">
-            <ProtectedRoute moduleId="transactions"><TransactionList /></ProtectedRoute>
+            <ProtectedRoute moduleId="transactions"><TenantRequired><TransactionList /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/transactions/new">
-            <ProtectedRoute moduleId="transactions"><TransactionForm /></ProtectedRoute>
+            <ProtectedRoute moduleId="transactions"><TenantRequired><TransactionForm /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/transactions/:id/edit">
-            <ProtectedRoute moduleId="transactions"><TransactionForm /></ProtectedRoute>
+            <ProtectedRoute moduleId="transactions"><TenantRequired><TransactionForm /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/daily-production">
-            <ProtectedRoute moduleId="dailyProduction"><DailyProductionList /></ProtectedRoute>
+            <ProtectedRoute moduleId="dailyProduction"><TenantRequired><DailyProductionList /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/attendance">
-            <ProtectedRoute moduleId="dailyProduction"><AttendancePage /></ProtectedRoute>
+            <ProtectedRoute moduleId="dailyProduction"><TenantRequired><AttendancePage /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/yarn-receipts">
-            <ProtectedRoute moduleId="yarnReceipts"><YarnReceiptList /></ProtectedRoute>
+            <ProtectedRoute moduleId="yarnReceipts"><TenantRequired><YarnReceiptList /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/daily-deliveries">
-            <ProtectedRoute moduleId="dailyDeliveries"><DailyDeliveryList /></ProtectedRoute>
+            <ProtectedRoute moduleId="dailyDeliveries"><TenantRequired><DailyDeliveryList /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/transactions/monthly-salary-entry/new">
-            <ProtectedRoute moduleId="payroll"><PayrollEntryPage /></ProtectedRoute>
+            <ProtectedRoute moduleId="payroll"><TenantRequired><PayrollEntryPage /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/transactions/monthly-salary-entry/:id/edit">
-            <ProtectedRoute moduleId="payroll"><PayrollEntryPage /></ProtectedRoute>
+            <ProtectedRoute moduleId="payroll"><TenantRequired><PayrollEntryPage /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/transactions/monthly-salary-entry">
-            <ProtectedRoute moduleId="payroll"><MonthlySalaryEntryPage /></ProtectedRoute>
+            <ProtectedRoute moduleId="payroll"><TenantRequired><MonthlySalaryEntryPage /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/transactions/advances">
-            <ProtectedRoute moduleId="payroll"><AdvancesPage /></ProtectedRoute>
+            <ProtectedRoute moduleId="payroll"><TenantRequired><AdvancesPage /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/masters">
-            <ProtectedRoute moduleId="masters"><MastersPage /></ProtectedRoute>
+            <ProtectedRoute moduleId="masters"><TenantRequired><MastersPage /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/reports">
-            <ProtectedRoute moduleId="reports"><Redirect to="/reports/yarn-balance" /></ProtectedRoute>
+            <ProtectedRoute moduleId="reports"><TenantRequired><Redirect to="/reports/yarn-balance" /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/reports/yarn-balance">
-            <ProtectedRoute moduleId="reports"><YarnBalancePage /></ProtectedRoute>
+            <ProtectedRoute moduleId="reports"><TenantRequired><YarnBalancePage /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/reports/yarn-to-fabric">
-            <ProtectedRoute moduleId="reports"><YarnToFabricPage /></ProtectedRoute>
+            <ProtectedRoute moduleId="reports"><TenantRequired><YarnToFabricPage /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/maintenance/machine">
-            <ProtectedRoute moduleId="maintenance"><MachineMaintenancePage /></ProtectedRoute>
+            <ProtectedRoute moduleId="maintenance"><TenantRequired><MachineMaintenancePage /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/maintenance/factory">
-            <ProtectedRoute moduleId="maintenance"><FactoryMaintenancePage /></ProtectedRoute>
+            <ProtectedRoute moduleId="maintenance"><TenantRequired><FactoryMaintenancePage /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/invoicing">
-            <ProtectedRoute moduleId="invoicing"><InvoicingPage /></ProtectedRoute>
+            <ProtectedRoute moduleId="invoicing"><TenantRequired><InvoicingPage /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/settings">
-            <ProtectedRoute moduleId="users"><SettingsPage /></ProtectedRoute>
+            <ProtectedRoute moduleId="users"><TenantRequired><SettingsPage /></TenantRequired></ProtectedRoute>
           </Route>
+          {/* /admin/tenants is platform-level — reachable without a tenant. */}
           <Route path="/admin/tenants">
             <ProtectedRoute><AdminTenantsPage /></ProtectedRoute>
           </Route>
