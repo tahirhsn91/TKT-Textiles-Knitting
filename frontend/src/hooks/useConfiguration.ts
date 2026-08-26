@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useState, useEffect, useCallback, createElement, type ReactNode, type ComponentType } from 'react';
+import { customFetch } from '@/vendor/api-client-react/custom-fetch';
 
 /**
  * useConfiguration Hook
@@ -83,36 +83,40 @@ export const useConfiguration = (): UseConfigurationReturn => {
     fetchConfiguration();
   }, []);
 
-  const fetchConfiguration = async () => {
+  const fetchConfiguration = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch in parallel
+      // Fetch in parallel (token + X-Tenant-Id attached by customFetch).
       const [settingsRes, featuresRes, integrationsRes, summaryRes] = await Promise.all([
-        axios.get('/api/configuration/settings'),
-        axios.get('/api/configuration/features'),
-        axios.get('/api/configuration/integrations'),
-        axios.get('/api/configuration/summary'),
+        customFetch<TenantSettings>('/api/configuration/settings'),
+        customFetch<{ features: FeatureFlag[] }>('/api/configuration/features'),
+        customFetch<{ integrations: IntegrationSetting[] }>('/api/configuration/integrations').catch(() => ({ integrations: [] })),
+        customFetch<ConfigurationSummary>('/api/configuration/summary'),
       ]);
 
-      setSettings(settingsRes.data);
-      setFeatures(featuresRes.data.features);
-      setIntegrations(integrationsRes.data.integrations);
-      setSummary(summaryRes.data);
+      setSettings(settingsRes);
+      setFeatures(featuresRes.features ?? []);
+      setIntegrations(integrationsRes.integrations ?? []);
+      setSummary(summaryRes);
     } catch (err) {
       console.error('Error fetching configuration:', err);
       setError('Failed to load configuration');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const updateSettings = async (newSettings: Partial<TenantSettings>) => {
     try {
       setLoading(true);
-      const response = await axios.put('/api/configuration/settings', newSettings);
-      setSettings(response.data.data);
+      const response = await customFetch<{ data: TenantSettings }>('/api/configuration/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings),
+      });
+      setSettings(response.data);
     } catch (err) {
       console.error('Error updating settings:', err);
       setError('Failed to update settings');
@@ -125,13 +129,14 @@ export const useConfiguration = (): UseConfigurationReturn => {
   const toggleFeature = async (featureKey: string, isEnabled: boolean) => {
     try {
       setLoading(true);
-      const response = await axios.put(`/api/configuration/features/${featureKey}`, {
-        is_enabled: isEnabled,
+      const response = await customFetch<{ data: FeatureFlag }>(`/api/configuration/features/${featureKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_enabled: isEnabled }),
       });
 
-      // Update features list
       setFeatures((prev) =>
-        prev.map((f) => (f.feature_key === featureKey ? response.data.data : f))
+        prev.map((f) => (f.feature_key === featureKey ? response.data : f))
       );
     } catch (err) {
       console.error('Error toggling feature:', err);
@@ -145,11 +150,13 @@ export const useConfiguration = (): UseConfigurationReturn => {
   const updateIntegration = async (integrationKey: string, config: any) => {
     try {
       setLoading(true);
-      const response = await axios.put(`/api/configuration/integrations/${integrationKey}`, config);
-
-      // Update integrations list
+      const response = await customFetch<{ data: IntegrationSetting }>(`/api/configuration/integrations/${integrationKey}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
       setIntegrations((prev) =>
-        prev.map((i) => (i.integration_key === integrationKey ? response.data.data : i))
+        prev.map((i) => (i.integration_key === integrationKey ? response.data : i))
       );
     } catch (err) {
       console.error('Error updating integration:', err);
@@ -195,8 +202,8 @@ export const useFeatureDetails = (featureKey: string) => {
  * Higher-order component to guard features
  */
 export const withFeatureFlag =
-  (featureKey: string, fallback?: React.ReactNode) =>
-  (Component: React.ComponentType<any>) =>
+  (featureKey: string, fallback?: ReactNode) =>
+  (Component: ComponentType<any>) =>
   (props: any) => {
     const isEnabled = useFeatureFlag(featureKey);
 
@@ -204,5 +211,5 @@ export const withFeatureFlag =
       return fallback || null;
     }
 
-    return <Component {...props} />;
+    return createElement(Component, props);
   };
