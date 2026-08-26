@@ -24,6 +24,7 @@ export const openApiSpec = {
     { name: "Audit Logs", description: "Compliance / audit trail" },
     { name: "Tenants", description: "Tenant management (super-admin)" },
     { name: "Public API v1", description: "API-key authenticated programmatic access (X-API-Key)" },
+    { name: "Reports", description: "Reports + CSV export" },
   ],
   paths: {
     "/api/auth/login": {
@@ -121,6 +122,22 @@ export const openApiSpec = {
         security: [{ apiKeyAuth: [] }],
         responses: {
           "200": { description: "Transaction + quantity KPIs" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/api/reports/export/csv": {
+      get: {
+        tags: ["Reports"],
+        summary: "Export the report as a CSV file",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "dateFrom", in: "query", required: false, schema: { type: "string", format: "date" } },
+          { name: "dateTo", in: "query", required: false, schema: { type: "string", format: "date" } },
+          { name: "docNumber", in: "query", required: false, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": { description: "CSV file download (Content-Disposition: attachment)" },
           "401": { $ref: "#/components/responses/Unauthorized" },
         },
       },
