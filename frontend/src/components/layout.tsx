@@ -487,7 +487,7 @@ function BottomNav({ location, can }: { location: string; can: (moduleId: string
   const visible = bottomNavItems.filter((item) => can(item.module));
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-sidebar-border bg-sidebar text-sidebar-foreground md:hidden print:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar text-sidebar-foreground md:hidden print:hidden"
       aria-label="Main navigation"
     >
       <div
