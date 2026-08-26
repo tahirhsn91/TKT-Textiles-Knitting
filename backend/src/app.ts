@@ -5,6 +5,7 @@ import rateLimit from "express-rate-limit";
 import router from "./routes/index.js";
 import authRouter from "./routes/auth.js";
 import { requireAuth } from "./lib/auth.js";
+import { UPLOAD_DIR, ensureUploadDir } from "./lib/uploads.js";
 import { logger } from "./lib/logger.js";
 
 const app: Express = express();
@@ -93,6 +94,12 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve uploaded tenant assets (logo/favicon) at /api/uploads. Public: the
+// URLs we store in branding config are self-referential image srcs; they don't
+// expose tenant internals (filenames are randomized).
+ensureUploadDir();
+app.use("/api/uploads", express.static(UPLOAD_DIR));
 
 // Apply rate limiting: general limiter on all API routes, stricter limiter
 // on mutations. The order matters — apiLimiter runs first (catch-all), then

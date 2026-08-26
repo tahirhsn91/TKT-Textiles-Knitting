@@ -25,3 +25,4 @@ db-backups/
 .graphify/
 graphify-out/
 .clawhub/
+uploads/

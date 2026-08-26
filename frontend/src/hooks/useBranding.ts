@@ -72,6 +72,8 @@ interface UseBrandingReturn {
   applyTheme: (presetKey: string) => Promise<void>;
   /** Upload a logo image. */
   uploadLogo: (file: File) => Promise<void>;
+  /** Upload a favicon image. */
+  uploadFavicon: (file: File) => Promise<void>;
 }
 
 export const DEFAULT_COLORS = {
@@ -201,6 +203,24 @@ export const useBranding = (enabled = true): UseBrandingReturn => {
     }
   };
 
+  const uploadFavicon = async (file: File) => {
+    try {
+      setLoading(true);
+      const formData = new FormData();
+      formData.append("favicon", file);
+      await customFetch("/api/branding/favicon", {
+        method: "POST",
+        body: formData,
+      });
+      await refreshBranding();
+    } catch (err) {
+      setError("Failed to upload favicon");
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     branding,
     loading,
@@ -209,6 +229,7 @@ export const useBranding = (enabled = true): UseBrandingReturn => {
     updateBranding,
     applyTheme,
     uploadLogo,
+    uploadFavicon,
   };
 };
 
