@@ -162,12 +162,27 @@ This is a starting point. Add your own conventions, style, and rules as you figu
 
 ## Skill Routing — Use the Matching Domain Skill (set 2026-08-26)
 
-- Whenever a task involves **backend** work (APIs, server-side logic, services, microservices, middleware) — read `skills/backend-developer/SKILL.md` and follow it.
-- Whenever a task involves **frontend** work (React/Vue/Angular UIs, components, views, full-stack frontend integration) — read `skills/frontend-developer/SKILL.md` and follow it.
-- Whenever a task involves **writing or optimizing database queries** (SQL, query tuning, indexing, slow-query analysis) — read `skills/database-optimizer/SKILL.md` and follow it.
-- Whenever a task involves **UI/UX changes** (visual design, flows, information architecture, design tokens, component styling, accessibility) — read `skills/ui-ux-pro-max/SKILL.md` and follow it.
-- Load the relevant skill before editing any file for that area. When a task spans multiple domains, load and follow each applicable skill.
-- These domain skills supplement — not replace — the graphify preflight: use graphify first to understand the codebase, then apply the matching domain skill for the work.
+Load the most specific applicable skill before editing any file in that area. When a task spans multiple domains, load and follow each applicable skill. These domain skills supplement — not replace — the graphify preflight: use graphify first to understand the codebase, then apply the matching domain skill for the work.
+
+Core domain routing:
+
+- **Backend** work (APIs, server-side logic, services, microservices, middleware) → `skills/backend-developer/SKILL.md`.
+- **Frontend** work (React/Vue/Angular UIs, components, views, full-stack frontend integration) → `skills/frontend-developer/SKILL.md`.
+- **Database query writing/optimization** (SQL, query tuning, indexing, slow-query analysis) → `skills/database-optimizer/SKILL.md`.
+- **UI/UX changes** (visual design, flows, information architecture, design tokens, component styling, accessibility) → `skills/ui-ux-pro-max/SKILL.md`.
+
+Specialized routing (use when the task matches the more specific skill over the generic one above):
+
+- **Full-stack features** spanning database + API + frontend as one unit → `skills/fullstack-developer/SKILL.md`.
+- **Next.js 14+ apps** (App Router, server components, server actions, core Web Vitals, SEO) → `skills/nextjs-developer/SKILL.md`.
+- **Optimizing existing React apps** (React 18+ features, performance, complex state) → `skills/react-specialist/SKILL.md`.
+- **Node.js / TypeScript backend patterns** (layered architecture, Express/Fastify/Hono/NestJS/Koa, tRPC, Bun) → `skills/compound-eng-nodejs-backend/SKILL.md` (name: `ia-nodejs-backend`).
+- **PostgreSQL at scale** (optimization, replication, HA, backups, configuration tuning) → `skills/postgres-pro/SKILL.md`.
+- **Visual design / design systems** (component libraries, design tokens, interaction patterns) → `skills/ui-designer/SKILL.md`.
+- **QA strategy** (test planning, QA across the development cycle, quality metrics) → `skills/qa-expert/SKILL.md`.
+- **Code review** (code quality, security vulnerabilities, best practices) → `skills/code-reviewer/SKILL.md`.
+
+Non-code skills: `skills/nox-grill-me/SKILL.md` is for stress-testing a plan/design through interrogation (when the user asks to be grilled or mentions "grill me"); it is not a coding domain.
 
 ## Core Rules
 
