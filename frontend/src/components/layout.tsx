@@ -119,6 +119,7 @@ const mobileGroups = [
 // it shows in the phone drawer (the desktop sidebar places it as a flat item).
 const adminItems = [
   { href: "/settings", label: "Users & Roles", icon: Settings, module: "users" },
+  { href: "/audit-logs", label: "Audit Logs", icon: ScrollText, module: "users" },
 ];
 
 // Primary route each collapsed group icon navigates to.
