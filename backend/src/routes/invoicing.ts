@@ -29,6 +29,7 @@ import { isFbrSandboxEnabled } from "../lib/fbr/config.js";
 import { isUniqueViolation } from "../lib/db-errors.js";
 import { buildFbrInvoicePayload, postInvoiceToFbr } from "../lib/fbr/client.js";
 import { validateBody } from "../lib/validate.js";
+import { activeTenantId } from "../middleware/tenant-context.js";
 
 const router: IRouter = Router();
 
@@ -46,8 +47,8 @@ function todayIso(): string {
 
 // ─── Parties with un-invoiced Fabric_Dispatch transactions ────────────────
 
-router.get("/invoicing/parties", async (_req, res): Promise<void> => {
-  const parties = await listUninvoicedParties();
+router.get("/invoicing/parties", async (req, res): Promise<void> => {
+  const parties = await listUninvoicedParties(activeTenantId(req));
   res.json(parties);
 });
 
@@ -60,7 +61,7 @@ router.get("/invoicing/preview/:partyId", async (req, res): Promise<void> => {
   const partyId = parseInt(req.params.partyId, 10);
   if (isNaN(partyId)) { res.status(400).json({ error: "Invalid party id" }); return; }
 
-  const { groups, transactionHeaderIds, totalNetWeight } = await getUninvoicedPreview(partyId);
+  const { groups, transactionHeaderIds, totalNetWeight } = await getUninvoicedPreview(activeTenantId(req), partyId);
   res.json({ partyId, groups, transactionHeaderIds, totalNetWeight });
 });
 
@@ -85,9 +86,10 @@ const generateBodySchema = z.object({
 
 router.post("/invoicing/generate", validateBody(generateBodySchema), async (req, res): Promise<void> => {
   const { partyId, createdBy, items } = req.body as unknown as z.infer<typeof generateBodySchema>;
+  const tenantId = activeTenantId(req);
 
   // Re-resolve the un-invoiced transactions fresh (concurrency guard).
-  const preview = await getUninvoicedPreview(partyId);
+  const preview = await getUninvoicedPreview(tenantId, partyId);
   if (preview.transactionHeaderIds.length === 0) {
     res.status(409).json({ error: "No un-invoiced Fabric Delivery transactions remain for this party." });
     return;
@@ -104,7 +106,7 @@ router.post("/invoicing/generate", validateBody(generateBodySchema), async (req,
   const defaultCompany = await db
     .select()
     .from(companyInfoMasterTable)
-    .where(eq(companyInfoMasterTable.isDefault, true));
+    .where(and(eq(companyInfoMasterTable.isDefault, true), eq(companyInfoMasterTable.tenantId, tenantId)));
   if (defaultCompany.length === 0) {
     res.status(409).json({ error: "No default company is configured. Set a default company in Company Info first." });
     return;
@@ -129,6 +131,7 @@ router.post("/invoicing/generate", validateBody(generateBodySchema), async (req,
         invoiceDate,
         companyId: company.id,
         partyId,
+        tenantId,
         status: "draft",
         totalValue: "0",
         totalTax: "0",
@@ -152,6 +155,7 @@ router.post("/invoicing/generate", validateBody(generateBodySchema), async (req,
         .insert(invoiceItemTable)
         .values({
           invoiceId: ins.id,
+          tenantId,
           yarnTypeId: g.yarnTypeId,
           yarnCountId: g.yarnCountId,
           hsCode: g.hsCode,
@@ -173,7 +177,7 @@ router.post("/invoicing/generate", validateBody(generateBodySchema), async (req,
 
     // Claim all source transactions for this invoice (junction rows).
     await tx.insert(invoiceTransactionTable).values(
-      preview.transactionHeaderIds.map((tid) => ({ invoiceId: ins.id, transactionHeaderId: tid })),
+      preview.transactionHeaderIds.map((tid) => ({ invoiceId: ins.id, transactionHeaderId: tid, tenantId })),
     );
 
     // Update the header totals.
@@ -200,13 +204,14 @@ router.post("/invoicing/generate", validateBody(generateBodySchema), async (req,
     return;
   }
 
-  const detail = await loadInvoiceDetail(result.id);
+  const detail = await loadInvoiceDetail(result.id, activeTenantId(req));
   res.status(201).json(detail);
 });
 
 // ─── List invoices ────────────────────────────────────────────────────────
 
-router.get("/invoicing", async (_req, res): Promise<void> => {
+router.get("/invoicing", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const rows = await db
     .select({
       id: invoiceTable.id,
@@ -229,11 +234,9 @@ router.get("/invoicing", async (_req, res): Promise<void> => {
     .from(invoiceTable)
     .leftJoin(companyInfoMasterTable, eq(invoiceTable.companyId, companyInfoMasterTable.id))
     .leftJoin(partyMasterTable, eq(invoiceTable.partyId, partyMasterTable.id))
+    .where(eq(invoiceTable.tenantId, tenantId))
     .orderBy(desc(invoiceTable.id));
 
-  // Attach derived payment state per invoice (issue #189). The as-of date is
-  // resolved once per request instead of once per row (each computePaymentState
-  // call used to construct a fresh `new Date()`).
   const ids = rows.map((r) => r.id);
   const payments = ids.length > 0
     ? await db
@@ -243,7 +246,7 @@ router.get("/invoicing", async (_req, res): Promise<void> => {
           taxDeduction: invoicePaymentTable.taxDeduction,
         })
         .from(invoicePaymentTable)
-        .where(inArray(invoicePaymentTable.invoiceId, ids))
+        .where(and(inArray(invoicePaymentTable.invoiceId, ids), eq(invoicePaymentTable.tenantId, tenantId)))
     : [];
   const payByInvoice = new Map<number, typeof payments>();
   for (const p of payments) {
@@ -277,7 +280,8 @@ router.get("/invoicing", async (_req, res): Promise<void> => {
 
 
 // ─── Receivables: per-party outstanding + aging ────────────────────────────
-router.get("/invoicing/receivables", async (_req, res): Promise<void> => {
+router.get("/invoicing/receivables", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const invoices = await db
     .select({
       id: invoiceTable.id,
@@ -291,12 +295,8 @@ router.get("/invoicing/receivables", async (_req, res): Promise<void> => {
     })
     .from(invoiceTable)
     .leftJoin(partyMasterTable, eq(invoiceTable.partyId, partyMasterTable.id))
-    .where(eq(invoiceTable.status, "posted"));
+    .where(and(eq(invoiceTable.status, "posted"), eq(invoiceTable.tenantId, tenantId)));
 
-  // Only payments against the posted invoices matter (payments can only be
-  // recorded against posted invoices anyway) — filtering by the posted ids
-  // lets Postgres use the invoice_payment_invoice_idx index instead of a full
-  // table scan.
   const postedIds = invoices.map((i) => i.id);
   const payments = postedIds.length > 0
     ? await db
@@ -306,7 +306,7 @@ router.get("/invoicing/receivables", async (_req, res): Promise<void> => {
           taxDeduction: invoicePaymentTable.taxDeduction,
         })
         .from(invoicePaymentTable)
-        .where(inArray(invoicePaymentTable.invoiceId, postedIds))
+        .where(and(inArray(invoicePaymentTable.invoiceId, postedIds), eq(invoicePaymentTable.tenantId, tenantId)))
     : [];
 
   const payByInvoice = new Map<number, typeof payments>();
@@ -395,7 +395,7 @@ router.get("/invoicing/rates/:partyId", async (req, res): Promise<void> => {
   const partyId = parseInt(req.params.partyId ?? "", 10);
   if (isNaN(partyId)) { res.status(400).json({ error: "Invalid party id" }); return; }
 
-  const rates = await loadLatestRates(partyId);
+  const rates = await loadLatestRates(activeTenantId(req), partyId);
   // Keys from loadLatestRates carry a `partyId|` prefix; strip it for the
   // single-party consumer (frontend expects `${yarnTypeId}|${yarnCountId}`).
   res.json(Array.from(rates.entries()).map(([key, v]) => ({ key: key.slice(String(partyId).length + 1), ...v })));
@@ -406,8 +406,11 @@ router.get("/invoicing/rates/:partyId", async (req, res): Promise<void> => {
  * recent invoice item for that combination, across all parties (when
  * `partyId` is undefined) or for one party. Key = `${yarnTypeId}|${yarnCountId}`.
  */
-async function loadLatestRates(partyId: number | undefined): Promise<Map<string, { ratePerKg: string; invoiceDate: string; invoiceId: number }>> {
-  const conditions = partyId != null ? eq(invoiceTable.partyId, partyId) : undefined;
+async function loadLatestRates(tenantId: number, partyId: number | undefined): Promise<Map<string, { ratePerKg: string; invoiceDate: string; invoiceId: number }>> {
+  const conditions = and(
+    eq(invoiceTable.tenantId, tenantId),
+    partyId != null ? eq(invoiceTable.partyId, partyId) : undefined,
+  );
   const rows = await db
     .selectDistinctOn(
       [invoiceTable.partyId, invoiceItemTable.yarnTypeId, invoiceItemTable.yarnCountId],
@@ -449,13 +452,12 @@ async function loadLatestRates(partyId: number | undefined): Promise<Map<string,
 // a prior invoice exists for that same combination, the latest rate and
 // projected value (quantity × rate). Groups with no prior rate are returned
 // with a null rate (unvalued).
-router.get("/invoicing/future", async (_req, res): Promise<void> => {
-  // Batch-load every party's un-invoiced preview in 2 queries instead of
-  // looping per-party previews (~2N round-trips).
-  const previews = await getAllUninvoicedPreviews();
+router.get("/invoicing/future", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
+  const previews = await getAllUninvoicedPreviews(tenantId);
   if (previews.size === 0) { res.json([]); return; }
 
-  const rates = await loadLatestRates(undefined);
+  const rates = await loadLatestRates(tenantId, undefined);
   const rows = [];
 
   const parties = [...previews.entries()].sort((a, b) => a[1].partyName.localeCompare(b[1].partyName));
@@ -492,7 +494,7 @@ router.get("/invoicing/future", async (_req, res): Promise<void> => {
 
 // ─── Single invoice detail ────────────────────────────────────────────────
 
-async function loadInvoiceDetail(id: number) {
+async function loadInvoiceDetail(id: number, tenantId: number) {
   const [inv] = await db
     .select({
       id: invoiceTable.id,
@@ -523,7 +525,7 @@ async function loadInvoiceDetail(id: number) {
     .from(invoiceTable)
     .leftJoin(companyInfoMasterTable, eq(invoiceTable.companyId, companyInfoMasterTable.id))
     .leftJoin(partyMasterTable, eq(invoiceTable.partyId, partyMasterTable.id))
-    .where(eq(invoiceTable.id, id));
+    .where(and(eq(invoiceTable.id, id), eq(invoiceTable.tenantId, tenantId)));
 
   const items = await db
     .select({
@@ -545,15 +547,15 @@ async function loadInvoiceDetail(id: number) {
     .from(invoiceItemTable)
     .leftJoin(yarnTypeMasterTable, eq(invoiceItemTable.yarnTypeId, yarnTypeMasterTable.id))
     .leftJoin(yarnCountMasterTable, eq(invoiceItemTable.yarnCountId, yarnCountMasterTable.id))
-    .where(eq(invoiceItemTable.invoiceId, id))
+    .where(and(eq(invoiceItemTable.invoiceId, id), eq(invoiceItemTable.tenantId, tenantId)))
     .orderBy(invoiceItemTable.id);
 
   const transactions = await db
     .select({ transactionHeaderId: invoiceTransactionTable.transactionHeaderId })
     .from(invoiceTransactionTable)
-    .where(eq(invoiceTransactionTable.invoiceId, id));
+    .where(and(eq(invoiceTransactionTable.invoiceId, id), eq(invoiceTransactionTable.tenantId, tenantId)));
 
-  const payments = await loadInvoicePayments(id);
+  const payments = await loadInvoicePayments(id, tenantId);
 
   // Posted date for due-date math: use the postedAt date when available, else
   // the invoice date (drafts have no due/overdue state but keep it safe).
@@ -581,7 +583,7 @@ async function loadInvoiceDetail(id: number) {
 }
 
 /** Load payments for an invoice (oldest first). */
-async function loadInvoicePayments(invoiceId: number) {
+async function loadInvoicePayments(invoiceId: number, tenantId: number) {
   return await db
     .select({
       id: invoicePaymentTable.id,
@@ -596,14 +598,14 @@ async function loadInvoicePayments(invoiceId: number) {
       createdAt: invoicePaymentTable.createdAt,
     })
     .from(invoicePaymentTable)
-    .where(eq(invoicePaymentTable.invoiceId, invoiceId))
+    .where(and(eq(invoicePaymentTable.invoiceId, invoiceId), eq(invoicePaymentTable.tenantId, tenantId)))
     .orderBy(invoicePaymentTable.paymentDate, invoicePaymentTable.id);
 }
 
 router.get("/invoicing/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid invoice id" }); return; }
-  const detail = await loadInvoiceDetail(id);
+  const detail = await loadInvoiceDetail(id, activeTenantId(req));
   if (!detail.id) { res.status(404).json({ error: "Invoice not found" }); return; }
   res.json(detail);
 });
@@ -617,9 +619,10 @@ router.get("/invoicing/:id", async (req, res): Promise<void> => {
 router.post("/invoicing/:id/post", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid invoice id" }); return; }
+  const tenantId = activeTenantId(req);
 
   const [inv] = await db
-    .select().from(invoiceTable).where(eq(invoiceTable.id, id));
+    .select().from(invoiceTable).where(and(eq(invoiceTable.id, id), eq(invoiceTable.tenantId, tenantId)));
   if (!inv) { res.status(404).json({ error: "Invoice not found" }); return; }
   if (inv.status === "posted") {
     res.status(409).json({ error: "This invoice is already posted and read-only." });
@@ -627,15 +630,15 @@ router.post("/invoicing/:id/post", async (req, res): Promise<void> => {
   }
 
   const [company] = await db
-    .select().from(companyInfoMasterTable).where(eq(companyInfoMasterTable.id, inv.companyId));
+    .select().from(companyInfoMasterTable).where(and(eq(companyInfoMasterTable.id, inv.companyId), eq(companyInfoMasterTable.tenantId, tenantId)));
   if (!company) { res.status(404).json({ error: "Company not found" }); return; }
 
   const [party] = await db
-    .select().from(partyMasterTable).where(eq(partyMasterTable.id, inv.partyId));
+    .select().from(partyMasterTable).where(and(eq(partyMasterTable.id, inv.partyId), eq(partyMasterTable.tenantId, tenantId)));
   if (!party) { res.status(404).json({ error: "Party not found" }); return; }
 
   const items = await db
-    .select().from(invoiceItemTable).where(eq(invoiceItemTable.invoiceId, inv.id)).orderBy(invoiceItemTable.id);
+    .select().from(invoiceItemTable).where(and(eq(invoiceItemTable.invoiceId, inv.id), eq(invoiceItemTable.tenantId, tenantId))).orderBy(invoiceItemTable.id);
   if (items.length === 0) {
     res.status(409).json({ error: "Invoice has no items to post." });
     return;
@@ -656,9 +659,9 @@ router.post("/invoicing/:id/post", async (req, res): Promise<void> => {
         postedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(invoiceTable.id, inv.id))
+      .where(and(eq(invoiceTable.id, inv.id), eq(invoiceTable.tenantId, tenantId)))
       .returning();
-    const detail = await loadInvoiceDetail(updated.id);
+    const detail = await loadInvoiceDetail(updated.id, tenantId);
     res.json({ message: "Invoice marked posted (unregistered party — not sent to FBR)", invoice: detail });
     return;
   }
@@ -698,7 +701,7 @@ router.post("/invoicing/:id/post", async (req, res): Promise<void> => {
       postedAt: valid ? new Date() : null,
       updatedAt: new Date(),
     })
-    .where(eq(invoiceTable.id, inv.id))
+    .where(and(eq(invoiceTable.id, inv.id), eq(invoiceTable.tenantId, tenantId)))
     .returning();
 
   if (!valid) {
@@ -711,7 +714,7 @@ router.post("/invoicing/:id/post", async (req, res): Promise<void> => {
     return;
   }
 
-  const detail = await loadInvoiceDetail(updated.id);
+  const detail = await loadInvoiceDetail(updated.id, tenantId);
   res.json({ message: "Invoice posted to FBR", invoice: detail });
 });
 
@@ -723,16 +726,17 @@ router.post("/invoicing/:id/post", async (req, res): Promise<void> => {
 router.delete("/invoicing/:id", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid invoice id" }); return; }
+  const tenantId = activeTenantId(req);
 
   const [inv] = await db
-    .select().from(invoiceTable).where(eq(invoiceTable.id, id));
+    .select().from(invoiceTable).where(and(eq(invoiceTable.id, id), eq(invoiceTable.tenantId, tenantId)));
   if (!inv) { res.status(404).json({ error: "Invoice not found" }); return; }
   if (inv.status === "posted") {
     res.status(409).json({ error: "Posted invoices are read-only and cannot be deleted." });
     return;
   }
 
-  await db.delete(invoiceTable).where(eq(invoiceTable.id, id));
+  await db.delete(invoiceTable).where(and(eq(invoiceTable.id, id), eq(invoiceTable.tenantId, tenantId)));
   res.sendStatus(204);
 });
 
@@ -758,9 +762,10 @@ const paymentSchema = z.object({
 router.post("/invoicing/:id/payments", validateBody(paymentSchema), async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid invoice id" }); return; }
+  const tenantId = activeTenantId(req);
 
   const [inv] = await db
-    .select().from(invoiceTable).where(eq(invoiceTable.id, id));
+    .select().from(invoiceTable).where(and(eq(invoiceTable.id, id), eq(invoiceTable.tenantId, tenantId)));
   if (!inv) { res.status(404).json({ error: "Invoice not found" }); return; }
   if (inv.status !== "posted") {
     res.status(409).json({ error: "Payments can only be recorded against posted invoices." });
@@ -778,6 +783,7 @@ router.post("/invoicing/:id/payments", validateBody(paymentSchema), async (req, 
     .insert(invoicePaymentTable)
     .values({
       invoiceId: id,
+      tenantId,
       amount: body.amount.toFixed(2),
       taxDeduction: body.taxDeduction.toFixed(2),
       paymentDate: body.paymentDate,
@@ -788,29 +794,30 @@ router.post("/invoicing/:id/payments", validateBody(paymentSchema), async (req, 
     })
     .returning();
 
-  const detail = await loadInvoiceDetail(id);
+  const detail = await loadInvoiceDetail(id, tenantId);
   res.status(201).json({ payment, invoice: detail });
 });
 
 // ─── Delete a payment ─────────────────────────────────────────────────────
 router.delete("/invoicing/:id/payments/:paymentId", async (req, res): Promise<void> => {
   const id = idParam(req);
+  const tenantId = activeTenantId(req);
   const paymentId = parseInt(req.params.paymentId, 10);
   if (!id || isNaN(paymentId)) { res.status(400).json({ error: "Invalid ids" }); return; }
 
   const [inv] = await db
-    .select().from(invoiceTable).where(eq(invoiceTable.id, id));
+    .select().from(invoiceTable).where(and(eq(invoiceTable.id, id), eq(invoiceTable.tenantId, tenantId)));
   if (!inv) { res.status(404).json({ error: "Invoice not found" }); return; }
 
   const [existing] = await db
-    .select().from(invoicePaymentTable).where(eq(invoicePaymentTable.id, paymentId));
+    .select().from(invoicePaymentTable).where(and(eq(invoicePaymentTable.id, paymentId), eq(invoicePaymentTable.tenantId, tenantId)));
   if (!existing || existing.invoiceId !== id) {
     res.status(404).json({ error: "Payment not found" });
     return;
   }
 
-  await db.delete(invoicePaymentTable).where(eq(invoicePaymentTable.id, paymentId));
-  const detail = await loadInvoiceDetail(id);
+  await db.delete(invoicePaymentTable).where(and(eq(invoicePaymentTable.id, paymentId), eq(invoicePaymentTable.tenantId, tenantId)));
+  const detail = await loadInvoiceDetail(id, tenantId);
   res.json({ message: "Payment deleted", invoice: detail });
 });
 
@@ -848,21 +855,21 @@ router.post("/invoicing/backdated", validateBody(backdatedSchema), async (req, r
   // The manually-entered id becomes the actual PK — guard against existing rows
   // (the DB PK unique constraint is the backstop for races/concurrency).
   const [existing] = await db
-    .select({ id: invoiceTable.id }).from(invoiceTable).where(eq(invoiceTable.id, body.id));
+    .select({ id: invoiceTable.id }).from(invoiceTable).where(and(eq(invoiceTable.id, body.id), eq(invoiceTable.tenantId, activeTenantId(req))));
   if (existing) {
     res.status(400).json({ error: `An invoice with ID ${body.id} already exists.` });
     return;
   }
 
   const [defaultCompany] = await db
-    .select().from(companyInfoMasterTable).where(eq(companyInfoMasterTable.isDefault, true));
+    .select().from(companyInfoMasterTable).where(and(eq(companyInfoMasterTable.isDefault, true), eq(companyInfoMasterTable.tenantId, activeTenantId(req))));
   if (!defaultCompany) {
     res.status(409).json({ error: "No default company is configured. Set a default company in Company Info first." });
     return;
   }
 
   const [party] = await db
-    .select().from(partyMasterTable).where(eq(partyMasterTable.id, body.partyId));
+    .select().from(partyMasterTable).where(and(eq(partyMasterTable.id, body.partyId), eq(partyMasterTable.tenantId, activeTenantId(req))));
   if (!party) { res.status(404).json({ error: "Party not found" }); return; }
 
   const dueDays = (party.creditDays ?? 0) > 0 ? party.creditDays ?? 0 : null;
@@ -883,6 +890,7 @@ router.post("/invoicing/backdated", validateBody(backdatedSchema), async (req, r
         grandTotal += parseFloat(amounts.totalValue);
         itemRows.push({
           invoiceId: body.id,
+          tenantId: activeTenantId(req),
           yarnTypeId: it.yarnTypeId,
           yarnCountId: it.yarnCountId ?? null,
           hsCode: it.hsCode ?? null,
@@ -907,6 +915,7 @@ router.post("/invoicing/backdated", validateBody(backdatedSchema), async (req, r
           invoiceDate: body.invoiceDate,
           companyId: defaultCompany.id,
           partyId: body.partyId,
+          tenantId: activeTenantId(req),
           status: "posted",
           origin: "manual",
           dueDays,
@@ -934,7 +943,7 @@ router.post("/invoicing/backdated", validateBody(backdatedSchema), async (req, r
     throw err;
   }
 
-  const detail = await loadInvoiceDetail(invoice!.id);
+  const detail = await loadInvoiceDetail(invoice!.id, activeTenantId(req));
   res.status(201).json({ message: "Backdated invoice created", invoice: detail });
 });
 
