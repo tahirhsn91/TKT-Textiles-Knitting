@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Palette, Save, Check } from "lucide-react";
+import { Palette, Save, Check, Upload } from "lucide-react";
 import { useBranding, type BrandingConfig } from "@/hooks/useBranding";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,9 +19,10 @@ const BUTTON_STYLE_OPTIONS = ["rounded", "square", "pill"];
 
 /** Branding tab — set the tenant's company name, logo, and theme (issue #219 1.2). */
 export function BrandingTab() {
-  const { branding, loading, error, updateBranding, applyTheme, refreshBranding } = useBranding();
+  const { branding, loading, error, updateBranding, applyTheme, refreshBranding, uploadLogo, uploadFavicon } = useBranding();
   const [form, setForm] = useState<Partial<BrandingConfig>>({});
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState<"logo" | "favicon" | null>(null);
 
   useEffect(() => {
     if (branding?.config) setForm(branding.config);
@@ -47,6 +48,30 @@ export function BrandingTab() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const uploadAsset = async (kind: "logo" | "favicon", file: File) => {
+    setUploading(kind);
+    try {
+      if (kind === "logo") await uploadLogo(file);
+      else await uploadFavicon(file);
+    } catch {
+      /* shown via error */
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  const onPickLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) void uploadAsset("logo", f);
+    e.target.value = "";
+  };
+
+  const onPickFavicon = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) void uploadAsset("favicon", f);
+    e.target.value = "";
   };
 
   const applyPreset = async (key: string) => {
@@ -86,12 +111,24 @@ export function BrandingTab() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Logo URL</Label>
-              <Input value={form.logo_url ?? ""} onChange={(e) => set("logo_url", e.target.value)} placeholder="https://…/logo.png" />
+              <Label>Logo</Label>
+              <div className="flex items-center gap-2">
+                <Input value={form.logo_url ?? ""} onChange={(e) => set("logo_url", e.target.value)} placeholder="https://…/logo.png" className="flex-1" />
+                <Button type="button" variant="outline" size="sm" disabled={uploading !== null} onClick={() => document.getElementById("branding-logo-input")?.click()} className="gap-1 whitespace-nowrap">
+                  <Upload className="h-3.5 w-3.5" /> {uploading === "logo" ? "Uploading…" : "Upload"}
+                </Button>
+                <input id="branding-logo-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif,image/x-icon" className="hidden" onChange={onPickLogo} />
+              </div>
             </div>
             <div className="space-y-1.5">
-              <Label>Favicon URL</Label>
-              <Input value={form.favicon_url ?? ""} onChange={(e) => set("favicon_url", e.target.value)} placeholder="https://…/favicon.ico" />
+              <Label>Favicon</Label>
+              <div className="flex items-center gap-2">
+                <Input value={form.favicon_url ?? ""} onChange={(e) => set("favicon_url", e.target.value)} placeholder="https://…/favicon.ico" className="flex-1" />
+                <Button type="button" variant="outline" size="sm" disabled={uploading !== null} onClick={() => document.getElementById("branding-favicon-input")?.click()} className="gap-1 whitespace-nowrap">
+                  <Upload className="h-3.5 w-3.5" /> {uploading === "favicon" ? "Uploading…" : "Upload"}
+                </Button>
+                <input id="branding-favicon-input" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif,image/x-icon" className="hidden" onChange={onPickFavicon} />
+              </div>
             </div>
           </div>
           {form.logo_url && (

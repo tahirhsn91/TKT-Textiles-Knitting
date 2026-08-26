@@ -4,9 +4,60 @@ import { db } from "../db/index.js";
 import { activeTenantId } from "../middleware/tenant-context.js";
 import { brandingConfigTable, themePresetsTable } from "../db/schema/tenants.js";
 import { requireAuth } from "../lib/auth.js";
+import { imageUploader, publicAssetUrl, isUploadError } from "../lib/uploads.js";
 
 const router: IRouter = Router();
 router.use(requireAuth);
+
+/**
+ * POST /api/branding/logo — upload a tenant logo (multipart, field "logo").
+ * Stores the file and writes logo_url (+ filename/storage path) so the app
+ * re-themes with the new logo immediately (issue #219 1.2).
+ */
+router.post("/logo", (req, res) => {
+  const upload = imageUploader("logo");
+  upload(req, res, async (err) => {
+    if (err) {
+      res.status(isUploadError(err) ? 400 : 500).json({ error: err.message || "Upload failed" });
+      return;
+    }
+    const file = (req as { file?: Express.Multer.File }).file;
+    if (!file) {
+      res.status(400).json({ error: "No logo file provided (field: logo)" });
+      return;
+    }
+    const tenantId = activeTenantId(req);
+    const url = publicAssetUrl(file.filename);
+    await updateBrandingAsset(tenantId, {
+      logoUrl: url,
+      logoFilename: file.originalname,
+      logoStoragePath: file.filename,
+    });
+    res.json({ ok: true, logo_url: url, filename: file.filename });
+  });
+});
+
+/**
+ * POST /api/branding/favicon — upload a tenant favicon (multipart, field "favicon").
+ */
+router.post("/favicon", (req, res) => {
+  const upload = imageUploader("favicon");
+  upload(req, res, async (err) => {
+    if (err) {
+      res.status(isUploadError(err) ? 400 : 500).json({ error: err.message || "Upload failed" });
+      return;
+    }
+    const file = (req as { file?: Express.Multer.File }).file;
+    if (!file) {
+      res.status(400).json({ error: "No favicon file provided (field: favicon)" });
+      return;
+    }
+    const tenantId = activeTenantId(req);
+    const url = publicAssetUrl(file.filename);
+    await updateBrandingAsset(tenantId, { faviconUrl: url });
+    res.json({ ok: true, favicon_url: url, filename: file.filename });
+  });
+});
 
 /**
  * Build a CSS-variable string from a branding config so the frontend can
@@ -218,5 +269,27 @@ router.post("/themes/apply/:key", async (req, res): Promise<void> => {
   await db.update(brandingConfigTable).set(apply as never).where(eq(brandingConfigTable.id, existing.id));
   res.json({ ok: true });
 });
+
+/** Update logo/favicon asset fields on the tenant's branding config. */
+async function updateBrandingAsset(
+  tenantId: number,
+  fields: { logoUrl?: string; logoFilename?: string; logoStoragePath?: string; faviconUrl?: string },
+): Promise<void> {
+  const [existing] = await db
+    .select({ id: brandingConfigTable.id })
+    .from(brandingConfigTable)
+    .where(eq(brandingConfigTable.tenantId, tenantId))
+    .limit(1);
+  const patch: Record<string, unknown> = { updatedAt: new Date() };
+  if (fields.logoUrl !== undefined) patch.logoUrl = fields.logoUrl;
+  if (fields.logoFilename !== undefined) patch.logoFilename = fields.logoFilename;
+  if (fields.logoStoragePath !== undefined) patch.logoStoragePath = fields.logoStoragePath;
+  if (fields.faviconUrl !== undefined) patch.faviconUrl = fields.faviconUrl;
+  if (existing) {
+    await db.update(brandingConfigTable).set(patch as never).where(eq(brandingConfigTable.id, existing.id));
+  } else {
+    await db.insert(brandingConfigTable).values({ tenantId, ...patch } as never);
+  }
+}
 
 export default router;
