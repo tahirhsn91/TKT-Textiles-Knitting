@@ -83,11 +83,36 @@ export function _resetUnauthorizedState(): void {
   unauthorizedFired = false;
 }
 
+// ── Active-tenant context (issue #219) ──────────────────────────────────────
+// The active tenant is carried on each request via the X-Tenant-Id header. It
+// is client-held state (the AuthProvider owns it for super-admins; tenant
+// users' home tenant is implied by their JWT and the header is optional). We
+// register a getter here (module scope, no React) that the AuthProvider keeps
+// in sync, mirroring the bearer-token getter pattern.
+type TenantIdGetter = () => number | null;
+let tenantIdGetter: TenantIdGetter | null = null;
+
+/** Register the callback that returns the active tenant id (from auth context). */
+export function setTenantIdGetter(getter: TenantIdGetter | null): () => void {
+  tenantIdGetter = getter;
+  return () => {
+    if (tenantIdGetter === getter) tenantIdGetter = null;
+  };
+}
+
 // ── Request middleware: attach the bearer token from localStorage ───────────
 httpClient.interceptors.request.use((config) => {
   const token = getStoredToken();
   if (token) {
     config.headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  // Attach the active tenant context (issue #219). Always send when present;
+  // the backend ignores/validates it per the user's role (a tenant user's
+  // mismatched header is rejected server-side with 403).
+  const tenantId = tenantIdGetter?.() ?? null;
+  if (tenantId != null) {
+    config.headers.set("X-Tenant-Id", String(tenantId));
   }
 
   // Axios does not set `Content-Type: application/json` when the body is a
