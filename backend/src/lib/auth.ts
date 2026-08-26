@@ -27,7 +27,13 @@ export interface AuthTokenPayload {
   roleId: number;
   role: string;
   isAdmin: boolean;
-  tenantId?: number; // tenant context (optional for backwards compatibility)
+  // The super-admin role is platform-global. When true, the user may act in
+  // any active tenant (via X-Tenant-Id) and access platform/tenant-management
+  // routes. Distinct from isAdmin (tenant-level Admin), which only grants full
+  // access WITHIN the user's own tenant.
+  isSuperAdmin?: boolean;
+  // The user's home tenant. NULL/absent for platform super-admins.
+  tenantId?: number;
 }
 
 export function signToken(payload: AuthTokenPayload): string {
@@ -54,6 +60,8 @@ export interface RolePermissionSet {
   role: string;
   roleId: number;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
+  tenantId: number | null;
   permissions: string[]; // moduleIds this role can access
 }
 
@@ -61,9 +69,11 @@ export interface RolePermissionSet {
 export async function loadRolePermissions(userId: number): Promise<RolePermissionSet | null> {
   const user = await db
     .select({
+      id: userTable.id,
       roleId: userTable.roleId,
       roleName: roleTable.name,
       isAdmin: roleTable.isAdmin,
+      tenantId: userTable.tenantId,
     })
     .from(userTable)
     .innerJoin(roleTable, eq(userTable.roleId, roleTable.id))
@@ -72,10 +82,38 @@ export async function loadRolePermissions(userId: number): Promise<RolePermissio
 
   const row = user[0];
   if (!row) return null;
-  if (row.isAdmin) {
-    // Admin has every route — fail-closed, never needs rows in the matrix.
-    return { role: row.roleName, roleId: row.roleId, isAdmin: true, permissions: ["*"] };
+
+  // The super-admin role is the platform-global administrator. It has every
+  // route AND may act across all tenants (tenant boundary is enforced
+  // separately by the tenant-context middleware via X-Tenant-Id).
+  const isSuperAdmin =
+    row.roleName === "super-admin" && row.isAdmin;
+
+  if (isSuperAdmin) {
+    return {
+      role: row.roleName,
+      roleId: row.roleId,
+      isAdmin: true,
+      isSuperAdmin: true,
+      tenantId: row.tenantId,
+      permissions: ["*"],
+    };
   }
+
+  if (row.isAdmin) {
+    // A tenant-level Admin has every route WITHIN their tenant only. Global
+    // access is NOT granted here — the tenant-context middleware still bounds
+    // them to their home tenant. Never a super-admin.
+    return {
+      role: row.roleName,
+      roleId: row.roleId,
+      isAdmin: true,
+      isSuperAdmin: false,
+      tenantId: row.tenantId,
+      permissions: ["*"],
+    };
+  }
+
   const perms = await db
     .select({ moduleId: rolePermissionTable.moduleId })
     .from(rolePermissionTable)
@@ -84,6 +122,8 @@ export async function loadRolePermissions(userId: number): Promise<RolePermissio
     role: row.roleName,
     roleId: row.roleId,
     isAdmin: false,
+    isSuperAdmin: false,
+    tenantId: row.tenantId,
     permissions: perms.map((p) => p.moduleId),
   };
 }
@@ -107,9 +147,13 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 
 /**
  * Route-level permission guard (issue #135). Call after requireAuth. The
- * moduleId matches the route keys the admin toggles in the permissions UI. The
- * admin role bypasses (has "*"). Denies with 403 — never 401 (we ARE
- * authenticated, just not allowed here).
+ * moduleId matches the route keys the admin toggles in the permissions UI. An
+ * admin (or super-admin) role bypasses (has "*"). Denies with 403 — never
+ * 401 (we ARE authenticated, just not allowed here).
+ *
+ * NOTE: The tenant boundary is enforced separately by the tenant-context
+ * middleware (requireTenant / resolveTenant). This guard only checks whether
+ * the role may access the module within the resolved tenant.
  */
 export function requirePermission(moduleId: string) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -117,16 +161,12 @@ export function requirePermission(moduleId: string) {
       res.status(401).json({ error: "Authentication required" });
       return;
     }
-    if (req.auth.isAdmin) {
-      next();
-      return;
-    }
     const set = await loadRolePermissions(req.auth.sub);
     if (!set) {
       res.status(403).json({ error: "Account not found" });
       return;
     }
-    if (set.permissions.includes(moduleId) || set.permissions.includes("*")) {
+    if (set.isAdmin || set.permissions.includes(moduleId) || set.permissions.includes("*")) {
       next();
       return;
     }
@@ -148,16 +188,13 @@ export function requireAnyPermission(...moduleIds: string[]) {
       res.status(401).json({ error: "Authentication required" });
       return;
     }
-    if (req.auth.isAdmin) {
-      next();
-      return;
-    }
     const set = await loadRolePermissions(req.auth.sub);
     if (!set) {
       res.status(403).json({ error: "Account not found" });
       return;
     }
     if (
+      set.isAdmin ||
       set.permissions.includes("*") ||
       moduleIds.some((m) => set.permissions.includes(m))
     ) {
@@ -165,5 +202,29 @@ export function requireAnyPermission(...moduleIds: string[]) {
       return;
     }
     res.status(403).json({ error: `You do not have access to ${moduleIds.join(" or ")}` });
+  };
+}
+
+/**
+ * Platform-level guard: only super-admins may pass. Used on global/platform
+ * routes (tenant management, tenant switcher list, platform config). Must run
+ * after requireAuth. Denies with 403.
+ */
+export function requireSuperAdmin() {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    if (!req.auth) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+    const set = await loadRolePermissions(req.auth.sub);
+    if (!set) {
+      res.status(403).json({ error: "Account not found" });
+      return;
+    }
+    if (set.isSuperAdmin) {
+      next();
+      return;
+    }
+    res.status(403).json({ error: "Super-admin access required" });
   };
 }

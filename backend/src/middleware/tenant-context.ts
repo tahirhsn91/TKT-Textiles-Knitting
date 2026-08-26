@@ -1,102 +1,146 @@
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import { Request, Response, NextFunction } from "express";
+import { eq } from "drizzle-orm";
+import { db } from "../db/index.js";
+import { tenantTable } from "../db/schema/tenants.js";
+import { loadRolePermissions } from "../lib/auth.js";
 
 /**
- * Tenant context middleware
- * Extracts tenant_id from JWT token and attaches to request
- * Ensures all database queries are filtered by tenant
+ * Express augmentation: the resolved active tenant context on the request.
+ * Set by resolveTenant; consumed by requireTenant and by every route that
+ * needs to scope its Drizzle queries.
  */
-
-export interface TenantRequest extends Request {
-  tenantId?: number;
-  userId?: number;
-  user?: any;
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      tenantId?: number | null;
+    }
+  }
 }
 
-export const tenantMiddleware = (req: TenantRequest, res: Response, next: NextFunction) => {
-  try {
-    // Extract token from Authorization header
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      // Skip tenant validation for public routes
-      return next();
-    }
+export const TENANT_HEADER = "x-tenant-id";
 
-    const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
-
-    // Extract tenant_id from token payload
-    if (!decoded.tenantId) {
-      return res.status(401).json({
-        error: 'Invalid token: missing tenant_id',
-      });
-    }
-
-    // Attach tenant context to request
-    req.tenantId = decoded.tenantId;
-    req.userId = decoded.sub || decoded.userId || decoded.id;
-    req.user = decoded;
-
-    next();
-  } catch (error) {
-    console.error('Tenant middleware error:', error);
-    return res.status(401).json({
-      error: 'Unauthorized: Invalid token',
-    });
-  }
-};
+function arrayAware(values: string | string[] | undefined): string | undefined {
+  return Array.isArray(values) ? values[0] : values;
+}
 
 /**
- * Require authenticated tenant
- * Middleware to ensure tenant_id is present
+ * Resolve the active tenant context for a request. Call AFTER requireAuth.
+ *
+ * Security model (issue #219 / Q2, Q8, Q3):
+ *   - The tenant is NEVER taken from query params or body. It comes only from
+ *     the X-Tenant-Id header (super-admin) or the user's home tenant (JWT).
+ *   - Super-admin: the X-Tenant-Id header selects the active tenant. It must
+ *     exist and be active. If absent -> 428 (Precondition Required), prompting
+ *     the UI to ask the super-admin to pick a tenant.
+ *   - Tenant user (Admin/Manager/Supervisor): their tenant is their home
+ *     tenant (req.auth.tenantId). If they send an X-Tenant-Id that differs ->
+ *     403 (cross-tenant attempt rejected). If their tenant is inactive they
+ *     are blocked (403).
+ *   - Active-status: non-super-admins are blocked on inactive tenants.
+ *     Super-admins may still operate on an inactive tenant (with the active
+ *     check skipped), per issue #219 Scenario 6.
  */
-export const requireTenant = (req: TenantRequest, res: Response, next: NextFunction) => {
+export async function resolveTenant(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  if (!req.auth) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const set = await loadRolePermissions(req.auth.sub);
+  if (!set) {
+    res.status(403).json({ error: "Account not found" });
+    return;
+  }
+
+  const headerTenant = arrayAware(req.headers[TENANT_HEADER] as string | string[] | undefined);
+
+  if (set.isSuperAdmin) {
+    // Super-admin may act in ANY tenant, selected by header.
+    if (!headerTenant) {
+      res.status(428).json({
+        error: "Select a tenant to continue",
+        code: "TENANT_REQUIRED",
+      });
+      return;
+    }
+    const tenantId = Number(headerTenant);
+    if (!Number.isInteger(tenantId) || tenantId <= 0) {
+      res.status(400).json({ error: "Invalid tenant id" });
+      return;
+    }
+    const tenant = await db
+      .select({ id: tenantTable.id, status: tenantTable.status })
+      .from(tenantTable)
+      .where(eq(tenantTable.id, tenantId))
+      .limit(1);
+    if (!tenant[0]) {
+      res.status(404).json({ error: "Tenant not found" });
+      return;
+    }
+    // Super-admins may operate on inactive tenants too (override), so we do
+    // NOT block here on status — the caller may still manage the tenant.
+    req.tenantId = tenantId;
+    next();
+    return;
+  }
+
+  // Not a super-admin: tenant is their home tenant (from the JWT).
+  const homeTenant = (req.auth as { tenantId?: number | null }).tenantId ?? null;
+  if (homeTenant == null) {
+    // A non-super-admin with no home tenant cannot operate in any tenant.
+    res.status(403).json({ error: "No tenant assigned to this account" });
+    return;
+  }
+  // Reject cross-tenant attempts: if the client sent an X-Tenant-Id header,
+  // it MUST match the user's home tenant.
+  if (headerTenant !== undefined && headerTenant !== "" && Number(headerTenant) !== homeTenant) {
+    res.status(403).json({ error: "Cross-tenant access denied" });
+    return;
+  }
+  // Block non-super-admins on inactive tenants.
+  const tenant = await db
+    .select({ id: tenantTable.id, status: tenantTable.status })
+    .from(tenantTable)
+    .where(eq(tenantTable.id, homeTenant))
+    .limit(1);
+  if (!tenant[0] || tenant[0].status !== "active") {
+    res.status(403).json({ error: "Tenant is not active" });
+    return;
+  }
+  req.tenantId = homeTenant;
+  next();
+}
+
+/**
+ * Ensure a tenant context is present on the request. Use after resolveTenant
+ * on tenant-scoped routes. Super-admin with no selected tenant => 428.
+ */
+export function requireTenant(req: Request, res: Response, next: NextFunction): void {
   if (!req.tenantId) {
-    return res.status(401).json({
-      error: 'Unauthorized: Tenant context required',
+    res.status(428).json({
+      error: "Select a tenant to continue",
+      code: "TENANT_REQUIRED",
     });
+    return;
   }
   next();
-};
+}
 
 /**
- * Get tenant-filtered query
- * Adds WHERE clause to filter by current tenant
- * Usage: db.select('*').from('users').where(getTenantFilter(req))
+ * Returns the resolved active tenant id for the request. Throws if none.
+ * Convenience for route handlers that need the numeric tenant id to scope
+ * their Drizzle queries.
  */
-export const getTenantFilter = (req: TenantRequest) => {
+export function activeTenantId(req: Request): number {
   if (!req.tenantId) {
-    throw new Error('Tenant context not found in request');
+    throw new Error("Tenant context not found in request");
   }
-  return {
-    tenant_id: req.tenantId,
-  };
-};
+  return req.tenantId;
+}
 
-/**
- * Validate tenant ownership
- * Ensures user belongs to the requested tenant
- */
-export const validateTenantOwnership = async (
-  req: TenantRequest,
-  userId: number,
-  db: any
-) => {
-  if (!req.tenantId) {
-    throw new Error('Tenant context required');
-  }
-
-  const user = await db('app_user')
-    .where({
-      id: userId,
-      tenant_id: req.tenantId,
-    })
-    .first();
-
-  if (!user) {
-    throw new Error('User does not belong to this tenant');
-  }
-
-  return user;
-};
+export { loadRolePermissions };
