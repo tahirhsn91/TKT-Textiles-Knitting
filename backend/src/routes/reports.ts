@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { and, eq, gte, lte, inArray, ilike, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { activeTenantId } from "../middleware/tenant-context.js";
+import { sendCsvRows } from "../lib/export.js";
 import {
   transactionHeaderTable,
   transactionDetailTable,
@@ -20,10 +21,8 @@ import {
 
 const router: IRouter = Router();
 
-router.get("/reports/data", async (req, res): Promise<void> => {
-  const q = req.query as Record<string, string | undefined>;
-  const tenantId = activeTenantId(req);
-
+/** Shared report query — filters + select reused by JSON and CSV export. */
+async function runReportQuery(tenantId: number, q: Record<string, string | undefined>) {
   const conditions = [eq(transactionHeaderTable.tenantId, tenantId)];
 
   if (q.dateFrom)   conditions.push(gte(transactionHeaderTable.date, q.dateFrom));
@@ -104,7 +103,47 @@ router.get("/reports/data", async (req, res): Promise<void> => {
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(transactionHeaderTable.date, transactionHeaderTable.id, transactionDetailTable.id);
 
+  return rows;
+}
+
+/** Map a report row to the exported CSV column values. */
+function csvColumns() {
+  return [
+    "Date", "Doc No", "Reference", "SL", "GSM", "Trans Type", "Action",
+    "Job", "Party", "Waste %", "Location", "Fabric Type",
+    "Quantity", "Net Wt", "Yarn Type", "Yarn Count", "Yarn Brand", "UOM",
+    "Machine", "Employee",
+  ];
+}
+
+function rowToCsv(r: Record<string, unknown>): unknown[] {
+  return [
+    r.date, r.docNumber, r.reference, r.sl, r.gsm, r.transactionTypeName, r.transactionTypeAction,
+    r.jobName, r.partyName, r.partyWastePercent, r.locationName, r.fabricTypeName,
+    r.quantity, r.netWt, r.yarnTypeName, r.yarnCountName, r.yarnBrandName, r.uomName,
+    r.machineName, r.employeeName,
+  ];
+}
+
+// JSON report data (existing endpoint, refactored to share runReportQuery).
+router.get("/reports/data", async (req, res): Promise<void> => {
+  const q = req.query as Record<string, string | undefined>;
+  const tenantId = activeTenantId(req);
+  const rows = await runReportQuery(tenantId, q);
   res.json(rows);
+});
+
+// CSV export of the report (issue #219 2.5). Same filters as /reports/data.
+router.get("/reports/export/csv", async (req, res): Promise<void> => {
+  const q = req.query as Record<string, string | undefined>;
+  const tenantId = activeTenantId(req);
+  const rows = await runReportQuery(tenantId, q);
+  sendCsvRows(
+    res as never,
+    "report.csv",
+    csvColumns(),
+    rows.map((r) => rowToCsv(r as unknown as Record<string, unknown>)),
+  );
 });
 
 export default router;

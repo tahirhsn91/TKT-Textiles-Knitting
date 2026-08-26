@@ -2,6 +2,7 @@ import { NUM_DECIMALS } from "@/lib/format";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "@/vendor/api-client-react/custom-fetch";
+import { ExportCsvButton } from "@/components/export-csv-button";
 // Type-only: jsPDF / autotable / html2canvas are loaded lazily inside each
 // export handler so the ~600 kB they add only downloads when the user clicks
 // Export.
@@ -809,6 +810,7 @@ export default function YarnToFabricPage() {
               <Button onClick={runReport} disabled={isFetching} size="sm">
                 {isFetching ? "Loading..." : "Run Report"}
               </Button>
+              <ExportCsvButton qs={qs} filename="yarn-to-fabric-report.csv" disabled={!hasRun} />
               <Button variant="outline" size="sm" onClick={resetFilters}>Reset</Button>
               <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="gap-1.5 ml-auto">
                 <Upload className="h-3.5 w-3.5" />
