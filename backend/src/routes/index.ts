@@ -46,13 +46,18 @@ router.use("/admin", adminRouter);
 // requireAuth in app.ts already guards them) rather than behind a
 // requirePermission gate — gating them under e.g. "masters" would 401 short
 // any role that lacks that module (issue #135 regression).
-router.use(lookupsRouter);
+// NOTE: lookups data is tenant-scoped (issue #219 Q5b), so this router MUST be
+// mounted AFTER resolveTenant — otherwise req.tenantId is unset and
+// activeTenantId() throws (500 on every /lookups/* call).
 
 // Resolve the active tenant context for every authenticated request (issue
 // #219). Runs after global requireAuth (app.ts). Sets req.tenantId and blocks
 // cross-tenant access / inactive tenants. Super-admins select a tenant via the
 // X-Tenant-Id header (428 if none); tenant users are bound to their home tenant.
 router.use(resolveTenant);
+
+// Lookups router — tenant-scoped, mounted after resolveTenant.
+router.use(lookupsRouter);
 
 // Protected — each router defines its own full (absolute) paths internally, so
 // each is mounted at the root (router.use(subRouter)) and its routes match their
