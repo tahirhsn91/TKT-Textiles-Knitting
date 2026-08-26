@@ -206,7 +206,7 @@ export function Layout({ children }: { children: ReactNode }) {
         )}>
           {!collapsed && (
             <Link href="/dashboard" className="transition-opacity hover:opacity-80">
-              <Wordmark />
+              <BrandedWordmark />
             </Link>
           )}
           <button
@@ -454,7 +454,7 @@ export function Layout({ children }: { children: ReactNode }) {
             {/* Drawer footer — a quiet sign-off so the menu doesn't end
                 abruptly and shows what build this is. */}
             <div className="flex items-center justify-between border-t border-sidebar-border px-4 py-3">
-              <span className="text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/40">TKT Textiles</span>
+              <BrandedOrgLabel className="text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/40" />
               <span className="text-[0.625rem] text-sidebar-foreground/30">v{import.meta.env.PACKAGE_VERSION ?? "1.0.0"}</span>
             </div>
           </SheetContent>
