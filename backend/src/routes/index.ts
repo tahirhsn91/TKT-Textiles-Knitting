@@ -22,6 +22,7 @@ import companyInfoRouter from "./company-info.js";
 import invoicingRouter from "./invoicing.js";
 import usersRouter from "./users.js";
 import attendanceRouter from "./attendance.js";
+import adminRouter from "./admin-routes.js";
 // Temporarily disabled due to TypeScript compilation issues with Knex-based services
 // import adminRouter from "./admin-routes.js";
 // import authRoutesRouter from "./auth-routes.js";
@@ -32,6 +33,12 @@ const router: IRouter = Router();
 
 // Public: health. Exempted from auth by the app.ts whitelist.
 router.use(healthRouter);
+
+// Platform-level super-admin routes (tenant management, tenant switching).
+// These are global and must NOT go through resolveTenant (which would 428 a
+// super-admin who has not yet selected an active tenant). requireSuperAdmin
+// guards them internally.
+router.use("/admin", adminRouter);
 
 // Lookups are universal reference data (party, machine, employee, yarn types,
 // …) used by virtually every authenticated screen across all roles. They are
