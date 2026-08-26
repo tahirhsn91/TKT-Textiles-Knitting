@@ -85,7 +85,19 @@ export function toFbrMoney(value: string | number): string {
  * value = kg * rate; tax = 18% of value; total = value + tax.
  * All money is rounded to 2 decimal places.
  */
-export function computeItemAmounts(netWeight: string | number, ratePerKg: string | number): {
+/**
+ * Compute value-excluding-tax + sales-tax + total for one invoice line.
+ *@param netWeight    quantity (kg)
+ * @param ratePerKg    unit rate
+ * @param taxRatePercent sales-tax percent (defaults to the app-wide FBR rate;
+ *                       pass the tenant's configured default_tax_rate to use
+ *                       the Company Settings value — issue #219).
+ */
+export function computeItemAmounts(
+  netWeight: string | number,
+  ratePerKg: string | number,
+  taxRatePercent: number = FBR_SALES_TAX_PERCENT,
+): {
   valueExcludingTax: string;
   taxAmount: string;
   totalValue: string;
@@ -95,8 +107,9 @@ export function computeItemAmounts(netWeight: string | number, ratePerKg: string
   if (!Number.isFinite(kg) || !Number.isFinite(rate) || kg <= 0 || rate <= 0) {
     return { valueExcludingTax: "0.00", taxAmount: "0.00", totalValue: "0.00" };
   }
+  const safeRate = Number.isFinite(taxRatePercent) && taxRatePercent >= 0 ? taxRatePercent : FBR_SALES_TAX_PERCENT;
   const value = round2(kg * rate);
-  const tax = round2((value * FBR_SALES_TAX_PERCENT) / 100);
+  const tax = round2((value * safeRate) / 100);
   const total = round2(value + tax);
   return {
     valueExcludingTax: value.toFixed(2),
@@ -120,6 +133,8 @@ export function buildFbrInvoicePayload(params: {
   buyerAddress: string;
   buyerRegistrationType: string;
   sandbox: boolean;
+  /** Sales-tax percent for the declared rate string (defaults to the FBR rate). */
+  taxRatePercent?: number;
 }): {
   invoiceType: string;
   invoiceDate: string;
@@ -136,8 +151,9 @@ export function buildFbrInvoicePayload(params: {
   scenarioId?: string;
   items: FbrInvoiceItemInput[];
 } {
-  const { invoice, items, company, buyerNtnCnic, buyerBusinessName, buyerProvince, buyerAddress, buyerRegistrationType, sandbox } = params;
-  const rateStr = `${FBR_SALES_TAX_PERCENT}%`;
+  const { invoice, items, company, buyerNtnCnic, buyerBusinessName, buyerProvince, buyerAddress, buyerRegistrationType, sandbox, taxRatePercent } = params;
+  const ratePercent = Number.isFinite(taxRatePercent) && taxRatePercent! >= 0 ? taxRatePercent! : FBR_SALES_TAX_PERCENT;
+  const rateStr = `${ratePercent}%`;
   const body: ReturnType<typeof buildFbrInvoicePayload> = {
     invoiceType: FBR_INVOICE_TYPE,
     invoiceDate: invoice.invoiceDate,

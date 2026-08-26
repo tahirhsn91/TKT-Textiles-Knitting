@@ -12,8 +12,7 @@ import {
   yarnTypeMasterTable,
   yarnCountMasterTable,
   configurationTable,
-} from "../db/index.js";
-import {
+} from "../db/index.js";import {
   getUninvoicedPreview,
   listUninvoicedParties,
   getAllUninvoicedPreviews,
@@ -26,15 +25,13 @@ import {
   toNum,
 } from "../lib/invoice-payments.js";
 import { isFbrSandboxEnabled } from "../lib/fbr/config.js";
+import { loadDefaultTaxRate } from "../lib/tax-rate.js";
 import { isUniqueViolation } from "../lib/db-errors.js";
 import { buildFbrInvoicePayload, postInvoiceToFbr } from "../lib/fbr/client.js";
 import { validateBody } from "../lib/validate.js";
 import { activeTenantId } from "../middleware/tenant-context.js";
 
 const router: IRouter = Router();
-
-/** Sales tax percent used when deriving amounts (matches the app-wide 18% FBR rate). */
-const SALES_TAX_DERIVED_PERCENT = 18;
 
 function idParam(req: { params: Record<string, unknown> }) {
   const id = parseInt(String(req.params.id ?? ""), 10);
@@ -87,6 +84,7 @@ const generateBodySchema = z.object({
 router.post("/invoicing/generate", validateBody(generateBodySchema), async (req, res): Promise<void> => {
   const { partyId, createdBy, items } = req.body as unknown as z.infer<typeof generateBodySchema>;
   const tenantId = activeTenantId(req);
+  const taxRate = await loadDefaultTaxRate(tenantId);
 
   // Re-resolve the un-invoiced transactions fresh (concurrency guard).
   const preview = await getUninvoicedPreview(tenantId, partyId);
@@ -146,7 +144,7 @@ router.post("/invoicing/generate", validateBody(generateBodySchema), async (req,
       const key = `${g.yarnTypeId}|${g.yarnCountId ?? ""}`;
       const rate = rateByGroup.get(key);
       if (rate == null || !(rate > 0)) continue;
-      const amounts = computeItemAmounts(g.quantity, rate);
+      const amounts = computeItemAmounts(g.quantity, rate, taxRate);
       const parsedQty = parseFloat(g.quantity) || 0;
       totalValue += parseFloat(amounts.valueExcludingTax);
       totalTax += parseFloat(amounts.taxAmount);
@@ -454,6 +452,7 @@ async function loadLatestRates(tenantId: number, partyId: number | undefined): P
 // with a null rate (unvalued).
 router.get("/invoicing/future", async (req, res): Promise<void> => {
   const tenantId = activeTenantId(req);
+  const taxRate = await loadDefaultTaxRate(tenantId);
   const previews = await getAllUninvoicedPreviews(tenantId);
   if (previews.size === 0) { res.json([]); return; }
 
@@ -482,8 +481,8 @@ router.get("/invoicing/future", async (req, res): Promise<void> => {
         ratePerKg,
         rateDate: rateInfo?.invoiceDate ?? null,
         value: value != null ? round2(value) : null,
-        tax: value != null ? round2(value * SALES_TAX_DERIVED_PERCENT / 100) : null,
-        total: value != null ? round2(value * (1 + SALES_TAX_DERIVED_PERCENT / 100)) : null,
+        tax: value != null ? round2(value * taxRate / 100) : null,
+        total: value != null ? round2(value * (1 + taxRate / 100)) : null,
       });
     }
   }
@@ -620,6 +619,7 @@ router.post("/invoicing/:id/post", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid invoice id" }); return; }
   const tenantId = activeTenantId(req);
+  const taxRate = await loadDefaultTaxRate(tenantId);
 
   const [inv] = await db
     .select().from(invoiceTable).where(and(eq(invoiceTable.id, id), eq(invoiceTable.tenantId, tenantId)));
@@ -679,6 +679,7 @@ router.post("/invoicing/:id/post", async (req, res): Promise<void> => {
     buyerAddress: party.address ?? "",
     buyerRegistrationType: party.registrationType ?? "Unregistered",
     sandbox,
+    taxRatePercent: taxRate,
   });
 
   const result = await postInvoiceToFbr({ payload, token, sandbox });
@@ -849,6 +850,8 @@ router.post("/invoicing/backdated", validateBody(backdatedSchema), async (req, r
     res.status(403).json({ error: "Backdated invoices are not enabled." });
     return;
   }
+  const tenantId = activeTenantId(req);
+  const taxRate = await loadDefaultTaxRate(tenantId);
 
   const body = req.body as unknown as z.infer<typeof backdatedSchema>;
 
@@ -884,7 +887,7 @@ router.post("/invoicing/backdated", validateBody(backdatedSchema), async (req, r
       const itemRows: (typeof invoiceItemTable.$inferInsert)[] = [];
 
       for (const it of body.items) {
-        const amounts = computeItemAmounts(String(it.quantity), it.ratePerKg);
+        const amounts = computeItemAmounts(String(it.quantity), it.ratePerKg, taxRate);
         totalValue += parseFloat(amounts.valueExcludingTax);
         totalTax += parseFloat(amounts.taxAmount);
         grandTotal += parseFloat(amounts.totalValue);

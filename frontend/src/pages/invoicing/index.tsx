@@ -55,6 +55,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentUserDisplayName } from "@/hooks/use-current-user";
+import { useConfiguration } from "@/hooks/useConfiguration";
 import { useFbrSandboxEnabled } from "@/context/config-context";
 import {
   useUninvoicedParties,
@@ -84,8 +85,6 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer,
 } from "recharts";
-
-const SALES_TAX_PERCENT = 18;
 
 const CHART_COLORS = [
   "#2563eb", "#16a34a", "#dc2626", "#d97706", "#7c3aed",
@@ -123,6 +122,10 @@ export default function InvoicingPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fbrSandbox = useFbrSandboxEnabled();
+  const { settings: configSettings } = useConfiguration();
+  // Sales-tax % comes from Company Settings (default_tax_rate); fall back to
+  // the app-wide 18% if unavailable (issue #219).
+  const salesTaxPercent = configSettings?.default_tax_rate ?? 18;
 
   const [partyId, setPartyId] = useState<number | null>(null);
   const enteredBy = useCurrentUserDisplayName();
@@ -285,10 +288,10 @@ export default function InvoicingPage() {
       const rate = parseFloat(rates[key] ?? "");
       const qty = parseFloat(g.quantity) || 0;
       const value = Number.isFinite(rate) ? qty * rate : 0;
-      const tax = (value * SALES_TAX_PERCENT) / 100;
+      const tax = (value * salesTaxPercent) / 100;
       return { group: g, key, rate: Number.isFinite(rate) ? rate : 0, value, tax, total: value + tax };
     });
-  }, [preview, rates]);
+  }, [preview, rates, salesTaxPercent]);
 
   const totals = useMemo(
     () =>
@@ -518,7 +521,7 @@ export default function InvoicingPage() {
               <CardContent className="space-y-4 p-5">
                 <p className="text-sm text-muted-foreground">
                   Pick a party with un-invoiced Fabric Delivery transactions. Net weights are summed per yarn
-                  type/count; enter a per-KG rate for each line to compute value, 18% sales tax, and total.
+                  type/count; enter a per-KG rate for each line to compute value, {salesTaxPercent}% sales tax, and total.
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
@@ -575,7 +578,7 @@ export default function InvoicingPage() {
                               <TableHead className="text-right">Net Wt (kg)</TableHead>
                               <TableHead className="text-right">Rate / kg</TableHead>
                               <TableHead className="text-right">Value</TableHead>
-                              <TableHead className="text-right">Tax (18%)</TableHead>
+                              <TableHead className="text-right">Tax ({salesTaxPercent}%)</TableHead>
                               <TableHead className="text-right">Total</TableHead>
                             </TableRow>
                           </TableHeader>
@@ -789,7 +792,7 @@ export default function InvoicingPage() {
 
           {/* Future Invoices tab (before Analytics) */}
           <TabsContent value="future" className="mt-3 space-y-4">
-            <FutureInvoicesView rows={futureInvoices ?? []} loading={!futureInvoices} />
+            <FutureInvoicesView rows={futureInvoices ?? []} loading={!futureInvoices} taxRatePercent={salesTaxPercent} />
           </TabsContent>
 
           {/* Analytics tab */}
@@ -960,6 +963,7 @@ export default function InvoicingPage() {
         onOpenChange={setBackdatedOpen}
         parties={allParties ?? []}
         createdBy={enteredBy || "system"}
+        taxRatePercent={salesTaxPercent}
         onCreate={(body) =>
           createBackdated.mutate(body, {
             onSuccess: () => { toast({ title: "Backdated invoice created" }); setBackdatedOpen(false); },
@@ -1075,7 +1079,7 @@ function ReceivablesView({ data, loading }: { data: import("@/hooks/use-fbr-invo
 // ─── Future Invoices tab ───────────────────────────────────────────────────
 // Shows all parties' un-invoiced Fabric_Dispatch transactions valued at the
 // latest rate from previous invoices (same party + yarn type + yarn count).
-function FutureInvoicesView({ rows, loading }: { rows: FutureInvoiceRow[]; loading: boolean }) {
+function FutureInvoicesView({ rows, loading, taxRatePercent = 18 }: { rows: FutureInvoiceRow[]; loading: boolean; taxRatePercent?: number }) {
   // Totals across the displayed rows.
   const totals = useMemo(() => {
     let qty = 0;
@@ -1121,7 +1125,7 @@ function FutureInvoicesView({ rows, loading }: { rows: FutureInvoiceRow[]; loadi
                   <TableHead className="text-right">Rate / kg</TableHead>
                   <TableHead>Rate From</TableHead>
                   <TableHead className="text-right">Value</TableHead>
-                  <TableHead className="text-right">Tax (18%)</TableHead>
+                  <TableHead className="text-right">Tax ({taxRatePercent}%)</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1397,6 +1401,7 @@ function BackdatedInvoiceDialog({
   onOpenChange,
   parties,
   createdBy,
+  taxRatePercent = 18,
   onCreate,
   pending,
 }: {
@@ -1404,6 +1409,7 @@ function BackdatedInvoiceDialog({
   onOpenChange: (o: boolean) => void;
   parties: { id: number; name: string }[];
   createdBy: string;
+  taxRatePercent?: number;
   onCreate: (body: import("@/hooks/use-fbr-invoicing").CreateBackdatedInvoiceBody) => void;
   pending: boolean;
 }) {
@@ -1440,9 +1446,9 @@ function BackdatedInvoiceDialog({
       const r = parseFloat(it.ratePerKg) || 0;
       value += q * r;
     }
-    const tax = (value * SALES_TAX_PERCENT) / 100;
+    const tax = (value * taxRatePercent) / 100;
     return { value, tax, total: value + tax };
-  }, [form.items]);
+  }, [form.items, taxRatePercent]);
 
   const submit = () => {
     const id = parseInt(form.id, 10);
@@ -1605,6 +1611,12 @@ function InvoiceView({
   })();
   const custAddr = [inv.partyAddress, inv.partyProvince].filter(Boolean).join(", ");
   const words = amountInWords(inv.grandTotal);
+  // Effective tax rate (%) from the invoice items (matches Company Settings).
+  const invoiceTaxItem = inv.items.find((it) => parseFloat(it.valueExcludingTax) > 0);
+  const taxRatePercent =
+    invoiceTaxItem && parseFloat(invoiceTaxItem.valueExcludingTax) > 0
+      ? Math.max(0, (parseFloat(invoiceTaxItem.taxAmount) / parseFloat(invoiceTaxItem.valueExcludingTax)) * 100)
+      : 18;
 
   return (
     <div className="space-y-4 text-foreground">
@@ -1677,7 +1689,7 @@ function InvoiceView({
                 <td className="text-right tabular-nums">{money(parseFloat(it.quantity))}</td>
                 <td className="text-right tabular-nums">{money(parseFloat(it.ratePerKg))}</td>
                 <td className="text-right tabular-nums">{money(parseFloat(it.valueExcludingTax))}</td>
-                <td className="text-center tabular-nums">18%</td>
+                <td className="text-center tabular-nums">{taxRatePercent}%</td>
                 <td className="text-right tabular-nums">{money(parseFloat(it.taxAmount))}</td>
                 <td className="text-right tabular-nums">{money(parseFloat(it.totalValue))}</td>
               </tr>
@@ -1701,7 +1713,7 @@ function InvoiceView({
             <span className="font-semibold tabular-nums">{money(parseFloat(inv.totalValue))}</span>
           </div>
           <div className="flex justify-between border-b border-foreground/20 px-3 py-2">
-            <span>Total Tax Amount @ 18%</span>
+            <span>Total Tax Amount @ {taxRatePercent}%</span>
             <span className="font-semibold tabular-nums">{money(parseFloat(inv.totalTax))}</span>
           </div>
           <div className="flex justify-between border-b border-foreground/20 px-3 py-2 font-bold">
