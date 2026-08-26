@@ -14,3 +14,4 @@ export * from "./invoice.js";
 export * from "./users.js";
 export * from "./tenants.js";
 export * from "./audit-log.js";
+export * from "./user-invitations.js";
