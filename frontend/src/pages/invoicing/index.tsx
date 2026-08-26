@@ -3,7 +3,6 @@ import { Send, Trash2, RefreshCw, FileText, Eye, Download, Plus, Banknote, Calen
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 
-import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -472,7 +471,7 @@ export default function InvoicingPage() {
   const paySubmitDisabled = !payNetValid || !payRateValid || addPayment.isPending;
 
   return (
-    <Layout>
+    <>
       <div className="flex flex-col gap-6">
         <header className="border-b pb-5">
           <p className="eyebrow">Billing &amp; invoicing</p>
@@ -972,7 +971,7 @@ export default function InvoicingPage() {
         }
         pending={createBackdated.isPending}
       />
-    </Layout>
+    </>
   );
 }
 

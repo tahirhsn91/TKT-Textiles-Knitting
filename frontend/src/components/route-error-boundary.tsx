@@ -14,14 +14,12 @@
  *    the import: React caches the rejected promise on the lazy component, so
  *    only a fresh document (fresh module graph, fresh index.html → fresh chunk
  *    names) can genuinely re-attempt it.
- *  - SuspenseFallback switches from the skeleton to a "taking too long"
- *    message after `timeoutMs` — covering the case where the import promise
- *    neither resolves nor rejects (stalled request) instead of spinning on the
- *    skeleton indefinitely.
+ *  - The content-area loading skeleton (components/page-loading-skeleton.tsx)
+ *    shows while a chunk downloads and swaps to a "taking too long" Retry
+ *    after a timeout, covering a chunk that neither resolves nor rejects.
  */
-import { Component, useEffect, useState, type ReactNode } from "react";
+import { Component, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 
 // ─── Error boundary ──────────────────────────────────────────────────────────
 
@@ -79,50 +77,4 @@ export class RouteErrorBoundary extends Component<BoundaryProps, BoundaryState> 
       </div>
     );
   }
-}
-
-// ─── Suspense fallback with timeout ──────────────────────────────────────────
-
-/** The original skeleton, shown while a route chunk loads. */
-export function RouteFallback() {
-  return (
-    <div className="space-y-4 p-8">
-      <Skeleton className="h-8 w-64" />
-      <Skeleton className="h-32 w-full" />
-      <Skeleton className="h-32 w-full" />
-    </div>
-  );
-}
-
-/**
- * Renders the skeleton, but if the suspended chunk still hasn't resolved after
- * `timeoutMs`, swaps in a "taking too long" message with a Retry. Prevents the
- * infinite-skeleton hang when the import neither resolves nor rejects.
- */
-export function SuspenseFallback({ timeoutMs = 10000 }: { timeoutMs?: number }) {
-  const [timedOut, setTimedOut] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setTimedOut(true), timeoutMs);
-    return () => clearTimeout(timer);
-  }, [timeoutMs]);
-
-  if (!timedOut) return <RouteFallback />;
-
-  return (
-    <div className="flex min-h-[60vh] items-center justify-center p-8">
-      <div className="max-w-md space-y-3 text-center">
-        <h1 className="text-xl font-semibold text-foreground">
-          This page is taking longer than expected to load
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Your connection to the server may be slow, or the app was updated
-          while this page was open. You can reload to try again.
-        </p>
-        <Button onClick={() => window.location.reload()} className="mt-2">
-          Retry
-        </Button>
-      </div>
-    </div>
-  );
 }

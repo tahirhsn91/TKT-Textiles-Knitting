@@ -27,7 +27,6 @@ import {
 } from "recharts";
 import { Printer, Download, FileText, FileSpreadsheet, Upload, Image, Loader2, ClipboardCopy } from "lucide-react";
 import { SortableHead as SortHead } from "@/components/sortable-head";
-import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
@@ -931,7 +930,7 @@ export default function ReportsPage() {
   );
 
   return (
-    <Layout>
+    <>
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -1433,7 +1432,7 @@ export default function ReportsPage() {
         onOpenChange={setImportOpen}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ["reports/data"] })}
       />
-    </Layout>
+    </>
   );
 }
 

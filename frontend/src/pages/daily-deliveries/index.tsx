@@ -41,7 +41,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { Layout } from "@/components/layout";
 import { PlausibilityListBanner } from "@/components/plausibility-warning";
 import { AbnormalDataTab } from "@/components/abnormal-data-tab";
 import { usePlausibilityList } from "@/hooks/use-plausibility-list";
@@ -142,7 +141,7 @@ export default function DailyDeliveryList() {
   };
 
   return (
-    <Layout>
+    <>
       <div className="flex flex-col gap-6">
         <header className="flex items-start justify-between gap-4 border-b pb-5">
           <div>
@@ -429,6 +428,6 @@ export default function DailyDeliveryList() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Layout>
+    </>
   );
 }

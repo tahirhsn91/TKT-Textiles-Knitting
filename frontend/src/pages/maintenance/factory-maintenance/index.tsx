@@ -38,7 +38,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { Layout } from "@/components/layout";
 import { useToast } from "@/hooks/use-toast";
 
 const COLUMN_COUNT = 5;
@@ -134,7 +133,7 @@ export default function FactoryMaintenanceList() {
   };
 
   return (
-    <Layout>
+    <>
       <div className="flex flex-col gap-6">
         <header className="flex items-start justify-between gap-4 border-b pb-5">
           <div>
@@ -390,6 +389,6 @@ export default function FactoryMaintenanceList() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Layout>
+    </>
   );
 }

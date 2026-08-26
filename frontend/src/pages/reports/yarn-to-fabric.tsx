@@ -27,7 +27,6 @@ import {
 } from "recharts";
 import { Printer, Download, FileText, FileSpreadsheet, Upload, Image, Loader2, ClipboardCopy } from "lucide-react";
 import { SortableHead as SortHead } from "@/components/sortable-head";
-import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/ui/date-input";
@@ -733,7 +732,7 @@ export default function YarnToFabricPage() {
   // ── JSX ───────────────────────────────────────────────────────────────────
 
   return (
-    <Layout>
+    <>
       <div className="space-y-4 p-4 md:p-6 max-w-[1600px] mx-auto">
         <div>
           <h1 className="text-2xl font-bold">Yarn to Fabric Movement Report</h1>
@@ -1157,7 +1156,7 @@ export default function YarnToFabricPage() {
         onOpenChange={setImportOpen}
         onSuccess={() => queryClient.invalidateQueries({ queryKey: ["ytf-reports/data"] })}
       />
-    </Layout>
+    </>
   );
 }
 

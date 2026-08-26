@@ -51,7 +51,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TransactionAnalytics } from "./analytics-tab";
 import { useToast } from "@/hooks/use-toast";
-import { Layout } from "@/components/layout";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 // ─── Column definitions ───────────────────────────────────────────────────────
@@ -297,7 +296,7 @@ export default function TransactionList() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <Layout>
+    <>
       <div className="flex flex-col gap-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
@@ -594,6 +593,6 @@ export default function TransactionList() {
           </TabsContent>
         </Tabs>
       </div>
-    </Layout>
+    </>
   );
 }

@@ -77,7 +77,6 @@ import {
 } from "@workspace/api-client-react";
 import { X, Tag, Briefcase, Building2, Cog, MapPin, SwatchBook, Hash, BadgeCheck, Ruler, Layers, Users, Scissors, Settings2, Landmark } from "lucide-react";
 import { useRef } from "react";
-import { Layout } from "@/components/layout";
 import { MasterTable } from "@/components/master-table";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -167,7 +166,7 @@ export default function MastersPage() {
   };
 
   return (
-    <Layout>
+    <>
       <div className="flex flex-col gap-6">
         {/* Page header matches dashboard and daily production: eyebrow, then a
             1.75rem semibold title on a hairline rule. The previous
@@ -292,7 +291,7 @@ export default function MastersPage() {
           </div>
         </Tabs>
       </div>
-    </Layout>
+    </>
   );
 }
 
