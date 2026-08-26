@@ -93,11 +93,18 @@ function shiftLightness(hsl: string, delta: number): string {
 /**
  * Build the `:root { … }` overrides that push Branding colours into the real
  * theme tokens. Only tokens whose brand value is provided are overridden.
+ *
+ * NOTE: each override is emitted with `!important` because the app's bundle
+ * (Vite/Tailwind v4) appends its own unlayered `:root { --sidebar: … }` etc.
+ * AFTER runtime-injected styles, so a plain unlayered override loses by
+ * source order. `!important` on the custom property makes `var(--…)` resolve
+ * the Branding value app-wide — the explicit requirement (theme colors must
+ * apply to the whole application, including the left navbar/sidebar).
  */
 export function buildThemeOverrides(colors: BrandColors): string {
   const decls: string[] = [];
 
-  const set = (token: string, value: string) => decls.push(`  ${token}: ${value};`);
+  const set = (token: string, value: string) => decls.push(`  ${token}: ${value} !important;`);
   const hsl = (hex?: string | null) => (hex ? hexToHsl(hex) : null);
 
   const primary = hsl(colors.primary);
@@ -137,7 +144,16 @@ export function buildThemeOverrides(colors: BrandColors): string {
   }
   if (sidebar) {
     set("--sidebar", sidebar);
-    set("--sidebar-foreground", sidebarText ?? readableHsl(colors.sidebar));
+    const fg = sidebarText ?? readableHsl(colors.sidebar);
+    set("--sidebar-foreground", fg);
+    // Coherent hover/active + border surfaces derived from the sidebar tone so
+    // the chrome stays readable on a light OR dark sidebar (ui-ux-pro-max:
+    // cover component states, not just the base surface).
+    const accentSurface = shiftLightness(sidebar, readableHsl(colors.sidebar) === "0 0% 100%" ? 6 : -6);
+    set("--sidebar-accent", accentSurface);
+    set("--sidebar-accent-foreground", fg);
+    set("--sidebar-border", shiftLightness(sidebar, 4));
+    set("--sidebar-ring", primary ?? sidebar);
   }
   if (navbar) {
     // Navbar reuses the sidebar surface tokens in this app.
@@ -149,15 +165,13 @@ export function buildThemeOverrides(colors: BrandColors): string {
     set("--brand-font", colors.fontFamily);
   }
 
-  // A dark primary or background should also carry a coherent dark theme, so
-  // the sidebar/navbar chrome reads well in dark mode too.
-  const chromeDark =
-    colors.sidebar ? readableHsl(colors.sidebar) === "0 0% 100%"
-    : colors.primary ? readableHsl(colors.primary) === "0 0% 100%"
-    : false;
+  // When no explicit sidebar colour is given, a dark primary should still
+  // drive a coherent dark chrome (the sidebar block above already handles the
+  // explicit-sidebar case).
+  const chromeDark = !colors.sidebar && colors.primary ? readableHsl(colors.primary) === "0 0% 100%" : false;
   if (chromeDark && primary) {
-    decls.push(`  --sidebar: ${primary};`);
-    decls.push(`  --sidebar-foreground: ${readableHsl(colors.primary)};`);
+    decls.push(`  --sidebar: ${primary} !important;`);
+    decls.push(`  --sidebar-foreground: ${readableHsl(colors.primary)} !important;`);
   }
 
   return `:root {\n${decls.join("\n")}\n}`;
