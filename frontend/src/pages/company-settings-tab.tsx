@@ -26,7 +26,7 @@ function maskField(v: string | null | undefined) {
 }
 
 export function CompanySettingsTab() {
-  const { settings, features, loading, updateSettings, toggleFeature } = useConfiguration();
+  const { settings, features, loading, updateSettings, toggleFeature, refreshConfiguration } = useConfiguration();
   const [form, setForm] = useState<Partial<TenantSettings>>({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -59,6 +59,9 @@ export function CompanySettingsTab() {
     setMessage(null);
     try {
       await updateSettings(form);
+      // Re-fetch from the server so the form always reflects what actually
+      // persisted (covers any field the select/input may have missed).
+      await refreshConfiguration();
       setMessage("Settings saved");
     } catch {
       setMessage("Failed to save settings");
