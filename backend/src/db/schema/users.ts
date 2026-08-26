@@ -30,7 +30,7 @@ export const roleTable = pgTable(
     tenantId: integer("tenant_id").references(() => tenantTable.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("role_name_idx").on(t.name)],
+  (t) => [uniqueIndex("role_name_idx").on(t.name, t.tenantId)],
 );
 
 // ─── Route-level permissions per role ───────────────────────────────────────
