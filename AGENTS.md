@@ -160,6 +160,15 @@ This is a starting point. Add your own conventions, style, and rules as you figu
 - Prefer graphify to a manual file-by-file hunt: it returns nodes/edges with `source_location` citations and surfaces cross-module connections (god nodes, surprising links) a line-by-line read would miss.
 - This is a preflight habit, not ceremony: pull the graph's answer first, then go read the exact files it points to if you need details.
 
+## Skill Routing — Use the Matching Domain Skill (set 2026-08-26)
+
+- Whenever a task involves **backend** work (APIs, server-side logic, services, microservices, middleware) — read `skills/backend-developer/SKILL.md` and follow it.
+- Whenever a task involves **frontend** work (React/Vue/Angular UIs, components, views, full-stack frontend integration) — read `skills/frontend-developer/SKILL.md` and follow it.
+- Whenever a task involves **writing or optimizing database queries** (SQL, query tuning, indexing, slow-query analysis) — read `skills/database-optimizer/SKILL.md` and follow it.
+- Whenever a task involves **UI/UX changes** (visual design, flows, information architecture, design tokens, component styling, accessibility) — read `skills/ui-ux-pro-max/SKILL.md` and follow it.
+- Load the relevant skill before editing any file for that area. When a task spans multiple domains, load and follow each applicable skill.
+- These domain skills supplement — not replace — the graphify preflight: use graphify first to understand the codebase, then apply the matching domain skill for the work.
+
 ## Core Rules
 
 - Never work directly on `main` or `develop`. Create a feature branch from `develop` for any change before editing files.
