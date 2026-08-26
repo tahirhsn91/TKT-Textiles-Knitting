@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useListConfigurationCrud } from "@/vendor/api-client-react";
+import { useAuth } from "@/context/auth-context";
 
 /**
  * Application-wide system configuration, loaded once on mount and cached by
@@ -28,7 +29,14 @@ export const RECONCILED_LOCK_CODE = "0001";
 export const FBR_DI_SANDBOX_CODE = "0002";
 
 export function ConfigurationProvider({ children }: { children: ReactNode }) {
-  const { data: configurations, isLoading } = useListConfigurationCrud();
+  // Configuration is tenant-scoped (issue #219) and only meaningful once the
+  // user is authenticated. Don't fetch it on the login page / when signed out
+  // — the endpoint requires auth + a tenant context, so firing it there just
+  // produces an unnecessary (401) /api/masters/configuration call.
+  const { isAuthenticated } = useAuth();
+  const { data: configurations, isLoading } = useListConfigurationCrud({
+    query: { enabled: isAuthenticated },
+  });
 
   const reconciledLockEnabled =
     configurations?.find((c) => c.code === RECONCILED_LOCK_CODE)?.enabled ?? false;
