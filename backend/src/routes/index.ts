@@ -27,6 +27,9 @@ import brandingRouter from "./branding-routes.js";
 import configurationRouter from "./configuration-routes.js";
 import invitationsRouter from "./invitations-routes.js";
 import auditLogsRouter from "./audit-logs-routes.js";
+import apiKeysRouter from "./api-keys-routes.js";
+import docsRouter from "./docs-routes.js";
+import publicApiRouter from "./public-api-routes.js";
 // Temporarily disabled due to TypeScript compilation issues with Knex-based services
 // import adminRouter from "./admin-routes.js";
 // import authRoutesRouter from "./auth-routes.js";
@@ -37,6 +40,15 @@ const router: IRouter = Router();
 
 // Public: health. Exempted from auth by the app.ts whitelist.
 router.use(healthRouter);
+
+// Public: OpenAPI / Swagger docs. Exempted from auth by the app.ts whitelist.
+router.use(docsRouter);
+
+// Versioned public API — API-key authenticated (issue #219 2.4). Exempted
+// from the global bearer requireAuth in app.ts (it authenticates its own
+// X-API-Key header) and mounted BEFORE resolveTenant (it sets its own tenant
+// context from the key).
+router.use("/v1", publicApiRouter);
 
 // Platform-level super-admin routes (tenant management, tenant switching).
 // These are global and must NOT go through resolveTenant (which would 428 a
@@ -77,6 +89,9 @@ router.use("/invitations", invitationsRouter);
 
 // Audit logs — tenant-scoped query of the audit trail (issue #219 2.3).
 router.use("/audit-logs", auditLogsRouter);
+
+// API keys — tenant-scoped programmatic access (issue #219 2.4).
+router.use("/keys", apiKeysRouter);
 
 // Protected — each router defines its own full (absolute) paths internally, so
 // each is mounted at the root (router.use(subRouter)) and its routes match their

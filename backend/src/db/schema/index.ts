@@ -13,5 +13,6 @@ export * from "./company-info.js";
 export * from "./invoice.js";
 export * from "./users.js";
 export * from "./tenants.js";
+export * from "./api-keys.js";
 export * from "./audit-log.js";
 export * from "./user-invitations.js";
