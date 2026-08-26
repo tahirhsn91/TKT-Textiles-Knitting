@@ -12,18 +12,22 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { employeeMasterTable } from "./lookups.js";
+import { tenantTable } from "./tenants.js";
 
 // ─── Roles ──────────────────────────────────────────────────────────────────
 // Fixed/seeded role set (Admin, Manager, Supervisor). Role *names* are not
 // admin-editable in v1 (issue #135); only per-role route permissions change.
+// Roles are tenant-scoped: each tenant has its own Admin/Manager/Supervisor
+// roles (Q5c). The platform-wide `super-admin` role is global (tenant_id NULL).
 export const roleTable = pgTable(
   "role",
   {
     id: serial("id").primaryKey(),
-    name: text("name").notNull().unique(),
+    name: text("name").notNull(),
     // Routes are locked to the admin role; this flag lets the permission
     // matrix render it non-editable and fail-closed by default.
     isAdmin: boolean("is_admin").notNull().default(false),
+    tenantId: integer("tenant_id").references(() => tenantTable.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("role_name_idx").on(t.name)],
@@ -66,11 +70,12 @@ export const userTable = pgTable(
     // Optional link to an employee record; NULL when the user is not an employee.
     employeeId: integer("employee_id").references(() => employeeMasterTable.id),
     isActive: boolean("is_active").notNull().default(true),
-    tenantId: integer("tenant_id").notNull().default(1),
+    // The tenant this user belongs to. NULL for platform super-admins (global).
+    tenantId: integer("tenant_id").references(() => tenantTable.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("user_username_idx").on(t.username)],
+  (t) => [uniqueIndex("user_username_idx").on(t.username, t.tenantId)],
 );
 
 export const insertRoleSchema = createInsertSchema(roleTable).omit({ id: true, createdAt: true });

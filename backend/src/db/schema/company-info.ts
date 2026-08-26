@@ -1,6 +1,7 @@
-import { pgTable, serial, text, boolean, timestamp } from "drizzle-orm/pg-core";
+import {pgTable, serial, text, boolean, timestamp, integer} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { tenantTable } from "./tenants.js";
 
 // ─── Company Info (seller) ─────────────────────────────────────────────────
 // The seller side of an FBR invoice. Multiple companies can exist, but exactly
@@ -12,6 +13,7 @@ import { z } from "zod/v4";
 // controlled by the global configuration toggle (code "0002"); the matching
 // token for the selected environment is read from the default company.
 export const companyInfoMasterTable = pgTable("company_info_master", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   // Seller NTN (7 digits) or CNIC (13 digits), as required by FBR.

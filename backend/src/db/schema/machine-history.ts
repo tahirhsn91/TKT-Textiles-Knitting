@@ -13,6 +13,7 @@ import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { machineMasterTable } from "./lookups.js";
+import { tenantTable } from "./tenants.js";
 
 // ─── Machine History (issue: machine needle/sinker audit trail) ─────────────
 // One row per write against the machine master (create / update / delete).
@@ -26,6 +27,7 @@ import { machineMasterTable } from "./lookups.js";
 // and don't rely on joining back to machine_master for display. This keeps the
 // History tab fully self-contained even after a machine is removed.
 export const machineHistoryTable = pgTable("machine_history", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   machineId: integer("machine_id")
     .references(() => machineMasterTable.id, { onDelete: "set null" }),

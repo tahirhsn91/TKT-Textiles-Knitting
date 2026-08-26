@@ -51,7 +51,7 @@ router.post("/login", async (req, res): Promise<void> => {
     roleId: user.roleId,
     role: user.roleName,
     isAdmin: user.isAdmin,
-    tenantId: user.tenantId,
+    tenantId: user.tenantId ?? undefined,
   });
 
   res.json({

@@ -13,6 +13,7 @@ import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { machineMasterTable } from "./lookups.js";
+import { tenantTable } from "./tenants.js";
 
 // ─── Machine Maintenance ───────────────────────────────────────────────────
 // One row per machine maintenance job. History-only (issue #109): no
@@ -21,6 +22,7 @@ import { machineMasterTable } from "./lookups.js";
 // (numeric) and vendor (free text) are both optional. Soft-delete via `status`
 // keeps records in the system with an undo path.
 export const machineMaintenanceTable = pgTable("machine_maintenance", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   maintenanceDate: date("maintenance_date").notNull(),
   machineId: integer("machine_id")

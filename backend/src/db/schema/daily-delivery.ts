@@ -15,6 +15,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { partyMasterTable, yarnTypeMasterTable } from "./lookups.js";
 import { transactionHeaderTable } from "./transactions.js";
+import { tenantTable } from "./tenants.js";
 
 // ─── Daily Delivery ────────────────────────────────────────────────────────
 // One row per fabric delivery: single line by product decision (Q1-A).
@@ -22,6 +23,7 @@ import { transactionHeaderTable } from "./transactions.js";
 // rest of the app. SL is a free-text string (e.g. a lot/serial marker), GSM
 // an optional number.
 export const dailyDeliveryTable = pgTable("daily_delivery", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   deliveryDate: date("delivery_date").notNull(),
   partyId: integer("party_id")

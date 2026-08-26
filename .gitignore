@@ -19,6 +19,7 @@ demo_video/
 
 # Database backups
 database/_restore_*/
+db-backups/
 
 # Graphify knowledge-graph output + ClawHub skill sync metadata — local only
 .graphify/
