@@ -39,13 +39,13 @@ function serializeUser(u: {
 // ─── Roles ───────────────────────────────────────────────────────────────────
 
 /** GET /api/users/roles — list roles (with isAdmin flag). */
-router.get("/users/roles", async (_req, res): Promise<void> => {
+router.get("/roles", async (_req, res): Promise<void> => {
   const roles = await db.select().from(roleTable).orderBy(roleTable.id);
   res.json(roles.map((r) => ({ id: r.id, name: r.name, isAdmin: r.isAdmin })));
 });
 
 /** GET /api/users/permissions — full role×route matrix (Admin row always full). */
-router.get("/users/permissions", async (_req, res): Promise<void> => {
+router.get("/permissions", async (_req, res): Promise<void> => {
   const roles = await db.select().from(roleTable).orderBy(roleTable.id);
   const perms = await db.select().from(rolePermissionTable);
   const byRole = new Map<number, string[]>();
@@ -68,7 +68,7 @@ router.get("/users/permissions", async (_req, res): Promise<void> => {
  * PUT /api/users/permissions — replace the permission set for ONE non-admin
  * role. The admin role is locked (server-side) and cannot be edited here.
  */
-router.put("/users/permissions", async (req, res): Promise<void> => {
+router.put("/permissions", async (req, res): Promise<void> => {
   const { roleId, permissions } = req.body ?? {};
   const rid = Number(roleId);
   if (!rid || !Array.isArray(permissions) || !permissions.every((p) => typeof p === "string")) {
@@ -99,7 +99,7 @@ router.put("/users/permissions", async (req, res): Promise<void> => {
 // ─── Users ─────────────────────────────────────────────────────────────────
 
 /** GET /api/users — list users with role names (optionally ?employee=1 to join). */
-router.get("/users", async (req, res): Promise<void> => {
+router.get("/", async (req, res): Promise<void> => {
   const rows = await db
     .select({
       id: userTable.id,
@@ -120,7 +120,7 @@ router.get("/users", async (req, res): Promise<void> => {
  * POST /api/users — create a user (admin sets the initial password). Checks for
  * duplicate username and duplicate employee link.
  */
-router.post("/users", async (req, res): Promise<void> => {
+router.post("/", async (req, res): Promise<void> => {
   const { username, displayName, password, roleId, employeeId, isActive } = req.body ?? {};
   if (typeof username !== "string" || !username.trim()) {
     res.status(400).json({ error: "username is required" });
@@ -185,7 +185,7 @@ router.post("/users", async (req, res): Promise<void> => {
 });
 
 /** PATCH /api/users/:id — update role / employee link / active status. */
-router.patch("/users/:id", async (req, res): Promise<void> => {
+router.patch("/:id", async (req, res): Promise<void> => {
   const id = Number(req.params.id);
   if (!id) {
     res.status(400).json({ error: "Invalid id" });
@@ -251,7 +251,7 @@ router.patch("/users/:id", async (req, res): Promise<void> => {
  * we also assert isAdmin on the request for defense in depth). Admin accounts
  * and the caller's own account cannot be deleted here.
  */
-router.delete("/users/:id", async (req, res): Promise<void> => {
+router.delete("/:id", async (req, res): Promise<void> => {
   if (!req.auth?.isAdmin) {
     res.status(403).json({ error: "Only an admin can delete a user" });
     return;
@@ -288,7 +288,7 @@ router.delete("/users/:id", async (req, res): Promise<void> => {
 });
 
 /** PUT /api/users/:id/password — admin resets a user's password. */
-router.put("/users/:id/password", async (req, res): Promise<void> => {
+router.put("/:id/password", async (req, res): Promise<void> => {
   const id = Number(req.params.id);
   const { password } = req.body ?? {};
   if (!id) {
