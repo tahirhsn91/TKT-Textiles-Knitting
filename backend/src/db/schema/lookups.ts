@@ -159,6 +159,7 @@ export type EmployeeMaster = typeof employeeMasterTable.$inferSelect;
 
 // ─── Employee Salary Settings ──────────────────────────────────────────────
 export const employeeSalarySettingsTable = pgTable("employee_salary_settings", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   employeeId: integer("employee_id").notNull().unique().references(() => employeeMasterTable.id),
   baseDailyWage: numeric("base_daily_wage").notNull().default("0"),
@@ -169,6 +170,7 @@ export type EmployeeSalarySettings = typeof employeeSalarySettingsTable.$inferSe
 
 // ─── Employee Salary Records ───────────────────────────────────────────────
 export const employeeSalaryRecordsTable = pgTable("employee_salary_records", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   employeeId: integer("employee_id").notNull().references(() => employeeMasterTable.id),
   date: date("date").notNull(),
@@ -183,6 +185,7 @@ export type EmployeeSalaryRecord = typeof employeeSalaryRecordsTable.$inferSelec
 
 // ─── Employee Advances ─────────────────────────────────────────────────────
 export const employeeAdvancesTable = pgTable("employee_advances", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   employeeId: integer("employee_id").notNull().references(() => employeeMasterTable.id),
   date: date("date").notNull(),
@@ -201,6 +204,7 @@ export type EmployeeAdvance = typeof employeeAdvancesTable.$inferSelect;
 
 // ─── Salary Header ─────────────────────────────────────────────────────────
 export const salaryHeaderTable = pgTable("salary_header", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   month: integer("month").notNull(),
   year: integer("year").notNull(),
@@ -218,6 +222,7 @@ export type SalaryHeader = typeof salaryHeaderTable.$inferSelect;
 
 // ─── Salary Detail ─────────────────────────────────────────────────────────
 export const salaryDetailTable = pgTable("salary_detail", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   headerId: integer("header_id").notNull().references(() => salaryHeaderTable.id, { onDelete: "cascade" }),
   employeeId: integer("employee_id").notNull().references(() => employeeMasterTable.id),

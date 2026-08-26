@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import argon2 from "argon2";
 import { db } from "../db/index.js";
 import {
@@ -8,6 +8,7 @@ import {
   userTable,
 } from "../db/schema/users.js";
 import { requireAuth, requirePermission } from "../lib/auth.js";
+import { activeTenantId } from "../middleware/tenant-context.js";
 
 const router: IRouter = Router();
 
@@ -38,16 +39,21 @@ function serializeUser(u: {
 
 // ─── Roles ───────────────────────────────────────────────────────────────────
 
-/** GET /api/users/roles — list roles (with isAdmin flag). */
-router.get("/roles", async (_req, res): Promise<void> => {
-  const roles = await db.select().from(roleTable).orderBy(roleTable.id);
+/** GET /api/users/roles — list the active tenant's roles (with isAdmin flag). */
+router.get("/roles", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
+  const roles = await db.select().from(roleTable).where(eq(roleTable.tenantId, tenantId)).orderBy(roleTable.id);
   res.json(roles.map((r) => ({ id: r.id, name: r.name, isAdmin: r.isAdmin })));
 });
 
-/** GET /api/users/permissions — full role×route matrix (Admin row always full). */
-router.get("/permissions", async (_req, res): Promise<void> => {
-  const roles = await db.select().from(roleTable).orderBy(roleTable.id);
-  const perms = await db.select().from(rolePermissionTable);
+/** GET /api/users/permissions — full role×route matrix for the active tenant (Admin row always full). */
+router.get("/permissions", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
+  const roles = await db.select().from(roleTable).where(eq(roleTable.tenantId, tenantId)).orderBy(roleTable.id);
+  const roleIds = roles.map((r) => r.id);
+  const perms = roleIds.length > 0
+    ? await db.select().from(rolePermissionTable).where(inArray(rolePermissionTable.roleId, roleIds))
+    : [];
   const byRole = new Map<number, string[]>();
   for (const p of perms) {
     const arr = byRole.get(p.roleId) ?? [];
@@ -98,8 +104,9 @@ router.put("/permissions", async (req, res): Promise<void> => {
 
 // ─── Users ─────────────────────────────────────────────────────────────────
 
-/** GET /api/users — list users with role names (optionally ?employee=1 to join). */
+/** GET /api/users — list the active tenant's users with role names. */
 router.get("/", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const rows = await db
     .select({
       id: userTable.id,
@@ -112,6 +119,7 @@ router.get("/", async (req, res): Promise<void> => {
     })
     .from(userTable)
     .innerJoin(roleTable, eq(userTable.roleId, roleTable.id))
+    .where(eq(userTable.tenantId, tenantId))
     .orderBy(userTable.username);
   res.json(rows.map(serializeUser));
 });
@@ -121,6 +129,7 @@ router.get("/", async (req, res): Promise<void> => {
  * duplicate username and duplicate employee link.
  */
 router.post("/", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const { username, displayName, password, roleId, employeeId, isActive } = req.body ?? {};
   if (typeof username !== "string" || !username.trim()) {
     res.status(400).json({ error: "username is required" });
@@ -135,7 +144,12 @@ router.post("/", async (req, res): Promise<void> => {
     return;
   }
   const rid = Number(roleId);
-  const [role] = await db.select().from(roleTable).where(eq(roleTable.id, rid)).limit(1);
+  // The role must belong to the active tenant (cross-tenant role assignment forbidden).
+  const [role] = await db
+    .select()
+    .from(roleTable)
+    .where(and(eq(roleTable.id, rid), eq(roleTable.tenantId, tenantId)))
+    .limit(1);
   if (!role) {
     res.status(400).json({ error: "Invalid role" });
     return;
@@ -146,7 +160,11 @@ router.post("/", async (req, res): Promise<void> => {
   }
 
   const uname = username.trim();
-  const existing = await db.select({ id: userTable.id }).from(userTable).where(eq(userTable.username, uname)).limit(1);
+  const existing = await db
+    .select({ id: userTable.id })
+    .from(userTable)
+    .where(and(eq(userTable.username, uname), eq(userTable.tenantId, tenantId)))
+    .limit(1);
   if (existing.length > 0) {
     res.status(409).json({ error: "Username already exists" });
     return;
@@ -166,6 +184,7 @@ router.post("/", async (req, res): Promise<void> => {
       displayName: displayName.trim(),
       passwordHash: hash,
       roleId: rid,
+      tenantId,
       employeeId: empId,
       isActive: isActive === undefined ? true : Boolean(isActive),
     })
@@ -184,8 +203,9 @@ router.post("/", async (req, res): Promise<void> => {
   );
 });
 
-/** PATCH /api/users/:id — update role / employee link / active status. */
+/** PATCH /api/users/:id — update role / employee link / active status (active tenant only). */
 router.patch("/:id", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const id = Number(req.params.id);
   if (!id) {
     res.status(400).json({ error: "Invalid id" });
@@ -195,7 +215,7 @@ router.patch("/:id", async (req, res): Promise<void> => {
     .select({ id: userTable.id, roleId: userTable.roleId, roleName: roleTable.name })
     .from(userTable)
     .innerJoin(roleTable, eq(userTable.roleId, roleTable.id))
-    .where(eq(userTable.id, id))
+    .where(and(eq(userTable.id, id), eq(userTable.tenantId, tenantId)))
     .limit(1);
   if (!existing) {
     res.status(404).json({ error: "User not found" });
@@ -207,7 +227,12 @@ router.patch("/:id", async (req, res): Promise<void> => {
   let newRoleId: number | undefined;
   if (roleId !== undefined) {
     const rid = Number(roleId);
-    const [role] = await db.select().from(roleTable).where(eq(roleTable.id, rid)).limit(1);
+    // Role must belong to the active tenant (prevent cross-tenant role assignment).
+    const [role] = await db
+      .select()
+      .from(roleTable)
+      .where(and(eq(roleTable.id, rid), eq(roleTable.tenantId, tenantId)))
+      .limit(1);
     if (!role) {
       res.status(400).json({ error: "Invalid role" });
       return;
@@ -235,12 +260,16 @@ router.patch("/:id", async (req, res): Promise<void> => {
   if (newEmpId !== undefined) patch.employeeId = newEmpId;
   if (isActive !== undefined) patch.isActive = Boolean(isActive);
 
-  const [updated] = await db.update(userTable).set(patch).where(eq(userTable.id, id)).returning();
+  const [updated] = await db
+    .update(userTable)
+    .set(patch)
+    .where(and(eq(userTable.id, id), eq(userTable.tenantId, tenantId)))
+    .returning();
   const [fresh] = await db
     .select({ id: userTable.id, username: userTable.username, displayName: userTable.displayName, roleId: userTable.roleId, roleName: roleTable.name, employeeId: userTable.employeeId, isActive: userTable.isActive })
     .from(userTable)
     .innerJoin(roleTable, eq(userTable.roleId, roleTable.id))
-    .where(eq(userTable.id, updated.id))
+    .where(and(eq(userTable.id, updated.id), eq(userTable.tenantId, tenantId)))
     .limit(1);
   res.json(serializeUser(fresh));
 });
@@ -269,7 +298,7 @@ router.delete("/:id", async (req, res): Promise<void> => {
     })
     .from(userTable)
     .innerJoin(roleTable, eq(userTable.roleId, roleTable.id))
-    .where(eq(userTable.id, id))
+    .where(and(eq(userTable.id, id), eq(userTable.tenantId, activeTenantId(req))))
     .limit(1);
   if (!existing) {
     res.status(404).json({ error: "User not found" });
@@ -283,12 +312,13 @@ router.delete("/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: "You cannot delete your own account" });
     return;
   }
-  await db.delete(userTable).where(eq(userTable.id, id));
+  await db.delete(userTable).where(and(eq(userTable.id, id), eq(userTable.tenantId, activeTenantId(req))));
   res.json({ ok: true, id });
 });
 
 /** PUT /api/users/:id/password — admin resets a user's password. */
 router.put("/:id/password", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const id = Number(req.params.id);
   const { password } = req.body ?? {};
   if (!id) {
@@ -299,13 +329,20 @@ router.put("/:id/password", async (req, res): Promise<void> => {
     res.status(400).json({ error: "password must be at least 6 characters" });
     return;
   }
-  const [existing] = await db.select({ id: userTable.id }).from(userTable).where(eq(userTable.id, id)).limit(1);
+  const [existing] = await db
+    .select({ id: userTable.id })
+    .from(userTable)
+    .where(and(eq(userTable.id, id), eq(userTable.tenantId, tenantId)))
+    .limit(1);
   if (!existing) {
     res.status(404).json({ error: "User not found" });
     return;
   }
   const hash = await argon2.hash(password);
-  await db.update(userTable).set({ passwordHash: hash, updatedAt: new Date() }).where(eq(userTable.id, id));
+  await db
+    .update(userTable)
+    .set({ passwordHash: hash, updatedAt: new Date() })
+    .where(and(eq(userTable.id, id), eq(userTable.tenantId, tenantId)));
   res.json({ ok: true });
 });
 
