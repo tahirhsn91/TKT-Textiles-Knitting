@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/auth-context";
 import { useAdmin } from "@/hooks/useAdmin";
+import { useTenantUsage } from "@/hooks/useTenantUsage";
 import { Layout } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Eye, Edit2, Trash2 } from "lucide-react";
+import { Loader2, Plus, Eye, Edit2, Trash2, Gauge } from "lucide-react";
 
 /**
  * Admin Tenants Page
@@ -53,6 +54,8 @@ export default function AdminTenantsPage() {
   });
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [usageTenant, setUsageTenant] = useState<any>(null);
+  const { usage, loading: usageLoading, error: usageError, load: loadUsage } = useTenantUsage();
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -90,6 +93,11 @@ export default function AdminTenantsPage() {
       status: tenant.status ?? "active",
     });
     setActionError(null);
+  };
+
+  const openUsage = (tenant: any) => {
+    setUsageTenant(tenant);
+    void loadUsage(tenant.id).catch(() => undefined);
   };
 
   const handleEditSave = async (e: React.FormEvent) => {
@@ -248,6 +256,14 @@ export default function AdminTenantsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openUsage(tenant)}
+                              title="Usage"
+                            >
+                              <Gauge className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -432,6 +448,55 @@ export default function AdminTenantsPage() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setViewTenant(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Tenant Usage Dialog */}
+      <Dialog open={usageTenant != null} onOpenChange={(o) => !o && setUsageTenant(null)}>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle>Tenant Usage</DialogTitle>
+            <DialogDescription>Resource usage for {usageTenant?.name ?? "this tenant"}.</DialogDescription>
+          </DialogHeader>
+          {usageLoading ? (
+            <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading usage…
+            </div>
+          ) : usageError ? (
+            <p className="text-sm text-destructive">{usageError}</p>
+          ) : usage ? (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-3 gap-1">
+                <span className="text-muted-foreground">Tenant</span>
+                <span className="col-span-2 font-medium">{usage.name} ({usage.slug})</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                <span className="text-muted-foreground">Status</span>
+                <span className="col-span-2">{getStatusBadge(usage.status)}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                <span className="text-muted-foreground">User seats</span>
+                <span className="col-span-2">{usage.usage.seats.used}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                <span className="text-muted-foreground">Transactions</span>
+                <span className="col-span-2">{usage.usage.transactions.used}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                <span className="text-muted-foreground">Detail records</span>
+                <span className="col-span-2">{usage.usage.records.used}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                <span className="text-muted-foreground">Audit events</span>
+                <span className="col-span-2">{usage.usage.auditEvents}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No usage data.</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUsageTenant(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -11,6 +11,8 @@ import {
 } from "../db/schema/tenants.js";
 import { userTable, roleTable, rolePermissionTable } from "../db/schema/users.js";
 import { auditLogTable } from "../db/schema/audit-log.js";
+import { transactionHeaderTable } from "../db/schema/transactions.js";
+import { transactionDetailTable } from "../db/schema/transactions.js";
 import argon2 from "argon2";
 import { logger } from "../lib/logger.js";
 
@@ -265,7 +267,51 @@ export const adminService = {
       .select({ roleCount: sql<number>`count(*)`.mapWith(Number) })
       .from(roleTable)
       .where(eq(roleTable.tenantId, tenantId));
-    return { tenantId, userCount, roleCount };
+    const [{ transactionCount }] = await db
+      .select({ transactionCount: sql<number>`count(*)`.mapWith(Number) })
+      .from(transactionHeaderTable)
+      .where(eq(transactionHeaderTable.tenantId, tenantId));
+    // Activity: audit entries referencing this tenant (creation/updates/etc.).
+    const [{ activityCount }] = await db
+      .select({ activityCount: sql<number>`count(*)`.mapWith(Number) })
+      .from(auditLogTable)
+      .where(eq(auditLogTable.targetTenantId, tenantId));
+    return { tenantId, userCount, roleCount, transactionCount, activityCount };
+  },
+
+  /**
+   * Usage snapshot for the super-admin tenant panel (issue #219 2.2).
+   * Resource-limited metrics (seats, records) used to monitor tenant load.
+   */
+  async getTenantUsage(tenantId: number) {
+    const [tenant] = await db
+      .select({ id: tenantTable.id, name: tenantTable.name, slug: tenantTable.slug, status: tenantTable.status })
+      .from(tenantTable)
+      .where(eq(tenantTable.id, tenantId))
+      .limit(1);
+    if (!tenant) {
+      const err = new Error("Tenant not found");
+      (err as Error & { status?: number }).status = 404;
+      throw err;
+    }
+
+    const [{ users }] = await db.select({ users: sql<number>`count(*)`.mapWith(Number) }).from(userTable).where(eq(userTable.tenantId, tenantId));
+    const [{ transactions }] = await db.select({ transactions: sql<number>`count(*)`.mapWith(Number) }).from(transactionHeaderTable).where(eq(transactionHeaderTable.tenantId, tenantId));
+    const [{ totalRecords }] = await db.select({ totalRecords: sql<number>`count(*)`.mapWith(Number) }).from(transactionDetailTable).where(eq(transactionDetailTable.tenantId, tenantId));
+    const [{ auditEvents }] = await db.select({ auditEvents: sql<number>`count(*)`.mapWith(Number) }).from(auditLogTable).where(eq(auditLogTable.targetTenantId, tenantId));
+
+    return {
+      tenantId,
+      name: tenant.name,
+      slug: tenant.slug,
+      status: tenant.status,
+      usage: {
+        seats: { used: users, limit: null },           // plan limit (null = unlimited) — set on subscription
+        transactions: { used: transactions, limit: null },
+        records: { used: totalRecords, limit: null },
+        auditEvents,
+      },
+    };
   },
 
   /**
