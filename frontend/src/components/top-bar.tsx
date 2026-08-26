@@ -53,7 +53,10 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-sidebar-border bg-sidebar px-3 text-sidebar-foreground print:hidden",
+        // Mobile: fixed to the viewport top so the top bar is always sticky and
+        // consistent with the fixed bottom nav. Desktop: sticky within the
+        // content column (offset by the sidebar).
+        "fixed inset-x-0 top-0 z-40 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-sidebar-border bg-sidebar px-3 text-sidebar-foreground print:hidden md:sticky md:z-30",
         // Push below the fixed dev banner in dev builds.
         import.meta.env.DEV && "top-7"
       )}
