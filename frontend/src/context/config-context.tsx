@@ -35,7 +35,7 @@ export function ConfigurationProvider({ children }: { children: ReactNode }) {
   // produces an unnecessary (401) /api/masters/configuration call.
   const { isAuthenticated } = useAuth();
   const { data: configurations, isLoading } = useListConfigurationCrud({
-    query: { enabled: isAuthenticated },
+    query: { enabled: isAuthenticated, queryKey: ["configuration"] },
   });
 
   const reconciledLockEnabled =

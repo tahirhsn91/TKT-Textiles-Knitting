@@ -244,7 +244,7 @@ export default function AdminTenantsPage() {
                         </TableCell>
                         <TableCell>{getStatusBadge(tenant.status)}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {new Date(tenant.created_at).toLocaleDateString()}
+                          {tenant.created_at ? new Date(tenant.created_at).toLocaleDateString() : "—"}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
