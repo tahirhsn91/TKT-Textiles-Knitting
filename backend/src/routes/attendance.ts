@@ -121,7 +121,7 @@ async function operatorProductionDays(
 // grid can render employee rows and pre-check Sundays for non-operators only)
 // and whether a payroll entry already exists for that month (which locks
 // editing).
-router.get("/attendance", async (req, res): Promise<void> => {
+router.get("/", async (req, res): Promise<void> => {
   const { month, year } = req.query as Record<string, string>;
   if (!month || !year) {
     res.status(400).json({ error: "month and year are required" });
@@ -170,7 +170,7 @@ router.get("/attendance", async (req, res): Promise<void> => {
 // array of { employeeId, attendanceDate, present }. Idempotent upsert by
 // (employee_id, attendance_date). Blocked with 409 if a payroll entry already
 // exists for the month (attendance is locked once payroll exists — spec Q10B).
-router.put("/attendance", async (req, res): Promise<void> => {
+router.put("/", async (req, res): Promise<void> => {
   const { month, year, records } = req.body as {
     month: number;
     year: number;
