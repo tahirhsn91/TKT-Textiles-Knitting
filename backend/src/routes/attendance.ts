@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and, inArray, gte, lte } from "drizzle-orm";
 import { db } from "../db/index.js";
+import { activeTenantId } from "../middleware/tenant-context.js";
 import {
   attendanceTable,
   employeeMasterTable,
@@ -35,11 +36,11 @@ function daysInMonth(year: number, month: number): number {
 // Whether ANY payroll salary detail exists for the given month+year. Used to
 // (a) lock attendance editing once a payroll entry exists for the month, and
 // (b) flag the payroll gate from the attendance side.
-async function payrollExistsForMonth(month: number, year: number): Promise<boolean> {
+async function payrollExistsForMonth(month: number, year: number, tenantId: number): Promise<boolean> {
   const rows = await db
     .select({ id: salaryDetailTable.id })
     .from(salaryDetailTable)
-    .where(and(eq(salaryDetailTable.month, month), eq(salaryDetailTable.year, year)))
+    .where(and(eq(salaryDetailTable.month, month), eq(salaryDetailTable.year, year), eq(salaryDetailTable.tenantId, tenantId)))
     .limit(1);
   return rows.length > 0;
 }
@@ -47,11 +48,11 @@ async function payrollExistsForMonth(month: number, year: number): Promise<boole
 // The Operator department (code 0002). Operators are paid on production in
 // payroll; this attendance endpoint just needs to know who they are so the
 // frontend can decide Sunday auto-check (non-operators only).
-async function operatorDeptId(): Promise<number | null> {
+async function operatorDeptId(tenantId: number): Promise<number | null> {
   const [dept] = await db
     .select({ id: departmentMasterTable.id })
     .from(departmentMasterTable)
-    .where(eq(departmentMasterTable.code, "0002"));
+    .where(and(eq(departmentMasterTable.code, "0002"), eq(departmentMasterTable.tenantId, tenantId)));
   return dept?.id ?? null;
 }
 
@@ -62,18 +63,19 @@ async function operatorDeptId(): Promise<number | null> {
 // operators). Returns employeeId -> sorted date list.
 async function operatorProductionDays(
   dateFrom: string,
-  dateTo: string
+  dateTo: string,
+  tenantId: number
 ): Promise<Map<number, string[]>> {
   const [fabricProd, operatorDept] = await Promise.all([
     db
       .select({ id: transactionTypeMasterTable.id })
       .from(transactionTypeMasterTable)
-      .where(eq(transactionTypeMasterTable.code, "Fabric_Production"))
+      .where(and(eq(transactionTypeMasterTable.code, "Fabric_Production"), eq(transactionTypeMasterTable.tenantId, tenantId)))
       .limit(1),
     db
       .select({ id: departmentMasterTable.id })
       .from(departmentMasterTable)
-      .where(eq(departmentMasterTable.code, "0002"))
+      .where(and(eq(departmentMasterTable.code, "0002"), eq(departmentMasterTable.tenantId, tenantId)))
       .limit(1),
   ]);
   if (!fabricProd[0] || !operatorDept[0]) return new Map();
@@ -85,7 +87,8 @@ async function operatorProductionDays(
       and(
         eq(transactionHeaderTable.transactionTypeId, fabricProd[0].id),
         gte(transactionHeaderTable.date, dateFrom),
-        lte(transactionHeaderTable.date, dateTo)
+        lte(transactionHeaderTable.date, dateTo),
+        eq(transactionHeaderTable.tenantId, tenantId),
       )
     );
   const headerIds = headers.map((h) => h.id);
@@ -95,7 +98,7 @@ async function operatorProductionDays(
   const details = await db
     .select({ employeeId: transactionDetailTable.employeeId, headerId: transactionDetailTable.headerId, netWt: transactionDetailTable.netWt })
     .from(transactionDetailTable)
-    .where(inArray(transactionDetailTable.headerId, headerIds));
+    .where(and(inArray(transactionDetailTable.headerId, headerIds), eq(transactionDetailTable.tenantId, tenantId)));
 
   const byEmp = new Map<number, Set<string>>();
   for (const d of details) {
@@ -133,15 +136,16 @@ router.get("/attendance", async (req, res): Promise<void> => {
 
   const from = monthStart(y, m);
   const to = monthEnd(y, m);
+  const tenantId = activeTenantId(req);
 
   const [records, deptId, payrollExists, productionDays] = await Promise.all([
     db
       .select()
       .from(attendanceTable)
-      .where(and(gte(attendanceTable.attendanceDate, from), lte(attendanceTable.attendanceDate, to))),
-    operatorDeptId(),
-    payrollExistsForMonth(m, y),
-    operatorProductionDays(from, to),
+      .where(and(gte(attendanceTable.attendanceDate, from), lte(attendanceTable.attendanceDate, to), eq(attendanceTable.tenantId, tenantId))),
+    operatorDeptId(tenantId),
+    payrollExistsForMonth(m, y, tenantId),
+    operatorProductionDays(from, to, tenantId),
   ]);
 
   res.json({
@@ -192,7 +196,8 @@ router.put("/attendance", async (req, res): Promise<void> => {
   }
 
   // Lock: once a payroll entry exists for the month, attendance can't change.
-  const [payrollExists] = await Promise.all([payrollExistsForMonth(m, y)]);
+  const tenantId = activeTenantId(req);
+  const [payrollExists] = await Promise.all([payrollExistsForMonth(m, y, tenantId)]);
   if (payrollExists) {
     res.status(409).json({
       error: "Attendance for this month is locked because a payroll entry already exists.",
@@ -206,7 +211,7 @@ router.put("/attendance", async (req, res): Promise<void> => {
     ? await db
         .select({ id: employeeMasterTable.id })
         .from(employeeMasterTable)
-        .where(inArray(employeeMasterTable.id, empIds))
+        .where(and(inArray(employeeMasterTable.id, empIds), eq(employeeMasterTable.tenantId, tenantId)))
     : [];
   const validIdSet = new Set(employees.map((e) => e.id));
 
@@ -219,13 +224,12 @@ router.put("/attendance", async (req, res): Promise<void> => {
     .filter((r) => r.attendanceDate >= from && r.attendanceDate <= to && r.attendanceDate <= todayIso)
     .map((r) => ({
       employeeId: r.employeeId,
+      tenantId,
       attendanceDate: r.attendanceDate,
       present: Boolean(r.present),
     }));
 
   await db.transaction(async (tx) => {
-    // Delete the month's existing rows for the touched employees, then insert
-    // the fresh set (idempotent whole-month replacement).
     const touchedEmpIds = [...new Set(rows.map((r) => r.employeeId))];
     if (touchedEmpIds.length) {
       await tx
@@ -233,6 +237,7 @@ router.put("/attendance", async (req, res): Promise<void> => {
         .where(
           and(
             inArray(attendanceTable.employeeId, touchedEmpIds),
+            eq(attendanceTable.tenantId, tenantId),
             gte(attendanceTable.attendanceDate, from),
             lte(attendanceTable.attendanceDate, to)
           )

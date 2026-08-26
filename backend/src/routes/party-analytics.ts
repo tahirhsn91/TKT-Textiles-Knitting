@@ -10,6 +10,7 @@ import {
   fabricTypeMasterTable,
 } from "../db/index.js";
 import { validateQuery } from "../lib/validate.js";
+import { activeTenantId } from "../middleware/tenant-context.js";
 
 const router: IRouter = Router();
 
@@ -31,16 +32,16 @@ function lastDayOfMonth(year: number, month: number): number {
 }
 
 /** Resolve the transaction type ids for the two fabric flows. */
-async function resolveFabricTypeIds(): Promise<{ productionId: number; deliveryId: number } | null> {
+async function resolveFabricTypeIds(tenantId: number): Promise<{ productionId: number; deliveryId: number } | null> {
   const [production, delivery] = await Promise.all([
     db
       .select({ id: transactionTypeMasterTable.id })
       .from(transactionTypeMasterTable)
-      .where(eq(transactionTypeMasterTable.code, FABRIC_PRODUCTION_CODE)),
+      .where(and(eq(transactionTypeMasterTable.code, FABRIC_PRODUCTION_CODE), eq(transactionTypeMasterTable.tenantId, tenantId))),
     db
       .select({ id: transactionTypeMasterTable.id })
       .from(transactionTypeMasterTable)
-      .where(eq(transactionTypeMasterTable.code, FABRIC_DELIVERY_CODE)),
+      .where(and(eq(transactionTypeMasterTable.code, FABRIC_DELIVERY_CODE), eq(transactionTypeMasterTable.tenantId, tenantId))),
   ]);
   const productionId = production[0]?.id;
   const deliveryId = delivery[0]?.id;
@@ -80,7 +81,8 @@ router.get("/party-analytics", validateQuery(partySchema), async (req, res): Pro
   const dayTo = isCurrentMonth ? today : lastDayOfMonth(year, month);
   const to = `${year}-${MONTHS[month - 1]}-${String(dayTo).padStart(2, "0")}`;
 
-  const typeIds = await resolveFabricTypeIds();
+  const tenantId = activeTenantId(req);
+  const typeIds = await resolveFabricTypeIds(tenantId);
   if (!typeIds) {
     res.status(500).json({ error: "Fabric Production / Delivery transaction types are not configured" });
     return;
@@ -88,10 +90,9 @@ router.get("/party-analytics", validateQuery(partySchema), async (req, res): Pro
   const { productionId, deliveryId } = typeIds;
 
   // ── Header-level filters shared by every aggregate ────────────────────
-  // Apply the party filter here so a single-party view only sums that party's
-  // rows (totals / fabric breakdown / daily trend all inherit this scope).
   const headerWhere = and(
     inArray(transactionHeaderTable.transactionTypeId, [productionId, deliveryId]),
+    eq(transactionHeaderTable.tenantId, tenantId),
     gte(transactionHeaderTable.date, from),
     lte(transactionHeaderTable.date, to),
     partyId != null ? eq(transactionHeaderTable.partyId, partyId) : undefined,
@@ -103,7 +104,7 @@ router.get("/party-analytics", validateQuery(partySchema), async (req, res): Pro
     const [p] = await db
       .select()
       .from(partyMasterTable)
-      .where(eq(partyMasterTable.id, partyId));
+      .where(and(eq(partyMasterTable.id, partyId), eq(partyMasterTable.tenantId, tenantId)));
     party = p
       ? { id: p.id, name: p.name, code: p.code }
       : null;

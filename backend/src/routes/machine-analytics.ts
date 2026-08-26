@@ -8,6 +8,7 @@ import {
   transactionHeaderTable,
   transactionDetailTable,
 } from "../db/index.js";
+import { activeTenantId } from "../middleware/tenant-context.js";
 
 const router: IRouter = Router();
 
@@ -67,10 +68,11 @@ router.get("/machine-analytics", async (req, res): Promise<void> => {
     baseline === "needle" ? machineMasterTable.needleChangeDate : machineMasterTable.sinkerChangeDate;
 
   // Resolve the Fabric Production transaction type (same convention as salary-entries).
+  const tenantId = activeTenantId(req);
   const [fabricProd] = await db
     .select()
     .from(transactionTypeMasterTable)
-    .where(eq(transactionTypeMasterTable.code, FABRIC_PRODUCTION_CODE));
+    .where(and(eq(transactionTypeMasterTable.code, FABRIC_PRODUCTION_CODE), eq(transactionTypeMasterTable.tenantId, tenantId)));
   if (!fabricProd) {
     res.status(500).json({ error: "Fabric Production transaction type is not configured" });
     return;
@@ -85,6 +87,7 @@ router.get("/machine-analytics", async (req, res): Promise<void> => {
       changeDate: changeDateCol,
     })
     .from(machineMasterTable)
+    .where(eq(machineMasterTable.tenantId, tenantId))
     .orderBy(machineMasterTable.machineNumber);
 
   // Per-machine production aggregates over Fabric Production transactions with
@@ -109,6 +112,7 @@ router.get("/machine-analytics", async (req, res): Promise<void> => {
     .where(
       and(
         eq(transactionHeaderTable.transactionTypeId, fabricProd.id),
+        eq(transactionDetailTable.tenantId, tenantId),
         gte(transactionHeaderTable.date, changeDateCol),
       ),
     )

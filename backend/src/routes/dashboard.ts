@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { and, eq, gte, lte, sql, count, sum } from "drizzle-orm";
 import { db } from "../db/index.js";
+import { activeTenantId } from "../middleware/tenant-context.js";
 import {
   transactionHeaderTable,
   transactionDetailTable,
@@ -69,25 +70,25 @@ function getWindow() {
 
 // ── Widget data functions ───────────────────────────────────────────────────
 
-async function getKpis() {
+async function getKpis(tenantId: number) {
   const { cmFrom, cmTo, periodLabel } = getWindow();
 
   const [txnCountRow] = await db
     .select({ totalTransactions: count(transactionHeaderTable.id) })
     .from(transactionHeaderTable)
-    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo)));
+    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo), eq(transactionHeaderTable.tenantId, tenantId)));
 
   const [netWtRow] = await db
     .select({ totalNetWeight: sum(transactionDetailTable.netWt) })
     .from(transactionDetailTable)
     .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
-    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo)));
+    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo), eq(transactionHeaderTable.tenantId, tenantId)));
 
   const [activeMachinesRow] = await db
     .select({ activeMachines: sql<number>`COUNT(DISTINCT ${transactionDetailTable.machineId})` })
     .from(transactionDetailTable)
     .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
-    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo)));
+    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo), eq(transactionHeaderTable.tenantId, tenantId)));
 
   return {
     totalTransactions: toNum(txnCountRow?.totalTransactions),
@@ -97,7 +98,7 @@ async function getKpis() {
   };
 }
 
-async function getMonthlyTrend() {
+async function getMonthlyTrend(tenantId: number) {
   const { trendFrom, cmTo } = getWindow();
   const rows = await db
     .select({
@@ -108,7 +109,7 @@ async function getMonthlyTrend() {
     })
     .from(transactionDetailTable)
     .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
-    .where(and(gte(transactionHeaderTable.date, trendFrom), lte(transactionHeaderTable.date, cmTo)))
+    .where(and(gte(transactionHeaderTable.date, trendFrom), lte(transactionHeaderTable.date, cmTo), eq(transactionHeaderTable.tenantId, tenantId)))
     .groupBy(
       sql`EXTRACT(YEAR FROM ${transactionHeaderTable.date})`,
       sql`EXTRACT(MONTH FROM ${transactionHeaderTable.date})`,
@@ -125,7 +126,7 @@ async function getMonthlyTrend() {
   }));
 }
 
-async function getDailyProduction() {
+async function getDailyProduction(tenantId: number) {
   const { dailyFrom, todayStr } = getWindow();
   const rows = await db
     .select({
@@ -135,7 +136,7 @@ async function getDailyProduction() {
     })
     .from(transactionDetailTable)
     .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
-    .where(and(gte(transactionHeaderTable.date, dailyFrom), lte(transactionHeaderTable.date, todayStr)))
+    .where(and(gte(transactionHeaderTable.date, dailyFrom), lte(transactionHeaderTable.date, todayStr), eq(transactionHeaderTable.tenantId, tenantId)))
     .groupBy(transactionHeaderTable.date)
     .orderBy(transactionHeaderTable.date);
 
@@ -146,7 +147,7 @@ async function getDailyProduction() {
   }));
 }
 
-async function getFabricBreakdown() {
+async function getFabricBreakdown(tenantId: number) {
   const { cmFrom, cmTo } = getWindow();
   const rows = await db
     .select({
@@ -156,14 +157,14 @@ async function getFabricBreakdown() {
     .from(transactionDetailTable)
     .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
     .leftJoin(fabricTypeMasterTable, eq(transactionHeaderTable.fabricTypeId, fabricTypeMasterTable.id))
-    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo)))
+    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo), eq(transactionHeaderTable.tenantId, tenantId)))
     .groupBy(fabricTypeMasterTable.name)
     .orderBy(sql`SUM(${transactionDetailTable.netWt}) DESC`);
 
   return rows.map((r) => ({ name: r.fabricType ?? "Unknown", value: toNum(r.totalNetWeight) }));
 }
 
-async function getTopParties() {
+async function getTopParties(tenantId: number) {
   const { cmFrom, cmTo } = getWindow();
   const rows = await db
     .select({
@@ -172,7 +173,7 @@ async function getTopParties() {
     })
     .from(transactionHeaderTable)
     .leftJoin(partyMasterTable, eq(transactionHeaderTable.partyId, partyMasterTable.id))
-    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo)))
+    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo), eq(transactionHeaderTable.tenantId, tenantId)))
     .groupBy(partyMasterTable.name)
     .orderBy(sql`COUNT(${transactionHeaderTable.id}) DESC`)
     .limit(10);
@@ -180,7 +181,7 @@ async function getTopParties() {
   return rows.map((r) => ({ name: r.partyName ?? "Unknown", count: toNum(r.transactionCount) }));
 }
 
-async function getMachineUtilization() {
+async function getMachineUtilization(tenantId: number) {
   const { cmFrom, cmTo } = getWindow();
   const rows = await db
     .select({
@@ -190,7 +191,7 @@ async function getMachineUtilization() {
     .from(transactionDetailTable)
     .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
     .leftJoin(machineMasterTable, eq(transactionDetailTable.machineId, machineMasterTable.id))
-    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo)))
+    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo), eq(transactionHeaderTable.tenantId, tenantId)))
     .groupBy(machineMasterTable.name)
     .orderBy(sql`COUNT(${transactionDetailTable.id}) DESC`)
     .limit(15);
@@ -198,7 +199,7 @@ async function getMachineUtilization() {
   return rows.map((r) => ({ name: r.machineName ?? "Unknown", lines: toNum(r.transactionLines) }));
 }
 
-async function getEmployeeOutput() {
+async function getEmployeeOutput(tenantId: number) {
   const { cmFrom, cmTo } = getWindow();
   const rows = await db
     .select({
@@ -208,7 +209,7 @@ async function getEmployeeOutput() {
     .from(transactionDetailTable)
     .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
     .leftJoin(employeeMasterTable, eq(transactionDetailTable.employeeId, employeeMasterTable.id))
-    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo)))
+    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo), eq(transactionHeaderTable.tenantId, tenantId)))
     .groupBy(employeeMasterTable.name)
     .orderBy(sql`SUM(${transactionDetailTable.netWt}) DESC`)
     .limit(10);
@@ -216,35 +217,36 @@ async function getEmployeeOutput() {
   return rows.map((r) => ({ name: r.employeeName ?? "Unknown", netWeight: toNum(r.totalNetWeight) }));
 }
 
-// ── Cached widget getters (TTL-cached) ─────────────────────────────────────
-const getCachedKpis = withCache("kpis", getKpis);
-const getCachedMonthlyTrend = withCache("monthly-trend", getMonthlyTrend);
-const getCachedDailyProduction = withCache("daily-production", getDailyProduction);
-const getCachedFabricBreakdown = withCache("fabric-breakdown", getFabricBreakdown);
-const getCachedTopParties = withCache("top-parties", getTopParties);
-const getCachedMachineUtilization = withCache("machine-utilization", getMachineUtilization);
-const getCachedEmployeeOutput = withCache("employee-output", getEmployeeOutput);
+// ── Cached widget getters (TTL-cached, keyed by tenant so no cross-tenant leak) ─
+const getCachedKpis = (t: number) => withCache(`kpis:${t}`, () => getKpis(t));
+const getCachedMonthlyTrend = (t: number) => withCache(`monthly-trend:${t}`, () => getMonthlyTrend(t));
+const getCachedDailyProduction = (t: number) => withCache(`daily-production:${t}`, () => getDailyProduction(t));
+const getCachedFabricBreakdown = (t: number) => withCache(`fabric-breakdown:${t}`, () => getFabricBreakdown(t));
+const getCachedTopParties = (t: number) => withCache(`top-parties:${t}`, () => getTopParties(t));
+const getCachedMachineUtilization = (t: number) => withCache(`machine-utilization:${t}`, () => getMachineUtilization(t));
+const getCachedEmployeeOutput = (t: number) => withCache(`employee-output:${t}`, () => getEmployeeOutput(t));
 
 // ── Per-widget endpoints ────────────────────────────────────────────────────
-router.get("/dashboard/kpis",                async (_req, res) => { res.json(await getCachedKpis()); });
-router.get("/dashboard/monthly-trend",       async (_req, res) => { res.json(await getCachedMonthlyTrend()); });
-router.get("/dashboard/daily-production",    async (_req, res) => { res.json(await getCachedDailyProduction()); });
-router.get("/dashboard/fabric-breakdown",    async (_req, res) => { res.json(await getCachedFabricBreakdown()); });
-router.get("/dashboard/top-parties",         async (_req, res) => { res.json(await getCachedTopParties()); });
-router.get("/dashboard/machine-utilization", async (_req, res) => { res.json(await getCachedMachineUtilization()); });
-router.get("/dashboard/employee-output",     async (_req, res) => { res.json(await getCachedEmployeeOutput()); });
+router.get("/dashboard/kpis",                async (req, res) => { res.json(await getCachedKpis(activeTenantId(req))()); });
+router.get("/dashboard/monthly-trend",       async (req, res) => { res.json(await getCachedMonthlyTrend(activeTenantId(req))()); });
+router.get("/dashboard/daily-production",    async (req, res) => { res.json(await getCachedDailyProduction(activeTenantId(req))()); });
+router.get("/dashboard/fabric-breakdown",    async (req, res) => { res.json(await getCachedFabricBreakdown(activeTenantId(req))()); });
+router.get("/dashboard/top-parties",         async (req, res) => { res.json(await getCachedTopParties(activeTenantId(req))()); });
+router.get("/dashboard/machine-utilization", async (req, res) => { res.json(await getCachedMachineUtilization(activeTenantId(req))()); });
+router.get("/dashboard/employee-output",     async (req, res) => { res.json(await getCachedEmployeeOutput(activeTenantId(req))()); });
 
 // ── Aggregated summary (kept for backward compatibility) ────────────────────
-router.get("/dashboard/summary", async (_req, res): Promise<void> => {
+router.get("/dashboard/summary", async (req, res): Promise<void> => {
+  const t = activeTenantId(req);
   const [kpis, monthlyTrend, dailyProduction, fabricBreakdown, topParties, machineUtilization, employeeOutput] =
     await Promise.all([
-      getCachedKpis(),
-      getCachedMonthlyTrend(),
-      getCachedDailyProduction(),
-      getCachedFabricBreakdown(),
-      getCachedTopParties(),
-      getCachedMachineUtilization(),
-      getCachedEmployeeOutput(),
+      getCachedKpis(t)(),
+      getCachedMonthlyTrend(t)(),
+      getCachedDailyProduction(t)(),
+      getCachedFabricBreakdown(t)(),
+      getCachedTopParties(t)(),
+      getCachedMachineUtilization(t)(),
+      getCachedEmployeeOutput(t)(),
     ]);
 
   res.json({ kpis, monthlyTrend, dailyProduction, fabricBreakdown, topParties, machineUtilization, employeeOutput });

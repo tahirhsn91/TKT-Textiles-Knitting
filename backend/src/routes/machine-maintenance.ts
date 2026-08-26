@@ -8,6 +8,7 @@ import {
   insertMachineMaintenanceSchema,
 } from "../db/index.js";
 import { validateBody } from "../lib/validate.js";
+import { activeTenantId } from "../middleware/tenant-context.js";
 
 const router: IRouter = Router();
 
@@ -32,6 +33,7 @@ const STATUSES = z.enum(["submitted", "cancelled"]);
 // ─── List (paginated, by date + status) ────────────────────────────────────
 
 router.get("/maintenance/machine", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const date = typeof req.query.date === "string" && req.query.date ? req.query.date : todayIso();
   const statusRaw = typeof req.query.status === "string" ? req.query.status : "submitted";
   const page = Math.max(parseInt(String(req.query.page ?? "1"), 10) || 1, 1);
@@ -42,6 +44,7 @@ router.get("/maintenance/machine", async (req, res): Promise<void> => {
   const where = and(
     eq(machineMaintenanceTable.maintenanceDate, date),
     eq(machineMaintenanceTable.status, status),
+    eq(machineMaintenanceTable.tenantId, tenantId),
   );
 
   const [{ total }] = await db
@@ -60,6 +63,7 @@ router.get("/maintenance/machine", async (req, res): Promise<void> => {
     .where(and(
       eq(machineMaintenanceTable.maintenanceDate, date),
       eq(machineMaintenanceTable.status, activeStatus),
+      eq(machineMaintenanceTable.tenantId, tenantId),
     ));
   const [monthCost] = await db
     .select({ sum: sql<string>`coalesce(sum(${machineMaintenanceTable.cost}), 0)` })
@@ -68,6 +72,7 @@ router.get("/maintenance/machine", async (req, res): Promise<void> => {
       gte(machineMaintenanceTable.maintenanceDate, monthStart),
       lte(machineMaintenanceTable.maintenanceDate, date),
       eq(machineMaintenanceTable.status, activeStatus),
+      eq(machineMaintenanceTable.tenantId, tenantId),
     ));
 
   // Per-day cost + job count from the 1st of the month through the selected
@@ -84,6 +89,7 @@ router.get("/maintenance/machine", async (req, res): Promise<void> => {
       gte(machineMaintenanceTable.maintenanceDate, monthStart),
       lte(machineMaintenanceTable.maintenanceDate, date),
       eq(machineMaintenanceTable.status, activeStatus),
+      eq(machineMaintenanceTable.tenantId, tenantId),
     ))
     .groupBy(machineMaintenanceTable.maintenanceDate)
     .orderBy(machineMaintenanceTable.maintenanceDate);
@@ -123,6 +129,7 @@ router.get("/maintenance/machine", async (req, res): Promise<void> => {
 // ─── Detail ────────────────────────────────────────────────────────────────
 
 router.get("/maintenance/machine/:id", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid maintenance id" });
@@ -147,7 +154,7 @@ router.get("/maintenance/machine/:id", async (req, res): Promise<void> => {
     })
     .from(machineMaintenanceTable)
     .leftJoin(machineMasterTable, eq(machineMaintenanceTable.machineId, machineMasterTable.id))
-    .where(eq(machineMaintenanceTable.id, id));
+    .where(and(eq(machineMaintenanceTable.id, id), eq(machineMaintenanceTable.tenantId, tenantId)));
 
   if (!row) {
     res.status(404).json({ error: "Machine maintenance record not found" });
@@ -170,6 +177,7 @@ router.post("/maintenance/machine", validateBody(machineSchema), async (req, res
       cost: cost != null ? String(cost) : null,
       vendor: vendor?.trim() ? vendor.trim() : null,
       createdBy,
+      tenantId: activeTenantId(req),
     })
     .returning({ id: machineMaintenanceTable.id });
 
@@ -186,6 +194,7 @@ router.put("/maintenance/machine/:id", validateBody(machineSchema), async (req, 
   }
 
   const { maintenanceDate, machineId, maintenanceWork, cost, vendor, createdBy, updatedBy } = req.body as unknown as z.infer<typeof machineSchema>;
+  const tenantId = activeTenantId(req);
 
   const [row] = await db
     .update(machineMaintenanceTable)
@@ -198,7 +207,7 @@ router.put("/maintenance/machine/:id", validateBody(machineSchema), async (req, 
       updatedBy: updatedBy ?? createdBy,
       updatedAt: new Date(),
     })
-    .where(and(eq(machineMaintenanceTable.id, id), eq(machineMaintenanceTable.status, "submitted")))
+    .where(and(eq(machineMaintenanceTable.id, id), eq(machineMaintenanceTable.status, "submitted"), eq(machineMaintenanceTable.tenantId, tenantId)))
     .returning({ id: machineMaintenanceTable.id });
 
   if (!row) {
@@ -228,7 +237,7 @@ router.patch("/maintenance/machine/:id/status", validateBody(z.object({ status: 
       updatedBy: by ?? null,
       updatedAt: new Date(),
     })
-    .where(eq(machineMaintenanceTable.id, id))
+    .where(and(eq(machineMaintenanceTable.id, id), eq(machineMaintenanceTable.tenantId, activeTenantId(req))))
     .returning({ id: machineMaintenanceTable.id, status: machineMaintenanceTable.status });
 
   if (!row) {
