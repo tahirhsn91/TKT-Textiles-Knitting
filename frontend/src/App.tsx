@@ -123,9 +123,9 @@ function Router() {
           <Route path="/settings">
             <ProtectedRoute moduleId="users"><TenantRequired><SettingsPage /></TenantRequired></ProtectedRoute>
           </Route>
-          {/* /admin/tenants is platform-level — reachable without a tenant. */}
+          {/* /admin/tenants is platform-level — super-admin only; moduleId is a placeholder. */}
           <Route path="/admin/tenants">
-            <ProtectedRoute><AdminTenantsPage /></ProtectedRoute>
+            <ProtectedRoute moduleId="*"><AdminTenantsPage /></ProtectedRoute>
           </Route>
           <Route component={NotFound} />
         </Switch>

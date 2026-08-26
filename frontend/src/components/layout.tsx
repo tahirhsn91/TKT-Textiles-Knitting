@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
 import { TopBar } from "@/components/top-bar";
 import { Wordmark } from "@/components/wordmark";
+import { BrandedWordmark, BrandedOrgLabel } from "@/components/branded-wordmark";
 import { useSeedAllLookups } from "@/hooks/use-all-lookups";
 import {
   Sheet,
