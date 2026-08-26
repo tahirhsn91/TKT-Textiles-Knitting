@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { customFetch, setAuthTokenGetter } from "@/vendor/api-client-react/custom-fetch";
-import { setUnauthorizedHandler } from "@/lib/http-client";
+import { setUnauthorizedHandler, setTenantIdGetter } from "@/lib/http-client";
 import { useLocation } from "wouter";
 
 // ─── Auth API shapes (mirror the backend responses, issue #135) ─────────────
@@ -22,15 +22,21 @@ export interface AuthRole {
   id: number;
   name: string;
   isAdmin: boolean;
+  /** The super-admin role is platform-global (issue #219). */
+  isSuperAdmin?: boolean;
 }
 
 export interface AuthSession {
   user: AuthUser;
   role: AuthRole;
+  /** The user's home tenant (null for platform super-admins). */
+  tenantId: number | null;
   permissions: string[]; // moduleIds this role can access; ["*"] = admin (all routes)
 }
 
 const TOKEN_KEY = "tkt_auth_token";
+// Persist the super-admin's selected active tenant across reloads.
+const ACTIVE_TENANT_KEY = "tkt_active_tenant";
 
 /** Read the bearer token from localStorage (safe getter — never throws). */
 export function getStoredToken(): string | null {
@@ -61,6 +67,21 @@ type AuthContextValue = {
   can: (moduleId: string) => boolean;
   /** True while the user is fully authenticated (session loaded). */
   isAuthenticated: boolean;
+  /** True when the signed-in user holds the platform super-admin role. */
+  isSuperAdmin: boolean;
+  /**
+   * The active tenant id for the current session. For tenant users this is
+   * their home tenant. For super-admins it is the tenant they selected in the
+   * tenant switcher (null until one is chosen — the UI blocks tenant-scoped
+   * screens until then, issue #219 Q3b).
+   */
+  activeTenantId: number | null;
+  /**
+   * Switch the super-admin's active tenant context. Tenant-scoped data and
+   * APIs follow via the X-Tenant-Id header; caches are cleared on switch
+   * (issue #219 Q3d). No-op for non-super-admins (they cannot switch).
+   */
+  switchTenant: (tenantId: number) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -73,6 +94,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTenantId, setActiveTenantId] = useState<number | null>(null);
   const [, setLocation] = useLocation();
 
   // Keep the customFetch bearer getter in sync whenever the token changes.
@@ -80,6 +102,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthTokenGetter(() => getStoredToken());
     return () => setAuthTokenGetter(null);
   }, []);
+
+  // Keep the API client's active-tenant getter in sync with auth context, so
+  // every request carries the X-Tenant-Id header for the current context.
+  useEffect(() => {
+    return setTenantIdGetter(() => activeTenantId);
+  }, [activeTenantId]);
 
   // App-wide auth middleware: when an API call returns 401 Unauthorized (an
   // expired/invalid bearer token), log the user out and redirect to /login.
@@ -116,10 +144,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     customFetch<AuthSession>("/api/auth/me", { method: "GET" })
       .then((s) => {
-        if (!cancelled) setSession(s);
+        if (cancelled) return;
+        setSession(s);
+        // Establish active tenant: super-admin restores their last selection
+        // (or null → blocked until they pick), tenant users use their home tenant.
+        const restored = s.role.isSuperAdmin
+          ? (() => {
+              try { const v = localStorage.getItem(ACTIVE_TENANT_KEY); return v ? Number(v) : null; } catch { return null; }
+            })()
+          : s.tenantId;
+        setActiveTenantId(restored);
       })
       .catch(() => {
-        // Invalid/expired token — drop it and treat as logged out.
         storeToken(null);
         if (!cancelled) setSession(null);
       })
@@ -137,21 +173,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
+    const sess: AuthSession = {
+      user: data.user,
+      role: data.role,
+      tenantId: data.tenantId,
+      permissions: data.permissions,
+    };
     storeToken(data.token);
-    setSession({ user: data.user, role: data.role, permissions: data.permissions });
-    return { user: data.user, role: data.role, permissions: data.permissions };
+    setSession(sess);
+    setActiveTenantId(sess.role.isSuperAdmin ? null : sess.tenantId);
+    return sess;
   };
 
   const logout = () => {
     storeToken(null);
     setSession(null);
+    setActiveTenantId(null);
+    try { localStorage.removeItem(ACTIVE_TENANT_KEY); } catch { /* ignore */ }
+  };
+
+  /** Switch the super-admin's active tenant (no token re-issue — header only). */
+  const switchTenant = (tenantId: number) => {
+    setActiveTenantId(tenantId);
+    try { localStorage.setItem(ACTIVE_TENANT_KEY, String(tenantId)); } catch { /* ignore */ }
   };
 
   const can = (moduleId: string): boolean => {
     if (!session) return false;
-    if (session.role.isAdmin) return true;
+    if (session.role.isAdmin || session.role.isSuperAdmin) return true;
     return session.permissions.includes(moduleId);
   };
+
+  const isSuperAdmin = session?.role.isSuperAdmin ?? false;
 
   const value: AuthContextValue = {
     session,
@@ -160,6 +213,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     can,
     isAuthenticated: session != null,
+    isSuperAdmin,
+    activeTenantId,
+    switchTenant,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
