@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useState, useEffect, useCallback } from "react";
+import { customFetch, type ErrorType } from "@/vendor/api-client-react/custom-fetch";
 
 /**
- * useBranding Hook
- * Fetches and manages tenant branding configuration
+ * useBranding Hook (issue #219 1.2 white-labeling)
+ * Fetches and manages the ACTIVE tenant's branding configuration.
+ * Uses customFetch so the bearer token + X-Tenant-Id header are attached
+ * (the backend branding endpoints are tenant-scoped).
  */
 
 export interface BrandingConfig {
@@ -13,6 +15,8 @@ export interface BrandingConfig {
   company_short_name?: string;
   logo_url?: string;
   favicon_url?: string;
+  logo_filename?: string;
+  logo_storage_path?: string;
   primary_color: string;
   secondary_color: string;
   accent_color: string;
@@ -22,8 +26,10 @@ export interface BrandingConfig {
   navbar_text_color: string;
   sidebar_background: string;
   sidebar_text_color: string;
-  custom_css?: string;
-  status: string;
+  font_family?: string;
+  font_size_base?: number;
+  border_radius?: number;
+  button_style?: string;
 }
 
 export interface BrandingPackage {
@@ -53,71 +59,89 @@ interface UseBrandingReturn {
   branding: BrandingPackage | null;
   loading: boolean;
   error: string | null;
-  updateBranding: (config: Partial<BrandingConfig>) => Promise<void>;
-  applyTheme: (presetKey: string) => Promise<void>;
-  uploadLogo: (file: File) => Promise<void>;
+  /** Fetch the active tenant's branding package. */
   refreshBranding: () => Promise<void>;
+  /** Update branding config fields (partial). */
+  updateBranding: (config: Partial<BrandingConfig>) => Promise<void>;
+  /** Apply a theme preset by key. */
+  applyTheme: (presetKey: string) => Promise<void>;
+  /** Upload a logo image. */
+  uploadLogo: (file: File) => Promise<void>;
 }
 
-export const useBranding = (): UseBrandingReturn => {
+export const DEFAULT_COLORS = {
+  primary: "#1F2937",
+  secondary: "#3B82F6",
+  accent: "#F59E0B",
+  text: "#111827",
+  background: "#FFFFFF",
+  navbar: "#1F2937",
+  sidebar: "#F9FAFB",
+};
+
+function updateFavicon(url: string | null | undefined) {
+  if (!url) return;
+  let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement | null;
+  if (!link) {
+    link = document.createElement("link");
+    link.rel = "icon";
+    document.head.appendChild(link);
+  }
+  link.href = url;
+}
+
+/** Apply the branding CSS-variable string to <style id="branding-css">. */
+function applyBrandingCss(css: string | undefined) {
+  if (!css) return;
+  const styleId = "branding-css";
+  let styleElement = document.getElementById(styleId) as HTMLStyleElement | null;
+  if (!styleElement) {
+    styleElement = document.createElement("style");
+    styleElement.id = styleId;
+    document.head.appendChild(styleElement);
+  }
+  styleElement.textContent = css;
+}
+
+export const useBranding = (enabled = true): UseBrandingReturn => {
   const [branding, setBranding] = useState<BrandingPackage | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch branding package on component mount
-  useEffect(() => {
-    fetchBranding();
-  }, []);
-
-  // Apply CSS variables to document
-  useEffect(() => {
-    if (branding?.css) {
-      const styleId = 'branding-css';
-      let styleElement = document.getElementById(styleId) as HTMLStyleElement;
-
-      if (!styleElement) {
-        styleElement = document.createElement('style');
-        styleElement.id = styleId;
-        document.head.appendChild(styleElement);
-      }
-
-      styleElement.textContent = branding.css;
-    }
-  }, [branding]);
-
-  const fetchBranding = async () => {
+  const refreshBranding = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-
-      const response = await axios.get('/api/branding/package');
-      setBranding(response.data);
-
-      // Update favicon if provided
-      if (response.data.config.favicon_url) {
-        updateFavicon(response.data.config.favicon_url);
-      }
-
-      // Update page title
-      if (response.data.config.company_name) {
-        document.title = response.data.config.company_name;
-      }
+      const data = await customFetch<BrandingPackage>("/api/branding/package", {
+        method: "GET",
+      });
+      setBranding(data);
+      applyBrandingCss(data.css);
+      if (data.config?.company_name) document.title = data.config.company_name;
+      updateFavicon(data.config?.favicon_url);
     } catch (err) {
-      console.error('Error fetching branding:', err);
-      setError('Failed to load branding configuration');
+      const msg = (err as ErrorType<{ error?: string }>)?.data?.error ?? "Failed to load branding configuration";
+      setError(msg);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (enabled) void refreshBranding();
+  }, [enabled, refreshBranding]);
 
   const updateBranding = async (config: Partial<BrandingConfig>) => {
     try {
       setLoading(true);
-      await axios.put('/api/branding/config', config);
-      await fetchBranding();
+      await customFetch("/api/branding/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config),
+      });
+      await refreshBranding();
     } catch (err) {
-      console.error('Error updating branding:', err);
-      setError('Failed to update branding');
+      setError("Failed to update branding");
       throw err;
     } finally {
       setLoading(false);
@@ -127,11 +151,12 @@ export const useBranding = (): UseBrandingReturn => {
   const applyTheme = async (presetKey: string) => {
     try {
       setLoading(true);
-      await axios.post(`/api/branding/themes/apply/${presetKey}`);
-      await fetchBranding();
+      await customFetch(`/api/branding/themes/apply/${presetKey}`, {
+        method: "POST",
+      });
+      await refreshBranding();
     } catch (err) {
-      console.error('Error applying theme:', err);
-      setError('Failed to apply theme');
+      setError("Failed to apply theme");
       throw err;
     } finally {
       setLoading(false);
@@ -142,76 +167,33 @@ export const useBranding = (): UseBrandingReturn => {
     try {
       setLoading(true);
       const formData = new FormData();
-      formData.append('logo', file);
-      formData.append('logoType', 'primary');
-
-      await axios.post('/api/branding/logo', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      formData.append("logo", file);
+      await customFetch("/api/branding/logo", {
+        method: "POST",
+        body: formData,
       });
-
-      await fetchBranding();
+      await refreshBranding();
     } catch (err) {
-      console.error('Error uploading logo:', err);
-      setError('Failed to upload logo');
+      setError("Failed to upload logo");
       throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  const updateFavicon = (url: string) => {
-    let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
-    if (!link) {
-      link = document.createElement('link');
-      link.rel = 'icon';
-      document.head.appendChild(link);
-    }
-    link.href = url;
-  };
-
   return {
     branding,
     loading,
     error,
+    refreshBranding,
     updateBranding,
     applyTheme,
     uploadLogo,
-    refreshBranding: fetchBranding,
   };
 };
 
-/**
- * Helper hook to get branding colors
- */
+/** Helper to read branding colors (falls back to defaults). */
 export const useBrandingColors = () => {
   const { branding } = useBranding();
-
-  return branding?.colors || {
-    primary: '#1F2937',
-    secondary: '#3B82F6',
-    accent: '#F59E0B',
-    text: '#111827',
-    background: '#FFFFFF',
-    navbar: '#1F2937',
-    sidebar: '#F9FAFB',
-  };
-};
-
-/**
- * Helper to apply branding colors to CSS
- */
-export const getBrandingColorMap = (branding: BrandingPackage | null) => {
-  if (!branding) {
-    return {};
-  }
-
-  return {
-    '--color-primary': branding.colors.primary,
-    '--color-secondary': branding.colors.secondary,
-    '--color-accent': branding.colors.accent,
-    '--color-text': branding.colors.text,
-    '--color-background': branding.colors.background,
-    '--color-navbar': branding.colors.navbar,
-    '--color-sidebar': branding.colors.sidebar,
-  } as React.CSSProperties;
+  return branding?.colors ?? DEFAULT_COLORS;
 };

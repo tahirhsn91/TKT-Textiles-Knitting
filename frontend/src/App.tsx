@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ConfigurationProvider } from "@/context/config-context";
 import { AuthProvider } from "@/context/auth-context";
+import { BrandingApplier } from "@/components/branding-applier";
 import { ProtectedRoute } from "@/components/protected-route";
 import { TenantRequired } from "@/components/tenant-required";
 import {
@@ -137,6 +138,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <BrandingApplier />
         <ConfigurationProvider>
           <TooltipProvider>
             <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>

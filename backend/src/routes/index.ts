@@ -23,6 +23,7 @@ import invoicingRouter from "./invoicing.js";
 import usersRouter from "./users.js";
 import attendanceRouter from "./attendance.js";
 import adminRouter from "./admin-routes.js";
+import brandingRouter from "./branding-routes.js";
 // Temporarily disabled due to TypeScript compilation issues with Knex-based services
 // import adminRouter from "./admin-routes.js";
 // import authRoutesRouter from "./auth-routes.js";
@@ -58,6 +59,10 @@ router.use(resolveTenant);
 
 // Lookups router — tenant-scoped, mounted after resolveTenant.
 router.use(lookupsRouter);
+
+// Branding — tenant-scoped (issue #219 1.2 white-labeling). Serves the active
+// tenant's branding package + allows updating the branding config.
+router.use("/branding", brandingRouter);
 
 // Protected — each router defines its own full (absolute) paths internally, so
 // each is mounted at the root (router.use(subRouter)) and its routes match their
