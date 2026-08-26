@@ -59,15 +59,9 @@ export function BrandingTab() {
     { key: "accent_color", label: "Accent" },
     { key: "text_color", label: "Text" },
     { key: "background_color", label: "Background" },
-    { key: "navbar_background", label: "Navbar / Sidebar" },
+    { key: "navbar_background", label: "Navbar" },
     { key: "sidebar_background", label: "Sidebar" },
-    { key: "navbar_text_color", label: "Navbar text" },
   ];
-  // Left-nav (sidebar) foreground text — grouped with the chrome colors.
-  const chromeTextFields: Array<{ key: keyof BrandingConfig; label: string }> = [
-    { key: "sidebar_text_color", label: "Sidebar text" },
-  ];
-  const allChromeFields = [...colorFields, ...chromeTextFields];
 
   return (
     <div className="space-y-6">
@@ -151,7 +145,7 @@ export function BrandingTab() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-            {allChromeFields.map(({ key, label }) => (
+            {colorFields.map(({ key, label }) => (
               <div key={key} className="space-y-1.5">
                 <Label className="capitalize">{label}</Label>
                 <div className="flex items-center gap-2">
