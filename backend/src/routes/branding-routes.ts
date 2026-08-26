@@ -97,9 +97,17 @@ router.get("/package", async (req, res): Promise<void> => {
       id: p.id,
       preset_name: p.presetName,
       preset_key: p.presetKey,
+      description: p.description,
       primary_color: p.primaryColor,
       secondary_color: p.secondaryColor,
       accent_color: p.accentColor,
+      text_color: p.textColor,
+      background_color: p.backgroundColor,
+      navbar_color: p.navbarColor,
+      navbar_text_color: p.navbarTextColor,
+      sidebar_color: p.sidebarColor,
+      sidebar_text_color: p.sidebarTextColor,
+      accent_hover_color: p.accentHoverColor,
       is_default: p.isDefault ?? false,
     })),
     css: buildCssVariables(config),
@@ -179,12 +187,19 @@ router.post("/themes/apply/:key", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Theme preset not found" });
     return;
   }
+  // Map every preset colour field to the branding config column so a theme
+  // apply re-colours the whole app (actions, text, page, navbar + sidebar).
   const patch = JSON.parse(JSON.stringify({
     primaryColor: preset.primaryColor ?? undefined,
     secondaryColor: preset.secondaryColor ?? undefined,
     accentColor: preset.accentColor ?? undefined,
     textColor: preset.textColor ?? undefined,
     backgroundColor: preset.backgroundColor ?? undefined,
+    navbarBackground: preset.navbarColor ?? undefined,
+    navbarTextColor: preset.navbarTextColor ?? undefined,
+    sidebarBackground: preset.sidebarColor ?? undefined,
+    sidebarTextColor: preset.sidebarTextColor ?? undefined,
+    accentHoverColor: preset.accentHoverColor ?? undefined,
   }));
   const [existing] = await db
     .select({ id: brandingConfigTable.id })

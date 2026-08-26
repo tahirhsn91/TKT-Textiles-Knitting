@@ -39,9 +39,13 @@ export interface BrandingPackage {
     id: number;
     preset_name: string;
     preset_key: string;
-    primary_color: string;
-    secondary_color: string;
-    accent_color: string;
+    description?: string | null;
+    primary_color: string | null;
+    secondary_color: string | null;
+    accent_color: string | null;
+    background_color?: string | null;
+    sidebar_color?: string | null;
+    navbar_color?: string | null;
     is_default: boolean;
   }>;
   css: string;
