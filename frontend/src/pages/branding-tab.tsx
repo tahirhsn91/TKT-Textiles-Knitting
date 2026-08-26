@@ -17,6 +17,116 @@ import {
 const FONT_OPTIONS = ["Inter", "Poppins", "Roboto", "Montserrat", "Open Sans", "Lato", "Georgia", "serif", "system-ui"];
 const BUTTON_STYLE_OPTIONS = ["rounded", "square", "pill"];
 
+/** Normalize a #RGB / #RRGGBB hex string, or null if invalid. */
+function normalizeHex(value: string): string | null {
+  let v = value.trim();
+  if (!v) return null;
+  if (v[0] !== "#") v = "#" + v;
+  if (!/^#[0-9a-fA-F]{3}$/.test(v) && !/^#[0-9a-fA-F]{6}$/.test(v)) return null;
+  if (v.length === 4) {
+    // Expand #RGB -> #RRGGBB
+    v = "#" + v.slice(1).split("")
+      .map((c) => c + c)
+      .join("");
+  }
+  return v.toUpperCase();
+}
+
+const HEX_RE = /^#[0-9a-fA-F]{0,6}$/;
+
+/**
+ * ColorPickerField — a polished inline colour control (ui-ux-pro-max): a
+ * visible swatch that opens the native colour picker, plus a validated hex
+ * text field so the user can either pick OR type a colour. Invalid/partial
+ * input is allowed while editing (kept in the field) but flagged; the stored
+ * value only updates on a valid hex.
+ */
+function ColorPickerField({
+  value,
+  onChange,
+  id,
+}: {
+  value?: string | null;
+  onChange: (v: string) => void;
+  id?: string;
+}) {
+  const [draft, setDraft] = useState<string>(value ?? "");
+  const [focused, setFocused] = useState(false);
+
+  // Keep the draft in sync when the saved value changes externally (e.g. a
+  // preset was applied).
+  useEffect(() => {
+    if (!focused && value) setDraft(value);
+  }, [value, focused]);
+
+  const valid = draft === "" || normalizeHex(draft) !== null;
+  const normalized = normalizeHex(draft);
+
+  const handlePicker = (hex: string) => {
+    setDraft(hex);
+    const norm = normalizeHex(hex);
+    if (norm) onChange(norm);
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <label
+        title="Pick a color"
+        className="relative h-9 w-9 shrink-0 cursor-pointer overflow-hidden rounded-md border shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1"
+        style={{
+          background: "conic-gradient(from 0deg, #f22, #fc8d03, #d4e60b, #0c9, #08f, #90c, #f22)",
+        }}
+      >
+        {/* Inner swatch shows the current colour; a gap of the rainbow ring
+            reads as a picker affordance rather than a plain solid swatch. */}
+        <span
+          className="absolute inset-[3px] rounded-[4px]"
+          style={{ background: normalized ?? "#ffffff" }}
+        />
+        <input
+          id={id}
+          type="color"
+          value={normalized ?? "#000000"}
+          onChange={(e) => handlePicker(e.target.value)}
+          className="absolute inset-0 cursor-pointer opacity-0"
+          aria-label="Pick a color"
+        />
+      </label>
+      <Input
+        value={draft}
+        onChange={(e) => {
+          const next = e.target.value;
+          // Allow typing hex chars only (keep it forgiving while editing).
+          if (HEX_RE.test(next) || next === "") setDraft(next);
+        }}
+        onBlur={() => {
+          setFocused(false);
+          const norm = normalizeHex(draft);
+          if (norm) {
+            onChange(norm);
+            setDraft(norm);
+          } else if (draft !== "" && value) {
+            setDraft(value); // revert invalid to last good value
+          }
+        }}
+        onFocus={() => setFocused(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            setFocused(false);
+            const norm = normalizeHex(draft);
+            if (norm) { onChange(norm); setDraft(norm); }
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        className={`font-mono text-xs ${valid ? "" : "border-destructive focus-visible:ring-destructive"}`}
+        aria-invalid={!valid}
+        placeholder={normalized ?? "#RRGGBB"}
+        maxLength={7}
+      />
+    </div>
+  );
+}
+
 /** Branding tab — set the tenant's company name, logo, and theme (issue #219 1.2). */
 export function BrandingTab() {
   const { branding, loading, error, updateBranding, applyTheme, refreshBranding, uploadLogo, uploadFavicon } = useBranding();
@@ -187,15 +297,11 @@ export function BrandingTab() {
             {colorFields.map(({ key, label }) => (
               <div key={key} className="space-y-1.5">
                 <Label className="capitalize">{label}</Label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={form[key] || "#000000"}
-                    onChange={(e) => set(key, e.target.value)}
-                    className="h-9 w-10 cursor-pointer rounded border"
-                  />
-                  <Input value={form[key] ?? ""} onChange={(e) => set(key, e.target.value)} className="font-mono text-xs" />
-                </div>
+                <ColorPickerField
+                  value={form[key] as string}
+                  onChange={(hex) => set(key, hex)}
+                  id={`branding-color-${key}`}
+                />
               </div>
             ))}
           </div>
