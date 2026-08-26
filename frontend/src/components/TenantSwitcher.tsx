@@ -42,6 +42,10 @@ export const TenantSwitcher: React.FC<TenantSwitcherProps> = ({ isSuperAdmin = f
     (tenantId: number) => {
       switchTenant(tenantId);
       setIsOpen(false);
+      // Reload the app so every tenant-scoped screen, query cache and the
+      // dashboards re-fetch for the newly selected tenant (issue #219 Q3d).
+      // The active tenant is persisted by switchTenant and restored on boot.
+      window.location.reload();
     },
     [switchTenant],
   );
