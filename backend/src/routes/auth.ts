@@ -62,7 +62,8 @@ router.post("/login", async (req, res): Promise<void> => {
       displayName: user.displayName,
       employeeId: user.employeeId,
     },
-    role: { id: user.roleId, name: user.roleName, isAdmin: user.isAdmin },
+    role: { id: user.roleId, name: user.roleName, isAdmin: user.isAdmin, isSuperAdmin: perms?.isSuperAdmin ?? false },
+    tenantId: user.tenantId ?? null,
     permissions: perms?.permissions ?? [],
   });
 });
@@ -83,6 +84,7 @@ router.get("/me", requireAuth, async (req, res): Promise<void> => {
       roleName: roleTable.name,
       isAdmin: roleTable.isAdmin,
       isActive: userTable.isActive,
+      tenantId: userTable.tenantId,
     })
     .from(userTable)
     .innerJoin(roleTable, eq(userTable.roleId, roleTable.id))
@@ -97,7 +99,8 @@ router.get("/me", requireAuth, async (req, res): Promise<void> => {
   const perms = await loadRolePermissions(user.id);
   res.json({
     user: { id: user.id, username: user.username, displayName: user.displayName, employeeId: user.employeeId },
-    role: { id: user.roleId, name: user.roleName, isAdmin: user.isAdmin },
+    role: { id: user.roleId, name: user.roleName, isAdmin: user.isAdmin, isSuperAdmin: perms?.isSuperAdmin ?? false },
+    tenantId: user.tenantId ?? null,
     permissions: perms?.permissions ?? [],
   });
 });
