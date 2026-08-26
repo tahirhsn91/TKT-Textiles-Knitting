@@ -1,10 +1,5 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { customFetch, setAuthTokenGetter } from "@/vendor/api-client-react/custom-fetch";
 import { setUnauthorizedHandler, setTenantIdGetter } from "@/lib/http-client";
 import { useLocation } from "wouter";
@@ -95,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTenantId, setActiveTenantId] = useState<number | null>(null);
+  const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
 
   // Keep the customFetch bearer getter in sync whenever the token changes.
@@ -194,7 +190,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /** Switch the super-admin's active tenant (no token re-issue — header only). */
   const switchTenant = (tenantId: number) => {
-    setActiveTenantId(tenantId);
+    setActiveTenantId((prev) => {
+      if (prev === tenantId) return prev; // no-op if unchanged
+      // Clear all cached query data so the previous tenant's data is never
+      // shown under the new tenant context (issue #219 Q3d).
+      queryClient.clear();
+      return tenantId;
+    });
     try { localStorage.setItem(ACTIVE_TENANT_KEY, String(tenantId)); } catch { /* ignore */ }
   };
 
