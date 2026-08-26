@@ -464,8 +464,10 @@ export default function TransactionList() {
           <TabsContent value="entries" className="mt-4">
         {/* Table — single scroll container: the Table component already wraps
             itself in overflow-auto, so an outer overflow-auto would create a
-            second scrollport that clips the sticky Actions column (P1). */}
-        <div className="rounded-md border bg-card overflow-hidden">
+            second scrollport that clips the sticky Actions column (P1).
+            Desktop only (hidden md:block); the md:hidden card list below is
+            the same data presented as tap-friendly cards on mobile. */}
+        <div className="rounded-md border bg-card overflow-hidden hidden md:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -577,6 +579,116 @@ export default function TransactionList() {
               )}
             </TableBody>
           </Table>
+        </div>
+
+        {/* ── Mobile card list (md:hidden) — the key txn fields as cards ── */}
+        <div className="md:hidden space-y-3">
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-lg border bg-card p-4">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="mt-3 h-4 w-24" />
+                <Skeleton className="mt-3 h-9 w-full" />
+              </div>
+            ))
+          ) : sorted.length === 0 ? (
+            <div className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">
+              {hasFilters ? "No transactions match the selected filters." : "No transactions found. Create one to get started."}
+            </div>
+          ) : (
+            sorted.map((t) => {
+              const ref = (t as { reference?: string | null }).reference;
+              const typeName = lookupName(masterMaps.transactionType, t.transactionTypeId);
+              const partyName = lookupName(masterMaps.party, t.partyId);
+              return (
+                <div
+                  key={t.id}
+                  className="rounded-lg border bg-card p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-foreground">{t.docNumber}</p>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        {new Date(t.date + "T00:00:00").toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span className="inline-flex shrink-0 rounded-sm border px-2 py-0.5 text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
+                      {typeName || "-"}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-y-2 text-sm">
+                    <div className="col-span-2">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Party</p>
+                      <p className="mt-0.5 truncate font-medium">{partyName || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Net weight</p>
+                      <p className="mt-0.5 num font-medium">{t.netWt ?? "-"}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Reference</p>
+                      <p className="mt-0.5 truncate text-muted-foreground">{ref ?? "-"}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setLocation(`/transactions/${t.id}/edit`)}
+                    >
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                          aria-label={`Delete ${t.docNumber}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Delete</span>
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Transaction?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            <span className="font-medium text-foreground">
+                              {t.docNumber} · {typeName}
+                            </span>
+                            {" — "}
+                            {partyName}
+                            {ref ? ` · ${ref}` : ""}
+                            {" on "}
+                            {new Date(t.date + "T00:00:00").toLocaleDateString()}
+                            {". This cannot be undone."}
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDelete(t.id)}
+                            className="gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:pointer-events-none disabled:opacity-60"
+                            disabled={deleteTransaction.isPending}
+                          >
+                            {deleteTransaction.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
           </TabsContent>
           <TabsContent value="analytics" className="mt-4">
