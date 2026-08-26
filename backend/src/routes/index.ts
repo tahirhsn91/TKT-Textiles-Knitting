@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { requireAnyPermission, requirePermission } from "../lib/auth.js";
+import { resolveTenant } from "../middleware/tenant-context.js";
 import healthRouter from "./health.js";
 import lookupsRouter from "./lookups.js";
 import mastersRouter from "./masters.js";
@@ -39,6 +40,12 @@ router.use(healthRouter);
 // requirePermission gate — gating them under e.g. "masters" would 401 short
 // any role that lacks that module (issue #135 regression).
 router.use(lookupsRouter);
+
+// Resolve the active tenant context for every authenticated request (issue
+// #219). Runs after global requireAuth (app.ts). Sets req.tenantId and blocks
+// cross-tenant access / inactive tenants. Super-admins select a tenant via the
+// X-Tenant-Id header (428 if none); tenant users are bound to their home tenant.
+router.use(resolveTenant);
 
 // Protected — each router defines its own full (absolute) paths internally, so
 // each is mounted at the root (router.use(subRouter)) and its routes match their
