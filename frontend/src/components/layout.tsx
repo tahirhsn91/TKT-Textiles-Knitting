@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   FileText, Database, BarChart2, LayoutDashboard, ClipboardList, Wallet,
   ChevronDown, PanelLeftClose, PanelLeftOpen, Search, Settings,
-  Factory, PackageCheck, Truck, HardHat, Wrench, Receipt, CalendarCheck,
+  Factory, PackageCheck, Truck, HardHat, Wrench, Receipt, CalendarCheck, ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
@@ -386,6 +386,15 @@ export function Layout({ children }: { children: ReactNode }) {
                 label="Users &amp; Roles"
                 icon={Settings}
                 active={isItemActive(location, "/settings")}
+                collapsed={collapsed}
+              />
+            )}
+            {can("users") && (
+              <DesktopItem
+                href="/audit-logs"
+                label="Audit Logs"
+                icon={ScrollText}
+                active={isItemActive(location, "/audit-logs")}
                 collapsed={collapsed}
               />
             )}

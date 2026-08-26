@@ -37,6 +37,7 @@ const AttendancePage = lazyRetry(() => import("@/pages/attendance"));
 const InvoicingPage = lazyRetry(() => import("@/pages/invoicing"));
 const SettingsPage = lazyRetry(() => import("@/pages/settings"));
 const AdminTenantsPage = lazyRetry(() => import("@/pages/admin/tenants"));
+const AuditLogsPage = lazyRetry(() => import("@/pages/audit-logs"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -122,6 +123,9 @@ function Router() {
           </Route>
           <Route path="/settings">
             <ProtectedRoute moduleId="users"><TenantRequired><SettingsPage /></TenantRequired></ProtectedRoute>
+          </Route>
+          <Route path="/audit-logs">
+            <ProtectedRoute moduleId="users"><TenantRequired><AuditLogsPage /></TenantRequired></ProtectedRoute>
           </Route>
           {/* /admin/tenants is platform-level — super-admin only; moduleId is a placeholder. */}
           <Route path="/admin/tenants">
