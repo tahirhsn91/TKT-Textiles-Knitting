@@ -15,6 +15,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { partyMasterTable, yarnCountMasterTable, yarnBrandMasterTable } from "./lookups.js";
 import { transactionHeaderTable } from "./transactions.js";
+import { tenantTable } from "./tenants.js";
 
 // ─── Yarn Receipt Header ───────────────────────────────────────────────────
 // One row per yarn delivery from a party. Lines live in
@@ -25,6 +26,7 @@ import { transactionHeaderTable } from "./transactions.js";
 // ("cancelled" preserves the audit trail instead of hard DELETE), even
 // though nothing downstream consumes receipts yet.
 export const yarnReceiptHeaderTable = pgTable("yarn_receipt_header", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   docNumber: text("doc_number").notNull(),
   receiptDate: date("receipt_date").notNull(),
@@ -74,6 +76,7 @@ export type YarnReceiptHeader = typeof yarnReceiptHeaderTable.$inferSelect;
 // net weight of those bags. Quantity is whole bags (requirement Q10-A); net
 // weight is kg with 3 decimals, matching the rest of the app.
 export const yarnReceiptDetailTable = pgTable("yarn_receipt_detail", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   headerId: integer("header_id")
     .notNull()

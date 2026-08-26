@@ -21,6 +21,7 @@ import {
   partyMasterTable,
 } from "./lookups.js";
 import { transactionHeaderTable } from "./transactions.js";
+import { tenantTable } from "./tenants.js";
 
 // A genuine Postgres ENUM type (not a text + CHECK constraint) — the
 // requirement is explicit that Shift is "stored as an Enum in the database".
@@ -37,6 +38,7 @@ export const shiftEnum = pgEnum("shift", ["Morning", "Night"]);
 // (Section 1 requirement), so no uniqueness constraint is placed on the
 // combination itself.
 export const dailyProductionHeaderTable = pgTable("daily_production_header", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   productionDate: date("production_date").notNull(),
   machineId: integer("machine_id")
@@ -102,6 +104,7 @@ export type DailyProductionHeader = typeof dailyProductionHeaderTable.$inferSele
 // ─── Daily Production Detail ───────────────────────────────────────────────
 // One row per physical yarn roll produced against the header.
 export const dailyProductionDetailTable = pgTable("daily_production_detail", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   headerId: integer("header_id")
     .notNull()

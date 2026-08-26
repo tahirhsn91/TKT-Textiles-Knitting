@@ -1,8 +1,10 @@
 import { pgTable, text, serial, unique, numeric, integer, timestamp, boolean, date, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { tenantTable } from "./tenants.js";
 
 export const transactionTypeMasterTable = pgTable("transaction_type_master", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
@@ -13,6 +15,7 @@ export type InsertTransactionTypeMaster = z.infer<typeof insertTransactionTypeMa
 export type TransactionTypeMaster = typeof transactionTypeMasterTable.$inferSelect;
 
 export const jobMasterTable = pgTable("job_master", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: text("code").notNull(),
@@ -25,6 +28,7 @@ export type InsertJobMaster = z.infer<typeof insertJobMasterSchema>;
 export type JobMaster = typeof jobMasterTable.$inferSelect;
 
 export const partyMasterTable = pgTable("party_master", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
@@ -49,6 +53,7 @@ export type InsertPartyMaster = z.infer<typeof insertPartyMasterSchema>;
 export type PartyMaster = typeof partyMasterTable.$inferSelect;
 
 export const machineMasterTable = pgTable("machine_master", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   machineNumber: text("machine_number").notNull().unique(),
@@ -63,6 +68,7 @@ export type InsertMachineMaster = z.infer<typeof insertMachineMasterSchema>;
 export type MachineMaster = typeof machineMasterTable.$inferSelect;
 
 export const locationMasterTable = pgTable("location_master", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
@@ -72,6 +78,7 @@ export type InsertLocationMaster = z.infer<typeof insertLocationMasterSchema>;
 export type LocationMaster = typeof locationMasterTable.$inferSelect;
 
 export const yarnTypeMasterTable = pgTable("yarn_type_master", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   makeRate: numeric("make_rate"),
@@ -85,6 +92,7 @@ export type InsertYarnTypeMaster = z.infer<typeof insertYarnTypeMasterSchema>;
 export type YarnTypeMaster = typeof yarnTypeMasterTable.$inferSelect;
 
 export const yarnCountMasterTable = pgTable("yarn_count_master", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   count: text("count").notNull().unique(),
@@ -94,6 +102,7 @@ export type InsertYarnCountMaster = z.infer<typeof insertYarnCountMasterSchema>;
 export type YarnCountMaster = typeof yarnCountMasterTable.$inferSelect;
 
 export const yarnBrandMasterTable = pgTable("yarn_brand_master", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
@@ -103,6 +112,7 @@ export type InsertYarnBrandMaster = z.infer<typeof insertYarnBrandMasterSchema>;
 export type YarnBrandMaster = typeof yarnBrandMasterTable.$inferSelect;
 
 export const uomMasterTable = pgTable("uom_master", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   abbreviation: text("abbreviation").notNull().unique(),
@@ -112,6 +122,7 @@ export type InsertUomMaster = z.infer<typeof insertUomMasterSchema>;
 export type UomMaster = typeof uomMasterTable.$inferSelect;
 
 export const fabricTypeMasterTable = pgTable("fabric_type_master", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
@@ -121,6 +132,7 @@ export type InsertFabricTypeMaster = z.infer<typeof insertFabricTypeMasterSchema
 export type FabricTypeMaster = typeof fabricTypeMasterTable.$inferSelect;
 
 export const departmentMasterTable = pgTable("department_master", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
@@ -130,6 +142,7 @@ export type InsertDepartmentMaster = z.infer<typeof insertDepartmentMasterSchema
 export type DepartmentMaster = typeof departmentMasterTable.$inferSelect;
 
 export const employeeMasterTable = pgTable("employee_master", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: text("code").notNull().unique(),

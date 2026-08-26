@@ -16,6 +16,7 @@ import { z } from "zod/v4";
 import { partyMasterTable, yarnTypeMasterTable, yarnCountMasterTable } from "./lookups.js";
 import { companyInfoMasterTable } from "./company-info.js";
 import { transactionHeaderTable } from "./transactions.js";
+import { tenantTable } from "./tenants.js";
 
 // ─── FBR Digital Invoicing ──────────────────────────────────────────────────
 // An FBR invoice is generated from Fabric_Dispatch transactions. Lifecycle:
@@ -33,6 +34,7 @@ import { transactionHeaderTable } from "./transactions.js";
 // value + tax.
 
 export const invoiceTable = pgTable("invoice", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   // invoiceDate = the generation date (today). Used as FBR invoiceDate.
   invoiceDate: date("invoice_date").notNull(),
@@ -87,6 +89,7 @@ export type Invoice = typeof invoiceTable.$inferSelect;
 
 // ─── Invoice item (one per aggregated group) ───────────────────────────────
 export const invoiceItemTable = pgTable("invoice_item", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   invoiceId: integer("invoice_id")
     .notNull()
@@ -123,6 +126,7 @@ export type InvoiceItem = typeof invoiceItemTable.$inferSelect;
 // removes its junction rows, un-marking those transactions for re-invoicing.
 // Posting an invoice permanently owns them (invoice becomes read-only).
 export const invoiceTransactionTable = pgTable("invoice_transaction", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   invoiceId: integer("invoice_id")
     .notNull()
@@ -146,6 +150,7 @@ export type InvoiceTransaction = typeof invoiceTransactionTable.$inferSelect;
 // to the invoice = amount - taxDeduction. Partial payments are allowed; an
 // invoice is considered paid when Σ (amount - taxDeduction) >= grandTotal.
 export const invoicePaymentTable = pgTable("invoice_payment", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
   id: serial("id").primaryKey(),
   invoiceId: integer("invoice_id")
     .notNull()
