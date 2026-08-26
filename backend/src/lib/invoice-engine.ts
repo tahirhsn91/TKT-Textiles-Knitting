@@ -68,7 +68,7 @@ const TYPE_ID_CACHE_TTL_MS = 60_000;
 let cachedFabricDeliveryTypeId: { id: number | null; expiresAt: number } | null = null;
 
 /** Resolve the Fabric Delivery transaction type id by code (cached, 60s TTL). */
-async function findFabricDeliveryTypeId(): Promise<number | null> {
+async function findFabricDeliveryTypeId(tenantId: number): Promise<number | null> {
   const now = Date.now();
   if (cachedFabricDeliveryTypeId && cachedFabricDeliveryTypeId.expiresAt > now) {
     return cachedFabricDeliveryTypeId.id;
@@ -76,7 +76,7 @@ async function findFabricDeliveryTypeId(): Promise<number | null> {
   const [row] = await db
     .select({ id: transactionTypeMasterTable.id })
     .from(transactionTypeMasterTable)
-    .where(eq(transactionTypeMasterTable.code, FABRIC_DELIVERY_TRANSACTION_TYPE_CODE));
+    .where(and(eq(transactionTypeMasterTable.code, FABRIC_DELIVERY_TRANSACTION_TYPE_CODE), eq(transactionTypeMasterTable.tenantId, tenantId)));
   const id = row?.id ?? null;
   // Cache only a found id, not a null miss, so a Fabric_Delivery row created
   // within the TTL window is picked up immediately instead of showing empty
@@ -158,17 +158,18 @@ function groupDetails(details: PreviewDetailRow[]): InvoiceGroup[] {
  * historical raw-sum total while the preview keeps its group-rounded total
  * (they can differ by 0.001 in rare rounding cases — preserved on purpose).
  */
-async function loadUninvoicedPreviews(partyIds?: number[]): Promise<
+async function loadUninvoicedPreviews(tenantId: number, partyIds?: number[]): Promise<
   Map<number, UninvoicedPreview & { partyName: string; totalNetWeightRaw: string }>
 > {
   const previews = new Map<number, UninvoicedPreview & { partyName: string; totalNetWeightRaw: string }>();
-  const typeId = await findFabricDeliveryTypeId();
+  const typeId = await findFabricDeliveryTypeId(tenantId);
   if (!typeId) return previews;
 
   // Un-invoiced Fabric_Dispatch headers for the requested parties (or all):
   // anti-join on invoice_transaction (LEFT JOIN + NULL filter = NOT EXISTS).
   const headerWhere = and(
     eq(transactionHeaderTable.transactionTypeId, typeId),
+    eq(transactionHeaderTable.tenantId, tenantId),
     isNull(invoiceTransactionTable.id),
     partyIds != null ? inArray(transactionHeaderTable.partyId, partyIds) : undefined,
   );
@@ -206,7 +207,7 @@ async function loadUninvoicedPreviews(partyIds?: number[]): Promise<
     .leftJoin(yarnTypeMasterTable, eq(transactionDetailTable.yarnTypeId, yarnTypeMasterTable.id))
     .leftJoin(yarnCountMasterTable, eq(transactionDetailTable.yarnCountId, yarnCountMasterTable.id))
     .leftJoin(uomMasterTable, eq(transactionDetailTable.uomId, uomMasterTable.id))
-    .where(inArray(transactionDetailTable.headerId, headerIds))
+    .where(and(inArray(transactionDetailTable.headerId, headerIds), eq(transactionDetailTable.tenantId, tenantId)))
     .orderBy(transactionDetailTable.id);
 
   // Index the detail rows by their header so each party's slice is a cheap
@@ -259,8 +260,8 @@ async function loadUninvoicedPreviews(partyIds?: number[]): Promise<
  * List parties that have at least one un-invoiced Fabric_Dispatch transaction.
  * Used by the Invoicing screen's party selector.
  */
-export async function listUninvoicedParties(): Promise<UninvoicedParty[]> {
-  const map = await loadUninvoicedPreviews();
+export async function listUninvoicedParties(tenantId: number): Promise<UninvoicedParty[]> {
+  const map = await loadUninvoicedPreviews(tenantId);
   return [...map.entries()]
     .map(([partyId, p]) => ({
       partyId,
@@ -276,8 +277,8 @@ export async function listUninvoicedParties(): Promise<UninvoicedParty[]> {
  * Fabric_Dispatch transactions. Returns the item groups plus the source
  * transaction header ids so generation can claim exactly those.
  */
-export async function getUninvoicedPreview(partyId: number): Promise<UninvoicedPreview> {
-  const map = await loadUninvoicedPreviews([partyId]);
+export async function getUninvoicedPreview(tenantId: number, partyId: number): Promise<UninvoicedPreview> {
+  const map = await loadUninvoicedPreviews(tenantId, [partyId]);
   const p = map.get(partyId);
   if (!p) return { groups: [], transactionHeaderIds: [], totalNetWeight: "0.000" };
   return {
@@ -292,10 +293,10 @@ export async function getUninvoicedPreview(partyId: number): Promise<UninvoicedP
  * "Future Invoices" projection loads all of them at once instead of looping
  * per-party previews (2 queries total vs ~2N).
  */
-export async function getAllUninvoicedPreviews(): Promise<
+export async function getAllUninvoicedPreviews(tenantId: number): Promise<
   Map<number, UninvoicedPreview & { partyName: string }>
 > {
-  return loadUninvoicedPreviews();
+  return loadUninvoicedPreviews(tenantId);
 }
 
 // Re-export the amount computation for the route layer / tests.
