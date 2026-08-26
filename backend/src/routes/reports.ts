@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { and, eq, gte, lte, inArray, ilike, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
+import { activeTenantId } from "../middleware/tenant-context.js";
 import {
   transactionHeaderTable,
   transactionDetailTable,
@@ -21,8 +22,9 @@ const router: IRouter = Router();
 
 router.get("/reports/data", async (req, res): Promise<void> => {
   const q = req.query as Record<string, string | undefined>;
+  const tenantId = activeTenantId(req);
 
-  const conditions = [];
+  const conditions = [eq(transactionHeaderTable.tenantId, tenantId)];
 
   if (q.dateFrom)   conditions.push(gte(transactionHeaderTable.date, q.dateFrom));
   if (q.dateTo)     conditions.push(lte(transactionHeaderTable.date, q.dateTo));

@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and, gte, lte, lt, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
+import { activeTenantId } from "../middleware/tenant-context.js";
 import {
   employeeMasterTable,
   employeeSalaryRecordsTable,
@@ -29,14 +30,12 @@ function toNumStrict(val: unknown): number | null {
 // ─── Advances ────────────────────────────────────────────────────────────────
 
 router.get("/employees/advances", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const { employeeId, dateFrom, dateTo, month, year } = req.query as Record<string, string>;
-  const conditions = [];
+  const conditions = [eq(employeeAdvancesTable.tenantId, tenantId)];
   if (employeeId) conditions.push(eq(employeeAdvancesTable.employeeId, Number(employeeId)));
   if (dateFrom) conditions.push(gte(employeeAdvancesTable.date, dateFrom));
   if (dateTo) conditions.push(lte(employeeAdvancesTable.date, dateTo));
-  // Month/year filter — `employee_advances.date` is a Postgres `date` column,
-  // so a prefix LIKE (`LIKE on a date`) would raise PG 42883. Instead use a
-  // closed date-range comparison (e.g. year=2026&month=8 -> [2026-08-01, 2026-09-01)).
   if (year && month) {
     const y = Number(year);
     const m = Number(month);
@@ -66,7 +65,7 @@ router.get("/employees/advances", async (req, res): Promise<void> => {
     })
     .from(employeeAdvancesTable)
     .leftJoin(employeeMasterTable, eq(employeeAdvancesTable.employeeId, employeeMasterTable.id))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .where(and(...conditions))
     .orderBy(employeeAdvancesTable.date);
   res.json(rows);
 });
@@ -85,7 +84,7 @@ router.post("/employees/advances", async (req, res): Promise<void> => {
   if (amt < 0) { res.status(400).json({ error: "amount must be >= 0" }); return; }
   const [row] = await db
     .insert(employeeAdvancesTable)
-    .values({ employeeId: Number(employeeId), date, amount: String(amt), notes: notes || null })
+    .values({ employeeId: Number(employeeId), date, amount: String(amt), notes: notes || null, tenantId: activeTenantId(req) })
     .returning();
   res.status(201).json(row);
 });
@@ -95,7 +94,7 @@ router.delete("/employees/advances/:id", async (req, res): Promise<void> => {
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
   const [row] = await db
     .delete(employeeAdvancesTable)
-    .where(eq(employeeAdvancesTable.id, id))
+    .where(and(eq(employeeAdvancesTable.id, id), eq(employeeAdvancesTable.tenantId, activeTenantId(req))))
     .returning();
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   res.sendStatus(204);
@@ -104,6 +103,7 @@ router.delete("/employees/advances/:id", async (req, res): Promise<void> => {
 // ─── Payroll Summary ─────────────────────────────────────────────────────────
 
 router.get("/employees/payroll-summary", async (req, res): Promise<void> => {
+  const tenantId = activeTenantId(req);
   const { month, year, employeeId } = req.query as Record<string, string>;
   if (!month || !year) {
     res.status(400).json({ error: "month and year are required" });
@@ -115,9 +115,9 @@ router.get("/employees/payroll-summary", async (req, res): Promise<void> => {
   const lastDay = new Date(y, m, 0).getDate();
   const dateTo = `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-  const opConditions = [];
-  const advConditions = [gte(employeeAdvancesTable.date, dateFrom), lte(employeeAdvancesTable.date, dateTo)];
-  const recConditions = [gte(employeeSalaryRecordsTable.date, dateFrom), lte(employeeSalaryRecordsTable.date, dateTo)];
+  const opConditions = [eq(employeeMasterTable.tenantId, tenantId)];
+  const advConditions = [gte(employeeAdvancesTable.date, dateFrom), lte(employeeAdvancesTable.date, dateTo), eq(employeeAdvancesTable.tenantId, tenantId)];
+  const recConditions = [gte(employeeSalaryRecordsTable.date, dateFrom), lte(employeeSalaryRecordsTable.date, dateTo), eq(employeeSalaryRecordsTable.tenantId, tenantId)];
 
   if (employeeId) {
     opConditions.push(eq(employeeMasterTable.id, Number(employeeId)));
