@@ -123,8 +123,12 @@ httpClient.interceptors.request.use((config) => {
   // methods unless the caller already set a content type. (issue #25 E2E)
   const method = (config.method ?? "get").toUpperCase();
   const hasBody = config.data !== undefined && config.data !== null;
+  const isFormData =
+    typeof FormData !== "undefined" && config.data instanceof FormData;
   if (hasBody && ["POST", "PUT", "PATCH"].includes(method)) {
-    if (!config.headers.has("Content-Type")) {
+    // Never force JSON for FormData/multipart uploads — let Axios/the browser
+    // set `multipart/form-data; boundary=…` so multer can parse the file.
+    if (!isFormData && !config.headers.has("Content-Type")) {
       config.headers.set("Content-Type", "application/json");
     }
   }
