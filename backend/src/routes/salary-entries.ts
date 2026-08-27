@@ -12,6 +12,7 @@ import {
   transactionDetailTable,
   transactionTypeMasterTable,
   machineMasterTable,
+  attendanceTable,
 } from "../db/index.js";
 
 const router: IRouter = Router();
@@ -69,9 +70,12 @@ router.get("/salary-entries", async (req, res): Promise<void> => {
 // than attendance: for each Fabric Production transaction in the selected
 // month, a row's value = netWt × machine.makingRate. Per (employee, day) the
 // credited amount is max(daily production sum, the operator's daily basic
-// salary). Present days = number of distinct days with production. Total salary
-// = sum of per-day credited. Returns both the per-employee aggregate and the
-// per-day breakdown.
+// salary). Present days = number of distinct days with production, UNLESS the
+// operator was marked Present in the Attendance module for a day that has no
+// production transaction — those attendance-present days are also treated as
+// present and credited the daily basic salary (production sum is 0 on such a
+// day, so max(0, daily basic) = daily basic). Total salary = sum of per-day
+// credited. Returns both the per-employee aggregate and the per-day breakdown.
 // NOTE: declared before /:id so Express routes this specific path correctly.
 router.get("/salary-entries/operator-production", async (req, res): Promise<void> => {
   const { month, year } = req.query as Record<string, string>;
@@ -137,6 +141,22 @@ router.get("/salary-entries/operator-production", async (req, res): Promise<void
         .where(and(inArray(transactionDetailTable.headerId, headerIds), eq(transactionDetailTable.tenantId, tenantId)))
     : [];
 
+  // Attendance-present days for the month (from the Attendance module). If an
+  // operator is marked Present on a day that has no production transaction, we
+  // still credit the daily basic salary for that day (production sum is 0, so
+  // max(0, daily basic) = daily basic). Keyed by employeeId -> Set<date>.
+  const attendanceRows = await db
+    .select({ employeeId: attendanceTable.employeeId, attendanceDate: attendanceTable.attendanceDate, present: attendanceTable.present })
+    .from(attendanceTable)
+    .where(and(gte(attendanceTable.attendanceDate, dateFrom), lte(attendanceTable.attendanceDate, dateTo), eq(attendanceTable.tenantId, tenantId)));
+  const attendancePresentByEmployee = new Map<number, Set<string>>();
+  for (const a of attendanceRows) {
+    if (!a.present || !a.employeeId) continue;
+    let set = attendancePresentByEmployee.get(a.employeeId);
+    if (!set) { set = new Set(); attendancePresentByEmployee.set(a.employeeId, set); }
+    set.add(a.attendanceDate);
+  }
+
   // Daily breakdown keyed by employeeId -> date -> { sum, machines[] }.
   const dailyByEmployee = new Map<number, Map<string, { sum: number; machines: Array<{ machineId: number; machineName: string; netWt: number; rate: number; amount: number }> }>>();
   for (const d of details) {
@@ -165,15 +185,25 @@ router.get("/salary-entries/operator-production", async (req, res): Promise<void
   const result = operators.map((op) => {
     const daily = dailyByEmployee.get(op.id) ?? new Map<string, { sum: number; machines: Array<{ machineId: number; machineName: string; netWt: number; rate: number; amount: number }> }>();
     const baseSalary = toNum(op.baseSalary); // operator baseSalary is a daily wage
-    const days = [...daily.entries()]
-      .map(([date, d]) => {
-        const credited = Math.max(d.sum, baseSalary);
+    // Union of production days and attendance-present days. A day with no
+    // production but marked Present in Attendance is still credited the daily
+    // basic salary (production sum = 0, empty machine breakdown).
+    const attendancePresent = attendancePresentByEmployee.get(op.id) ?? new Set<string>();
+    const allDates = new Set<string>([...daily.keys(), ...attendancePresent]);
+    const days = [...allDates]
+      .map((date) => {
+        const d = daily.get(date);
+        const sum = d ? d.sum : 0;
+        const credited = Math.max(sum, baseSalary);
         return {
           date,
-          dailyProductionSum: Number(d.sum.toFixed(2)),
+          dailyProductionSum: Number(sum.toFixed(2)),
           dailyBasic: baseSalary,
           credited: Number(credited.toFixed(2)),
-          machines: d.machines,
+          machines: d ? d.machines : [],
+          // Flag days paid purely on attendance (no production this day), so the
+          // UI can distinguish them from production-paid days.
+          attendanceOnly: !d,
         };
       })
       .sort((a, b) => a.date.localeCompare(b.date));
