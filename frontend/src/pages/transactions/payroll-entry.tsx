@@ -36,6 +36,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { customFetch } from "@/vendor/api-client-react/custom-fetch";
@@ -762,6 +763,12 @@ export default function PayrollEntryPage() {
           </div>
         </div>
 
+        <Tabs defaultValue="entry" className="mt-2">
+          <TabsList>
+            <TabsTrigger value="entry">Salary Entry</TabsTrigger>
+            <TabsTrigger value="logic">Calculation Logic</TabsTrigger>
+          </TabsList>
+          <TabsContent value="entry" className="mt-4 space-y-4">
         {/* Header card */}
         <Card>
           <CardHeader><CardTitle>Entry Header</CardTitle></CardHeader>
@@ -1065,6 +1072,12 @@ export default function PayrollEntryPage() {
             No active employees found for the selected department(s).
           </p>
         )}
+          </TabsContent>
+
+          <TabsContent value="logic" className="mt-4">
+            <SalaryCalculationLogic daysInMonth={totalDays} isNewMode={isNewMode} />
+          </TabsContent>
+        </Tabs>
 
         <div className="flex gap-3 justify-end pb-4">
           <Button variant="outline" onClick={() => navigate("/transactions/monthly-salary-entry")}>
@@ -1087,6 +1100,120 @@ export default function PayrollEntryPage() {
         onClose={() => setOperatorDetail(null)}
       />
     </>
+  );
+}
+
+// ─── Salary calculation logic reference ───────────────────────────────────────
+// Read-only tab that explains, end-to-end, how an employee's salary is derived
+// in this page: where every input comes from, the non-operator vs operator
+// (dept 0002) formulas, the payable reconciliation and the save-time guards.
+function SalaryCalculationLogic({
+  daysInMonth,
+  isNewMode,
+}: {
+  daysInMonth: number;
+  isNewMode: boolean;
+}) {
+  // Small presentational helpers.
+  const formula = "flex flex-col gap-1 rounded-lg border bg-muted/20 px-3 py-2";
+  const term = "font-mono text-xs mt-0.5";
+  return (
+    <div className="flex flex-col gap-5">
+      {/* 1. Inputs */}
+      <Card>
+        <CardHeader><CardTitle>1 · Where the inputs come from</CardTitle></CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <ul className="list-disc pl-5 space-y-1.5 text-muted-foreground">
+            <li><span className="text-foreground font-medium">Basic Salary, OT Rate/Hr, Att. Allowance, Oth. Allowance</span> — pulled from the <em>Employee Master</em> (read-only snapshot on each row).</li>
+            <li><span className="text-foreground font-medium">Present / Absent days</span> — in a <em>new</em> entry these come from the <em>Attendance</em> module for the selected month. Edit mode lets you adjust them; Present + Absent are kept linked to the days in the month.</li>
+            <li><span className="text-foreground font-medium">Advance Deduction</span> — auto-filled from the sum of the employee&apos;s advances for the month.</li>
+            <li><span className="text-foreground font-medium">Loan / Other deduction</span> — hand-entered per employee.</li>
+            <li><span className="text-foreground font-medium">Operator (dept 0002)</span> — present days and the base salary come from <em>Fabric Production transactions</em> instead of attendance alone (see §3).</li>
+          </ul>
+          {isNewMode && (
+            <p className="text-xs text-amber-600">
+              New entry: Present / Absent are derived from Attendance and read-only. Saving is blocked until attendance exists for the month.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 2. Non-operator */}
+      <Card>
+        <CardHeader><CardTitle>2 · Regular employee (non-operator)</CardTitle></CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className={formula}>
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total Attendance</span>
+              <code className={term}>Present + Holidays</code>
+              <span className="text-xs text-muted-foreground">Absent is derived: days in month − Present (never below 0).</span>
+            </div>
+            <div className={formula}>
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">OT Amount</span>
+              <code className={term}>OT Hours × OT Rate/Hr</code>
+              <span className="text-xs text-muted-foreground">Zero when the employee has no OT rate set.</span>
+            </div>
+            <div className={formula}>
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total Salary</span>
+              <code className={term}>(Basic ÷ {daysInMonth}) × Total Attendance + OT Amount</code>
+              <span className="text-xs text-muted-foreground">Basic prorated to the days actually attended, plus OT.</span>
+            </div>
+            <div className={formula}>
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Attendance Allowance Bonus</span>
+              <code className={term}>Full allowance if Present ≥ {daysInMonth} (100% attendance)</code>
+              <span className="text-xs text-muted-foreground">Otherwise 0.</span>
+            </div>
+          </div>
+          <div className={formula}>
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payable Salary</span>
+            <code className={term}>Total Salary + Att. Allowance Bonus − Advance − Loan − Other</code>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 3. Operator */}
+      <Card>
+        <CardHeader>
+          <CardTitle>3 · Operator (dept 0002) — paid on production</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p className="text-muted-foreground">
+            Operators are paid per day on <em>Fabric Production</em> output rather than attendance, using each machine&apos;s making rate.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className={formula}>
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Production per row</span>
+              <code className={term}>Net Weight × Machine Making Rate</code>
+            </div>
+            <div className={formula}>
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Credited per day</span>
+              <code className={term}>max(Daily Production Sum, Daily Basic)</code>
+              <span className="text-xs text-muted-foreground">Employee is never paid less than a day&apos;s basic even if production is low.</span>
+            </div>
+          </div>
+          <div className={formula}>
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Present days / total salary</span>
+            <code className={term}>Sum of credited days across presenting (production OR attendance) days</code>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            <span className="text-indigo-600 font-medium">Attendance-only rule:</span> if an operator is marked Present in Attendance on a day with no production transaction, that day is still credited the daily basic salary ({isNewMode ? "applied live from Attendance" : "in the saved breakdown"}).
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* 4. Save flow + guards */}
+      <Card>
+        <CardHeader><CardTitle>4 · Save flow &amp; guards</CardTitle></CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <ol className="list-decimal pl-5 space-y-1.5 text-muted-foreground">
+            <li>On <span className="text-foreground font-medium">Save</span>, the page validates: month &amp; year present, not a future period, ≥1 department, at least one employee, <span className="text-foreground font-medium">attendance exists</span> for the month, and Present + Absent ≤ {daysInMonth}.</li>
+            <li>POST <code className={term}>/api/salary-entries</code> with {`{ month, year, departmentIds, details[] }`}.</li>
+            <li>Backend runs a <span className="text-foreground font-medium">DB transaction</span>: duplicate guard on (employee, month, year) → insert one header (posted=false) → insert detail rows → returns 201.</li>
+            <li>Until <span className="text-foreground font-medium">posted</span>, the entry can be edited (PUT) or deleted. Once posted it becomes read-only; un-post to modify.</li>
+          </ol>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
