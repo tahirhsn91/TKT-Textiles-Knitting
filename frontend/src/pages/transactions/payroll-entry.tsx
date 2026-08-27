@@ -1158,8 +1158,18 @@ function OperatorDetailDialog({
                 )}
               </div>
               {d.attendanceOnly ? (
-                <div className="px-3 py-2.5 sm:px-4 sm:py-3 text-sm text-muted-foreground">
-                  No production transaction this day — marked Present in Attendance, so credited the daily basic salary.
+                <div className="divide-y divide-border/60">
+                  <div className="px-3 py-2 sm:px-4 sm:py-2.5 text-sm text-muted-foreground">
+                    No production transaction this day — marked Present in Attendance, so credited the daily basic salary.
+                  </div>
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 sm:px-4 sm:py-2.5">
+                    <span className="text-xs sm:text-sm text-muted-foreground">Daily basic salary</span>
+                    <span className="text-sm sm:text-base font-mono font-semibold">{fmtMoney(d.dailyBasic)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 bg-muted/20 px-3 py-2 sm:px-4 sm:py-2.5">
+                    <span className="text-xs sm:text-sm text-muted-foreground">Credited (attendance only)</span>
+                    <span className="text-sm sm:text-base font-mono font-bold text-green-700">{fmtMoney(d.credited)}</span>
+                  </div>
                 </div>
               ) : (
               <div className="divide-y divide-border/60">
