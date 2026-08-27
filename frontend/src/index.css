@@ -152,6 +152,18 @@
   --chart-4: 353 46% 46%;   /* madder       */
   --chart-5: 14 100% 50%;   /* signal       */
 
+  /* Salary flow diagram (D3) — semantic fill/line/tone per node kind.
+     Inputs = paper, Calculation = vat indigo, Result = machine green. */
+  --flow-input: #e7edf6;
+  --flow-input-edge: #9db3cf;
+  --flow-process: #ccd6ec;
+  --flow-process-edge: #7c90bd;
+  --flow-output: #cfe3d6;
+  --flow-output-edge: #7fae90;
+  --flow-line: #5b6475;
+  --flow-fg: #172033;
+  --flow-muted: #5b6475;
+
   /* System stacks only — no CDN, works on a factory floor with no internet.
      Personality comes from weight, tracking and the mono numeral spine. */
   --app-font-sans: ui-sans-serif, system-ui, "Segoe UI Variable Text", "Segoe UI",
@@ -238,6 +250,16 @@
   --chart-3: 38 78% 58%;    /* ochre         */
   --chart-4: 353 55% 58%;   /* madder        */
   --chart-5: 14 100% 58%;   /* signal        */
+
+  --flow-input: #243043;
+  --flow-input-edge: #4c5f80;
+  --flow-process: #2c3552;
+  --flow-process-edge: #5a6a96;
+  --flow-output: #1f3a2d;
+  --flow-output-edge: #3f6f52;
+  --flow-line: #94a3b8;
+  --flow-fg: #e5e7eb;
+  --flow-muted: #a3adbd;
 }
 
 @layer base {
@@ -521,4 +543,21 @@
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
   }
+}
+
+/* ─── Salary flow diagram (D3) ──────────────────────────────────────────── */
+.flow-node {
+  transition: filter 120ms ease, opacity 120ms ease;
+}
+.flow-node:hover {
+  filter: brightness(1.03);
+}
+.flow-node-active rect {
+  stroke-width: 2.5px;
+}
+.edge-dim {
+  transition: opacity 140ms ease;
+}
+.edge-dim:hover path {
+  stroke-width: 2.6px;
 }
