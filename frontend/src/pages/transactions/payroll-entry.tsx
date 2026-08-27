@@ -116,6 +116,9 @@ interface OperatorDay {
   dailyBasic: number;
   credited: number;
   machines?: OperatorMachine[];
+  // True when the day is paid purely on attendance (present, but no production
+  // transaction that day) — credited the daily basic salary.
+  attendanceOnly?: boolean;
 }
 interface OperatorProduction {
   employeeId: number;
@@ -1148,9 +1151,17 @@ function OperatorDetailDialog({
               {/* Day header */}
               <div className="flex items-center justify-between gap-2 border-b bg-muted/30 px-3 py-2 sm:px-4 sm:py-2.5">
                 <span className="font-medium text-sm sm:text-base">{formatDate(d.date)}</span>
-                <span className="text-xs sm:text-sm text-muted-foreground">{d.machines?.length ?? 0} machine{(d.machines?.length ?? 0) === 1 ? "" : "s"}</span>
+                {d.attendanceOnly ? (
+                  <span className="text-[11px] sm:text-xs font-medium text-indigo-600 bg-indigo-100/70 dark:bg-indigo-900/40 dark:text-indigo-300 px-2 py-0.5 rounded-full">Attendance only</span>
+                ) : (
+                  <span className="text-xs sm:text-sm text-muted-foreground">{d.machines?.length ?? 0} machine{(d.machines?.length ?? 0) === 1 ? "" : "s"}</span>
+                )}
               </div>
-              {/* Machine lines */}
+              {d.attendanceOnly ? (
+                <div className="px-3 py-2.5 sm:px-4 sm:py-3 text-sm text-muted-foreground">
+                  No production transaction this day — marked Present in Attendance, so credited the daily basic salary.
+                </div>
+              ) : (
               <div className="divide-y divide-border/60">
                 {(d.machines ?? []).map((m, mi) => (
                   <div key={mi} className="flex items-center gap-3 px-3 py-2 sm:px-4 sm:py-2.5">
@@ -1169,14 +1180,16 @@ function OperatorDetailDialog({
                   <span className="text-sm sm:text-base font-mono font-bold text-green-700">{fmtMoney(d.credited)}</span>
                 </div>
               </div>
+              )}
             </div>
           ))}
         </div>
 
         <p className="text-xs sm:text-sm text-muted-foreground">
           Per machine: production = net weight × machine making rate. Credited per day =
-          max(daily production sum, daily basic salary). Total salary = sum of credited
-          days. Daily basic salary: <span className="font-medium">{fmtMoney(toNum(row?.basicSalary ?? 0))}</span>.
+          max(daily production sum, daily basic salary). Days marked "Attendance only" have no
+          production that day — present in Attendance — and are credited the daily basic salary.
+          Total salary = sum of credited days. Daily basic salary: <span className="font-medium">{fmtMoney(toNum(row?.basicSalary ?? 0))}</span>.
         </p>
       </DialogContent>
     </Dialog>
