@@ -42,6 +42,8 @@ import { useToast } from "@/hooks/use-toast";
 import { customFetch } from "@/vendor/api-client-react/custom-fetch";
 import { cn } from "@/lib/utils";
 
+import * as d3 from "d3";
+
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -1104,9 +1106,204 @@ export default function PayrollEntryPage() {
 }
 
 // ─── Salary calculation logic reference ───────────────────────────────────────
-// Read-only tab that explains, end-to-end, how an employee's salary is derived
-// in this page: where every input comes from, the non-operator vs operator
-// (dept 0002) formulas, the payable reconciliation and the save-time guards.
+// Read-only tab that explains, end-to-end, how an employee's salary is derived.
+// Centers on an interactive D3 flow diagram (SVG) built declaratively: D3
+// provides the layout scales, the curved edge generator and arrow markers, while
+// the nodes/edges are rendered as JSX. Hover (or focus) a node to see the live
+// formula, with the selected month's day-count substituted.
+
+// Node/edge model for the salary flow diagram.
+type FlowNodeKind = "input" | "process" | "output";
+interface FlowNode {
+  id: string;
+  label: string;
+  sub?: string;
+  formula: string;
+  kind: FlowNodeKind;
+  // Optional explicit vertical center (SVG y) to override the auto layout, e.g.
+  // to align a lone output node with the step it connects from.
+  yHint?: number;
+}
+interface FlowEdge {
+  source: string;
+  target: string;
+  label?: string;
+}
+
+const FLOW_NODES: FlowNode[] = [
+  // Inputs (sources of data)
+  { id: "master", label: "Employee Master", sub: "Basic · OT Rate · Allowances", formula: "Basic Salary, OT Rate/Hr, Att./Oth. Allowance from the employee record (read-only on each row).", kind: "input" },
+  { id: "attendance", label: "Attendance", sub: "Present days", formula: "Present / Absent for the month come from the Attendance module (new entries). Absent = days in month − Present.", kind: "input" },
+  { id: "production", label: "Fabric Production", sub: "Operator (dept 0002)", formula: "Per row: Net Weight × Machine Making Rate. Operators are paid on production, not attendance.", kind: "input" },
+  { id: "advances", label: "Advances", sub: "Auto-filled", formula: "Sum of the employee's advances for the month — auto-fills the Advance Deduction column.", kind: "input" },
+  { id: "manual", label: "Manual entry", sub: "Loan · Other", formula: "Loan Deduction and Other Deduction are hand-entered per employee.", kind: "input" },
+  // Computation steps
+  { id: "otAmt", label: "OT Amount", formula: "OT Hours × OT Rate/Hr", kind: "process" },
+  { id: "totalAtt", label: "Total Attendance", formula: "Present + Holidays (Absent derived from days in month − Present)", kind: "process" },
+  { id: "dailyCredit", label: "Daily Credit", formula: "max(Daily Production Sum, Daily Basic) — an operator is never paid less than a day's basic.", kind: "process" },
+  { id: "totalSalary", label: "Total Salary", formula: "(Basic ÷ DAYS) × Total Attendance + OT Amount", kind: "process" },
+  { id: "attBonus", label: "Att. Allowance Bonus", formula: "Full allowance when Present ≥ DAYS (100% attendance), else 0.", kind: "process" },
+  { id: "payable", label: "Payable Salary", formula: "Total Salary + Att. Allowance Bonus − Advance − Loan − Other", kind: "process" },
+  // Output
+  { id: "netPayable", label: "Net Payable", sub: "Per employee", formula: "Final take-home for the month, shown in the grid and payroll summary.", kind: "output", yHint: 560 },
+];
+
+const FLOW_EDGES: FlowEdge[] = [
+  { source: "master", target: "otAmt", label: "OT rate / hrs" },
+  { source: "master", target: "totalSalary", label: "Basic salary" },
+  { source: "master", target: "attBonus", label: "Allowance" },
+  { source: "attendance", target: "totalAtt", label: "Present days" },
+  { source: "production", target: "dailyCredit", label: "Production" },
+  { source: "production", target: "totalAtt", label: "Present (operators)" },
+  { source: "dailyCredit", target: "totalSalary", label: "Credited/day" },
+  { source: "totalAtt", target: "totalSalary", label: "Attendance" },
+  { source: "otAmt", target: "totalSalary", label: "OT" },
+  { source: "totalSalary", target: "payable", label: "Earnings" },
+  { source: "attBonus", target: "payable", label: "Bonus" },
+  { source: "advances", target: "payable", label: "Advance −" },
+  { source: "manual", target: "payable", label: "Loan/Other −" },
+  { source: "payable", target: "netPayable", label: "" },
+];
+
+// D3-driven flow diagram. Declarative: D3 computes the vertical scale, the
+// column x positions and the curved link paths; JSX renders the SVG.
+function SalaryFlowDiagram({
+  daysInMonth,
+  isNewMode,
+}: {
+  daysInMonth: number;
+  isNewMode: boolean;
+}) {
+  const W = 900;
+  const H = 660;
+  const [active, setActive] = useState<string | null>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const shown = hovered ?? active;
+  const shownNode = shown ? FLOW_NODES.find((n) => n.id === shown) : undefined;
+
+  // Column x positions (layout).
+  const col = { input: 120, process: 430, output: 760 };
+  const nodeW = 210;
+  const nodeH = 46;
+
+  // Vertically distribute nodes within each column using a D3 point scale.
+  const yFor = (kind: FlowNodeKind) => {
+    const items = FLOW_NODES.filter((n) => n.kind === kind);
+    const pad = 44;
+    const span = d3.scalePoint()
+      .domain(items.map((n) => n.id))
+      .range([pad, H - pad])
+      .padding(0.5);
+    const pos = new Map(items.map((n) => [n.id, span(n.id)!]));
+    return (id: string) => pos.get(id) ?? H / 2;
+  };
+  const yInput = yFor("input");
+  const yProcess = yFor("process");
+  const yOutput = yFor("output");
+
+  const nodePos = (id: string): { x: number; y: number } => {
+    const n = FLOW_NODES.find((d) => d.id === id)!;
+    const baseY = n.kind === "input" ? yInput(id) : n.kind === "process" ? yProcess(id) : yOutput(id);
+    const y = n.yHint != null ? n.yHint : baseY;
+    return { x: col[n.kind] - nodeW / 2, y: y - nodeH / 2 };
+  };
+
+  // Curved connector (D3 cubic bezier), horizontal-dominant, with an arrow at
+  // the target. Inset the target a touch so the arrow sits on the node edge.
+  const link = d3.linkHorizontal<FlowEdge, { x: number; y: number }>()
+    .x((d) => d.x)
+    .y((d) => d.y);
+  const edgePath = (e: FlowEdge) => {
+    const s = nodePos(e.source);
+    const t = nodePos(e.target);
+    const sx = s.x + nodeW + 2;
+    const sy = s.y + nodeH / 2;
+    const tx = t.x - 2;
+    const ty = t.y + nodeH / 2;
+    return link({ source: { x: sx, y: sy }, target: { x: tx, y: ty } } as any) ?? "";
+  };
+
+  // Fill/tone per kind (semantic colors, usable in light + dark).
+  const fill = { input: "var(--flow-input)", process: "var(--flow-process)", output: "var(--flow-output)" };
+  const stroke = { input: "var(--flow-input-edge)", process: "var(--flow-process-edge)", output: "var(--flow-output-edge)" };
+
+  const nodeActive = (id: string) => shown === id;
+  const edgeActive = (e: FlowEdge) => shown != null && (e.source === shown || e.target === shown);
+
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto select-none" role="img" aria-label="Salary calculation flow diagram">
+        <defs>
+          <marker id="fl-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="var(--flow-line)" />
+          </marker>
+        </defs>
+
+        {/* column labels */}
+        <text x={col.input} y={20} textAnchor="middle" fontSize="12" fontWeight="600" fill="var(--flow-muted)">INPUTS</text>
+        <text x={col.process} y={20} textAnchor="middle" fontSize="12" fontWeight="600" fill="var(--flow-muted)">CALCULATION</text>
+        <text x={col.output} y={20} textAnchor="middle" fontSize="12" fontWeight="600" fill="var(--flow-muted)">RESULT</text>
+
+        {/* edges behind nodes */}
+        {FLOW_EDGES.map((e) => (
+          <g key={`${e.source}-${e.target}`} className={edgeActive(e) ? "" : "edge-dim"}>
+            <path d={edgePath(e)} fill="none" stroke="var(--flow-line)" strokeWidth={edgeActive(e) ? 2.4 : 1.4} opacity={edgeActive(e) ? 1 : 0.55} markerEnd="url(#fl-arrow)" />
+            {e.label ? (
+              <text x={(nodePos(e.source).x + nodePos(e.target).x) / 2} y={(nodePos(e.source).y + nodePos(e.target).y) / 2 + nodeH / 2} textAnchor="middle" fontSize="10" fill="var(--flow-muted)" pointerEvents="none">{e.label}</text>
+            ) : null}
+          </g>
+        ))}
+
+        {/* nodes */}
+        {FLOW_NODES.map((n) => {
+          const p = nodePos(n.id);
+          const isActive = nodeActive(n.id);
+          return (
+            <g
+              key={n.id}
+              transform={`translate(${p.x},${p.y})`}
+              className={`flow-node${isActive ? " flow-node-active" : ""}`}
+              onMouseEnter={() => setHovered(n.id)}
+              onMouseLeave={() => setHovered(null)}
+              onClick={() => setActive(active === n.id ? null : n.id)}
+              style={{ cursor: "pointer" }}
+            >
+              <rect width={nodeW} height={nodeH} rx={9} fill={fill[n.kind]} stroke={isActive ? "var(--flow-fg)" : stroke[n.kind]} strokeWidth={isActive ? 2 : 1.2} />
+              <text x={12} y={20} fontSize="12.5" fontWeight="650" fill="var(--flow-fg)">{n.label}</text>
+              {n.sub ? <text x={12} y={36} fontSize="10" fill="var(--flow-muted)">{n.sub}</text> : null}
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* hover / selection readout */}
+      <div className="mt-3 min-h-[52px] rounded-lg border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+        {shownNode ? (
+          <>
+            <span className="font-semibold text-foreground">{shownNode.label}: </span>
+            {shownNode.formula.replace(/DAYS/g, String(daysInMonth))}
+          </>
+        ) : (
+          <span>Hover or tap a box to see how that step is calculated.</span>
+        )}
+      </div>
+
+      {/* legend */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded" style={{ background: "var(--flow-input)" }} /> Input</span>
+        <span className="inline-flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded" style={{ background: "var(--flow-process)" }} /> Calculation</span>
+        <span className="inline-flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded" style={{ background: "var(--flow-output)" }} /> Result</span>
+        <span className="inline-flex items-center gap-1.5">
+          <svg width="22" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--flow-line)" strokeWidth="1.6" /></svg>
+          Data flow
+        </span>
+        {isNewMode && <span className="text-amber-600">New entry: Present / Absent come from Attendance and are read-only.</span>}
+      </div>
+    </div>
+  );
+}
+
+// Read-only reference text that accompanies the D3 flow diagram.
 function SalaryCalculationLogic({
   daysInMonth,
   isNewMode,
@@ -1114,11 +1311,17 @@ function SalaryCalculationLogic({
   daysInMonth: number;
   isNewMode: boolean;
 }) {
-  // Small presentational helpers.
-  const formula = "flex flex-col gap-1 rounded-lg border bg-muted/20 px-3 py-2";
   const term = "font-mono text-xs mt-0.5";
+  const formula = "flex flex-col gap-1 rounded-lg border bg-muted/20 px-3 py-2";
   return (
     <div className="flex flex-col gap-5">
+      <Card>
+        <CardHeader><CardTitle>How salary is calculated — end to end</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <SalaryFlowDiagram daysInMonth={daysInMonth} isNewMode={isNewMode} />
+        </CardContent>
+      </Card>
+
       {/* 1. Inputs */}
       <Card>
         <CardHeader><CardTitle>1 · Where the inputs come from</CardTitle></CardHeader>
@@ -1130,11 +1333,6 @@ function SalaryCalculationLogic({
             <li><span className="text-foreground font-medium">Loan / Other deduction</span> — hand-entered per employee.</li>
             <li><span className="text-foreground font-medium">Operator (dept 0002)</span> — present days and the base salary come from <em>Fabric Production transactions</em> instead of attendance alone (see §3).</li>
           </ul>
-          {isNewMode && (
-            <p className="text-xs text-amber-600">
-              New entry: Present / Absent are derived from Attendance and read-only. Saving is blocked until attendance exists for the month.
-            </p>
-          )}
         </CardContent>
       </Card>
 
