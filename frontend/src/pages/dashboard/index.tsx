@@ -293,8 +293,8 @@ function DailyProductionWidget() {
             contentStyle={tooltipStyle}
             cursor={{ fill: "rgba(31,34,28,0.05)" }}
             formatter={(v: number, name: string) => [
-              name === "netWeight" ? `${v.toFixed(NUM_DECIMALS)} kg` : v.toFixed(NUM_DECIMALS),
-              name === "netWeight" ? "Net weight" : "Quantity",
+              name === "Net weight (kg)" ? `${v.toFixed(NUM_DECIMALS)} kg` : v.toFixed(NUM_DECIMALS),
+              name === "Net weight (kg)" ? "Net weight" : "Quantity",
             ]}
           />
           <Legend wrapperStyle={{ fontSize: 11, color: TOKEN.machine }} />
