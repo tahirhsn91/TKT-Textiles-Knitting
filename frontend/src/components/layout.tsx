@@ -141,7 +141,7 @@ function isSubItemActive(location: string, href: string) {
 /** Stamped section divider inside the nav. */
 function NavSection({ label }: { label: string }) {
   return (
-    <div className="px-4 pt-6 pb-2 text-[0.625rem] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/45">
+    <div className="px-3 pt-5 pb-2 text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/55">
       {label}
     </div>
   );
@@ -203,8 +203,7 @@ export function Layout({ children }: { children: ReactNode }) {
       >
         {/* Sidebar header: wordmark + collapse toggle */}
         <div className={cn(
-          "group/head relative flex h-16 shrink-0 items-center border-b border-sidebar-border",
-          "bg-gradient-to-b from-sidebar-accent/40 to-transparent",
+          "flex h-14 items-center border-b border-sidebar-border shrink-0",
           collapsed ? "justify-center px-0" : "justify-between px-4"
         )}>
           {!collapsed && (
@@ -214,11 +213,7 @@ export function Layout({ children }: { children: ReactNode }) {
           )}
           <button
             onClick={() => setCollapsed((c) => !c)}
-            className={cn(
-              "flex items-center justify-center rounded-md p-2 text-sidebar-foreground/60 transition-all",
-              "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring"
-            )}
+            className="flex items-center justify-center rounded-md p-2 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={collapsed ? "Expand menu" : "Collapse menu"}
           >
@@ -227,7 +222,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
 
         {/* Sidebar nav */}
-        <nav className="flex flex-1 flex-col overflow-y-auto px-2.5 pb-5 pt-1">
+        <nav className="flex flex-1 flex-col overflow-y-auto px-2 pb-4">
           {!collapsed && <NavSection label="Overview" />}
           <div className={cn("flex flex-col gap-0.5", collapsed && "pt-2")}>
             {navItems.filter((item) => can(item.module)).map((item) => (
@@ -548,7 +543,7 @@ function SubLabel({ label, active }: { label: string; active: boolean }) {
     <span className={cn(
       "block rounded-md py-2 pl-3 pr-2 text-[0.8125rem] transition-colors",
       active
-        ? "selvedge -ml-px font-semibold text-sidebar-accent-foreground"
+        ? "selvedge font-semibold text-sidebar-accent-foreground"
         : "text-sidebar-foreground/60 hover:text-sidebar-accent-foreground"
     )}>
       {label}
@@ -580,7 +575,7 @@ function DesktopItem({
         "flex items-center rounded-md text-sm font-medium transition-colors",
         collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5",
         active
-          ? "selvedge bg-sidebar-accent text-sidebar-accent-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+          ? "selvedge bg-sidebar-accent text-sidebar-accent-foreground"
           : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
       )}>
         <Icon className="h-[1.125rem] w-[1.125rem] shrink-0" />
@@ -622,7 +617,7 @@ function DesktopGroup({
             <span className={cn(
               "flex items-center justify-center rounded-md p-2.5 text-sm font-medium transition-colors",
               active
-                ? "selvedge bg-sidebar-accent text-sidebar-accent-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                ? "selvedge bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
             )}>
               <Icon className="h-[1.125rem] w-[1.125rem] shrink-0" />
@@ -641,7 +636,7 @@ function DesktopGroup({
         className={cn(
           "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
           active
-            ? "selvedge bg-sidebar-accent/50 text-sidebar-accent-foreground"
+            ? "text-sidebar-accent-foreground"
             : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
         )}
         aria-expanded={open}
@@ -651,7 +646,7 @@ function DesktopGroup({
         <ChevronDown className={cn("ml-auto h-4 w-4 opacity-50 transition-transform", open && "rotate-180")} />
       </button>
       {open && (
-        <div className="ml-[1.4375rem] flex flex-col border-l border-sidebar-border/70 pl-1.5">
+        <div className="ml-[1.4375rem] flex flex-col border-l border-sidebar-border pl-1.5">
           {children}
         </div>
       )}
