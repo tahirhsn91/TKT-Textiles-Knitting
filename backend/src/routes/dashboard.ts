@@ -243,6 +243,7 @@ async function getMachineUtilization(tenantId: number) {
     .select({
       machineName: machineMasterTable.name,
       transactionLines: count(transactionDetailTable.id),
+      totalNetWeight: sum(transactionDetailTable.netWt),
     })
     .from(transactionDetailTable)
     .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
@@ -258,7 +259,7 @@ async function getMachineUtilization(tenantId: number) {
     .orderBy(sql`COUNT(${transactionDetailTable.id}) DESC`)
     .limit(15);
 
-  return rows.map((r) => ({ name: r.machineName ?? "Unknown", lines: toNum(r.transactionLines) }));
+  return rows.map((r) => ({ name: r.machineName ?? "Unknown", lines: toNum(r.transactionLines), netWeight: toNum(r.totalNetWeight) }));
 }
 
 async function getEmployeeOutput(tenantId: number) {
