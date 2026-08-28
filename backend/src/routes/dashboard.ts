@@ -1,11 +1,13 @@
 import { Router, type IRouter } from "express";
-import { and, eq, gte, lte, sql, count, sum } from "drizzle-orm";
+import { and, eq, gte, lte, ne, sql, count, sum } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { activeTenantId } from "../middleware/tenant-context.js";
 import {
   transactionHeaderTable,
   transactionDetailTable,
   transactionTypeMasterTable,
+  yarnReceiptHeaderTable,
+  yarnReceiptDetailTable,
   fabricTypeMasterTable,
   partyMasterTable,
   machineMasterTable,
@@ -74,24 +76,45 @@ function getWindow() {
 async function getKpis(tenantId: number) {
   const { cmFrom, cmTo, periodLabel } = getWindow();
 
-  const [txnCountRow] = await db
-    .select({ totalTransactions: count(transactionHeaderTable.id) })
-    .from(transactionHeaderTable)
-    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo), eq(transactionHeaderTable.tenantId, tenantId)));
-
+  // Net weight produced = fabric production transactions (excludes dispatches/
+  // receipts, which also carry net_wt but are not production).
   const [netWtRow] = await db
     .select({ totalNetWeight: sum(transactionDetailTable.netWt) })
     .from(transactionDetailTable)
     .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
-    // Net weight produced = fabric production only (excludes dispatches/receipts,
-    // which also carry net_wt but are not production). Matches the established
-    // Fabric_Production code filter used in machine/party analytics.
     .innerJoin(transactionTypeMasterTable, eq(transactionHeaderTable.transactionTypeId, transactionTypeMasterTable.id))
     .where(and(
       gte(transactionHeaderTable.date, cmFrom),
       lte(transactionHeaderTable.date, cmTo),
       eq(transactionHeaderTable.tenantId, tenantId),
       eq(transactionTypeMasterTable.code, "Fabric_Production"),
+    ));
+
+  // Net weight delivered = fabric delivery transactions (Fabric_Dispatch).
+  const [netWtDeliveredRow] = await db
+    .select({ totalNetWeight: sum(transactionDetailTable.netWt) })
+    .from(transactionDetailTable)
+    .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
+    .innerJoin(transactionTypeMasterTable, eq(transactionHeaderTable.transactionTypeId, transactionTypeMasterTable.id))
+    .where(and(
+      gte(transactionHeaderTable.date, cmFrom),
+      lte(transactionHeaderTable.date, cmTo),
+      eq(transactionHeaderTable.tenantId, tenantId),
+      eq(transactionTypeMasterTable.code, "Fabric_Dispatch"),
+    ));
+
+  // Net weight yarn receipt — yarn receipts live in their own tables
+  // (yarn_receipt_header / yarn_receipt_detail), not transaction_header, and
+  // the date is receipt_date. Exclude cancelled receipts.
+  const [netWtYarnReceiptRow] = await db
+    .select({ totalNetWeight: sum(yarnReceiptDetailTable.netWeight) })
+    .from(yarnReceiptDetailTable)
+    .innerJoin(yarnReceiptHeaderTable, eq(yarnReceiptDetailTable.headerId, yarnReceiptHeaderTable.id))
+    .where(and(
+      gte(yarnReceiptHeaderTable.receiptDate, cmFrom),
+      lte(yarnReceiptHeaderTable.receiptDate, cmTo),
+      eq(yarnReceiptHeaderTable.tenantId, tenantId),
+      ne(yarnReceiptHeaderTable.status, "cancelled"),
     ));
 
   const [activeMachinesRow] = await db
@@ -101,8 +124,9 @@ async function getKpis(tenantId: number) {
     .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo), eq(transactionHeaderTable.tenantId, tenantId)));
 
   return {
-    totalTransactions: toNum(txnCountRow?.totalTransactions),
     totalNetWeight: toNum(netWtRow?.totalNetWeight),
+    netWeightDelivered: toNum(netWtDeliveredRow?.totalNetWeight),
+    netWeightYarnReceipt: toNum(netWtYarnReceiptRow?.totalNetWeight),
     activeMachines: toNum(activeMachinesRow?.activeMachines),
     periodLabel,
   };
