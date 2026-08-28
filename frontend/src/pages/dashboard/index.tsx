@@ -440,7 +440,7 @@ function TopPartiesWidget() {
           <Tooltip
             contentStyle={tooltipStyle}
             cursor={{ fill: "rgba(31,34,28,0.05)" }}
-            formatter={(v: number, name: string) => [`${v.toFixed(NUM_DECIMALS)} kg`, name === "produced" ? "Produced" : "Delivered"]}
+            formatter={(v: number, name: string) => [`${v.toFixed(NUM_DECIMALS)} kg`, name === "Produced (kg)" ? "Produced" : "Delivered"]}
           />
           <Legend wrapperStyle={{ fontSize: 11, color: TOKEN.machine }} />
           <Bar dataKey="produced" fill={DYE[0]} name="Produced (kg)" radius={[0, 1, 1, 0]} barSize={9} />
