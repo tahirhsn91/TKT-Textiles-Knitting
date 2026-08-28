@@ -242,7 +242,6 @@ async function getMachineUtilization(tenantId: number) {
   const rows = await db
     .select({
       machineName: machineMasterTable.name,
-      transactionLines: count(transactionDetailTable.id),
       totalNetWeight: sum(transactionDetailTable.netWt),
     })
     .from(transactionDetailTable)
@@ -256,10 +255,10 @@ async function getMachineUtilization(tenantId: number) {
       eq(transactionTypeMasterTable.code, "Fabric_Production"),
     ))
     .groupBy(machineMasterTable.name)
-    .orderBy(sql`COUNT(${transactionDetailTable.id}) DESC`)
+    .orderBy(sql`SUM(${transactionDetailTable.netWt}) DESC`)
     .limit(15);
 
-  return rows.map((r) => ({ name: r.machineName ?? "Unknown", lines: toNum(r.transactionLines), netWeight: toNum(r.totalNetWeight) }));
+  return rows.map((r) => ({ name: r.machineName ?? "Unknown", netWeight: toNum(r.totalNetWeight) }));
 }
 
 async function getEmployeeOutput(tenantId: number) {
