@@ -53,7 +53,7 @@ type TrendPoint = { label: string; netWeight: number; quantity: number };
 type DailyPoint = { date: string; quantity: number; netWeight: number };
 type NameValue = { name: string; value: number };
 type NameCount = { name: string; count: number };
-type NameLines = { name: string; lines: number; netWeight: number };
+type NameLines = { name: string; netWeight: number };
 type NameNetWeight = { name: string; netWeight: number };
 type PartyProducedDelivered = { name: string; produced: number; delivered: number };
 
@@ -454,18 +454,18 @@ function TopPartiesWidget() {
 
 function MachineUtilizationWidget() {
   const { data, isLoading, isError, refetch } = useWidget<NameLines[]>("machine-utilization");
-  const height = Math.max(180, (data?.length ?? 6) * 50 + 30);
+  const height = Math.max(180, (data?.length ?? 6) * 28 + 30);
   return (
     <ChartCard
       title="Machine utilisation"
-      scope="Net weight & lines, this month"
+      scope="By net weight, this month"
       isLoading={isLoading}
       isError={isError}
       isEmpty={data?.length === 0}
       onRetry={() => refetch()}
       height={height}
     >
-      <div role="img" aria-label="Horizontal grouped bar chart of net weight and transaction lines per machine, this month">
+      <div role="img" aria-label="Horizontal bar chart of net weight per machine, this month">
       <ResponsiveContainer width="100%" height={height}>
         <BarChart data={data} layout="vertical" margin={{ left: 8, right: 32, top: 4, bottom: 4 }}>
           <CartesianGrid stroke={TOKEN.rule} horizontal={false} />
@@ -488,15 +488,9 @@ function MachineUtilizationWidget() {
           <Tooltip
             contentStyle={tooltipStyle}
             cursor={{ fill: "rgba(31,34,28,0.05)" }}
-            formatter={(v: number, name: string) =>
-              name === "Net weight (kg)"
-                ? [`${v.toFixed(NUM_DECIMALS)} kg`, "Net weight"]
-                : [String(v), "Transaction lines"]
-            }
+            formatter={(v: number) => [`${v.toFixed(NUM_DECIMALS)} kg`, "Net weight"]}
           />
-          <Legend wrapperStyle={{ fontSize: 11, color: TOKEN.machine }} />
-          <Bar dataKey="netWeight" fill={DYE[0]} name="Net weight (kg)" radius={[0, 1, 1, 0]} barSize={9} />
-          <Bar dataKey="lines" fill={DYE[2]} name="Transaction lines" radius={[0, 1, 1, 0]} barSize={9} />
+          <Bar dataKey="netWeight" fill={DYE[0]} name="Net weight (kg)" radius={[0, 1, 1, 0]} barSize={14} />
         </BarChart>
       </ResponsiveContainer>
       </div>
