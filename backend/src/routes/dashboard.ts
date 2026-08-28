@@ -143,7 +143,13 @@ async function getMonthlyTrend(tenantId: number) {
     })
     .from(transactionDetailTable)
     .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
-    .where(and(gte(transactionHeaderTable.date, trendFrom), lte(transactionHeaderTable.date, cmTo), eq(transactionHeaderTable.tenantId, tenantId)))
+    .innerJoin(transactionTypeMasterTable, eq(transactionHeaderTable.transactionTypeId, transactionTypeMasterTable.id))
+    .where(and(
+      gte(transactionHeaderTable.date, trendFrom),
+      lte(transactionHeaderTable.date, cmTo),
+      eq(transactionHeaderTable.tenantId, tenantId),
+      eq(transactionTypeMasterTable.code, "Fabric_Production"),
+    ))
     .groupBy(
       sql`EXTRACT(YEAR FROM ${transactionHeaderTable.date})`,
       sql`EXTRACT(MONTH FROM ${transactionHeaderTable.date})`,
