@@ -246,8 +246,14 @@ async function getMachineUtilization(tenantId: number) {
     })
     .from(transactionDetailTable)
     .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
+    .innerJoin(transactionTypeMasterTable, eq(transactionHeaderTable.transactionTypeId, transactionTypeMasterTable.id))
     .leftJoin(machineMasterTable, eq(transactionDetailTable.machineId, machineMasterTable.id))
-    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo), eq(transactionHeaderTable.tenantId, tenantId)))
+    .where(and(
+      gte(transactionHeaderTable.date, cmFrom),
+      lte(transactionHeaderTable.date, cmTo),
+      eq(transactionHeaderTable.tenantId, tenantId),
+      eq(transactionTypeMasterTable.code, "Fabric_Production"),
+    ))
     .groupBy(machineMasterTable.name)
     .orderBy(sql`COUNT(${transactionDetailTable.id}) DESC`)
     .limit(15);
