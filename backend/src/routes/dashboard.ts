@@ -5,6 +5,7 @@ import { activeTenantId } from "../middleware/tenant-context.js";
 import {
   transactionHeaderTable,
   transactionDetailTable,
+  transactionTypeMasterTable,
   fabricTypeMasterTable,
   partyMasterTable,
   machineMasterTable,
@@ -82,7 +83,16 @@ async function getKpis(tenantId: number) {
     .select({ totalNetWeight: sum(transactionDetailTable.netWt) })
     .from(transactionDetailTable)
     .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
-    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo), eq(transactionHeaderTable.tenantId, tenantId)));
+    // Net weight produced = fabric production only (excludes dispatches/receipts,
+    // which also carry net_wt but are not production). Matches the established
+    // Fabric_Production code filter used in machine/party analytics.
+    .innerJoin(transactionTypeMasterTable, eq(transactionHeaderTable.transactionTypeId, transactionTypeMasterTable.id))
+    .where(and(
+      gte(transactionHeaderTable.date, cmFrom),
+      lte(transactionHeaderTable.date, cmTo),
+      eq(transactionHeaderTable.tenantId, tenantId),
+      eq(transactionTypeMasterTable.code, "Fabric_Production"),
+    ));
 
   const [activeMachinesRow] = await db
     .select({ activeMachines: sql<number>`COUNT(DISTINCT ${transactionDetailTable.machineId})` })
