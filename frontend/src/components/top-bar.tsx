@@ -57,6 +57,7 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
         // consistent with the fixed bottom nav. Desktop: sticky within the
         // content column (offset by the sidebar).
         "fixed inset-x-0 top-0 z-40 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-sidebar-border bg-sidebar px-3 text-sidebar-foreground print:hidden md:sticky md:z-30",
+        "bg-gradient-to-b from-sidebar-accent/35 to-transparent",
         // Push below the fixed dev banner in dev builds.
         import.meta.env.DEV && "top-7"
       )}
@@ -66,7 +67,7 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
         {onMenuClick && (
           <button
             onClick={onMenuClick}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground md:hidden"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring md:hidden"
             aria-label="Open navigation menu"
           >
             <Menu className="h-5 w-5" />
@@ -82,10 +83,10 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              className="flex h-8 items-center gap-2 rounded-md px-2 text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              className="flex h-8 items-center gap-2 rounded-md px-1.5 text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring"
               aria-label="Account menu"
             >
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-b from-sidebar-accent to-sidebar-accent/60 text-sidebar-accent-foreground ring-1 ring-sidebar-border">
                 <UserIcon className="h-3.5 w-3.5" />
               </span>
               <span className="hidden max-w-[10rem] truncate sm:block">
@@ -97,8 +98,8 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
           <DropdownMenuContent align="end" className="w-60">
             <DropdownMenuLabel className="font-normal">
               <p className="truncate text-sm font-semibold">{session?.user.displayName ?? "—"}</p>
-              <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                <ShieldCheck className="h-3 w-3" /> {session?.role.name ?? ""}
+              <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <ShieldCheck className="h-3.5 w-3.5 text-sidebar-ring" /> {session?.role.name ?? ""}
               </p>
             </DropdownMenuLabel>
 
