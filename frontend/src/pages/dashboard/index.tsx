@@ -70,10 +70,11 @@ function useWidget<T>(key: string): UseQueryResult<T> {
 const tooltipStyle = {
   background: TOKEN.card,
   border: `1px solid ${TOKEN.rule}`,
-  borderRadius: 3,
+  borderRadius: 6,
+  boxShadow: "0 4px 14px rgba(31,34,28,0.09)",
   fontSize: 12,
   fontFamily: "var(--app-font-mono)",
-  padding: "6px 10px",
+  padding: "8px 12px",
 } as const;
 
 const axisTick = { fontSize: 11, fill: TOKEN.machine, fontFamily: "var(--app-font-mono)" };
@@ -94,10 +95,18 @@ function Reading({
   lead?: boolean;
 }) {
   return (
-    <div className={`px-6 py-5 ${lead ? "selvedge-top" : ""}`}>
+    <div
+      className={`relative px-6 py-5 ${lead ? "selvedge-top bg-muted/30" : ""}`}
+    >
+      {lead && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-0 h-full w-[3px] bg-[#FF3C00]"
+        />
+      )}
       <p className="eyebrow">{label}</p>
       <p className="mt-3 flex items-baseline gap-1.5">
-        <span className="num text-[2.125rem] font-medium leading-none text-foreground">
+        <span className={`num leading-none text-foreground ${lead ? "text-[2.5rem] font-semibold" : "text-[2.125rem] font-medium"}`}>
           {value}
         </span>
         {unit && (
@@ -129,12 +138,12 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card className="overflow-hidden">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-3.5">
-        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+    <Card className="overflow-hidden transition-shadow duration-200 hover:shadow-md">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-5 py-4">
+        <h2 className="text-[0.95rem] font-semibold tracking-tight text-foreground">{title}</h2>
         <span className="eyebrow">{scope}</span>
       </div>
-      <CardContent className="px-3 pt-4 pb-3">
+      <CardContent className="px-4 pt-4 pb-3">
         {isLoading ? (
           <Skeleton className="w-full" style={{ height }} />
         ) : isError ? (
@@ -147,7 +156,8 @@ function ChartCard({
             )}
           </div>
         ) : isEmpty ? (
-          <div className="flex items-center justify-center px-2 text-sm text-muted-foreground" style={{ height }}>
+          <div className="flex items-center justify-center gap-2 px-2 text-sm text-muted-foreground" style={{ height }}>
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
             Nothing recorded for this period yet.
           </div>
         ) : (
@@ -509,7 +519,7 @@ function EmployeeOutputWidget() {
       isError={isError}
       dataKey="netWeight"
       seriesName="Net weight (kg)"
-      color={DYE[3]}
+      color={DYE[0]}
       formatter={(v: number) => [`${v.toFixed(NUM_DECIMALS)} kg`, "Net weight"]}
       numeric
       onRetry={() => refetch()}
@@ -524,13 +534,13 @@ export default function DashboardPage() {
   return (
     <>
       <div className="space-y-6">
-        <header className="border-b pb-5">
+        <header className="border-b pb-6 pt-1">
           <p className="eyebrow">Knitting operations</p>
-          <h1 className="mt-2 text-[1.75rem] font-semibold leading-none text-foreground">
+          <h1 className="mt-2 text-[1.75rem] font-semibold leading-none tracking-tight text-foreground">
             Dashboard
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            {kpis ? <>Figures for <span className="num">{kpis.periodLabel}</span>.</> : "Loading figures…"}
+            {kpis ? <>Figures for <span className="num font-medium text-foreground">{kpis.periodLabel}</span> — production, delivery &amp; yarn in one view.</> : "Loading figures…"}
           </p>
         </header>
 
