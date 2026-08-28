@@ -270,8 +270,14 @@ async function getEmployeeOutput(tenantId: number) {
     })
     .from(transactionDetailTable)
     .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
+    .innerJoin(transactionTypeMasterTable, eq(transactionHeaderTable.transactionTypeId, transactionTypeMasterTable.id))
     .leftJoin(employeeMasterTable, eq(transactionDetailTable.employeeId, employeeMasterTable.id))
-    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo), eq(transactionHeaderTable.tenantId, tenantId)))
+    .where(and(
+      gte(transactionHeaderTable.date, cmFrom),
+      lte(transactionHeaderTable.date, cmTo),
+      eq(transactionHeaderTable.tenantId, tenantId),
+      eq(transactionTypeMasterTable.code, "Fabric_Production"),
+    ))
     .groupBy(employeeMasterTable.name)
     .orderBy(sql`SUM(${transactionDetailTable.netWt}) DESC`)
     .limit(10);
