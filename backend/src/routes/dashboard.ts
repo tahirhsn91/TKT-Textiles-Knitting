@@ -212,19 +212,29 @@ async function getFabricBreakdown(tenantId: number) {
 
 async function getTopParties(tenantId: number) {
   const { cmFrom, cmTo } = getWindow();
+  // Per party: net weight produced (Fabric_Production) vs delivered
+  // (Fabric_Dispatch) this month, as two series on the same bar.
   const rows = await db
     .select({
       partyName: partyMasterTable.name,
-      transactionCount: count(transactionHeaderTable.id),
+      produced: sql<number>`SUM(CASE WHEN ${transactionTypeMasterTable.code} = 'Fabric_Production' THEN ${transactionDetailTable.netWt} ELSE 0 END)`,
+      delivered: sql<number>`SUM(CASE WHEN ${transactionTypeMasterTable.code} = 'Fabric_Dispatch' THEN ${transactionDetailTable.netWt} ELSE 0 END)`,
     })
-    .from(transactionHeaderTable)
+    .from(transactionDetailTable)
+    .innerJoin(transactionHeaderTable, eq(transactionDetailTable.headerId, transactionHeaderTable.id))
+    .innerJoin(transactionTypeMasterTable, eq(transactionHeaderTable.transactionTypeId, transactionTypeMasterTable.id))
     .leftJoin(partyMasterTable, eq(transactionHeaderTable.partyId, partyMasterTable.id))
-    .where(and(gte(transactionHeaderTable.date, cmFrom), lte(transactionHeaderTable.date, cmTo), eq(transactionHeaderTable.tenantId, tenantId)))
+    .where(and(
+      gte(transactionHeaderTable.date, cmFrom),
+      lte(transactionHeaderTable.date, cmTo),
+      eq(transactionHeaderTable.tenantId, tenantId),
+      sql`${transactionTypeMasterTable.code} IN ('Fabric_Production', 'Fabric_Dispatch')`,
+    ))
     .groupBy(partyMasterTable.name)
-    .orderBy(sql`COUNT(${transactionHeaderTable.id}) DESC`)
+    .orderBy(sql`SUM(${transactionDetailTable.netWt}) DESC`)
     .limit(10);
 
-  return rows.map((r) => ({ name: r.partyName ?? "Unknown", count: toNum(r.transactionCount) }));
+  return rows.map((r) => ({ name: r.partyName ?? "Unknown", produced: toNum(r.produced), delivered: toNum(r.delivered) }));
 }
 
 async function getMachineUtilization(tenantId: number) {

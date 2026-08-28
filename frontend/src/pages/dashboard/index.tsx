@@ -55,6 +55,7 @@ type NameValue = { name: string; value: number };
 type NameCount = { name: string; count: number };
 type NameLines = { name: string; lines: number };
 type NameNetWeight = { name: string; netWeight: number };
+type PartyProducedDelivered = { name: string; produced: number; delivered: number };
 
 // ── Generic per-widget fetch hook ────────────────────────────────────────────
 // Uses customFetch so the bearer auth token is attached — a bare fetch() here
@@ -404,20 +405,50 @@ function RankedBars<T extends Record<string, unknown>>({
 }
 
 function TopPartiesWidget() {
-  const { data, isLoading, isError, refetch } = useWidget<NameCount[]>("top-parties");
+  const { data, isLoading, isError, refetch } = useWidget<PartyProducedDelivered[]>("top-parties");
+  const height = Math.max(180, (data?.length ?? 6) * 50 + 30);
   return (
-    <RankedBars
-      title="Top parties"
-      scope="By transaction count, this month"
-      data={data}
+    <ChartCard
+      title="Top parties — production vs delivery"
+      scope="Net weight, this month"
       isLoading={isLoading}
       isError={isError}
-      dataKey="count"
-      seriesName="Transactions"
-      color={DYE[1]}
-      formatter={(v: number) => [String(v), "Transactions"]}
+      isEmpty={data?.length === 0}
       onRetry={() => refetch()}
-    />
+      height={height}
+    >
+      <div role="img" aria-label="Horizontal grouped bar chart of net weight produced vs delivered per party, this month">
+      <ResponsiveContainer width="100%" height={height}>
+        <BarChart data={data} layout="vertical" margin={{ left: 8, right: 32, top: 4, bottom: 4 }}>
+          <CartesianGrid stroke={TOKEN.rule} horizontal={false} />
+          <XAxis
+            type="number"
+            tick={axisTick}
+            tickLine={false}
+            axisLine={false}
+            allowDecimals={false}
+            tickFormatter={(v) => fmt(v)}
+          />
+          <YAxis
+            dataKey="name"
+            type="category"
+            tick={{ fontSize: 11, fill: TOKEN.ink }}
+            tickLine={false}
+            axisLine={{ stroke: TOKEN.rule }}
+            width={118}
+          />
+          <Tooltip
+            contentStyle={tooltipStyle}
+            cursor={{ fill: "rgba(31,34,28,0.05)" }}
+            formatter={(v: number, name: string) => [`${v.toFixed(NUM_DECIMALS)} kg`, name === "produced" ? "Produced" : "Delivered"]}
+          />
+          <Legend wrapperStyle={{ fontSize: 11, color: TOKEN.machine }} />
+          <Bar dataKey="produced" fill={DYE[0]} name="Produced (kg)" radius={[0, 1, 1, 0]} barSize={9} />
+          <Bar dataKey="delivered" fill={DYE[1]} name="Delivered (kg)" radius={[0, 1, 1, 0]} barSize={9} />
+        </BarChart>
+      </ResponsiveContainer>
+      </div>
+    </ChartCard>
   );
 }
 
