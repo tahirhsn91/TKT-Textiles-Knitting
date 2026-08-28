@@ -43,8 +43,9 @@ function fmt(n: number, decimals = 2) {
 
 // ── Per-widget data types ────────────────────────────────────────────────────
 interface Kpis {
-  totalTransactions: number;
   totalNetWeight: number;
+  netWeightDelivered: number;
+  netWeightYarnReceipt: number;
   activeMachines: number;
   periodLabel: string;
 }
@@ -163,8 +164,8 @@ function ReadingPanel() {
   if (isLoading) {
     return (
       <Card>
-        <div className="grid grid-cols-1 divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-          {[...Array(3)].map((_, i) => (
+        <div className="grid grid-cols-1 divide-y sm:grid-cols-2 lg:grid-cols-4 sm:divide-x sm:divide-y-0">
+          {[...Array(4)].map((_, i) => (
             <div key={i} className="px-6 py-5"><Skeleton className="h-[5.5rem] w-full" /></div>
           ))}
         </div>
@@ -185,7 +186,7 @@ function ReadingPanel() {
   }
   return (
     <Card className="overflow-hidden">
-      <div className="grid grid-cols-1 divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      <div className="grid grid-cols-1 divide-y sm:grid-cols-2 lg:grid-cols-4 sm:divide-x sm:divide-y-0">
         <Reading
           lead
           label="Net weight produced"
@@ -197,9 +198,22 @@ function ReadingPanel() {
           sub="Fabric off the machines this month"
         />
         <Reading
-          label="Transactions"
-          value={data.totalTransactions.toLocaleString()}
-          sub="Yarn-to-fabric headers recorded"
+          label="Net weight delivered"
+          value={data.netWeightDelivered.toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
+          unit="kg"
+          sub="Fabric dispatched to parties this month"
+        />
+        <Reading
+          label="Yarn received"
+          value={data.netWeightYarnReceipt.toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
+          unit="kg"
+          sub="Yarn receipts booked this month"
         />
         <Reading
           label="Machines running"
