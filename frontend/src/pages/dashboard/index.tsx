@@ -53,7 +53,7 @@ type TrendPoint = { label: string; netWeight: number; quantity: number };
 type DailyPoint = { date: string; quantity: number; netWeight: number };
 type NameValue = { name: string; value: number };
 type NameCount = { name: string; count: number };
-type NameLines = { name: string; lines: number };
+type NameLines = { name: string; lines: number; netWeight: number };
 type NameNetWeight = { name: string; netWeight: number };
 type PartyProducedDelivered = { name: string; produced: number; delivered: number };
 
@@ -454,19 +454,53 @@ function TopPartiesWidget() {
 
 function MachineUtilizationWidget() {
   const { data, isLoading, isError, refetch } = useWidget<NameLines[]>("machine-utilization");
+  const height = Math.max(180, (data?.length ?? 6) * 50 + 30);
   return (
-    <RankedBars
+    <ChartCard
       title="Machine utilisation"
-      scope="By transaction lines, this month"
-      data={data}
+      scope="Net weight & lines, this month"
       isLoading={isLoading}
       isError={isError}
-      dataKey="lines"
-      seriesName="Lines"
-      color={DYE[0]}
-      formatter={(v: number) => [String(v), "Transaction lines"]}
+      isEmpty={data?.length === 0}
       onRetry={() => refetch()}
-    />
+      height={height}
+    >
+      <div role="img" aria-label="Horizontal grouped bar chart of net weight and transaction lines per machine, this month">
+      <ResponsiveContainer width="100%" height={height}>
+        <BarChart data={data} layout="vertical" margin={{ left: 8, right: 32, top: 4, bottom: 4 }}>
+          <CartesianGrid stroke={TOKEN.rule} horizontal={false} />
+          <XAxis
+            type="number"
+            tick={axisTick}
+            tickLine={false}
+            axisLine={false}
+            allowDecimals={false}
+            tickFormatter={(v) => fmt(v)}
+          />
+          <YAxis
+            dataKey="name"
+            type="category"
+            tick={{ fontSize: 11, fill: TOKEN.ink }}
+            tickLine={false}
+            axisLine={{ stroke: TOKEN.rule }}
+            width={118}
+          />
+          <Tooltip
+            contentStyle={tooltipStyle}
+            cursor={{ fill: "rgba(31,34,28,0.05)" }}
+            formatter={(v: number, name: string) =>
+              name === "Net weight (kg)"
+                ? [`${v.toFixed(NUM_DECIMALS)} kg`, "Net weight"]
+                : [String(v), "Transaction lines"]
+            }
+          />
+          <Legend wrapperStyle={{ fontSize: 11, color: TOKEN.machine }} />
+          <Bar dataKey="netWeight" fill={DYE[0]} name="Net weight (kg)" radius={[0, 1, 1, 0]} barSize={9} />
+          <Bar dataKey="lines" fill={DYE[2]} name="Transaction lines" radius={[0, 1, 1, 0]} barSize={9} />
+        </BarChart>
+      </ResponsiveContainer>
+      </div>
+    </ChartCard>
   );
 }
 
