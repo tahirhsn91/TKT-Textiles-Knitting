@@ -147,6 +147,9 @@ export function buildFbrInvoicePayload(params: {
   buyerProvince: string;
   buyerAddress: string;
   buyerRegistrationType: string;
+  /** Unique per-invoice reference (`INV-<invoice id>`). FBR treats this as
+   *  the seller-side uniqueness key for duplicate detection — an empty ref
+   *  made distinct invoices collide in FBR's duplicate check. */
   invoiceRefNo: string;
   scenarioId?: string;
   items: FbrInvoiceItemInput[];
@@ -166,7 +169,10 @@ export function buildFbrInvoicePayload(params: {
     buyerProvince,
     buyerAddress,
     buyerRegistrationType,
-    invoiceRefNo: "",
+    // Unique per invoice: the ERP's de-facto invoice number is its id (the UI
+    // shows "Invoice #<id>"), so `INV-<id>` is unique, stable across retries,
+    // and lets FBR's duplicate check distinguish distinct invoices.
+    invoiceRefNo: `INV-${invoice.id}`,
     items: items.map((it) => ({
       hsCode: it.hsCode ?? "",
       productDescription: it.productDescription ?? "",
