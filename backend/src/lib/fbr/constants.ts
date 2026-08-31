@@ -53,7 +53,7 @@ export const FBR_SALE_TYPES = [
 ] as const;
 
 /** The default saleType used for all v1 fabric invoices. */
-export const FBR_DEFAULT_SALE_TYPE = "Goods at standard rate (default)";
+export const FBR_DEFAULT_SALE_TYPE = "Processing/Conversion of Goods";
 
 /** Fixed sales-tax rate (%) applied on top of the value (v1 constant). */
 export const FBR_SALES_TAX_PERCENT = 18;
