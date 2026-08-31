@@ -189,6 +189,54 @@ test("buildFbrInvoicePayload: emits every optional numeric FBR field as 2-dp zer
   assert.equal(it.sroItemSerialNo, "");
 });
 
+test("buildFbrInvoicePayload: merges lines with the same hsCode+uoM into one (FBR duplicate-line rule)", () => {
+  // FBR rejects invoices with two+ lines sharing (hsCode, uoM) as
+  // "DUPLICATE INVOICE EXISTS" — merge them before posting.
+  const multiItems = [
+    { ...baseItems[0], id: 1, quantity: "6525.200", valueExcludingTax: "208806.40", taxAmount: "37585.15", totalValue: "246391.55" },
+    { ...baseItems[0], id: 2, quantity: "11940.050", valueExcludingTax: "382081.60", taxAmount: "68774.69", totalValue: "450856.29" },
+  ];
+  const p = buildFbrInvoicePayload({
+    invoice: baseInvoice,
+    items: multiItems,
+    company: baseCompany,
+    buyerNtnCnic: "7654321",
+    buyerBusinessName: "Acme Buyer",
+    buyerProvince: "Sindh",
+    buyerAddress: "Karachi",
+    buyerRegistrationType: "Registered",
+    sandbox: false,
+  });
+
+  assert.equal(p.items.length, 1);
+  assert.equal(p.items[0].hsCode, "6001.2100");
+  assert.equal(p.items[0].uoM, "KG");
+  assert.equal(p.items[0].quantity, "18465.250");
+  assert.equal(p.items[0].valueSalesExcludingST, "590888.00");
+  assert.equal(p.items[0].salesTaxApplicable, "106359.84");
+  assert.equal(p.items[0].totalValues, "697247.84");
+});
+
+test("buildFbrInvoicePayload: keeps distinct hsCode+uoM lines separate", () => {
+  const distinctItems = [
+    { ...baseItems[0], id: 1, hsCode: "6001.2100", uoM: "KG", quantity: "100.000", valueExcludingTax: "10000.00", taxAmount: "1800.00", totalValue: "11800.00" },
+    { ...baseItems[0], id: 2, hsCode: "6109.1000", uoM: "Numbers, pieces, units", quantity: "50.000", valueExcludingTax: "5000.00", taxAmount: "900.00", totalValue: "5900.00" },
+  ];
+  const p = buildFbrInvoicePayload({
+    invoice: baseInvoice,
+    items: distinctItems,
+    company: baseCompany,
+    buyerNtnCnic: "7654321",
+    buyerBusinessName: "Acme Buyer",
+    buyerProvince: "Sindh",
+    buyerAddress: "Karachi",
+    buyerRegistrationType: "Registered",
+    sandbox: false,
+  });
+
+  assert.equal(p.items.length, 2);
+});
+
 test("buildFbrInvoicePayload: unregistered buyer → SN002, empty NTN, no scenario in production", () => {
   const p = buildFbrInvoicePayload({
     invoice: baseInvoice,
