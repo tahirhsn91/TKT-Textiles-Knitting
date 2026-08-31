@@ -239,8 +239,8 @@ test("buildFbrInvoicePayload: appends yarn count to productDescription when prov
   // description twice in one invoice → DUPLICATE INVOICE EXISTS. All fabric
   // lines share one HS code, so the yarn count makes each description unique.
   const items = [
-    { ...baseItems[0], id: 1, quantity: "2604.600", valueExcludingTax: "88556.40", taxAmount: "15940.15", totalValue: "104496.55" },
-    { ...baseItems[0], id: 2, quantity: "6631.350", valueExcludingTax: "225465.90", taxAmount: "40583.86", totalValue: "266049.76" },
+    { ...baseItems[0], id: 1, yarnCountId: 10, quantity: "2604.600", valueExcludingTax: "88556.40", taxAmount: "15940.15", totalValue: "104496.55" },
+    { ...baseItems[0], id: 2, yarnCountId: 20, quantity: "6631.350", valueExcludingTax: "225465.90", taxAmount: "40583.86", totalValue: "266049.76" },
   ];
   const p = buildFbrInvoicePayload({
     invoice: baseInvoice,
@@ -252,7 +252,8 @@ test("buildFbrInvoicePayload: appends yarn count to productDescription when prov
     buyerAddress: "Karachi",
     buyerRegistrationType: "Registered",
     sandbox: false,
-    yarnCountNames: { 1: "30s+75/36+16s", 2: "30s+75/36+10s" },
+    // Keyed by yarn *count* master id (matched to each line via yarnCountId).
+    yarnCountNames: { 10: "30s+75/36+16s", 20: "30s+75/36+10s" },
   });
 
   assert.equal(p.items.length, 2);
