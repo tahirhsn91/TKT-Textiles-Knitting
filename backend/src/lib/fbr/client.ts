@@ -49,21 +49,22 @@ export interface FbrInvoiceItemInput {
   rate: string;
   /** FBR field name is `uoM` (camelCase). */
   uoM: string;
-  quantity: string;
-  totalValues: string;
-  valueSalesExcludingST: string;
-  salesTaxApplicable: string;
+  /** Numeric fields are sent as JSON numbers (FBR's field table is "Number (Decimal)"). */
+  quantity: number;
+  totalValues: number;
+  valueSalesExcludingST: number;
+  salesTaxApplicable: number;
   saleType: string;
   /** FBR's sandbox strictly validates every numeric field, so even the
-   *  optional ones must be present as a well-formed 2-dp value (usually
-   *  "0.00") rather than omitted (see error 0300/0302). */
-  fixedNotifiedValueOrRetailPrice: string;
-  salesTaxWithheldAtSource: string;
-  extraTax: string;
-  furtherTax: string;
+   *  optional ones must be present as numbers (usually 0) rather than
+   *  omitted (see error 0300/0302). */
+  fixedNotifiedValueOrRetailPrice: number;
+  salesTaxWithheldAtSource: number;
+  extraTax: number;
+  furtherTax: number;
   sroScheduleNo: string;
-  fedPayable: string;
-  discount: string;
+  fedPayable: number;
+  discount: number;
   sroItemSerialNo: string;
 }
 
@@ -189,22 +190,28 @@ export function buildFbrInvoicePayload(params: {
       productDescription: describeLine(it, yarnCountNames),
       rate: rateStr,
       uoM: it.uoM ?? "",
-      quantity: it.quantity,
-      totalValues: it.totalValue,
-      valueSalesExcludingST: it.valueExcludingTax,
-      salesTaxApplicable: it.taxAmount,
+      // FBR's DI API expects numeric money/quantity fields as JSON *numbers*
+      // (its field table says "Number (Decimal)" and every documented example
+      // sends unquoted values). Sending strings like "0.00" makes FBR treat
+      // mandatory fields (e.g. fixedNotifiedValueOrRetailPrice) as empty and
+      // reject the invoice (error 0090: "Fixed/Notified Value or Retail Price
+      // is mandatory"). Coerce to numbers here.
+      quantity: parseFloat(it.quantity),
+      totalValues: parseFloat(it.totalValue),
+      valueSalesExcludingST: parseFloat(it.valueExcludingTax),
+      salesTaxApplicable: parseFloat(it.taxAmount),
       saleType: FBR_DEFAULT_SALE_TYPE,
       // FBR's sandbox validates every numeric field strictly, so the optional
-      // ones must be present as 2-dp values (zero here because fabric sales at
-      // the standard rate carry no discount / FED / extra / further tax /
-      // withholding). Sending "0.00" avoids error 0300/0302.
-      fixedNotifiedValueOrRetailPrice: "0.00",
-      salesTaxWithheldAtSource: "0.00",
-      extraTax: "0.00",
-      furtherTax: "0.00",
+      // ones must be present as numbers (0 here because fabric sales at the
+      // standard rate carry no discount / FED / extra / further tax /
+      // withholding). Sending "0" avoids error 0300/0302.
+      fixedNotifiedValueOrRetailPrice: 0,
+      salesTaxWithheldAtSource: 0,
+      extraTax: 0,
+      furtherTax: 0,
       sroScheduleNo: "",
-      fedPayable: "0.00",
-      discount: "0.00",
+      fedPayable: 0,
+      discount: 0,
       sroItemSerialNo: "",
     })),
   };

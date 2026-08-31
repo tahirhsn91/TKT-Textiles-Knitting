@@ -171,16 +171,16 @@ test("buildFbrInvoicePayload: maps seller/buyer/items and adds scenarioId in san
   assert.equal(p.items[0].hsCode, "6001.2100");
   assert.equal(p.items[0].uoM, "KG");
   assert.equal(p.items[0].rate, "18%");
-  assert.equal(p.items[0].quantity, "100.000");
-  assert.equal(p.items[0].valueSalesExcludingST, "10000.00");
-  assert.equal(p.items[0].salesTaxApplicable, "1800.00");
-  assert.equal(p.items[0].totalValues, "11800.00");
+  assert.equal(p.items[0].quantity, 100.0);
+  assert.equal(p.items[0].valueSalesExcludingST, 10000.0);
+  assert.equal(p.items[0].salesTaxApplicable, 1800.0);
+  assert.equal(p.items[0].totalValues, 11800.0);
   assert.equal(p.items[0].saleType, FBR_DEFAULT_SALE_TYPE);
 });
 
-test("buildFbrInvoicePayload: emits every optional numeric FBR field as 2-dp zero", () => {
+test("buildFbrInvoicePayload: emits every optional numeric FBR field as zero", () => {
   // FBR's sandbox rejects items that omit the optional numeric fields
-  // (error 0300/0302), so they must all be present as "0.00".
+  // (error 0300/0302), so they must all be present as numbers (0).
   const p = buildFbrInvoicePayload({
     invoice: baseInvoice,
     items: baseItems,
@@ -194,13 +194,13 @@ test("buildFbrInvoicePayload: emits every optional numeric FBR field as 2-dp zer
   });
 
   const it = p.items[0];
-  assert.equal(it.fixedNotifiedValueOrRetailPrice, "0.00");
-  assert.equal(it.salesTaxWithheldAtSource, "0.00");
-  assert.equal(it.extraTax, "0.00");
-  assert.equal(it.furtherTax, "0.00");
+  assert.equal(it.fixedNotifiedValueOrRetailPrice, 0);
+  assert.equal(it.salesTaxWithheldAtSource, 0);
+  assert.equal(it.extraTax, 0);
+  assert.equal(it.furtherTax, 0);
   assert.equal(it.sroScheduleNo, "");
-  assert.equal(it.fedPayable, "0.00");
-  assert.equal(it.discount, "0.00");
+  assert.equal(it.fedPayable, 0);
+  assert.equal(it.discount, 0);
   assert.equal(it.sroItemSerialNo, "");
 });
 
@@ -224,14 +224,14 @@ test("buildFbrInvoicePayload: keeps one line per item (no merging)", () => {
   });
 
   assert.equal(p.items.length, 2);
-  assert.equal(p.items[0].quantity, "6525.200");
-  assert.equal(p.items[1].quantity, "11940.050");
-  assert.equal(p.items[0].valueSalesExcludingST, "208806.40");
-  assert.equal(p.items[1].valueSalesExcludingST, "382081.60");
-  assert.equal(p.items[0].salesTaxApplicable, "37585.15");
-  assert.equal(p.items[1].salesTaxApplicable, "68774.69");
-  assert.equal(p.items[0].totalValues, "246391.55");
-  assert.equal(p.items[1].totalValues, "450856.29");
+  assert.equal(p.items[0].quantity, 6525.2);
+  assert.equal(p.items[1].quantity, 11940.05);
+  assert.equal(p.items[0].valueSalesExcludingST, 208806.4);
+  assert.equal(p.items[1].valueSalesExcludingST, 382081.6);
+  assert.equal(p.items[0].salesTaxApplicable, 37585.15);
+  assert.equal(p.items[1].salesTaxApplicable, 68774.69);
+  assert.equal(p.items[0].totalValues, 246391.55);
+  assert.equal(p.items[1].totalValues, 450856.29);
 });
 
 test("buildFbrInvoicePayload: appends yarn count to productDescription when provided", () => {
