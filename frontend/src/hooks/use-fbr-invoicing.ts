@@ -293,6 +293,30 @@ export function useDeleteInvoice() {
   });
 }
 
+// ─── Edit draft invoice rates (issue: edit rates on drafts) ──────────────
+// Update the per-KG rate of one or more items on a draft invoice. The backend
+// recomputes item amounts + header totals and returns the refreshed detail.
+
+export interface UpdateDraftRatesBody {
+  items: { id: number; ratePerKg: number }[];
+}
+
+export function useUpdateDraftRates() {
+  const qc = useQueryClient();
+  return useMutation<InvoiceDetail, ErrorType<unknown>, { id: number; body: UpdateDraftRatesBody }>({
+    mutationFn: ({ id, body }) =>
+      customFetch<InvoiceDetail>(`${invoicingKey}/${id}/rates`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: [invoicingKey] });
+      qc.invalidateQueries({ queryKey: [`${invoicingKey}/detail`, id] });
+    },
+  });
+}
+
 // ─── Payments (issue #189) ────────────────────────────────────────────────
 
 export interface CreatePaymentBody {
