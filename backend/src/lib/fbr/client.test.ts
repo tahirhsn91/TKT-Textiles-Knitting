@@ -217,6 +217,34 @@ test("buildFbrInvoicePayload: merges lines with the same hsCode+uoM into one (FB
   assert.equal(p.items[0].totalValues, "697247.84");
 });
 
+test("buildFbrInvoicePayload: recomputes merged tax from value×rate (avoids 0104 drift)", () => {
+  // Real case (invoice 262): per-line taxes sum to 18,533.25, but FBR
+  // validates tax = value × rate → 102,962.45 × 18% = 18,533.24. The merged
+  // line must carry the recomputed tax, not the sum of rounded line taxes.
+  const items = [
+    { ...baseItems[0], id: 1, quantity: "439.850", valueExcludingTax: "15394.75", taxAmount: "2771.06", totalValue: "18165.81" },
+    { ...baseItems[0], id: 2, quantity: "2489.650", valueExcludingTax: "69710.20", taxAmount: "12547.84", totalValue: "82258.04" },
+    { ...baseItems[0], id: 3, quantity: "595.250", valueExcludingTax: "17857.50", taxAmount: "3214.35", totalValue: "21071.85" },
+  ];
+  const p = buildFbrInvoicePayload({
+    invoice: baseInvoice,
+    items,
+    company: baseCompany,
+    buyerNtnCnic: "7654321",
+    buyerBusinessName: "Acme Buyer",
+    buyerProvince: "Sindh",
+    buyerAddress: "Karachi",
+    buyerRegistrationType: "Registered",
+    sandbox: false,
+  });
+
+  assert.equal(p.items.length, 1);
+  assert.equal(p.items[0].quantity, "3524.750");
+  assert.equal(p.items[0].valueSalesExcludingST, "102962.45");
+  assert.equal(p.items[0].salesTaxApplicable, "18533.24"); // NOT 18533.25
+  assert.equal(p.items[0].totalValues, "121495.69");
+});
+
 test("buildFbrInvoicePayload: keeps distinct hsCode+uoM lines separate", () => {
   const distinctItems = [
     { ...baseItems[0], id: 1, hsCode: "6001.2100", uoM: "KG", quantity: "100.000", valueExcludingTax: "10000.00", taxAmount: "1800.00", totalValue: "11800.00" },

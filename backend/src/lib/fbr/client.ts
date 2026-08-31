@@ -124,10 +124,12 @@ export function computeItemAmounts(
  * the highest-value duplicate line. The ERP generates one line per yarn type
  * and every fabric yarn type maps to the same HS code (6002.9000 / KG), so
  * every multi-line invoice tripped FBR's check while single-line invoices
- * posted fine. Merge lines by (hsCode + uoM) before posting: quantities and
- * money values are summed, the first product description wins.
+ * posted fine. Merge lines by (hsCode + uoM) before posting: quantities are
+ * summed, and value/tax/total are recomputed from the summed value at the
+ * FBR rate (summing per-line rounded taxes can drift by a paisa from
+ * FBR's value×rate calculation → error 0104). First description wins.
  */
-function mergeItemsByHsCode(items: InvoiceItem[]): Array<{
+function mergeItemsByHsCode(items: InvoiceItem[], taxRatePercent: number): Array<{
   hsCode: string;
   productDescription: string;
   uoM: string;
@@ -144,8 +146,6 @@ function mergeItemsByHsCode(items: InvoiceItem[]): Array<{
     saleType: string;
     quantity: number;
     valueExcludingTax: number;
-    taxAmount: number;
-    totalValue: number;
   }>();
   for (const it of items) {
     const key = `${it.hsCode ?? ""}|${it.uoM ?? ""}`;
@@ -156,25 +156,26 @@ function mergeItemsByHsCode(items: InvoiceItem[]): Array<{
       saleType: it.saleType ?? FBR_DEFAULT_SALE_TYPE,
       quantity: 0,
       valueExcludingTax: 0,
-      taxAmount: 0,
-      totalValue: 0,
     };
     g.quantity += parseFloat(it.quantity) || 0;
     g.valueExcludingTax += parseFloat(it.valueExcludingTax) || 0;
-    g.taxAmount += parseFloat(it.taxAmount) || 0;
-    g.totalValue += parseFloat(it.totalValue) || 0;
     groups.set(key, g);
   }
-  return [...groups.values()].map((g) => ({
-    hsCode: g.hsCode,
-    productDescription: g.productDescription,
-    uoM: g.uoM,
-    quantity: round2(g.quantity).toFixed(3),
-    valueExcludingTax: toFbrMoney(g.valueExcludingTax),
-    taxAmount: toFbrMoney(g.taxAmount),
-    totalValue: toFbrMoney(g.totalValue),
-    saleType: g.saleType,
-  }));
+  const rate = Number.isFinite(taxRatePercent) && taxRatePercent >= 0 ? taxRatePercent : FBR_SALES_TAX_PERCENT;
+  return [...groups.values()].map((g) => {
+    const value = round2(g.valueExcludingTax);
+    const tax = round2((value * rate) / 100);
+    return {
+      hsCode: g.hsCode,
+      productDescription: g.productDescription,
+      uoM: g.uoM,
+      quantity: round2(g.quantity).toFixed(3),
+      valueExcludingTax: value.toFixed(2),
+      taxAmount: tax.toFixed(2),
+      totalValue: round2(value + tax).toFixed(2),
+      saleType: g.saleType,
+    };
+  });
 }
 
 /**
@@ -226,7 +227,7 @@ export function buildFbrInvoicePayload(params: {
     buyerAddress,
     buyerRegistrationType,
     invoiceRefNo: "",
-    items: mergeItemsByHsCode(items).map((it) => ({
+    items: mergeItemsByHsCode(items, ratePercent).map((it) => ({
       hsCode: it.hsCode ?? "",
       productDescription: it.productDescription ?? "",
       rate: rateStr,
