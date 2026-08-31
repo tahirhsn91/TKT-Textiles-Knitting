@@ -130,7 +130,9 @@ export function computeItemAmounts(
  */
 function describeLine(it: InvoiceItem, yarnCountNames?: Record<number, string>): string {
   const base = it.productDescription ?? "";
-  const count = it.id != null ? yarnCountNames?.[it.id] : undefined;
+  // The route passes yarnCountNames keyed by yarn *count* master id
+  // (yarn_count_master.id), matched to each line via it.yarnCountId.
+  const count = it.yarnCountId != null ? yarnCountNames?.[it.yarnCountId] : undefined;
   return count ? `${base} (${count})` : base;
 }
 
