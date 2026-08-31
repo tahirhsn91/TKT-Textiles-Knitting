@@ -119,63 +119,18 @@ export function computeItemAmounts(
 }
 
 /**
- * FBR DI rejects an invoice that contains two or more lines with the same
- * (hsCode + uoM) combination, reporting it as "DUPLICATE INVOICE EXISTS" on
- * the highest-value duplicate line. The ERP generates one line per yarn type
- * and every fabric yarn type maps to the same HS code (6002.9000 / KG), so
- * every multi-line invoice tripped FBR's check while single-line invoices
- * posted fine. Merge lines by (hsCode + uoM) before posting: quantities are
- * summed, and value/tax/total are recomputed from the summed value at the
- * FBR rate (summing per-line rounded taxes can drift by a paisa from
- * FBR's value×rate calculation → error 0104). First description wins.
+ * FBR DI rejects an invoice that contains two or more lines sharing the same
+ * (hsCode + uoM + productDescription) combination, reporting it as
+ * "DUPLICATE INVOICE EXISTS" on the highest-value duplicate line. The ERP
+ * generates one line per yarn type and every fabric yarn type maps to the
+ * same HS code (6002.9000 / KG), so lines that share a description collide.
+ * Each line's description therefore carries its yarn count (e.g.
+ * "3-Fleece fabric (30s+75/36+16s)"), which is unique per invoice line.
  */
-function mergeItemsByHsCode(items: InvoiceItem[], taxRatePercent: number): Array<{
-  hsCode: string;
-  productDescription: string;
-  uoM: string;
-  quantity: string;
-  valueExcludingTax: string;
-  taxAmount: string;
-  totalValue: string;
-  saleType: string;
-}> {
-  const groups = new Map<string, {
-    hsCode: string;
-    productDescription: string;
-    uoM: string;
-    saleType: string;
-    quantity: number;
-    valueExcludingTax: number;
-  }>();
-  for (const it of items) {
-    const key = `${it.hsCode ?? ""}|${it.uoM ?? ""}`;
-    const g = groups.get(key) ?? {
-      hsCode: it.hsCode ?? "",
-      productDescription: it.productDescription ?? "",
-      uoM: it.uoM ?? "",
-      saleType: it.saleType ?? FBR_DEFAULT_SALE_TYPE,
-      quantity: 0,
-      valueExcludingTax: 0,
-    };
-    g.quantity += parseFloat(it.quantity) || 0;
-    g.valueExcludingTax += parseFloat(it.valueExcludingTax) || 0;
-    groups.set(key, g);
-  }
-  const rate = Number.isFinite(taxRatePercent) && taxRatePercent >= 0 ? taxRatePercent : FBR_SALES_TAX_PERCENT;
-  return [...groups.values()].map((g) => {
-    const value = round2(g.valueExcludingTax);
-    const tax = round2((value * rate) / 100);
-    return {
-      hsCode: g.hsCode,
-      productDescription: g.productDescription,
-      uoM: g.uoM,
-      quantity: round2(g.quantity).toFixed(3),
-      valueExcludingTax: value.toFixed(2),
-      taxAmount: tax.toFixed(2),
-      totalValue: round2(value + tax).toFixed(2),
-      saleType: g.saleType,
-    };
-  });
+function describeLine(it: InvoiceItem, yarnCountNames?: Record<number, string>): string {
+  const base = it.productDescription ?? "";
+  const count = it.id != null ? yarnCountNames?.[it.id] : undefined;
+  return count ? `${base} (${count})` : base;
 }
 
 /**
@@ -195,6 +150,8 @@ export function buildFbrInvoicePayload(params: {
   sandbox: boolean;
   /** Sales-tax percent for the declared rate string (defaults to the FBR rate). */
   taxRatePercent?: number;
+  /** invoice-item id → yarn count name, appended to productDescription. */
+  yarnCountNames?: Record<number, string>;
 }): {
   invoiceType: string;
   invoiceDate: string;
@@ -211,7 +168,7 @@ export function buildFbrInvoicePayload(params: {
   scenarioId?: string;
   items: FbrInvoiceItemInput[];
 } {
-  const { invoice, items, company, buyerNtnCnic, buyerBusinessName, buyerProvince, buyerAddress, buyerRegistrationType, sandbox, taxRatePercent } = params;
+  const { invoice, items, company, buyerNtnCnic, buyerBusinessName, buyerProvince, buyerAddress, buyerRegistrationType, sandbox, taxRatePercent, yarnCountNames } = params;
   const ratePercent = Number.isFinite(taxRatePercent) && taxRatePercent! >= 0 ? taxRatePercent! : FBR_SALES_TAX_PERCENT;
   const rateStr = `${ratePercent}%`;
   const body: ReturnType<typeof buildFbrInvoicePayload> = {
@@ -227,9 +184,9 @@ export function buildFbrInvoicePayload(params: {
     buyerAddress,
     buyerRegistrationType,
     invoiceRefNo: "",
-    items: mergeItemsByHsCode(items, ratePercent).map((it) => ({
+    items: items.map((it) => ({
       hsCode: it.hsCode ?? "",
-      productDescription: it.productDescription ?? "",
+      productDescription: describeLine(it, yarnCountNames),
       rate: rateStr,
       uoM: it.uoM ?? "",
       quantity: it.quantity,
