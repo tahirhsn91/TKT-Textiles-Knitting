@@ -67,7 +67,25 @@ export const FBR_DI_ENDPOINTS = {
   production: "https://gw.fbr.gov.pk/di_data/v1/di/postinvoicedata",
 } as const;
 
-/** Sandbox scenarioId by buyer registration type (per FBR scenario table). */
+/** 
+ * Sandbox scenarioId by buyer registration type (per FBR scenario table).
+ *
+ * FBR validates that the scenarioId and the item saleType form a valid pair:
+ * e.g. SN001/SN002 are for "Goods at standard rate (default)" while
+ * "Processing/Conversion of Goods" must be filed under SN016. Return a
+ * scenario derived from the actual sale type, falling back to the
+ * registration-based SN001/SN002 for standard-rate goods.
+ */
 export function fbrScenarioId(registrationType: string): string {
   return registrationType === "Registered" ? "SN001" : "SN002";
+}
+
+/** FBR scenarioId for a given saleType (per the DI sandbox scenario table). */
+export function fbrScenarioIdForSaleType(saleType: string, registrationType: string): string {
+  switch (saleType) {
+    case "Processing/Conversion of Goods":
+      return "SN016";
+    default:
+      return fbrScenarioId(registrationType);
+  }
 }
