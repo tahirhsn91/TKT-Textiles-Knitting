@@ -741,6 +741,87 @@ router.delete("/invoicing/:id", async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
+// ─── Edit draft invoice rates ─────────────────────────────────────────────
+// Update the per-KG rate of one or more items on a draft invoice. Amounts
+// (value excluding tax / tax / total) are recomputed for each changed item
+// and the header totals are recomputed. Posted invoices are read-only.
+// Body: { items: [{ id: itemId, ratePerKg }] }.
+
+const updateRatesSchema = z.object({
+  items: z.array(z.object({
+    id: z.coerce.number().int().positive(),
+    ratePerKg: z.coerce.number().positive("Rate per kg must be positive"),
+  })).min(1, "At least one item rate is required"),
+});
+
+router.patch("/invoicing/:id/rates", validateBody(updateRatesSchema), async (req, res): Promise<void> => {
+  const id = idParam(req);
+  if (!id) { res.status(400).json({ error: "Invalid invoice id" }); return; }
+  const tenantId = activeTenantId(req);
+  const taxRate = await loadDefaultTaxRate(tenantId);
+
+  const [inv] = await db
+    .select().from(invoiceTable).where(and(eq(invoiceTable.id, id), eq(invoiceTable.tenantId, tenantId)));
+  if (!inv) { res.status(404).json({ error: "Invoice not found" }); return; }
+  if (inv.status !== "draft") {
+    res.status(409).json({ error: "Only draft invoices can have their rates edited." });
+    return;
+  }
+
+  const body = req.body as unknown as z.infer<typeof updateRatesSchema>;
+  const items = await db
+    .select().from(invoiceItemTable).where(and(eq(invoiceItemTable.invoiceId, id), eq(invoiceItemTable.tenantId, tenantId)));
+
+  // Map requested rates by item id; reject ids that don't belong to this invoice.
+  const rateById = new Map<number, number>();
+  for (const r of body.items) rateById.set(r.id, r.ratePerKg);
+  for (const r of body.items) {
+    if (!items.some((it) => it.id === r.id)) {
+      res.status(400).json({ error: `Item ${r.id} does not belong to this invoice.` });
+      return;
+    }
+  }
+
+  let totalValue = 0;
+  let totalTax = 0;
+  let grandTotal = 0;
+
+  await db.transaction(async (tx) => {
+    for (const it of items) {
+      const newRate = rateById.get(it.id);
+      const rate = newRate != null ? newRate : parseFloat(it.ratePerKg);
+      const amounts = computeItemAmounts(it.quantity, rate, taxRate);
+      if (newRate != null) {
+        await tx
+          .update(invoiceItemTable)
+          .set({
+            ratePerKg: String(rate),
+            valueExcludingTax: amounts.valueExcludingTax,
+            taxAmount: amounts.taxAmount,
+            totalValue: amounts.totalValue,
+          })
+          .where(and(eq(invoiceItemTable.id, it.id), eq(invoiceItemTable.tenantId, tenantId)));
+      }
+      totalValue += parseFloat(amounts.valueExcludingTax);
+      totalTax += parseFloat(amounts.taxAmount);
+      grandTotal += parseFloat(amounts.totalValue);
+    }
+
+    await tx
+      .update(invoiceTable)
+      .set({
+        totalValue: totalValue.toFixed(2),
+        totalTax: totalTax.toFixed(2),
+        grandTotal: grandTotal.toFixed(2),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(invoiceTable.id, id), eq(invoiceTable.tenantId, tenantId)));
+  });
+
+  const detail = await loadInvoiceDetail(id, tenantId);
+  res.json(detail);
+});
+
 // ─── Config: allow backdated invoices (issue #189) ─────────────────────────
 async function isAllowBackdatedInvoices(): Promise<boolean> {
   const [cfg] = await db
