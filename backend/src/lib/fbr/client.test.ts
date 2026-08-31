@@ -10,7 +10,7 @@ import {
   toFbrMoney,
   buildFbrInvoicePayload,
 } from "./client.js";
-import { fbrScenarioId, FBR_DEFAULT_SALE_TYPE } from "./constants.js";
+import { fbrScenarioId, fbrScenarioIdForSaleType, FBR_DEFAULT_SALE_TYPE } from "./constants.js";
 
 // ─── computeItemAmounts ───────────────────────────────────────────────────
 
@@ -72,6 +72,20 @@ test("fbrScenarioId: SN001 for registered, SN002 for unregistered", () => {
   assert.equal(fbrScenarioId("Registered"), "SN001");
   assert.equal(fbrScenarioId("Unregistered"), "SN002");
   assert.equal(fbrScenarioId("anything-else"), "SN002");
+});
+
+// ─── fbrScenarioIdForSaleType ─────────────────────────────────────────────
+
+test("fbrScenarioIdForSaleType: Processing/Conversion of Goods -> SN016", () => {
+  // TKT fabric sales are filed as Processing/Conversion of Goods, which FBR
+  // maps to scenario SN016 regardless of buyer registration.
+  assert.equal(fbrScenarioIdForSaleType("Processing/Conversion of Goods", "Registered"), "SN016");
+  assert.equal(fbrScenarioIdForSaleType("Processing/Conversion of Goods", "Unregistered"), "SN016");
+});
+
+test("fbrScenarioIdForSaleType: standard-rate goods fall back to registration scenario", () => {
+  assert.equal(fbrScenarioIdForSaleType("Goods at standard rate (default)", "Registered"), "SN001");
+  assert.equal(fbrScenarioIdForSaleType("Goods at standard rate (default)", "Unregistered"), "SN002");
 });
 
 // ─── buildFbrInvoicePayload ───────────────────────────────────────────────
@@ -152,7 +166,8 @@ test("buildFbrInvoicePayload: maps seller/buyer/items and adds scenarioId in san
   assert.equal(p.buyerNTNCNIC, "7654321");
   assert.equal(p.buyerBusinessName, "Acme Buyer");
   assert.equal(p.buyerRegistrationType, "Registered");
-  assert.equal(p.scenarioId, "SN001");
+  // Scenario derives from the item saleType (Processing/Conversion of Goods) -> SN016
+  assert.equal(p.scenarioId, "SN016");
   assert.equal(p.items[0].hsCode, "6001.2100");
   assert.equal(p.items[0].uoM, "KG");
   assert.equal(p.items[0].rate, "18%");
