@@ -119,6 +119,65 @@ export function computeItemAmounts(
 }
 
 /**
+ * FBR DI rejects an invoice that contains two or more lines with the same
+ * (hsCode + uoM) combination, reporting it as "DUPLICATE INVOICE EXISTS" on
+ * the highest-value duplicate line. The ERP generates one line per yarn type
+ * and every fabric yarn type maps to the same HS code (6002.9000 / KG), so
+ * every multi-line invoice tripped FBR's check while single-line invoices
+ * posted fine. Merge lines by (hsCode + uoM) before posting: quantities and
+ * money values are summed, the first product description wins.
+ */
+function mergeItemsByHsCode(items: InvoiceItem[]): Array<{
+  hsCode: string;
+  productDescription: string;
+  uoM: string;
+  quantity: string;
+  valueExcludingTax: string;
+  taxAmount: string;
+  totalValue: string;
+  saleType: string;
+}> {
+  const groups = new Map<string, {
+    hsCode: string;
+    productDescription: string;
+    uoM: string;
+    saleType: string;
+    quantity: number;
+    valueExcludingTax: number;
+    taxAmount: number;
+    totalValue: number;
+  }>();
+  for (const it of items) {
+    const key = `${it.hsCode ?? ""}|${it.uoM ?? ""}`;
+    const g = groups.get(key) ?? {
+      hsCode: it.hsCode ?? "",
+      productDescription: it.productDescription ?? "",
+      uoM: it.uoM ?? "",
+      saleType: it.saleType ?? FBR_DEFAULT_SALE_TYPE,
+      quantity: 0,
+      valueExcludingTax: 0,
+      taxAmount: 0,
+      totalValue: 0,
+    };
+    g.quantity += parseFloat(it.quantity) || 0;
+    g.valueExcludingTax += parseFloat(it.valueExcludingTax) || 0;
+    g.taxAmount += parseFloat(it.taxAmount) || 0;
+    g.totalValue += parseFloat(it.totalValue) || 0;
+    groups.set(key, g);
+  }
+  return [...groups.values()].map((g) => ({
+    hsCode: g.hsCode,
+    productDescription: g.productDescription,
+    uoM: g.uoM,
+    quantity: round2(g.quantity).toFixed(3),
+    valueExcludingTax: toFbrMoney(g.valueExcludingTax),
+    taxAmount: toFbrMoney(g.taxAmount),
+    totalValue: toFbrMoney(g.totalValue),
+    saleType: g.saleType,
+  }));
+}
+
+/**
  * Build the FBR `postinvoicedata` payload for one invoice.
  * `sandbox` selects the scenarioId (SN001/SN002 by buyer registration type)
  * which FBR requires for sandbox only.
@@ -167,7 +226,7 @@ export function buildFbrInvoicePayload(params: {
     buyerAddress,
     buyerRegistrationType,
     invoiceRefNo: "",
-    items: items.map((it) => ({
+    items: mergeItemsByHsCode(items).map((it) => ({
       hsCode: it.hsCode ?? "",
       productDescription: it.productDescription ?? "",
       rate: rateStr,
