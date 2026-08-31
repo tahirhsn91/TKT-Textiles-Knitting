@@ -520,7 +520,7 @@ export default function InvoicingPage() {
               <CardContent className="space-y-4 p-5">
                 <p className="text-sm text-muted-foreground">
                   Pick a party with un-invoiced Fabric Delivery transactions. Net weights are summed per yarn
-                  type/count; enter a per-KG rate for each line to compute value, {salesTaxPercent}% sales tax, and total.
+                  type/count; enter a per-KG rate for each line to compute value, {Math.round(salesTaxPercent)}% sales tax, and total.
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
@@ -577,7 +577,7 @@ export default function InvoicingPage() {
                               <TableHead className="text-right">Net Wt (kg)</TableHead>
                               <TableHead className="text-right">Rate / kg</TableHead>
                               <TableHead className="text-right">Value</TableHead>
-                              <TableHead className="text-right">Tax ({salesTaxPercent}%)</TableHead>
+                              <TableHead className="text-right">Tax ({Math.round(salesTaxPercent)}%)</TableHead>
                               <TableHead className="text-right">Total</TableHead>
                             </TableRow>
                           </TableHeader>
@@ -1127,7 +1127,7 @@ function FutureInvoicesView({ rows, loading, taxRatePercent = 18 }: { rows: Futu
                   <TableHead className="text-right">Rate / kg</TableHead>
                   <TableHead>Rate From</TableHead>
                   <TableHead className="text-right">Value</TableHead>
-                  <TableHead className="text-right">Tax ({taxRatePercent}%)</TableHead>
+                  <TableHead className="text-right">Tax ({Math.round(taxRatePercent)}%)</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1691,7 +1691,7 @@ function InvoiceView({
                 <td className="text-right tabular-nums">{money(parseFloat(it.quantity))}</td>
                 <td className="text-right tabular-nums">{money(parseFloat(it.ratePerKg))}</td>
                 <td className="text-right tabular-nums">{money(parseFloat(it.valueExcludingTax))}</td>
-                <td className="text-center tabular-nums">{taxRatePercent}%</td>
+                <td className="text-center tabular-nums">{Math.round(taxRatePercent)}%</td>
                 <td className="text-right tabular-nums">{money(parseFloat(it.taxAmount))}</td>
                 <td className="text-right tabular-nums">{money(parseFloat(it.totalValue))}</td>
               </tr>
@@ -1715,7 +1715,7 @@ function InvoiceView({
             <span className="font-semibold tabular-nums">{money(parseFloat(inv.totalValue))}</span>
           </div>
           <div className="flex justify-between border-b border-foreground/20 px-3 py-2">
-            <span>Total Tax Amount @ {taxRatePercent}%</span>
+            <span>Total Tax Amount @ {Math.round(taxRatePercent)}%</span>
             <span className="font-semibold tabular-nums">{money(parseFloat(inv.totalTax))}</span>
           </div>
           <div className="flex justify-between border-b border-foreground/20 px-3 py-2 font-bold">
