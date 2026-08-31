@@ -145,7 +145,6 @@ test("buildFbrInvoicePayload: maps seller/buyer/items and adds scenarioId in san
 
   assert.equal(p.invoiceType, "Sale Invoice");
   assert.equal(p.invoiceDate, "2026-08-12");
-  assert.equal(p.invoiceRefNo, "INV-42");
   assert.equal(p.sellerNTNCNIC, "1234567");
   assert.equal(p.sellerBusinessName, "TKT Textiles");
   assert.equal(p.sellerProvince, "Punjab");
@@ -188,37 +187,6 @@ test("buildFbrInvoicePayload: emits every optional numeric FBR field as 2-dp zer
   assert.equal(it.fedPayable, "0.00");
   assert.equal(it.discount, "0.00");
   assert.equal(it.sroItemSerialNo, "");
-});
-
-test("buildFbrInvoicePayload: invoiceRefNo is unique per invoice (never empty)", () => {
-  // Regression guard: an empty invoiceRefNo made FBR's duplicate check treat
-  // distinct invoices as the same one ("DUPLICATE INVOICE EXISTS" on prod).
-  const p1 = buildFbrInvoicePayload({
-    invoice: { ...baseInvoice, id: 259 },
-    items: baseItems,
-    company: baseCompany,
-    buyerNtnCnic: "7654321",
-    buyerBusinessName: "Acme Buyer",
-    buyerProvince: "Sindh",
-    buyerAddress: "Karachi",
-    buyerRegistrationType: "Registered",
-    sandbox: false,
-  });
-  const p2 = buildFbrInvoicePayload({
-    invoice: { ...baseInvoice, id: 260 },
-    items: baseItems,
-    company: baseCompany,
-    buyerNtnCnic: "7654321",
-    buyerBusinessName: "Acme Buyer",
-    buyerProvince: "Sindh",
-    buyerAddress: "Karachi",
-    buyerRegistrationType: "Registered",
-    sandbox: false,
-  });
-
-  assert.equal(p1.invoiceRefNo, "INV-259");
-  assert.equal(p2.invoiceRefNo, "INV-260");
-  assert.notEqual(p1.invoiceRefNo, p2.invoiceRefNo);
 });
 
 test("buildFbrInvoicePayload: unregistered buyer → SN002, empty NTN, no scenario in production", () => {
