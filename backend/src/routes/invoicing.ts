@@ -669,6 +669,20 @@ router.post("/invoicing/:id/post", async (req, res): Promise<void> => {
   const sandbox = await isFbrSandboxEnabled();
   const token = sandbox ? company.fbrSandboxToken : company.fbrProductionToken;
 
+  // FBR's duplicate check keys on (hsCode + uoM + productDescription): two
+  // lines sharing the same description in one invoice are rejected as
+  // "DUPLICATE INVOICE EXISTS". All fabric yarn types share one HS code, so
+  // append the yarn count to each line's description to keep lines unique.
+  const countIds = [...new Set(items.map((it) => it.yarnCountId).filter((id): id is number => id != null))];
+  const counts = countIds.length
+    ? await db
+        .select({ id: yarnCountMasterTable.id, count: yarnCountMasterTable.count })
+        .from(yarnCountMasterTable)
+        .where(and(eq(yarnCountMasterTable.tenantId, tenantId), inArray(yarnCountMasterTable.id, countIds)))
+    : [];
+  const yarnCountNames: Record<number, string> = {};
+  for (const c of counts) yarnCountNames[c.id] = c.count;
+
   const payload = buildFbrInvoicePayload({
     invoice: inv,
     items,
@@ -680,6 +694,7 @@ router.post("/invoicing/:id/post", async (req, res): Promise<void> => {
     buyerRegistrationType: party.registrationType ?? "Unregistered",
     sandbox,
     taxRatePercent: taxRate,
+    yarnCountNames,
   });
 
   const result = await postInvoiceToFbr({ payload, token, sandbox });

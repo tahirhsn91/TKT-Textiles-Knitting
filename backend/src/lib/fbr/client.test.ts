@@ -189,9 +189,9 @@ test("buildFbrInvoicePayload: emits every optional numeric FBR field as 2-dp zer
   assert.equal(it.sroItemSerialNo, "");
 });
 
-test("buildFbrInvoicePayload: merges lines with the same hsCode+uoM into one (FBR duplicate-line rule)", () => {
-  // FBR rejects invoices with two+ lines sharing (hsCode, uoM) as
-  // "DUPLICATE INVOICE EXISTS" — merge them before posting.
+test("buildFbrInvoicePayload: keeps one line per item (no merging)", () => {
+  // Lines are NOT merged — uniqueness for FBR's duplicate check comes from
+  // the yarn count in the description, not from collapsing lines.
   const multiItems = [
     { ...baseItems[0], id: 1, quantity: "6525.200", valueExcludingTax: "208806.40", taxAmount: "37585.15", totalValue: "246391.55" },
     { ...baseItems[0], id: 2, quantity: "11940.050", valueExcludingTax: "382081.60", taxAmount: "68774.69", totalValue: "450856.29" },
@@ -208,23 +208,24 @@ test("buildFbrInvoicePayload: merges lines with the same hsCode+uoM into one (FB
     sandbox: false,
   });
 
-  assert.equal(p.items.length, 1);
-  assert.equal(p.items[0].hsCode, "6001.2100");
-  assert.equal(p.items[0].uoM, "KG");
-  assert.equal(p.items[0].quantity, "18465.250");
-  assert.equal(p.items[0].valueSalesExcludingST, "590888.00");
-  assert.equal(p.items[0].salesTaxApplicable, "106359.84");
-  assert.equal(p.items[0].totalValues, "697247.84");
+  assert.equal(p.items.length, 2);
+  assert.equal(p.items[0].quantity, "6525.200");
+  assert.equal(p.items[1].quantity, "11940.050");
+  assert.equal(p.items[0].valueSalesExcludingST, "208806.40");
+  assert.equal(p.items[1].valueSalesExcludingST, "382081.60");
+  assert.equal(p.items[0].salesTaxApplicable, "37585.15");
+  assert.equal(p.items[1].salesTaxApplicable, "68774.69");
+  assert.equal(p.items[0].totalValues, "246391.55");
+  assert.equal(p.items[1].totalValues, "450856.29");
 });
 
-test("buildFbrInvoicePayload: recomputes merged tax from value×rate (avoids 0104 drift)", () => {
-  // Real case (invoice 262): per-line taxes sum to 18,533.25, but FBR
-  // validates tax = value × rate → 102,962.45 × 18% = 18,533.24. The merged
-  // line must carry the recomputed tax, not the sum of rounded line taxes.
+test("buildFbrInvoicePayload: appends yarn count to productDescription when provided", () => {
+  // FBR's duplicate check keys on (hsCode + uoM + description): same
+  // description twice in one invoice → DUPLICATE INVOICE EXISTS. All fabric
+  // lines share one HS code, so the yarn count makes each description unique.
   const items = [
-    { ...baseItems[0], id: 1, quantity: "439.850", valueExcludingTax: "15394.75", taxAmount: "2771.06", totalValue: "18165.81" },
-    { ...baseItems[0], id: 2, quantity: "2489.650", valueExcludingTax: "69710.20", taxAmount: "12547.84", totalValue: "82258.04" },
-    { ...baseItems[0], id: 3, quantity: "595.250", valueExcludingTax: "17857.50", taxAmount: "3214.35", totalValue: "21071.85" },
+    { ...baseItems[0], id: 1, quantity: "2604.600", valueExcludingTax: "88556.40", taxAmount: "15940.15", totalValue: "104496.55" },
+    { ...baseItems[0], id: 2, quantity: "6631.350", valueExcludingTax: "225465.90", taxAmount: "40583.86", totalValue: "266049.76" },
   ];
   const p = buildFbrInvoicePayload({
     invoice: baseInvoice,
@@ -236,23 +237,19 @@ test("buildFbrInvoicePayload: recomputes merged tax from value×rate (avoids 010
     buyerAddress: "Karachi",
     buyerRegistrationType: "Registered",
     sandbox: false,
+    yarnCountNames: { 1: "30s+75/36+16s", 2: "30s+75/36+10s" },
   });
 
-  assert.equal(p.items.length, 1);
-  assert.equal(p.items[0].quantity, "3524.750");
-  assert.equal(p.items[0].valueSalesExcludingST, "102962.45");
-  assert.equal(p.items[0].salesTaxApplicable, "18533.24"); // NOT 18533.25
-  assert.equal(p.items[0].totalValues, "121495.69");
+  assert.equal(p.items.length, 2);
+  assert.equal(p.items[0].productDescription, "3-Fleece fabric (30s+75/36+16s)");
+  assert.equal(p.items[1].productDescription, "3-Fleece fabric (30s+75/36+10s)");
+  assert.notEqual(p.items[0].productDescription, p.items[1].productDescription);
 });
 
-test("buildFbrInvoicePayload: keeps distinct hsCode+uoM lines separate", () => {
-  const distinctItems = [
-    { ...baseItems[0], id: 1, hsCode: "6001.2100", uoM: "KG", quantity: "100.000", valueExcludingTax: "10000.00", taxAmount: "1800.00", totalValue: "11800.00" },
-    { ...baseItems[0], id: 2, hsCode: "6109.1000", uoM: "Numbers, pieces, units", quantity: "50.000", valueExcludingTax: "5000.00", taxAmount: "900.00", totalValue: "5900.00" },
-  ];
+test("buildFbrInvoicePayload: no yarn count map → plain description", () => {
   const p = buildFbrInvoicePayload({
     invoice: baseInvoice,
-    items: distinctItems,
+    items: baseItems,
     company: baseCompany,
     buyerNtnCnic: "7654321",
     buyerBusinessName: "Acme Buyer",
@@ -262,7 +259,7 @@ test("buildFbrInvoicePayload: keeps distinct hsCode+uoM lines separate", () => {
     sandbox: false,
   });
 
-  assert.equal(p.items.length, 2);
+  assert.equal(p.items[0].productDescription, "3-Fleece fabric");
 });
 
 test("buildFbrInvoicePayload: unregistered buyer → SN002, empty NTN, no scenario in production", () => {
