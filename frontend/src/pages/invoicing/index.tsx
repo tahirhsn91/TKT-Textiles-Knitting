@@ -94,6 +94,11 @@ function money(n: number): string {
   return n.toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/** Whole-rupee money: rounds to zero decimal places before formatting. */
+function money0(n: number): string {
+  return Math.round(n).toLocaleString("en-PK", { maximumFractionDigits: 0 });
+}
+
 /** Payment state for a listed invoice (derived from the detail fields). */
 function paymentState(inv: { status: string; paid: boolean; overdue: boolean; outstanding: number; dueDate: string | null; origin?: string }) {
   if (inv.status !== "posted") return null;
@@ -1693,7 +1698,7 @@ function InvoiceView({
                 <td className="text-right tabular-nums">{money(parseFloat(it.valueExcludingTax))}</td>
                 <td className="text-center tabular-nums">{Math.round(taxRatePercent)}%</td>
                 <td className="text-right tabular-nums">{money(parseFloat(it.taxAmount))}</td>
-                <td className="text-right tabular-nums">{money(parseFloat(it.totalValue))}</td>
+                <td className="text-right tabular-nums">{money0(parseFloat(it.totalValue))}</td>
               </tr>
             ))}
             <tr className="border-t border-foreground/20 font-bold [&>td]:px-2 [&>td]:py-2 [&>td]:align-middle">
@@ -1701,7 +1706,7 @@ function InvoiceView({
               <td className="border-l border-foreground/20 text-right tabular-nums">{money(parseFloat(inv.totalValue))}</td>
               <td className="border-l border-foreground/20" />
               <td className="border-l border-foreground/20 text-right tabular-nums">{money(parseFloat(inv.totalTax))}</td>
-              <td className="border-l border-foreground/20 text-right tabular-nums">{money(parseFloat(inv.grandTotal))}</td>
+              <td className="border-l border-foreground/20 text-right tabular-nums">{money0(parseFloat(inv.grandTotal))}</td>
             </tr>
           </tbody>
         </table>
@@ -1720,7 +1725,7 @@ function InvoiceView({
           </div>
           <div className="flex justify-between border-b border-foreground/20 px-3 py-2 font-bold">
             <span>Grand Total</span>
-            <span className="tabular-nums">{money(parseFloat(inv.grandTotal))}</span>
+            <span className="tabular-nums">{money0(parseFloat(inv.grandTotal))}</span>
           </div>
           <div className="flex justify-between border-b border-foreground/20 px-3 py-2">
             <span>Paid</span>
