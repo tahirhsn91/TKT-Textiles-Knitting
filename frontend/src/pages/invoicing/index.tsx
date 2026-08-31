@@ -743,6 +743,9 @@ export default function InvoicingPage() {
                           <TableCell className="text-right">
                             {inv.status === "draft" ? (
                               <div className="flex justify-end gap-1">
+                                <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground sm:h-8 sm:w-8" title="View invoice" aria-label="View invoice" onClick={() => handleView(inv.id)}>
+                                  <Eye className="h-4 w-4" />
+                                </Button>
                                 <Button variant="outline" size="sm" className="gap-1.5" onClick={() => handlePost(inv)} disabled={post.isPending}>
                                   <Send className="h-4 w-4" /> Post
                                 </Button>
