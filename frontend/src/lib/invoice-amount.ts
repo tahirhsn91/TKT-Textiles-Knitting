@@ -8,8 +8,8 @@
  */
 
 // Groups: crore (10^7), lakh (10^5), thousand, hundred. Returns a title-cased
-// string ending in "Only" (with "And N Paisa Only" when paisa are present),
-// matching the reference invoice's amount-in-words style.
+// string ending in "Only", matching the reference invoice's amount-in-words
+// style. The amount is rounded to whole rupees before conversion (no paisa).
 const ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
   "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen",
   "Eighteen", "Nineteen"];
@@ -32,18 +32,19 @@ function threeDigits(n: number): string {
 function rupeesToWordsAmount(amount: string | number): string {
   const n = typeof amount === "number" ? amount : parseFloat(amount);
   if (!Number.isFinite(n) || n <= 0) return "Zero Only";
-  const paise = Math.round((n % 1) * 100);
-  let whole = Math.floor(n);
-  const crore = Math.floor(whole / 10000000); whole %= 10000000;
-  const lakh = Math.floor(whole / 100000); whole %= 100000;
-  const thousand = Math.floor(whole / 1000); whole %= 1000;
+  // Round the amount to zero decimal places (whole rupees) before converting
+  // to words, so fractional amounts always produce a clean whole-rupee phrase.
+  const whole = Math.round(n);
+  let w = whole;
+  const crore = Math.floor(w / 10000000); w %= 10000000;
+  const lakh = Math.floor(w / 100000); w %= 100000;
+  const thousand = Math.floor(w / 1000); w %= 1000;
   const parts: string[] = [];
   if (crore) parts.push(`${threeDigits(crore)} Crore`);
   if (lakh) parts.push(`${threeDigits(lakh)} Lakh`);
   if (thousand) parts.push(`${threeDigits(thousand)} Thousand`);
-  if (whole) parts.push(threeDigits(whole));
+  if (w) parts.push(threeDigits(w));
   const ru = parts.length ? parts.join(" ") : "Zero";
-  if (paise) return `${ru} And ${twoDigits(paise)} Paisa Only`;
   return `${ru} Only`;
 }
 
