@@ -3,7 +3,7 @@ import {
   FBR_INVOICE_TYPE,
   FBR_SALES_TAX_PERCENT,
   FBR_DEFAULT_SALE_TYPE,
-  fbrScenarioId,
+  fbrScenarioIdForSaleType,
 } from "./constants.js";
 import type { CompanyInfoMaster } from "../../db/index.js";
 import type { Invoice, InvoiceItem } from "../../db/index.js";
@@ -209,7 +209,10 @@ export function buildFbrInvoicePayload(params: {
     })),
   };
   if (sandbox) {
-    body.scenarioId = fbrScenarioId(buyerRegistrationType);
+    // Scenario must match the item saleType (FBR error: "Sale type not
+    // match with provided scenario"). All v1 fabric invoices use
+    // FBR_DEFAULT_SALE_TYPE, so derive the scenario from it.
+    body.scenarioId = fbrScenarioIdForSaleType(FBR_DEFAULT_SALE_TYPE, buyerRegistrationType);
   }
   return body;
 }
