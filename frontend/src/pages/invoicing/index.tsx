@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, type ReactNode } from "react";
-import { Send, Trash2, RefreshCw, FileText, Eye, Download, Plus, Banknote, CalendarPlus, History } from "lucide-react";
+import { Send, Trash2, RefreshCw, FileText, Eye, Download, Plus, Banknote, CalendarPlus, History, PencilLine, Save } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 
@@ -65,6 +65,7 @@ import {
   useGenerateInvoice,
   usePostInvoice,
   useDeleteInvoice,
+  useUpdateDraftRates,
   useCreatePayment,
   useDeletePayment,
   useReceivables,
@@ -172,6 +173,7 @@ export default function InvoicingPage() {
   const generate = useGenerateInvoice();
   const post = usePostInvoice();
   const remove = useDeleteInvoice();
+  const updateDraftRates = useUpdateDraftRates();
   const addPayment = useCreatePayment();
   const removePayment = useDeletePayment();
   const createBackdated = useCreateBackdatedInvoice();
@@ -461,6 +463,22 @@ export default function InvoicingPage() {
   };
 
   const handleView = (invoiceId: number) => setViewingId(invoiceId);
+
+  // Update rates on a draft invoice (issue: edit rates on drafts).
+  const handleUpdateDraftRates = (items: { id: number; ratePerKg: number }[], onDone: () => void) => {
+    if (viewingId == null) return;
+    updateDraftRates.mutate(
+      { id: viewingId, body: { items } },
+      {
+        onSuccess: (detail) => {
+          toast({ title: "Rates updated", description: `Invoice total is now ${money(parseFloat(detail.grandTotal))}.` });
+          onDone();
+        },
+        onError: (e) =>
+          toast({ title: "Could not update rates", description: e?.message, variant: "destructive" }),
+      },
+    );
+  };
 
   // ── Derived values for the Record Payment dialog (net + rate → gross + tax) ──
   const payNetNum = parseFloat(payNet);
@@ -959,6 +977,8 @@ export default function InvoicingPage() {
               onDownload={() => handleDownloadInvoice(viewing)}
               onAddPayment={() => openPayment(viewing)}
               onDeletePayment={(p) => setDeletePayment({ inv: viewing, payment: p })}
+              onUpdateRates={handleUpdateDraftRates}
+              updatePending={updateDraftRates.isPending}
             />
           ) : null}
         </DialogContent>
@@ -1603,12 +1623,46 @@ function InvoiceView({
   onDownload,
   onAddPayment,
   onDeletePayment,
+  onUpdateRates,
+  updatePending = false,
 }: {
   inv: InvoiceDetail;
   onDownload: () => void;
   onAddPayment: () => void;
   onDeletePayment: (p: InvoicePayment) => void;
+  onUpdateRates?: (items: { id: number; ratePerKg: number }[], onDone: () => void) => void;
+  updatePending?: boolean;
 }) {
+  const isDraft = inv.status === "draft";
+  const [editing, setEditing] = useState(false);
+  const [rates, setRates] = useState<Record<number, string>>({});
+
+  const startEdit = () => {
+    setRates(Object.fromEntries(inv.items.map((it) => [it.id, it.ratePerKg])));
+    setEditing(true);
+  };
+  const cancelEdit = () => {
+    setRates({});
+    setEditing(false);
+  };
+  // Rounds to 2 decimals on blur, keeps whole-and-half inputs valid.
+  const saveEdit = () => {
+    const items = inv.items
+      .map((it) => {
+        const raw = rates[it.id];
+        const rate = parseFloat(raw);
+        return Number.isFinite(rate) && rate > 0
+          ? { id: it.id, ratePerKg: Math.round(rate * 100) / 100 }
+          : null;
+      })
+      .filter((x): x is { id: number; ratePerKg: number } => x != null);
+    if (items.length !== inv.items.length) {
+      // All rates must be valid positive numbers.
+      return;
+    }
+    onUpdateRates?.(items, cancelEdit);
+  };
+
   const invDate = (() => {
     try {
       return format(new Date(inv.invoiceDate + "T00:00:00"), "dd-MMM-yyyy").toUpperCase();
@@ -1638,6 +1692,24 @@ function InvoiceView({
           Sales Tax Invoice
         </div>
       </div>
+
+      {isDraft && onUpdateRates && (
+        <div className="flex items-center justify-end gap-2 border-b border-foreground/20 pb-2">
+          {!editing ? (
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={startEdit}>
+              <PencilLine className="h-4 w-4" /> Edit Rates
+            </Button>
+          ) : (
+            <>
+              <span className="text-xs text-muted-foreground">Editing rates &mdash; recalculates line and invoice totals.</span>
+              <Button variant="outline" size="sm" onClick={cancelEdit}>Cancel</Button>
+              <Button variant="default" size="sm" className="gap-1.5" onClick={saveEdit} disabled={updatePending}>
+                {updatePending ? <Spinner className="h-4 w-4" /> : <Save className="h-4 w-4" />} Save Rates
+              </Button>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Section title="Supplier Details">
@@ -1694,7 +1766,21 @@ function InvoiceView({
                 </td>
                 <td>{it.uoM ?? "KG"}</td>
                 <td className="text-right tabular-nums">{money(parseFloat(it.quantity))}</td>
-                <td className="text-right tabular-nums">{money(parseFloat(it.ratePerKg))}</td>
+                <td className="text-right">
+                  {editing ? (
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={rates[it.id] ?? ""}
+                      onChange={(e) => setRates((r) => ({ ...r, [it.id]: e.target.value }))}
+                      className="ml-auto h-8 w-28 text-right tabular-nums"
+                      aria-label={`Rate for ${it.yarnTypeName ?? `item ${it.id}`}`}
+                    />
+                  ) : (
+                    money(parseFloat(it.ratePerKg))
+                  )}
+                </td>
                 <td className="text-right tabular-nums">{money(parseFloat(it.valueExcludingTax))}</td>
                 <td className="text-center tabular-nums">{Math.round(taxRatePercent)}%</td>
                 <td className="text-right tabular-nums">{money(parseFloat(it.taxAmount))}</td>
