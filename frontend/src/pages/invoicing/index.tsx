@@ -1724,8 +1724,7 @@ function InvoiceView({
           <Field label="FBR Invoice No.:" value={inv.fbrInvoiceNumber ?? (inv.origin === "local" ? "— (unregistered)" : "—")} />
           <Field label="Due Date:" value={inv.dueDate ?? "—"} />
           <Field label="Status:" value={inv.status} />
-          <Field label="Site Name:" value="Head Office" />
-          <Field label="Store Name:" value="Store 01" />
+          <Field label="Reference:" value="DC challan copies are attached for reference" />
         </Section>
       </div>
 
