@@ -169,8 +169,7 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
     txValW,
   );
   ty = kvRow("FBR Invoice No.:", inv.fbrInvoiceNumber ?? "\u2014", rightX + 12, ty, txLabelW, txValW);
-  ty = kvRow("Site Name:", "Head Office", rightX + 12, ty, txLabelW, txValW);
-  ty = kvRow("Store Name:", "Store 01", rightX + 12, ty, txLabelW, txValW);
+  ty = kvRow("Reference:", "DC challan copies are attached for reference", rightX + 12, ty, txLabelW, txValW);
   ty = kvRow("Remarks:", "", rightX + 12, ty, txLabelW, txValW);
   const txBottom = ty + 6;
 
