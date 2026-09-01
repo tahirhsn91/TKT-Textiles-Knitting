@@ -763,8 +763,8 @@ router.delete("/invoicing/:id", async (req, res): Promise<void> => {
 // Body: { items: [{ id: itemId, ratePerKg }] }.
 //
 // An optional invoiceDate backdates a generated draft (issue: edit draft
-// invoice date). It is only honoured when the allow-backdated-invoices toggle
-// (0003) is enabled, mirroring the backdated-creation endpoint.
+// invoice date). It is honoured for any draft; like rate edits it does not
+// require the backdated-creation toggle.
 
 const updateRatesSchema = z.object({
   items: z.array(z.object({
@@ -789,12 +789,6 @@ router.patch("/invoicing/:id/rates", validateBody(updateRatesSchema), async (req
   }
 
   const body = req.body as unknown as z.infer<typeof updateRatesSchema>;
-
-  if (body.invoiceDate != null && !(await isAllowBackdatedInvoices())) {
-    res.status(403).json({ error: "Backdated invoices are not enabled." });
-    return;
-  }
-
   const items = await db
     .select().from(invoiceItemTable).where(and(eq(invoiceItemTable.invoiceId, id), eq(invoiceItemTable.tenantId, tenantId)));
 

@@ -979,7 +979,6 @@ export default function InvoicingPage() {
               onDeletePayment={(p) => setDeletePayment({ inv: viewing, payment: p })}
               onUpdateRates={handleUpdateDraftRates}
               updatePending={updateDraftRates.isPending}
-              allowBackdated={allowBackdated ?? false}
             />
           ) : null}
         </DialogContent>
@@ -1626,7 +1625,6 @@ function InvoiceView({
   onDeletePayment,
   onUpdateRates,
   updatePending = false,
-  allowBackdated = false,
 }: {
   inv: InvoiceDetail;
   onDownload: () => void;
@@ -1634,7 +1632,6 @@ function InvoiceView({
   onDeletePayment: (p: InvoicePayment) => void;
   onUpdateRates?: (items: { id: number; ratePerKg: number }[], invoiceDate: string | undefined, onDone: () => void) => void;
   updatePending?: boolean;
-  allowBackdated?: boolean;
 }) {
   const isDraft = inv.status === "draft";
   const [editing, setEditing] = useState(false);
@@ -1708,18 +1705,16 @@ function InvoiceView({
           ) : (
             <>
               <span className="text-xs text-muted-foreground">Editing rates &mdash; recalculates line and invoice totals.</span>
-              {allowBackdated && (
-                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  Invoice Date
-                  <Input
-                    type="date"
-                    value={invoiceDate}
-                    onChange={(e) => setInvoiceDate(e.target.value)}
-                    className="h-8 w-40 text-sm"
-                    aria-label="Invoice date"
-                  />
-                </label>
-              )}
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                Invoice Date
+                <Input
+                  type="date"
+                  value={invoiceDate}
+                  onChange={(e) => setInvoiceDate(e.target.value)}
+                  className="h-8 w-40 text-sm"
+                  aria-label="Invoice date"
+                />
+              </label>
               <Button variant="outline" size="sm" onClick={cancelEdit}>Cancel</Button>
               <Button variant="default" size="sm" className="gap-1.5" onClick={saveEdit} disabled={updatePending}>
                 {updatePending ? <Spinner className="h-4 w-4" /> : <Save className="h-4 w-4" />} Save Rates
