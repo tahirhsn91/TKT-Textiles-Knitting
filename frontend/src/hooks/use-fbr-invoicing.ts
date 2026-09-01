@@ -299,6 +299,8 @@ export function useDeleteInvoice() {
 
 export interface UpdateDraftRatesBody {
   items: { id: number; ratePerKg: number }[];
+  /** Optional invoice date so a generated draft can be backdated. */
+  invoiceDate?: string;
 }
 
 export function useUpdateDraftRates() {

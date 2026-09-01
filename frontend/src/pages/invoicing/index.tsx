@@ -464,11 +464,11 @@ export default function InvoicingPage() {
 
   const handleView = (invoiceId: number) => setViewingId(invoiceId);
 
-  // Update rates on a draft invoice (issue: edit rates on drafts).
-  const handleUpdateDraftRates = (items: { id: number; ratePerKg: number }[], onDone: () => void) => {
+  // Update rates (and optionally the date, for backdating) on a draft invoice.
+  const handleUpdateDraftRates = (items: { id: number; ratePerKg: number }[], invoiceDate: string | undefined, onDone: () => void) => {
     if (viewingId == null) return;
     updateDraftRates.mutate(
-      { id: viewingId, body: { items } },
+      { id: viewingId, body: { items, ...(invoiceDate ? { invoiceDate } : {}) } },
       {
         onSuccess: (detail) => {
           toast({ title: "Rates updated", description: `Invoice total is now ${money(parseFloat(detail.grandTotal))}.` });
@@ -979,6 +979,7 @@ export default function InvoicingPage() {
               onDeletePayment={(p) => setDeletePayment({ inv: viewing, payment: p })}
               onUpdateRates={handleUpdateDraftRates}
               updatePending={updateDraftRates.isPending}
+              allowBackdated={allowBackdated ?? false}
             />
           ) : null}
         </DialogContent>
@@ -1625,24 +1626,29 @@ function InvoiceView({
   onDeletePayment,
   onUpdateRates,
   updatePending = false,
+  allowBackdated = false,
 }: {
   inv: InvoiceDetail;
   onDownload: () => void;
   onAddPayment: () => void;
   onDeletePayment: (p: InvoicePayment) => void;
-  onUpdateRates?: (items: { id: number; ratePerKg: number }[], onDone: () => void) => void;
+  onUpdateRates?: (items: { id: number; ratePerKg: number }[], invoiceDate: string | undefined, onDone: () => void) => void;
   updatePending?: boolean;
+  allowBackdated?: boolean;
 }) {
   const isDraft = inv.status === "draft";
   const [editing, setEditing] = useState(false);
   const [rates, setRates] = useState<Record<number, string>>({});
+  const [invoiceDate, setInvoiceDate] = useState<string>(inv.invoiceDate);
 
   const startEdit = () => {
     setRates(Object.fromEntries(inv.items.map((it) => [it.id, it.ratePerKg])));
+    setInvoiceDate(inv.invoiceDate);
     setEditing(true);
   };
   const cancelEdit = () => {
     setRates({});
+    setInvoiceDate(inv.invoiceDate);
     setEditing(false);
   };
   // Rounds to 2 decimals on blur, keeps whole-and-half inputs valid.
@@ -1660,7 +1666,7 @@ function InvoiceView({
       // All rates must be valid positive numbers.
       return;
     }
-    onUpdateRates?.(items, cancelEdit);
+    onUpdateRates?.(items, invoiceDate !== inv.invoiceDate ? invoiceDate : undefined, cancelEdit);
   };
 
   const invDate = (() => {
@@ -1702,6 +1708,18 @@ function InvoiceView({
           ) : (
             <>
               <span className="text-xs text-muted-foreground">Editing rates &mdash; recalculates line and invoice totals.</span>
+              {allowBackdated && (
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  Invoice Date
+                  <Input
+                    type="date"
+                    value={invoiceDate}
+                    onChange={(e) => setInvoiceDate(e.target.value)}
+                    className="h-8 w-40 text-sm"
+                    aria-label="Invoice date"
+                  />
+                </label>
+              )}
               <Button variant="outline" size="sm" onClick={cancelEdit}>Cancel</Button>
               <Button variant="default" size="sm" className="gap-1.5" onClick={saveEdit} disabled={updatePending}>
                 {updatePending ? <Spinner className="h-4 w-4" /> : <Save className="h-4 w-4" />} Save Rates

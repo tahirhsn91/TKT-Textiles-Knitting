@@ -761,12 +761,17 @@ router.delete("/invoicing/:id", async (req, res): Promise<void> => {
 // (value excluding tax / tax / total) are recomputed for each changed item
 // and the header totals are recomputed. Posted invoices are read-only.
 // Body: { items: [{ id: itemId, ratePerKg }] }.
+//
+// An optional invoiceDate backdates a generated draft (issue: edit draft
+// invoice date). It is only honoured when the allow-backdated-invoices toggle
+// (0003) is enabled, mirroring the backdated-creation endpoint.
 
 const updateRatesSchema = z.object({
   items: z.array(z.object({
     id: z.coerce.number().int().positive(),
     ratePerKg: z.coerce.number().positive("Rate per kg must be positive"),
   })).min(1, "At least one item rate is required"),
+  invoiceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid invoice date").optional(),
 });
 
 router.patch("/invoicing/:id/rates", validateBody(updateRatesSchema), async (req, res): Promise<void> => {
@@ -784,6 +789,12 @@ router.patch("/invoicing/:id/rates", validateBody(updateRatesSchema), async (req
   }
 
   const body = req.body as unknown as z.infer<typeof updateRatesSchema>;
+
+  if (body.invoiceDate != null && !(await isAllowBackdatedInvoices())) {
+    res.status(403).json({ error: "Backdated invoices are not enabled." });
+    return;
+  }
+
   const items = await db
     .select().from(invoiceItemTable).where(and(eq(invoiceItemTable.invoiceId, id), eq(invoiceItemTable.tenantId, tenantId)));
 
@@ -828,6 +839,7 @@ router.patch("/invoicing/:id/rates", validateBody(updateRatesSchema), async (req
         totalValue: totalValue.toFixed(2),
         totalTax: totalTax.toFixed(2),
         grandTotal: grandTotal.toFixed(2),
+        ...(body.invoiceDate != null ? { invoiceDate: body.invoiceDate } : {}),
         updatedAt: new Date(),
       })
       .where(and(eq(invoiceTable.id, id), eq(invoiceTable.tenantId, tenantId)));
