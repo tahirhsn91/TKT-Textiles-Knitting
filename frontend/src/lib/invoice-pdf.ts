@@ -170,7 +170,6 @@ export async function downloadInvoicePdf(inv: InvoiceDetail): Promise<void> {
   );
   ty = kvRow("FBR Invoice No.:", inv.fbrInvoiceNumber ?? "\u2014", rightX + 12, ty, txLabelW, txValW);
   ty = kvRow("Reference:", "DC challan copies are attached for reference", rightX + 12, ty, txLabelW, txValW);
-  ty = kvRow("Remarks:", "", rightX + 12, ty, txLabelW, txValW);
   const txBottom = ty + 6;
 
   // Draw the SUPPLIER + TRANSACTION borders. TRANSACTION has more rows, so both
