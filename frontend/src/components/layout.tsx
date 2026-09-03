@@ -58,62 +58,100 @@ const invoicingItems = [
   { href: "/invoicing",    label: "Invoicing",    icon: Receipt,     module: "invoicing" },
 ];
 
-// Mobile drawer: the groups and their items, so the drawer can render from
-// config and auto-open the group holding the active route. Sub-item icons are
-// chosen to make the long list scannable. Each item declares the RBAC module
-// it needs so the drawer hides what the signed-in role can't open.
-const mobileGroups = [
+// Mobile drawer: mirrors the desktop sidebar. Non-interactive section
+// dividers (Overview / Daily Work / Maintenance / Analysis / Invoicing /
+// Administration) each hold collapsible groups, which hold the nav items.
+// Transactions and Payroll stay as two separate groups — exactly like the
+// desktop sidebar — instead of being fused. Each item declares the RBAC
+// module it needs so the drawer hides what the signed-in role can't open.
+const mobileSections = [
   {
     key: "daily",
     label: "Daily Work",
-    icon: ClipboardList,
-    activeFn: (loc: string) => loc.startsWith("/daily-production") || loc.startsWith("/yarn-receipts") || loc.startsWith("/daily-deliveries") || loc.startsWith("/attendance"),
-    items: [
-      { href: "/attendance",       label: "Attendance",         icon: CalendarCheck, module: "dailyProduction" },
-      { href: "/daily-production", label: "Daily Production", icon: Factory,      module: "dailyProduction" },
-      { href: "/yarn-receipts",    label: "Daily Yarn Receipt", icon: PackageCheck, module: "yarnReceipts" },
-      { href: "/daily-deliveries", label: "Daily Delivery",    icon: Truck,        module: "dailyDeliveries" },
-    ],
-  },
-  {
-    key: "transactions",
-    label: "Transactions & Payroll",
-    icon: FileText,
-    activeFn: (loc: string) => loc.startsWith("/transactions"),
-    items: [
-      { href: "/transactions",           label: "Yarn-Fabric Transactions", icon: FileText,  module: "transactions" },
-      { href: "/transactions/advances",  label: "Advances",                icon: Wallet,    module: "payroll" },
-      { href: "/transactions/monthly-salary-entry", label: "Payroll Maintenance", icon: Settings, module: "payroll" },
+    groups: [
+      {
+        key: "dailyOperations",
+        label: "Daily Operations",
+        icon: ClipboardList,
+        activeFn: (loc: string) => loc.startsWith("/daily-production") || loc.startsWith("/yarn-receipts") || loc.startsWith("/daily-deliveries") || loc.startsWith("/attendance"),
+        items: [
+          { href: "/attendance",       label: "Attendance",         icon: CalendarCheck, module: "dailyProduction" },
+          { href: "/daily-production", label: "Daily Production",   icon: Factory,      module: "dailyProduction" },
+          { href: "/yarn-receipts",    label: "Daily Yarn Receipt", icon: PackageCheck, module: "yarnReceipts" },
+          { href: "/daily-deliveries", label: "Daily Delivery",     icon: Truck,        module: "dailyDeliveries" },
+        ],
+      },
+      {
+        key: "transactions",
+        label: "Transactions",
+        icon: FileText,
+        activeFn: (loc: string) => loc.startsWith("/transactions") && !loc.startsWith("/transactions/advances") && !loc.startsWith("/transactions/monthly-salary-entry"),
+        items: [
+          { href: "/transactions", label: "Yarn-Fabric Transactions", icon: FileText, module: "transactions" },
+        ],
+      },
+      {
+        key: "payroll",
+        label: "Payroll",
+        icon: Wallet,
+        activeFn: (loc: string) => loc.startsWith("/transactions/advances") || loc.startsWith("/transactions/monthly-salary-entry"),
+        items: [
+          { href: "/transactions/advances",             label: "Advances",            icon: Wallet,   module: "payroll" },
+          { href: "/transactions/monthly-salary-entry", label: "Payroll Maintenance", icon: Settings, module: "payroll" },
+        ],
+      },
     ],
   },
   {
     key: "maintenance",
     label: "Maintenance",
-    icon: Wrench,
-    activeFn: (loc: string) => loc.startsWith("/maintenance"),
-    items: [
-      { href: "/maintenance/machine", label: "Machine Maintenance", icon: Factory, module: "maintenance" },
-      { href: "/maintenance/factory", label: "Factory Maintenance",  icon: HardHat, module: "maintenance" },
+    groups: [
+      {
+        key: "maintenanceGroup",
+        label: "Maintenance",
+        icon: Wrench,
+        activeFn: (loc: string) => loc.startsWith("/maintenance"),
+        items: [
+          { href: "/maintenance/machine", label: "Machine Maintenance", icon: Factory, module: "maintenance" },
+          { href: "/maintenance/factory", label: "Factory Maintenance",  icon: HardHat, module: "maintenance" },
+        ],
+      },
     ],
   },
   {
     key: "reports",
     label: "Analysis",
-    icon: BarChart2,
-    activeFn: (loc: string) => loc.startsWith("/reports"),
-    items: [
-      { href: "/reports/yarn-balance",   label: "Yarn Balance Report",      icon: BarChart2, module: "reports" },
-      { href: "/reports/yarn-to-fabric", label: "Yarn to Fabric Movement",   icon: Database,  module: "reports" },
+    groups: [
+      {
+        key: "reportsGroup",
+        label: "Reports",
+        icon: BarChart2,
+        activeFn: (loc: string) => loc.startsWith("/reports"),
+        items: [
+          { href: "/reports/yarn-balance",   label: "Yarn Balance Report",    icon: BarChart2, module: "reports" },
+          { href: "/reports/yarn-to-fabric", label: "Yarn to Fabric Movement", icon: Database,  module: "reports" },
+        ],
+      },
     ],
   },
   {
     key: "invoicing",
     label: "Invoicing",
-    icon: Receipt,
-    activeFn: (loc: string) => loc.startsWith("/invoicing"),
-    items: invoicingItems,
+    groups: [
+      {
+        key: "invoicingGroup",
+        label: "Invoicing",
+        icon: Receipt,
+        activeFn: (loc: string) => loc.startsWith("/invoicing"),
+        items: invoicingItems,
+      },
+    ],
   },
 ];
+
+// Shallow list of every collapsible group (across all sections) so the
+// "which groups are open" state and config lookups stay flat.
+const mobileGroups = mobileSections.flatMap((s) => s.groups);
 
 // Mobile-only "Administration" group — the Users & Roles admin lives here so
 // it shows in the phone drawer (the desktop sidebar places it as a flat item).
@@ -164,6 +202,22 @@ export function Layout({ children }: { children: ReactNode }) {
   const [mobileOpenGroups, setMobileOpenGroups] = useState<Set<string>>(
     () => new Set(mobileGroups.filter((g) => g.activeFn(location)).map((g) => g.key))
   );
+
+  // Every time the drawer opens, start from a fresh, predictable default:
+  // the group holding the active route auto-opens plus the Daily Operations
+  // group stays expanded by default (it mirrors the mobile bottom nav — the
+  // four screens a floor operator reaches most).
+  useEffect(() => {
+    if (!mobileOpen) return;
+    setMobileOpenGroups(
+      () => new Set([
+        ...mobileGroups.filter((g) => g.activeFn(location)).map((g) => g.key),
+        "dailyOperations",
+      ])
+    );
+    // Reset the search box each time the menu reopens too.
+    setMobileQuery("");
+  }, [mobileOpen]);
 
   useEffect(() => {
     try { localStorage.setItem(LS_SIDEBAR_COLLAPSED, String(collapsed)); } catch {}
@@ -655,10 +709,12 @@ function DesktopGroup({
 }
 
 // ── Mobile drawer menu ─────────────────────────────────────────
-// Searchable, auto-expanding menu for the phone drawer. Top-level items
-// (Overview) sit flat; the rest are accordion groups that open when active
-// or when the search query matches something inside them, so the drawer
-// stays compact instead of a giant wall of open sections.
+// Searchable, auto-expanding menu for the phone drawer. Overview items sit
+// flat; themed sections (Daily Work / Maintenance / Analysis / Invoicing /
+// Administration) each render one quiet divider plus the collapsible groups
+// under it — mirroring the desktop sidebar's two-level structure. Groups
+// open when active or when the search query matches something inside them,
+// so the drawer stays compact instead of a giant wall of open sections.
 function MobileNavMenu({
   location,
   query,
@@ -677,18 +733,21 @@ function MobileNavMenu({
   const q = query.trim().toLowerCase();
   const matches = (label: string) => !q || label.toLowerCase().includes(q);
 
-  // Only groups with at least one permitted item (matching the query) show.
-  const visibleGroups = mobileGroups
-    .map((g) => ({
-      ...g,
-      items: g.items.filter((i) => can(i.module) && matches(i.label)),
+  // Only groups with at least one permitted item (matching the query) show;
+  // drop empty sections entirely.
+  const visibleSections = mobileSections
+    .map((s) => ({
+      ...s,
+      groups: s.groups
+        .map((g) => ({ ...g, items: g.items.filter((i) => can(i.module) && matches(i.label)) }))
+        .filter((g) => g.items.length > 0),
     }))
-    .filter((g) => g.items.length > 0);
+    .filter((s) => s.groups.length > 0);
+
+  const visibleKeys = visibleSections.flatMap((s) => s.groups.map((g) => g.key));
 
   // When typing, force-open any group that matched so results are visible.
-  const effOpenGroups = q
-    ? new Set(visibleGroups.map((g) => g.key))
-    : openGroups;
+  const effOpenGroups = q ? new Set(visibleKeys) : openGroups;
 
   const toggleGroup = (key: string) =>
     setOpenGroups((prev) => {
@@ -718,59 +777,63 @@ function MobileNavMenu({
           </Link>
         ))}
 
-      {visibleGroups.map((group) => {
-        const groupActive = group.activeFn(location);
-        const open = effOpenGroups.has(group.key);
-        const Icon = group.icon;
-        return (
-          <div key={group.key} className="mt-1 flex flex-col">
-            <NavSection label={group.label} />
-            <button
-              onClick={() => toggleGroup(group.key)}
-              className={cn(
-                "flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-                groupActive
-                  ? "text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60"
-              )}
-              aria-expanded={open}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              <span className="whitespace-nowrap">{group.label}</span>
-              <ChevronDown
-                className={cn("ml-auto h-4 w-4 opacity-50 transition-transform", open && "rotate-180")}
-              />
-            </button>
-            {open && (
-              <div className="ml-[1.4375rem] flex flex-col border-l border-sidebar-border pl-1.5">
-                {group.items
-                  .filter((i) => matches(i.label))
-                  .map((item) => {
-                    const active = isItemActive(location, item.href);
-                    const ItemIcon = item.icon;
-                    return (
-                      <Link key={item.href} href={item.href} onClick={onNavigate}>
-                        <span
-                          className={cn(
-                            "flex min-h-11 items-center gap-3 rounded-md pl-2 pr-3 py-2.5 text-[0.8125rem] transition-colors",
-                            active
-                              ? "selvedge font-semibold text-sidebar-accent-foreground"
-                              : "text-sidebar-foreground/60 hover:text-sidebar-accent-foreground"
-                          )}
-                        >
-                          <ItemIcon
-                            className={cn("h-4 w-4 shrink-0", active ? "text-signal" : "opacity-60")}
-                          />
-                          {item.label}
-                        </span>
-                      </Link>
-                    );
-                  })}
+      {visibleSections.map((section) => (
+        <div key={section.key} className="mt-1 flex flex-col">
+          <NavSection label={section.label} />
+          {section.groups.map((group) => {
+            const groupActive = group.activeFn(location);
+            const open = effOpenGroups.has(group.key);
+            const Icon = group.icon;
+            return (
+              <div key={group.key} className="flex flex-col">
+                <button
+                  onClick={() => toggleGroup(group.key)}
+                  className={cn(
+                    "flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                    groupActive
+                      ? "text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60"
+                  )}
+                  aria-expanded={open}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="whitespace-nowrap">{group.label}</span>
+                  <ChevronDown
+                    className={cn("ml-auto h-4 w-4 opacity-50 transition-transform", open && "rotate-180")}
+                  />
+                </button>
+                {open && (
+                  <div className="ml-[1.4375rem] flex flex-col border-l border-sidebar-border pl-1.5">
+                    {group.items
+                      .filter((i) => matches(i.label))
+                      .map((item) => {
+                        const active = isItemActive(location, item.href);
+                        const ItemIcon = item.icon;
+                        return (
+                          <Link key={item.href} href={item.href} onClick={onNavigate}>
+                            <span
+                              className={cn(
+                                "flex min-h-11 items-center gap-3 rounded-md pl-2 pr-3 py-2.5 text-[0.8125rem] transition-colors",
+                                active
+                                  ? "selvedge font-semibold text-sidebar-accent-foreground"
+                                  : "text-sidebar-foreground/60 hover:text-sidebar-accent-foreground"
+                              )}
+                            >
+                              <ItemIcon
+                                className={cn("h-4 w-4 shrink-0", active ? "text-signal" : "opacity-60")}
+                              />
+                              {item.label}
+                            </span>
+                          </Link>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      ))}
 
       {/* Administration — phone-only entry to Users & Roles (admin role). */}
       {can("users") && (
