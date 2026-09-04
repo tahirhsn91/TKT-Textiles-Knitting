@@ -67,11 +67,6 @@ function formatDate(dateStr: string) {
   return `${day}/${mon}/${d.getFullYear()}`;
 }
 
-function getDayName(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][d.getDay()];
-}
-
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -118,15 +113,6 @@ interface EmployeeLookup {
   active: boolean;
 }
 
-interface SalaryRecord {
-  id: number;
-  employeeId: number;
-  date: string;
-  baseWage: string | null;
-  commission: string | null;
-  finalSalary: string | null;
-}
-
 interface Advance {
   id: number;
   employeeId: number;
@@ -144,7 +130,6 @@ interface PayrollSummaryItem {
   totalSalary: number;
   totalAdvances: number;
   netPayable: number;
-  records: SalaryRecord[];
   advances: Advance[];
 }
 
@@ -606,7 +591,9 @@ function PayrollSummaryTab() {
     autoTable(doc, {
       startY: 26,
       head: [["Employee", "Days Worked", "Total Salary", "Total Advances", "Net Payable"]],
-      body: summary.map((s) => [
+      // Export follows the on-screen order so the PDF matches what the user
+      // is looking at when they hit Download (the table is sortable).
+      body: sortedSummary.map((s) => [
         s.employeeName,
         s.totalDaysWorked,
         fmtMoney(s.totalSalary),
@@ -617,29 +604,39 @@ function PayrollSummaryTab() {
       headStyles: { fillColor: [37, 99, 235] },
     });
 
+    // Grand total row on the PDF (mirrors the on-screen footer).
+    const pdfGrand = sortedSummary.reduce((acc, s) => ({
+      days: acc.days + s.totalDaysWorked,
+      salary: acc.salary + s.totalSalary,
+      advances: acc.advances + s.totalAdvances,
+      net: acc.net + s.netPayable,
+    }), { days: 0, salary: 0, advances: 0, net: 0 });
+    const grandY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4;
+    autoTable(doc, {
+      startY: grandY,
+      head: [],
+      body: [[
+        "Total",
+        pdfGrand.days,
+        fmtMoney(pdfGrand.salary),
+        fmtMoney(pdfGrand.advances),
+        fmtMoney(pdfGrand.net),
+      ]],
+      styles: { fontSize: 9, fontStyle: "bold", fillColor: [243, 244, 246], textColor: [31, 41, 55] },
+      headStyles: { fillColor: [100, 116, 139] },
+    });
+
     let yOffset = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
 
-    for (const s of summary) {
+    // Per-employee detail: dated advance records for the month (when present)
+    // plus the net payable — a per-person recap below the summary table. The
+    // old per-day "Daily Breakdown" came from employee_salary_records, which
+    // the payroll flow no longer writes, so it has been dropped.
+    for (const s of sortedSummary) {
       if (yOffset > 250) { doc.addPage(); yOffset = 14; }
       doc.setFontSize(12);
-      doc.text(`${s.employeeName} (${s.employeeCode}) — Daily Breakdown`, 14, yOffset);
+      doc.text(`${s.employeeName} (${s.employeeCode})`, 14, yOffset);
       yOffset += 4;
-
-      autoTable(doc, {
-        startY: yOffset,
-        head: [["Date", "Day", "Base Wage", "Commission", "Final Amount"]],
-        body: s.records.map((r) => [
-          formatDate(r.date),
-          getDayName(r.date),
-          fmtMoney(toNum(r.baseWage)),
-          fmtMoney(toNum(r.commission)),
-          fmtMoney(toNum(r.finalSalary)),
-        ]),
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [100, 116, 139] },
-      });
-
-      yOffset = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4;
 
       if (s.advances.length > 0) {
         doc.setFontSize(10);
@@ -661,7 +658,7 @@ function PayrollSummaryTab() {
 
       doc.setFontSize(9);
       doc.text(`Net Payable: ${fmtMoney(s.netPayable)}`, 14, yOffset);
-      yOffset += 10;
+      yOffset += 8;
     }
 
     doc.save(`payroll-${year}-${String(month).padStart(2, "0")}.pdf`);
