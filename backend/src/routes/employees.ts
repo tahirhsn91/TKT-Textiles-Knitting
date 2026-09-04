@@ -1,10 +1,10 @@
 import { Router, type IRouter } from "express";
-import { eq, and, gte, lte, lt, sql } from "drizzle-orm";
+import { eq, and, gte, lte, lt } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { activeTenantId } from "../middleware/tenant-context.js";
 import {
   employeeMasterTable,
-  employeeSalaryRecordsTable,
+  salaryDetailTable,
   employeeAdvancesTable,
 } from "../db/index.js";
 
@@ -115,76 +115,65 @@ router.get("/employees/payroll-summary", async (req, res): Promise<void> => {
   const lastDay = new Date(y, m, 0).getDate();
   const dateTo = `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-  const opConditions = [eq(employeeMasterTable.tenantId, tenantId)];
-  const advConditions = [gte(employeeAdvancesTable.date, dateFrom), lte(employeeAdvancesTable.date, dateTo), eq(employeeAdvancesTable.tenantId, tenantId)];
-  const recConditions = [gte(employeeSalaryRecordsTable.date, dateFrom), lte(employeeSalaryRecordsTable.date, dateTo), eq(employeeSalaryRecordsTable.tenantId, tenantId)];
+  // Source of truth is the posted/monthly payroll entries: each employee with a
+  // salary_detail row for this month/year. Days worked, gross salary and the
+  // advance deduction all come straight from that entry, while the authoritative
+  // net is the stored payable_salary (it already nets OT, attendance/holiday
+  // bonus and loan/other deductions too — recomputing it as salary − advances
+  // here would be wrong). The old implementation read the now-unused
+  // employee_salary_records daily table, which is never written to by the
+  // current payroll flow (Salary Entry → salary_detail), so it always returned
+  // zero salaries. advances remain the dated advance rows for the month so the
+  // UI/PDF can still break them out.
+  const detailConditions = [
+    eq(salaryDetailTable.month, m),
+    eq(salaryDetailTable.year, y),
+    eq(salaryDetailTable.tenantId, tenantId),
+  ];
+  const advConditions = [
+    gte(employeeAdvancesTable.date, dateFrom),
+    lte(employeeAdvancesTable.date, dateTo),
+    eq(employeeAdvancesTable.tenantId, tenantId),
+  ];
 
   if (employeeId) {
-    opConditions.push(eq(employeeMasterTable.id, Number(employeeId)));
+    detailConditions.push(eq(salaryDetailTable.employeeId, Number(employeeId)));
     advConditions.push(eq(employeeAdvancesTable.employeeId, Number(employeeId)));
-    recConditions.push(eq(employeeSalaryRecordsTable.employeeId, Number(employeeId)));
   }
 
-  const employees = await db
-    .select({ id: employeeMasterTable.id, name: employeeMasterTable.name, code: employeeMasterTable.code })
-    .from(employeeMasterTable)
-    .where(opConditions.length > 0 ? and(...opConditions) : undefined)
+  const details = await db
+    .select({
+      employeeId: salaryDetailTable.employeeId,
+      employeeName: employeeMasterTable.name,
+      employeeCode: employeeMasterTable.code,
+      presentDays: salaryDetailTable.presentDays,
+      totalSalary: salaryDetailTable.totalSalary,
+      advanceDeduction: salaryDetailTable.advanceDeduction,
+      payableSalary: salaryDetailTable.payableSalary,
+    })
+    .from(salaryDetailTable)
+    .innerJoin(employeeMasterTable, and(eq(salaryDetailTable.employeeId, employeeMasterTable.id), eq(employeeMasterTable.tenantId, tenantId)))
+    .where(and(...detailConditions))
     .orderBy(employeeMasterTable.name);
-
-  const records = await db
-    .select()
-    .from(employeeSalaryRecordsTable)
-    .where(and(...recConditions));
 
   const advances = await db
     .select()
     .from(employeeAdvancesTable)
     .where(and(...advConditions));
 
-  // Totals are aggregated in SQL with COALESCE so a NULL column value
-  // contributes 0 explicitly in the DB layer — never silently coerced by a JS
-  // helper (issue #23). Detail rows are still returned raw for the PDF's
-  // daily breakdown; the frontend formats them for display.
-  const salaryTotals = await db
-    .select({
-      employeeId: employeeSalaryRecordsTable.employeeId,
-      totalDaysWorked: sql<number>`count(*)::int`,
-      totalSalary: sql<string>`coalesce(sum(${employeeSalaryRecordsTable.finalSalary}), 0)`,
-    })
-    .from(employeeSalaryRecordsTable)
-    .where(and(...recConditions))
-    .groupBy(employeeSalaryRecordsTable.employeeId);
-
-  const advanceTotals = await db
-    .select({
-      employeeId: employeeAdvancesTable.employeeId,
-      totalAdvances: sql<string>`coalesce(sum(${employeeAdvancesTable.amount}), 0)`,
-    })
-    .from(employeeAdvancesTable)
-    .where(and(...advConditions))
-    .groupBy(employeeAdvancesTable.employeeId);
-
-  const salaryByEmployee = new Map(salaryTotals.map((t) => [t.employeeId, t]));
-  const advanceByEmployee = new Map(advanceTotals.map((t) => [t.employeeId, t]));
-
-  const summary = employees.map((op) => {
-    const opRecords = records.filter((r) => r.employeeId === op.id);
-    const opAdvances = advances.filter((a) => a.employeeId === op.id);
-    const salaryTotal = salaryByEmployee.get(op.id);
-    const advanceTotal = advanceByEmployee.get(op.id);
-    const totalSalary = Number(salaryTotal?.totalSalary ?? 0);
-    const totalAdvances = Number(advanceTotal?.totalAdvances ?? 0);
-    const totalDaysWorked = salaryTotal?.totalDaysWorked ?? 0;
-    const netPayable = totalSalary - totalAdvances;
+  const summary = details.map((d) => {
+    const opAdvances = advances.filter((a) => a.employeeId === d.employeeId);
+    const totalSalary = Number(d.totalSalary);
+    const totalAdvances = Number(d.advanceDeduction);
+    const netPayable = Number(d.payableSalary);
     return {
-      employeeId: op.id,
-      employeeName: op.name,
-      employeeCode: op.code,
-      totalDaysWorked,
+      employeeId: d.employeeId,
+      employeeName: d.employeeName,
+      employeeCode: d.employeeCode,
+      totalDaysWorked: Number(d.presentDays),
       totalSalary,
       totalAdvances,
       netPayable,
-      records: opRecords,
       advances: opAdvances,
     };
   });
