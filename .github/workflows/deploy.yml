@@ -11,7 +11,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Gate. Calls the same workflow that runs on PRs, so production can no longer be
+  # deployed from a commit that fails to install or compile — and there is only one
+  # definition of "CI" to keep current.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   deploy:
+    needs: ci
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 40
