@@ -82,7 +82,7 @@ production traffic and vice versa.
 │   └── Dockerfile
 ├── database/
 │   ├── migrations/    # Drizzle SQL migration files
-│   └── backup.sql     # Full database dump
+│   └── schema.sql     # Schema-only seed for fresh volumes
 └── docker-compose.yml
 ```
 

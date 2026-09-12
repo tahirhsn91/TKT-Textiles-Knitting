@@ -16,12 +16,27 @@ cd backend
 npm run db:generate
 ```
 
-## backup.sql
-Full `pg_dump` of the database at the time of export (includes schema + all data).
+## schema.sql — the initdb seed
 
-To restore to a fresh PostgreSQL instance:
+Schema-only `pg_dump` (structure, no rows, no data) that initializes a **fresh** Postgres volume
+through `docker-entrypoint-initdb.d`. It exists so a brand-new environment has the right tables
+before migrations run.
+
+It replaced `backup.sql`, which was a full dump **including data** — so a recreated volume used to
+come up holding a stale snapshot of real production rows rather than an empty database.
+
+Refresh it after a schema change:
+
 ```bash
-psql postgresql://postgres:password@localhost/heliumdb < database/backup.sql
+docker exec <compose-project>-postgres-1 \
+  pg_dump -U <user> -d <db> --schema-only --no-owner --no-acl > database/schema.sql
 ```
 
-When using `docker compose up`, the backup is automatically loaded into the postgres container on first startup via the `docker-entrypoint-initdb.d` mount.
+Restore a schema to a fresh PostgreSQL instance:
+
+```bash
+psql postgresql://postgres:***@localhost/heliumdb < database/schema.sql
+```
+
+Data backups are a separate concern: `scripts/backup-db.sh` writes a full `pg_dump` to
+`database/backup.sql` on a `backup/<date>` branch. Nothing in this repo reads that file.
