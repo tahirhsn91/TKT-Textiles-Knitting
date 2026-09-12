@@ -141,6 +141,25 @@ This is a starting point. Add your own conventions, style, and rules as you figu
 - Branch naming: `fix/...`, `feat/...`, `docs/...`, `chore/...` (issue id included when relevant, e.g. `fix/issue-8-rate-limiting`).
 - Merge to `main` only via PR from `develop` (release flow, out of scope for this environment).
 
+### Local enforcement of those rules (git hooks)
+
+The rules above are also enforced mechanically by tracked hooks, which git does not activate
+automatically on clone — enable them once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+- `.githooks/pre-commit` refuses to create a commit while on `main` or `develop`.
+- `.githooks/pre-push` refuses any push whose *destination ref* is `main` or `develop`, so
+  `git push origin HEAD:develop` is caught too — not just the checked-out branch.
+
+Emergency escape hatch: `ALLOW_PROTECTED=1 git commit` / `ALLOW_PROTECTED=1 git push <remote> <branch>`.
+It bypasses the local hook only; there are no server-side branch rules on this repo.
+
+`rebase-develop.yml` force-pushes `develop` from GitHub's runners, so it is unaffected by these
+local hooks — do not "fix" that workflow to satisfy a hook.
+
 ## Post-Merge Issue Cleanup (set 2026-08-12)
 
 - Whenever a task is completed and merged into `develop`, check whether it has an associated GitHub issue and/or whether the merge generated any new issue/task.
