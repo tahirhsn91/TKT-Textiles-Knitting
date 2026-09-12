@@ -26,3 +26,19 @@ db-backups/
 graphify-out/
 .clawhub/
 uploads/
+
+# Agent workspace files — these belong to the workspace root (~/project/tkt-textiles-prod),
+# not to this repo. They were tracked once, which put the agent's session notes, its skill
+# library and a staged database dump into a public repository. AGENTS.md is the only agent
+# file that belongs in git: it is the rules file other agents read.
+SOUL.md
+IDENTITY.md
+USER.md
+TOOLS.md
+HEARTBEAT.md
+DREAMS.md
+MEMORY.md
+memory/
+skills/
+openclaw-workspace-state.json
+design/identity-preview.html
