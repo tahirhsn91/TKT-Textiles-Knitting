@@ -20,6 +20,9 @@ demo_video/
 # Database backups
 database/_restore_*/
 db-backups/
+# Ad-hoc dumps kept in the working tree (dev-preRestore-*.sql, prod-dump-*.sql). Real dumps
+# were found sitting here untracked, one `git add -A` away from a public repo.
+database/backups/
 
 # Graphify knowledge-graph output + ClawHub skill sync metadata — local only
 .graphify/
