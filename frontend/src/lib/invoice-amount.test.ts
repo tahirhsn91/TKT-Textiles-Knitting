@@ -26,8 +26,8 @@ test("amountInWords: fractional paisa is dropped after rounding, no paisa phrase
 });
 
 test("amountInWords: large amount with lakh and crore grouping", () => {
-  // 1,23,45,678 → One Crore Twenty Three Lakh Forty Five Thousand Six Hundred Seventy Eight
-  assert.equal(amountInWords(12345678), "One Crore Twenty-Three Lakh Forty-Five Thousand Six Hundred Seventy-Eight Only");
+  // 1,23,45,678 → One Crore Twenty Three Lac Forty Five Thousand Six Hundred Seventy Eight
+  assert.equal(amountInWords(12345678), "One Crore Twenty-Three Lac Forty-Five Thousand Six Hundred Seventy-Eight Only");
 });
 
 test("amountInWords: rounds large fractional amount up", () => {
