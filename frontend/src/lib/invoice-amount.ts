@@ -7,7 +7,7 @@
  * imports this module for the same formatting.
  */
 
-// Groups: crore (10^7), lakh (10^5), thousand, hundred. Returns a title-cased
+// Groups: crore (10^7), lac (10^5), thousand, hundred. Returns a title-cased
 // string ending in "Only", matching the reference invoice's amount-in-words
 // style. The amount is rounded to whole rupees before conversion (no paisa).
 const ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
@@ -41,7 +41,7 @@ function rupeesToWordsAmount(amount: string | number): string {
   const thousand = Math.floor(w / 1000); w %= 1000;
   const parts: string[] = [];
   if (crore) parts.push(`${threeDigits(crore)} Crore`);
-  if (lakh) parts.push(`${threeDigits(lakh)} Lakh`);
+  if (lakh) parts.push(`${threeDigits(lakh)} Lac`);
   if (thousand) parts.push(`${threeDigits(thousand)} Thousand`);
   if (w) parts.push(threeDigits(w));
   const ru = parts.length ? parts.join(" ") : "Zero";
