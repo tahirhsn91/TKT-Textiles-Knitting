@@ -162,6 +162,10 @@ This is a starting point. Add your own conventions, style, and rules as you figu
 
 ## Skill Routing — Use the Matching Domain Skill (set 2026-08-26)
 
+**Where skills live:** in the agent workspace at `~/project/tkt-textiles-prod/skills/` — *not* in
+this repo. Every `skills/...` path below is relative to that workspace root. This repo tracks no
+agent state at all (no skills, no memory notes, no identity files) — see "Repo hygiene" below.
+
 Load the most specific applicable skill before editing any file in that area. When a task spans multiple domains, load and follow each applicable skill. These domain skills supplement — not replace — the graphify preflight: use graphify first to understand the codebase, then apply the matching domain skill for the work.
 
 Core domain routing:
@@ -192,6 +196,21 @@ Non-code skills: `skills/nox-grill-me/SKILL.md` is for stress-testing a plan/des
 - Before running a destructive or irreversible command (migrations, `rm -rf`, `git reset --hard`, dependency major-version bumps), summarize the intended change and wait for explicit confirmation.
 - Prefer `git diff` / `git status` output back to the requester before committing.
 - Commit messages should be descriptive; do not commit generated artifacts or secrets.
+
+## Repo Hygiene — what does NOT belong in this repo (set 2026-09-12)
+
+This is an application repository. Agent working state does not live here.
+
+- **Tracked:** `AGENTS.md` (the rules other agents read) plus everything the app needs to build
+  and run.
+- **Not tracked** — gitignored, and living in the workspace root `~/project/tkt-textiles-prod/`:
+  `skills/`, `memory/`, `SOUL.md`, `IDENTITY.md`, `USER.md`, `TOOLS.md`, `HEARTBEAT.md`,
+  `DREAMS.md`, `MEMORY.md`, `openclaw-workspace-state.json`, `design/identity-preview.html`.
+
+Why this is written down: these files used to be tracked, and this repository is **public** — so
+the agent's session notes and its whole skill library were published, alongside a staged database
+dump parked under `media/inbound/`. Before adding any file that is not source code, check
+`.gitignore`; and remember that anything pushed is already public, even if deleted later.
 
 ## Docker & Long-Running Commands
 
