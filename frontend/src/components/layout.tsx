@@ -45,6 +45,7 @@ const transactionItems = [
 ];
 
 const payrollItems = [
+  { href: "/transactions/loans",               label: "Loans",               module: "payroll" },
   { href: "/transactions/advances",             label: "Advances",             module: "payroll" },
   { href: "/transactions/monthly-salary-entry", label: "Payroll Maintenance",  module: "payroll" },
 ];
@@ -85,7 +86,7 @@ const mobileSections = [
         key: "transactions",
         label: "Transactions",
         icon: FileText,
-        activeFn: (loc: string) => loc.startsWith("/transactions") && !loc.startsWith("/transactions/advances") && !loc.startsWith("/transactions/monthly-salary-entry"),
+        activeFn: (loc: string) => loc.startsWith("/transactions") && !loc.startsWith("/transactions/loans") && !loc.startsWith("/transactions/advances") && !loc.startsWith("/transactions/monthly-salary-entry"),
         items: [
           { href: "/transactions", label: "Yarn-Fabric Transactions", icon: FileText, module: "transactions" },
         ],
@@ -94,8 +95,9 @@ const mobileSections = [
         key: "payroll",
         label: "Payroll",
         icon: Wallet,
-        activeFn: (loc: string) => loc.startsWith("/transactions/advances") || loc.startsWith("/transactions/monthly-salary-entry"),
+        activeFn: (loc: string) => loc.startsWith("/transactions/loans") || loc.startsWith("/transactions/advances") || loc.startsWith("/transactions/monthly-salary-entry"),
         items: [
+          { href: "/transactions/loans",               label: "Loans",              icon: Wallet,   module: "payroll" },
           { href: "/transactions/advances",             label: "Advances",            icon: Wallet,   module: "payroll" },
           { href: "/transactions/monthly-salary-entry", label: "Payroll Maintenance", icon: Settings, module: "payroll" },
         ],
@@ -223,7 +225,7 @@ export function Layout({ children }: { children: ReactNode }) {
     try { localStorage.setItem(LS_SIDEBAR_COLLAPSED, String(collapsed)); } catch {}
   }, [collapsed]);
 
-  const payrollActive = location.startsWith("/transactions/monthly-salary-entry") || location.startsWith("/transactions/advances");
+  const payrollActive = location.startsWith("/transactions/monthly-salary-entry") || location.startsWith("/transactions/advances") || location.startsWith("/transactions/loans");
   const transactionsActive = location.startsWith("/transactions") && !payrollActive;
   const reportsActive = location.startsWith("/reports");
   const dailyProductionActive = location.startsWith("/daily-production");
