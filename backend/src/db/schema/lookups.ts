@@ -253,3 +253,46 @@ export const salaryDetailTable = pgTable("salary_detail", {
   index("salary_detail_header_idx").on(t.headerId),
 ]);
 export type SalaryDetail = typeof salaryDetailTable.$inferSelect;
+
+// ─── Employee Loans ───────────────────────────────────────────────────────
+// A loan is a single running balance per employee: Σ(loans given) −
+// Σ(posted payroll deductions). Rows in this table are the "money given"
+// side; the payroll side lives in employee_loan_deductions and is only
+// written when a salary entry is posted (and removed when it is un-posted).
+export const employeeLoansTable = pgTable("employee_loans", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull().references(() => employeeMasterTable.id),
+  date: date("date").notNull(),
+  amount: numeric("amount").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  // Serves the flat history list and the running-balance lookup, both of
+  // which filter by employee and order by date.
+  index("employee_loans_employee_date_idx").on(t.employeeId, t.date),
+]);
+export const insertEmployeeLoansSchema = createInsertSchema(employeeLoansTable).omit({ id: true, createdAt: true });
+export type InsertEmployeeLoan = z.infer<typeof insertEmployeeLoansSchema>;
+export type EmployeeLoan = typeof employeeLoansTable.$inferSelect;
+
+// ─── Employee Loan Deductions (posted payroll → loan recovery) ────────────
+export const employeeLoanDeductionsTable = pgTable("employee_loan_deductions", {
+    tenantId: integer("tenant_id").notNull().default(1).references(() => tenantTable.id, { onDelete: "cascade" }),
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull().references(() => employeeMasterTable.id),
+  headerId: integer("header_id").notNull().references(() => salaryHeaderTable.id, { onDelete: "cascade" }),
+  month: integer("month").notNull(),
+  year: integer("year").notNull(),
+  date: date("date").notNull(),
+  amount: numeric("amount").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  // One deduction per employee per payroll run — lets post be idempotent
+  // (replace-on-post) and gives the ledger a stable payroll reference.
+  unique("employee_loan_deductions_header_employee_unique").on(t.headerId, t.employeeId),
+  index("employee_loan_deductions_employee_idx").on(t.employeeId),
+]);
+export const insertEmployeeLoanDeductionsSchema = createInsertSchema(employeeLoanDeductionsTable).omit({ id: true, createdAt: true });
+export type InsertEmployeeLoanDeduction = z.infer<typeof insertEmployeeLoanDeductionsSchema>;
+export type EmployeeLoanDeduction = typeof employeeLoanDeductionsTable.$inferSelect;
