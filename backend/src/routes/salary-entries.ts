@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and, inArray, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { isUniqueViolation } from "../lib/db-errors.js";
+import { loanBalances } from "../lib/loan-balance.js";
 import { activeTenantId } from "../middleware/tenant-context.js";
 import {
   salaryHeaderTable,
@@ -13,6 +14,7 @@ import {
   transactionTypeMasterTable,
   machineMasterTable,
   attendanceTable,
+  employeeLoanDeductionsTable,
 } from "../db/index.js";
 
 const router: IRouter = Router();
@@ -26,6 +28,16 @@ function idParam(req: { params: Record<string, string> }) {
 function toNum(val: unknown): number {
   const n = parseFloat(String(val ?? ""));
   return isNaN(n) ? 0 : n;
+}
+
+function fmtMoney(n: number): string {
+  return n.toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Last calendar day of a payroll period, used as the loan-deduction date. */
+function lastDayOfMonth(year: number, month: number): string {
+  const last = new Date(year, month, 0).getDate();
+  return `${year}-${String(month).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
 }
 
 // ─── List headers ─────────────────────────────────────────────────────────────
@@ -515,11 +527,67 @@ router.post("/salary-entries/:id/post", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  const [row] = await db
-    .update(salaryHeaderTable)
-    .set({ posted: true, updatedAt: new Date() })
-    .where(and(eq(salaryHeaderTable.id, id), eq(salaryHeaderTable.tenantId, tenantId)))
-    .returning();
+  const [header] = await db
+    .select()
+    .from(salaryHeaderTable)
+    .where(and(eq(salaryHeaderTable.id, id), eq(salaryHeaderTable.tenantId, tenantId)));
+  if (!header) { res.status(404).json({ error: "Not found" }); return; }
+  if (header.posted) { res.json(header); return; }
+
+  const details = await db
+    .select()
+    .from(salaryDetailTable)
+    .where(and(eq(salaryDetailTable.headerId, id), eq(salaryDetailTable.tenantId, tenantId)));
+
+  // Loan guard: a payroll loan deduction may never exceed the employee's
+  // remaining loan balance, or the running balance would go negative.
+  // Validate the whole run before writing anything — the header's own rows
+  // are excluded, since they are not committed yet (Q3: allow in draft,
+  // block on Post).
+  const balances = await loanBalances(tenantId, details.map((d) => d.employeeId), id);
+  const overDrawn = details
+    .map((d) => ({
+      name: d.employeeName,
+      attempted: toNum(d.loanDeduction),
+      remaining: balances.get(d.employeeId)?.remaining ?? 0,
+    }))
+    .filter((o) => o.attempted > o.remaining + 0.005);
+  if (overDrawn.length > 0) {
+    const detailMsg = overDrawn
+      .map((o) => `${o.name} — remaining ${fmtMoney(o.remaining)}, attempted ${fmtMoney(o.attempted)}`)
+      .join("; ");
+    res.status(409).json({ error: `Loan deduction exceeds the remaining loan balance: ${detailMsg}` });
+    return;
+  }
+
+  // Post + commit the loan recovery atomically. Replace-on-post makes a
+  // re-post (or a post after un-post) idempotent.
+  const [row] = await db.transaction(async (tx) => {
+    const updated = await tx
+      .update(salaryHeaderTable)
+      .set({ posted: true, updatedAt: new Date() })
+      .where(and(eq(salaryHeaderTable.id, id), eq(salaryHeaderTable.tenantId, tenantId)))
+      .returning();
+
+    await tx
+      .delete(employeeLoanDeductionsTable)
+      .where(and(eq(employeeLoanDeductionsTable.headerId, id), eq(employeeLoanDeductionsTable.tenantId, tenantId)));
+
+    const rows = details
+      .filter((d) => toNum(d.loanDeduction) > 0)
+      .map((d) => ({
+        tenantId,
+        employeeId: d.employeeId,
+        headerId: id,
+        month: header.month,
+        year: header.year,
+        date: lastDayOfMonth(header.year, header.month),
+        amount: String(toNum(d.loanDeduction)),
+      }));
+    if (rows.length > 0) await tx.insert(employeeLoanDeductionsTable).values(rows);
+
+    return updated;
+  });
 
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   res.json(row);
@@ -532,11 +600,19 @@ router.post("/salary-entries/:id/unpost", async (req, res): Promise<void> => {
   const id = idParam(req);
   if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  const [row] = await db
-    .update(salaryHeaderTable)
-    .set({ posted: false, updatedAt: new Date() })
-    .where(and(eq(salaryHeaderTable.id, id), eq(salaryHeaderTable.tenantId, tenantId)))
-    .returning();
+  // Un-posting reverses any loan recovery the post committed, inside the
+  // same transaction as the status flip.
+  const [row] = await db.transaction(async (tx) => {
+    await tx
+      .delete(employeeLoanDeductionsTable)
+      .where(and(eq(employeeLoanDeductionsTable.headerId, id), eq(employeeLoanDeductionsTable.tenantId, tenantId)));
+
+    return tx
+      .update(salaryHeaderTable)
+      .set({ posted: false, updatedAt: new Date() })
+      .where(and(eq(salaryHeaderTable.id, id), eq(salaryHeaderTable.tenantId, tenantId)))
+      .returning();
+  });
 
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
   res.json(row);

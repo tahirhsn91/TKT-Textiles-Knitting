@@ -27,6 +27,7 @@ const YarnReceiptList = lazyRetry(() => import("@/pages/yarn-receipts"));
 const DailyDeliveryList = lazyRetry(() => import("@/pages/daily-deliveries"));
 const MonthlySalaryEntryPage = lazyRetry(() => import("@/pages/transactions/monthly-salary-entry"));
 const AdvancesPage = lazyRetry(() => import("@/pages/transactions/advances"));
+const LoansPage = lazyRetry(() => import("@/pages/transactions/loans"));
 const PayrollEntryPage = lazyRetry(() => import("@/pages/transactions/payroll-entry"));
 const MastersPage = lazyRetry(() => import("@/pages/masters"));
 const YarnBalancePage = lazyRetry(() => import("@/pages/reports/index"));
@@ -107,6 +108,9 @@ function Router() {
           </Route>
           <Route path="/transactions/monthly-salary-entry">
             <ProtectedRoute moduleId="payroll"><TenantRequired><MonthlySalaryEntryPage /></TenantRequired></ProtectedRoute>
+          </Route>
+          <Route path="/transactions/loans">
+            <ProtectedRoute moduleId="payroll"><TenantRequired><LoansPage /></TenantRequired></ProtectedRoute>
           </Route>
           <Route path="/transactions/advances">
             <ProtectedRoute moduleId="payroll"><TenantRequired><AdvancesPage /></TenantRequired></ProtectedRoute>
