@@ -80,7 +80,7 @@ import {
 } from "@/hooks/use-fbr-invoicing";
 import { useListYarnTypeMaster, useListYarnCountMaster } from "@workspace/api-client-react";
 import { amountInWords } from "@/lib/invoice-amount";
-import { derivePayment, maxNetForBalance, DEFAULT_WHT_RATE } from "@/lib/payment-wht";
+import { derivePayment, deriveRateFromTax, maxNetForBalance, DEFAULT_WHT_RATE } from "@/lib/payment-wht";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer,
@@ -151,6 +151,7 @@ export default function InvoicingPage() {
   const [payFor, setPayFor] = useState<InvoiceListItem | null>(null);
   const [payNet, setPayNet] = useState("");
   const [payRate, setPayRate] = useState("1");
+  const [payTax, setPayTax] = useState("0");
   const [payDate, setPayDate] = useState("");
   const [payMethod, setPayMethod] = useState("Bank Transfer");
   const [payRef, setPayRef] = useState("");
@@ -368,6 +369,41 @@ export default function InvoicingPage() {
     const rate = DEFAULT_WHT_RATE;
     const max = maxNetForBalance(Math.max(outstanding, 0), rate);
     setPayNet(max > 0 ? String(max) : "");
+    // Seed the tax box from the same net + rate so the trio starts in sync.
+    setPayTax(max > 0 ? String(derivePayment(max, rate).tax) : "0");
+  };
+
+  // Keep the net / rate / tax trio consistent when any one is edited:
+  //   net  → tax recomputed from the current rate
+  //   rate → tax recomputed from net (canonical direction)
+  //   tax  → rate derived from net + tax (the new inverse direction)
+  // Gross is always net + tax and stays read-only.
+  const handlePayNetChange = (value: string) => {
+    setPayNet(value);
+    const net = parseFloat(value);
+    const ratePct = parseFloat(payRate);
+    if (Number.isFinite(net) && net > 0 && Number.isFinite(ratePct) && ratePct >= 0 && ratePct < 100) {
+      setPayTax(String(derivePayment(net, ratePct / 100).tax));
+    }
+  };
+
+  const handlePayRateChange = (value: string) => {
+    setPayRate(value);
+    const net = parseFloat(payNet);
+    const ratePct = parseFloat(value);
+    if (Number.isFinite(net) && net > 0 && Number.isFinite(ratePct) && ratePct >= 0 && ratePct < 100) {
+      setPayTax(String(derivePayment(net, ratePct / 100).tax));
+    }
+  };
+
+  const handlePayTaxChange = (value: string) => {
+    setPayTax(value);
+    const net = parseFloat(payNet);
+    const tax = parseFloat(value);
+    if (Number.isFinite(net) && net > 0 && Number.isFinite(tax) && tax >= 0) {
+      // Show the equivalent percentage without a wall of decimals.
+      setPayRate(String(Number((deriveRateFromTax(net, tax) * 100).toFixed(4))));
+    }
   };
 
   const submitPayment = () => {
@@ -375,7 +411,7 @@ export default function InvoicingPage() {
 
     const net = parseFloat(payNet);
     const ratePct = parseFloat(payRate);
-    const rate = Number.isFinite(ratePct) ? ratePct / 100 : DEFAULT_WHT_RATE;
+    const tax = parseFloat(payTax);
 
     if (!Number.isFinite(net) || net <= 0) {
       toast({ title: "Enter a valid net amount", variant: "destructive" });
@@ -386,16 +422,18 @@ export default function InvoicingPage() {
       toast({ title: "WHT rate must be between 0% and 100%", variant: "destructive" });
       return;
     }
-
-    // Outstanding reduces by GROSS; cap net so the payment never overpays.
-    const outstanding = payFor.outstanding ?? parseFloat(payFor.grandTotal);
-    const maxNet = maxNetForBalance(Math.max(outstanding, 0), rate);
-    if (net > maxNet + 0.005) {
-      toast({ title: "Payment would exceed the outstanding balance", variant: "destructive" });
+    if (!Number.isFinite(tax) || tax < 0) {
+      toast({ title: "Enter a valid tax deduction", variant: "destructive" });
       return;
     }
 
-    const { tax, gross } = derivePayment(net, rate);
+    // Outstanding reduces by GROSS = net + tax; never overpay.
+    const gross = round2(net + tax);
+    const outstanding = payFor.outstanding ?? parseFloat(payFor.grandTotal);
+    if (gross > Math.max(outstanding, 0) + 0.005) {
+      toast({ title: "Payment would exceed the outstanding balance", variant: "destructive" });
+      return;
+    }
     addPayment.mutate(
       {
         id: payFor.id,
@@ -486,12 +524,16 @@ export default function InvoicingPage() {
   const payRateFrac = Number.isFinite(payRatePct) ? payRatePct / 100 : DEFAULT_WHT_RATE;
   const payOutstanding = payFor ? (payFor.outstanding ?? parseFloat(payFor.grandTotal)) : 0;
   const payMaxNet = maxNetForBalance(Math.max(payOutstanding, 0), payRateFrac);
-  const payDerived = Number.isFinite(payNetNum) && payNetNum > 0
-    ? derivePayment(payNetNum, payRateFrac)
-    : { tax: 0, gross: 0 };
-  const payNetValid = Number.isFinite(payNetNum) && payNetNum > 0 && payNetNum <= payMaxNet + 0.005;
+  const payTaxNum = parseFloat(payTax);
+  const payTaxValid = Number.isFinite(payTaxNum) && payTaxNum >= 0;
+  // Gross is always net + tax. The tax amount is what actually gets stored, so
+  // it is the authoritative figure for the overpayment cap.
+  const payGross = Number.isFinite(payNetNum) && payNetNum > 0 && payTaxValid
+    ? round2(payNetNum + payTaxNum)
+    : 0;
+  const payNetValid = Number.isFinite(payNetNum) && payNetNum > 0 && payGross <= Math.max(payOutstanding, 0) + 0.005;
   const payRateValid = Number.isFinite(payRatePct) && payRatePct >= 0 && payRatePct < 100;
-  const paySubmitDisabled = !payNetValid || !payRateValid || addPayment.isPending;
+  const paySubmitDisabled = !payNetValid || !payRateValid || !payTaxValid || addPayment.isPending;
 
   return (
     <>
@@ -862,7 +904,7 @@ export default function InvoicingPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Record Payment — Invoice #{payFor?.id}</DialogTitle>
-            <DialogDescription>Record a net payment received against this invoice. The WHT rate (default 1%) applies to the gross; net = gross − tax.</DialogDescription>
+            <DialogDescription>Record a net payment received against this invoice. The WHT rate (default 1%) applies to the gross; net = gross − tax. Edit the rate or the tax deduction — the other one updates automatically.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
@@ -877,16 +919,16 @@ export default function InvoicingPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pay-net">Net Amount</Label>
-              <Input id="pay-net" type="number" min="0" step="0.01" value={payNet} onChange={(e) => setPayNet(e.target.value)} placeholder="0.00" aria-describedby="pay-max-hint" />
+              <Input id="pay-net" type="number" min="0" step="0.01" value={payNet} onChange={(e) => handlePayNetChange(e.target.value)} placeholder="0.00" aria-describedby="pay-max-hint" />
               <p id="pay-max-hint" className="text-xs text-muted-foreground">
                 Max net for the remaining balance: {money(payMaxNet)}
-                {payNetNum > payMaxNet + 0.005 ? " — exceeds outstanding." : ""}
+                {payGross > payOutstanding + 0.005 ? " — exceeds outstanding." : ""}
               </p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="pay-rate">WHT Rate (%)</Label>
               <div className="flex items-center gap-2">
-                <Input id="pay-rate" type="number" min="0" step="0.01" max="100" value={payRate} onChange={(e) => setPayRate(e.target.value)} placeholder="1" className="w-32" />
+                <Input id="pay-rate" type="number" min="0" step="0.01" max="100" value={payRate} onChange={(e) => handlePayRateChange(e.target.value)} placeholder="1" className="w-32" />
                 <span className="text-xs text-muted-foreground">default 1%</span>
               </div>
               {!payRateValid && <p className="text-xs text-destructive">Rate must be between 0% and 100%.</p>}
@@ -894,11 +936,21 @@ export default function InvoicingPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Gross Amount</Label>
-                <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm font-semibold tabular-nums">{money(payDerived.gross)}</div>
+                <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm font-semibold tabular-nums">{money(payGross)}</div>
               </div>
               <div className="space-y-1.5">
-                <Label>Tax Deduction (WHT)</Label>
-                <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm font-semibold tabular-nums">{money(payDerived.tax)}</div>
+                <Label htmlFor="pay-tax">Tax Deduction (WHT)</Label>
+                <Input
+                  id="pay-tax"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={payTax}
+                  onChange={(e) => handlePayTaxChange(e.target.value)}
+                  placeholder="0.00"
+                />
+                {!payTaxValid && <p className="text-xs text-destructive">Enter a valid tax amount.</p>}
               </div>
             </div>
             <div className="space-y-1.5">
@@ -926,7 +978,7 @@ export default function InvoicingPage() {
             </div>
             {Number.isFinite(payNetNum) && payNetNum > 0 && (
               <p className="text-xs text-muted-foreground">
-                Gross applied to balance: <span className="font-semibold">{money(payDerived.gross)}</span> · Tax: <span className="font-semibold">{money(payDerived.tax)}</span>
+                Gross applied to balance: <span className="font-semibold">{money(payGross)}</span> · Tax: <span className="font-semibold">{money(payTaxNum)}</span>
               </p>
             )}
           </div>
