@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   derivePayment,
+  deriveRateFromTax,
   maxNetForBalance,
   DEFAULT_WHT_RATE,
   round2,
@@ -9,6 +10,28 @@ import {
 
 test("DEFAULT_WHT_RATE is 1%", () => {
   assert.equal(DEFAULT_WHT_RATE, 0.01);
+});
+
+test("deriveRateFromTax: 990 net + 10 tax → 1%", () => {
+  assert.equal(deriveRateFromTax(990, 10), 0.01);
+});
+
+test("deriveRateFromTax: no tax → 0%", () => {
+  assert.equal(deriveRateFromTax(990, 0), 0);
+});
+
+test("deriveRateFromTax: round-trips derivePayment at the default rate", () => {
+  const d = derivePayment(990, DEFAULT_WHT_RATE);
+  assert.equal(round2(deriveRateFromTax(990, d.tax) * 100), 1);
+});
+
+test("deriveRateFromTax: invalid or zero inputs return 0, never NaN/Infinity", () => {
+  assert.equal(deriveRateFromTax(0, 0), 0);
+  assert.equal(deriveRateFromTax(NaN, 10), 0);
+  assert.equal(deriveRateFromTax(100, NaN), 0);
+  assert.equal(deriveRateFromTax(-10, 5), 0);
+  // net 0 with tax > 0 would be rate 100% — clamp just below 1.
+  assert.ok(deriveRateFromTax(0, 10) < 1);
 });
 
 test("derivePayment: 1% on gross — net 990 → gross 1000, tax 10 (requested example)", () => {
