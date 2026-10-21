@@ -59,6 +59,20 @@ export function maxNetForBalance(balance: number, rate: number): number {
 }
 
 /**
+ * Clamp a NET amount so the resulting gross (net + WHT) never exceeds the
+ * outstanding balance.
+ *
+ * Used when the operator raises the WHT rate: the net is pre-filled to the
+ * maximum for the old rate, so keeping it unchanged would push the gross above
+ * the balance and disable the Record Payment button. Clamping pulls the net
+ * down to the new maximum for that rate, keeping gross == balance.
+ */
+export function clampNetForBalance(net: number, balance: number, rate: number): number {
+  if (!Number.isFinite(net) || !Number.isFinite(balance)) return 0;
+  return round2(Math.min(net, maxNetForBalance(Math.max(balance, 0), rate)));
+}
+
+/**
  * Inverse of derivePayment: derive the equivalent WHT rate from a NET amount
  * and a TAX amount. Since tax = gross * rate and net = gross * (1 - rate):
  *

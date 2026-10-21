@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   derivePayment,
   deriveRateFromTax,
+  clampNetForBalance,
   maxNetForBalance,
   DEFAULT_WHT_RATE,
   round2,
@@ -32,6 +33,25 @@ test("deriveRateFromTax: invalid or zero inputs return 0, never NaN/Infinity", (
   assert.equal(deriveRateFromTax(-10, 5), 0);
   // net 0 with tax > 0 would be rate 100% — clamp just below 1.
   assert.ok(deriveRateFromTax(0, 10) < 1);
+});
+
+test("clampNetForBalance: raising the rate pulls a maxed-out net down", () => {
+  // 10,000 balance; net pre-filled at 1% max (9,900). At 2% the max net is 9,800.
+  assert.equal(clampNetForBalance(9900, 10000, 0.02), 9800);
+});
+
+test("clampNetForBalance: a partial net below the maximum is untouched", () => {
+  assert.equal(clampNetForBalance(5000, 10000, 0.02), 5000);
+});
+
+test("clampNetForBalance: lowering the rate does not change the net", () => {
+  assert.equal(clampNetForBalance(9800, 10000, 0.01), 9800);
+});
+
+test("clampNetForBalance: zero balance or invalid input yields 0", () => {
+  assert.equal(clampNetForBalance(5000, 0, 0.01), 0);
+  assert.equal(clampNetForBalance(NaN, 10000, 0.01), 0);
+  assert.equal(clampNetForBalance(5000, NaN, 0.01), 0);
 });
 
 test("derivePayment: 1% on gross — net 990 → gross 1000, tax 10 (requested example)", () => {

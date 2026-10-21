@@ -80,7 +80,7 @@ import {
 } from "@/hooks/use-fbr-invoicing";
 import { useListYarnTypeMaster, useListYarnCountMaster } from "@workspace/api-client-react";
 import { amountInWords } from "@/lib/invoice-amount";
-import { derivePayment, deriveRateFromTax, maxNetForBalance, DEFAULT_WHT_RATE } from "@/lib/payment-wht";
+import { derivePayment, deriveRateFromTax, clampNetForBalance, maxNetForBalance, DEFAULT_WHT_RATE } from "@/lib/payment-wht";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer,
@@ -389,11 +389,21 @@ export default function InvoicingPage() {
 
   const handlePayRateChange = (value: string) => {
     setPayRate(value);
-    const net = parseFloat(payNet);
     const ratePct = parseFloat(value);
-    if (Number.isFinite(net) && net > 0 && Number.isFinite(ratePct) && ratePct >= 0 && ratePct < 100) {
-      setPayTax(String(derivePayment(net, ratePct / 100).tax));
-    }
+    if (!Number.isFinite(ratePct) || ratePct < 0 || ratePct >= 100) return;
+
+    const rateFrac = ratePct / 100;
+    const currentNet = parseFloat(payNet);
+    if (!Number.isFinite(currentNet) || currentNet <= 0) return;
+
+    // Raising the rate grows the gross for the same net. If that would push
+    // the payment over the outstanding balance, pull the net down to the new
+    // maximum so the Record Payment button stays enabled and the invoice
+    // still settles exactly (rather than disabling on a rate increase).
+    const outstanding = payFor ? (payFor.outstanding ?? parseFloat(payFor.grandTotal)) : 0;
+    const net = clampNetForBalance(currentNet, Math.max(outstanding, 0), rateFrac);
+    if (net !== currentNet) setPayNet(String(net));
+    setPayTax(String(derivePayment(net, rateFrac).tax));
   };
 
   const handlePayTaxChange = (value: string) => {
