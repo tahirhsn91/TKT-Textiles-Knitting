@@ -116,6 +116,12 @@ function csvColumns() {
   ];
 }
 
+// Document Number and Reference are identifiers, not quantities. Export them
+// as text so Excel/Sheets don't coerce them to numbers (which drops leading
+// zeros and turns long ids into scientific notation). Indexes match
+// csvColumns(): 1 = "Doc No", 2 = "Reference".
+const CSV_TEXT_COLUMNS = [1, 2];
+
 function rowToCsv(r: Record<string, unknown>): unknown[] {
   return [
     r.date, r.docNumber, r.reference, r.sl, r.gsm, r.transactionTypeName, r.transactionTypeAction,
@@ -143,6 +149,7 @@ router.get("/reports/export/csv", async (req, res): Promise<void> => {
     "report.csv",
     csvColumns(),
     rows.map((r) => rowToCsv(r as unknown as Record<string, unknown>)),
+    CSV_TEXT_COLUMNS,
   );
 });
 
