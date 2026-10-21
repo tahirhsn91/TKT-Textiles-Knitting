@@ -57,3 +57,21 @@ export function maxNetForBalance(balance: number, rate: number): number {
   const safeRate = Number.isFinite(rate) ? Math.min(Math.max(rate, 0), 0.999999) : DEFAULT_WHT_RATE;
   return round2(balance * (1 - safeRate));
 }
+
+/**
+ * Inverse of derivePayment: derive the equivalent WHT rate from a NET amount
+ * and a TAX amount. Since tax = gross * rate and net = gross * (1 - rate):
+ *
+ *   gross = net + tax
+ *   rate  = tax / (net + tax)
+ *
+ * Returns 0 for invalid/zero inputs and is clamped below 1 (100%). Used by
+ * the Record Payment dialog when the operator types the tax deduction and the
+ * rate box should follow.
+ */
+export function deriveRateFromTax(net: number, tax: number): number {
+  if (!Number.isFinite(net) || !Number.isFinite(tax) || net < 0 || tax < 0) return 0;
+  const gross = net + tax;
+  if (gross <= 0) return 0;
+  return Math.min(tax / gross, 0.999999);
+}
