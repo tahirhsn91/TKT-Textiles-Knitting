@@ -24,16 +24,32 @@ test("csvField: asText still quotes values containing CSV specials", () => {
   assert.equal(csvField('say "hi"', { asText: true }), "\"\tsay \"\"hi\"\"\"");
 });
 
-test("toCsv: only textColumns are forced to text", () => {
+test("toCsv: only the named text columns are forced to text", () => {
   const csv = toCsv(
     ["Date", "Doc No", "Reference", "Qty"],
     [["2026-10-21", "00123", "12345", 7]],
     "\n",
-    [1, 2],
+    ["Doc No", "Reference"],
   );
   const [header, row] = csv.trimEnd().split("\n");
   assert.equal(header, "Date,Doc No,Reference,Qty");
   assert.equal(row, "2026-10-21,\t00123,\t12345,7");
+});
+
+test("toCsv: text columns are resolved by header name, not position", () => {
+  // Reference moved to the first column; the name still targets the right cell.
+  const csv = toCsv(
+    ["Reference", "Date", "Doc No"],
+    [["12345", "2026-10-21", "00123"]],
+    "\n",
+    ["Doc No", "Reference"],
+  );
+  assert.equal(csv, "Reference,Date,Doc No\n\t12345,2026-10-21,\t00123\n");
+});
+
+test("toCsv: unknown text column names are ignored", () => {
+  const csv = toCsv(["A", "B"], [["001", "002"]], "\n", ["Nope"]);
+  assert.equal(csv, "A,B\n001,002\n");
 });
 
 test("toCsv: no textColumns behaves exactly as before", () => {
@@ -46,7 +62,7 @@ test("toCsv: text columns preserve leading zeros and long numeric ids", () => {
     ["Doc No", "Reference"],
     [["000123", "99999999999999999999"]],
     "\n",
-    [0, 1],
+    ["Doc No", "Reference"],
   );
   assert.equal(csv, "Doc No,Reference\n\t000123,\t99999999999999999999\n");
 });
