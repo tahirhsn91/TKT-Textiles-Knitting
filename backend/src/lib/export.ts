@@ -35,11 +35,17 @@ export function csvField(value: unknown, opts: CsvFieldOptions = {}): string {
  * @param headers column names (encode into the first line)
  * @param rows each row is an array of field values aligned to headers
  * @param eol line ending (default CRLF for Excel compatibility)
- * @param textColumns zero-based indexes of columns to force to text, so
- *        Excel preserves identifiers such as document numbers and references
+ * @param textColumns header NAMES of columns to force to text, so Excel
+ *        preserves identifiers such as document numbers and references.
+ *        Resolved against `headers`, so reordering columns cannot silently
+ *        target the wrong one. Unknown names are ignored.
  */
-export function toCsv(headers: string[], rows: unknown[][], eol = "\r\n", textColumns: number[] = []): string {
-  const text = new Set(textColumns);
+export function toCsv(headers: string[], rows: unknown[][], eol = "\r\n", textColumns: string[] = []): string {
+  const text = new Set(
+    textColumns
+      .map((name) => headers.indexOf(name))
+      .filter((i) => i >= 0),
+  );
   const lines = [headers.map((h) => csvField(h)).join(",")];
   for (const row of rows) {
     lines.push(row.map((v, i) => csvField(v, { asText: text.has(i) })).join(","));
@@ -49,13 +55,14 @@ export function toCsv(headers: string[], rows: unknown[][], eol = "\r\n", textCo
 
 /**
  * Express-friendly CSV response. Sets headers + sends the string.
+ * `textColumns` are header names (see `toCsv`).
  */
 export function sendCsvRows(
   res: { statusCode?: number; setHeader: (k: string, v: string) => void; send: (b: string) => void },
   filename: string,
   headers: string[],
   rows: unknown[][],
-  textColumns: number[] = [],
+  textColumns: string[] = [],
 ): void {
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);

@@ -118,9 +118,9 @@ function csvColumns() {
 
 // Document Number and Reference are identifiers, not quantities. Export them
 // as text so Excel/Sheets don't coerce them to numbers (which drops leading
-// zeros and turns long ids into scientific notation). Indexes match
-// csvColumns(): 1 = "Doc No", 2 = "Reference".
-const CSV_TEXT_COLUMNS = [1, 2];
+// zeros and turns long ids into scientific notation). Identified by their CSV
+// header names so a future column reorder can't target the wrong column.
+const CSV_TEXT_COLUMNS = ["Doc No", "Reference"];
 
 function rowToCsv(r: Record<string, unknown>): unknown[] {
   return [
