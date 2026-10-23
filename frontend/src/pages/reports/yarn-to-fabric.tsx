@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "@/vendor/api-client-react/custom-fetch";
 import { ExportCsvButton } from "@/components/export-csv-button";
+import { toCSV } from "@/lib/csv";
 // Type-only: jsPDF / autotable / html2canvas are loaded lazily inside each
 // export handler so the ~600 kB they add only downloads when the user clicks
 // Export.
@@ -495,14 +496,6 @@ export default function YarnToFabricPage() {
     URL.revokeObjectURL(url);
   }
 
-  function toCSV(headers: string[], dataRows: (string | number | null)[][]): string {
-    const escape = (v: string | number | null) => {
-      const s = String(v ?? "");
-      return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    return [headers, ...dataRows].map((row) => row.map(escape).join(",")).join("\r\n");
-  }
-
   function exportSummaryCSV() {
     const groupLabel = GROUP_BY_OPTIONS.find((o) => o.value === groupBy)?.label ?? groupBy;
     const headers = [groupLabel, "Doc Number(s)", "Rows", "Qty", "Fabric Production", "Fabric Delivery", "Fab Del Return", "Run Fabric Bal."];
@@ -515,7 +508,7 @@ export default function YarnToFabricPage() {
       }),
       ["Total", "", rows.length, fmt(totalQty), fmt(totalFabricProd), fmt(totalFabricDelivery), fmt(totalFabricDelRtn), ""],
     ];
-    downloadBlob(csvHeading() + toCSV(headers, data), "ytf-summary.csv", "text/csv;charset=utf-8;");
+    downloadBlob(csvHeading() + toCSV(headers, data, ["Doc Number(s)"]), "ytf-summary.csv", "text/csv;charset=utf-8;");
   }
 
   function exportDetailCSV() {
@@ -562,7 +555,7 @@ export default function YarnToFabricPage() {
       : c.key === "fabricDeliveryReturn" ? fmt(totalFabricDelRtn)
       : ""
     );
-    downloadBlob(csvHeading() + toCSV(headers, [obRow, ...bodyRows, grandRow]), "ytf-detail.csv", "text/csv;charset=utf-8;");
+    downloadBlob(csvHeading() + toCSV(headers, [obRow, ...bodyRows, grandRow], ["Doc Number", "Reference"]), "ytf-detail.csv", "text/csv;charset=utf-8;");
   }
 
   async function exportSummaryPDF() {
