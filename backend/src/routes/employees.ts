@@ -10,6 +10,7 @@ import {
   employeeAdvancesTable,
   employeeLoansTable,
   employeeLoanDeductionsTable,
+  userTable,
 } from "../db/index.js";
 
 const router: IRouter = Router();
@@ -78,6 +79,7 @@ router.get("/employees/advances", async (req, res): Promise<void> => {
       date: employeeAdvancesTable.date,
       amount: employeeAdvancesTable.amount,
       notes: employeeAdvancesTable.notes,
+      createdBy: employeeAdvancesTable.createdBy,
       createdAt: employeeAdvancesTable.createdAt,
     })
     .from(employeeAdvancesTable)
@@ -99,9 +101,23 @@ router.post("/employees/advances", async (req, res): Promise<void> => {
     return;
   }
   if (amt < 0) { res.status(400).json({ error: "amount must be >= 0" }); return; }
+
+  // Snapshot the creator's display name for the history grid. Fall back to
+  // the username for users that have no display name.
+  const tenantId = activeTenantId(req);
+  let createdBy: string | null = null;
+  if (req.auth?.sub) {
+    const [creator] = await db
+      .select({ displayName: userTable.displayName, username: userTable.username })
+      .from(userTable)
+      .where(eq(userTable.id, req.auth.sub))
+      .limit(1);
+    createdBy = creator?.displayName || creator?.username || null;
+  }
+
   const [row] = await db
     .insert(employeeAdvancesTable)
-    .values({ employeeId: Number(employeeId), date, amount: String(amt), notes: notes || null, tenantId: activeTenantId(req) })
+    .values({ employeeId: Number(employeeId), date, amount: String(amt), notes: notes || null, createdBy, tenantId })
     .returning();
   res.status(201).json(row);
 });

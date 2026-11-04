@@ -66,9 +66,10 @@ function currentMonthKey() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function firstDayOfThisMonth() {
+function firstDayOfLastMonth() {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  const prev = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+  return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
 interface EmployeeLookup {
@@ -85,6 +86,7 @@ interface Advance {
   date: string;
   amount: string;
   notes: string | null;
+  createdBy: string | null;
 }
 
 async function apiFetch<T = unknown>(path: string, opts?: RequestInit): Promise<T> {
@@ -134,6 +136,7 @@ export default function AdvancesPage() {
     employeeName: (a: Advance) => a.employeeName,
     amount: (a: Advance) => toNum(a.amount),
     notes: (a: Advance) => a.notes,
+    createdBy: (a: Advance) => a.createdBy,
   });
 
   // Only the current month's advances can be deleted — earlier months are
@@ -216,8 +219,8 @@ export default function AdvancesPage() {
                   <DateInput
                     className="h-11 w-full sm:h-9"
                     value={form.date}
-                    // Advances are recorded for the current month only.
-                    min={firstDayOfThisMonth()}
+                    // Advances can be recorded for last month or this month.
+                    min={firstDayOfLastMonth()}
                     max={todayStr()}
                     onChange={(e) => { setFormError(null); setForm((p) => ({ ...p, date: e.target.value })); }}
                   />
@@ -325,18 +328,19 @@ export default function AdvancesPage() {
                     <SortableHead label="Employee" sortKey="employeeName" sort={advSort} onSort={toggleAdvSort} />
                     <SortableHead label="Amount" sortKey="amount" sort={advSort} onSort={toggleAdvSort} right />
                     <SortableHead className="hidden sm:table-cell" label="Notes" sortKey="notes" sort={advSort} onSort={toggleAdvSort} />
+                    <SortableHead className="hidden md:table-cell" label="Created By" sortKey="createdBy" sort={advSort} onSort={toggleAdvSort} />
                     <TableHead className="sticky right-0 bg-background w-16"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading && Array.from({ length: 4 }).map((_, i) => (
                     <TableRow key={i}>
-                      {[1,2,3,4,5].map((c) => <TableCell key={c}><Skeleton className="h-5 w-full" /></TableCell>)}
+                      {[1,2,3,4,5,6].map((c) => <TableCell key={c}><Skeleton className="h-5 w-full" /></TableCell>)}
                     </TableRow>
                   ))}
                   {!isLoading && advances.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                         No advances for {MONTH_NAMES[Number(filterMonth) - 1]} {filterYear}
                         {filterOp !== "__all__" ? " for the selected employee" : ""}. Record one above.
                       </TableCell>
@@ -350,6 +354,7 @@ export default function AdvancesPage() {
                       <TableCell>{a.employeeName}</TableCell>
                       <TableCell className="text-right font-mono">{fmtMoney(toNum(a.amount))}</TableCell>
                       <TableCell className="text-muted-foreground text-sm hidden sm:table-cell">{a.notes || "—"}</TableCell>
+                      <TableCell className="text-sm hidden md:table-cell">{a.createdBy || "—"}</TableCell>
                       <TableCell className="sticky right-0 bg-background">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>

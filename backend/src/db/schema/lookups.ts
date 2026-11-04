@@ -191,6 +191,10 @@ export const employeeAdvancesTable = pgTable("employee_advances", {
   date: date("date").notNull(),
   amount: numeric("amount").notNull(),
   notes: text("notes"),
+  // Snapshot of the creator's display name at creation time, shown as
+  // "Created By" in the advances history. Null for rows created before the
+  // column existed.
+  createdBy: text("created_by"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
   // Serves the advances list + payroll summary, both of which filter by
