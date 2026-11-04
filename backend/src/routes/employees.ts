@@ -375,7 +375,10 @@ router.get("/employees/payroll-summary", async (req, res): Promise<void> => {
       employeeCode: employeeMasterTable.code,
       presentDays: salaryDetailTable.presentDays,
       totalSalary: salaryDetailTable.totalSalary,
+      attAllowance: salaryDetailTable.attAllowance,
+      othAllowance: salaryDetailTable.othAllowance,
       advanceDeduction: salaryDetailTable.advanceDeduction,
+      loanDeduction: salaryDetailTable.loanDeduction,
       payableSalary: salaryDetailTable.payableSalary,
     })
     .from(salaryDetailTable)
@@ -399,7 +402,10 @@ router.get("/employees/payroll-summary", async (req, res): Promise<void> => {
       employeeCode: d.employeeCode,
       totalDaysWorked: Number(d.presentDays),
       totalSalary,
+      attAllowance: Number(d.attAllowance),
+      othAllowance: Number(d.othAllowance),
       totalAdvances,
+      loanDeduction: Number(d.loanDeduction),
       netPayable,
       advances: opAdvances,
     };
