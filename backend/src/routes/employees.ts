@@ -391,19 +391,28 @@ router.get("/employees/payroll-summary", async (req, res): Promise<void> => {
     .from(employeeAdvancesTable)
     .where(and(...advConditions));
 
+  const daysInMonth = new Date(y, m, 0).getDate();
   const summary = details.map((d) => {
     const opAdvances = advances.filter((a) => a.employeeId === d.employeeId);
     const totalSalary = Number(d.totalSalary);
     const totalAdvances = Number(d.advanceDeduction);
     const netPayable = Number(d.payableSalary);
+    const presentDays = Number(d.presentDays);
+    // Payroll adds the attendance allowance only at 100% attendance. Below
+    // that it contributes nothing to the salary, so report 0 — the PDF leaves
+    // zero allowances blank.
+    const attAllowance = presentDays >= daysInMonth ? Number(d.attAllowance) : 0;
+    // Other allowance is stored on the salary row but is not part of the
+    // payable calculation, so it is never added to the salary — report 0.
+    const othAllowance = 0;
     return {
       employeeId: d.employeeId,
       employeeName: d.employeeName,
       employeeCode: d.employeeCode,
-      totalDaysWorked: Number(d.presentDays),
+      totalDaysWorked: presentDays,
       totalSalary,
-      attAllowance: Number(d.attAllowance),
-      othAllowance: Number(d.othAllowance),
+      attAllowance,
+      othAllowance,
       totalAdvances,
       loanDeduction: Number(d.loanDeduction),
       netPayable,

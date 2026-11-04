@@ -599,8 +599,8 @@ function PayrollSummaryTab() {
       body: sortedSummary.map((s) => [
         s.employeeName,
         s.totalDaysWorked,
-        fmtMoney(s.attAllowance),
-        fmtMoney(s.othAllowance),
+        s.attAllowance > 0 ? fmtMoney(s.attAllowance) : "",
+        s.othAllowance > 0 ? fmtMoney(s.othAllowance) : "",
         fmtMoney(s.totalSalary),
         fmtMoney(s.totalAdvances),
         fmtMoney(s.loanDeduction),
@@ -627,8 +627,8 @@ function PayrollSummaryTab() {
       body: [[
         "Total",
         pdfGrand.days,
-        fmtMoney(pdfGrand.att),
-        fmtMoney(pdfGrand.oth),
+        pdfGrand.att > 0 ? fmtMoney(pdfGrand.att) : "",
+        pdfGrand.oth > 0 ? fmtMoney(pdfGrand.oth) : "",
         fmtMoney(pdfGrand.salary),
         fmtMoney(pdfGrand.advances),
         fmtMoney(pdfGrand.loan),
