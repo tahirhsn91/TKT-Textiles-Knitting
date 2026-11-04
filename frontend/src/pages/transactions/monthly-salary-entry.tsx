@@ -128,7 +128,10 @@ interface PayrollSummaryItem {
   employeeCode: string;
   totalDaysWorked: number;
   totalSalary: number;
+  attAllowance: number;
+  othAllowance: number;
   totalAdvances: number;
+  loanDeduction: number;
   netPayable: number;
   advances: Advance[];
 }
@@ -590,14 +593,17 @@ function PayrollSummaryTab() {
 
     autoTable(doc, {
       startY: 26,
-      head: [["Employee", "Days Worked", "Total Salary", "Total Advances", "Net Payable"]],
+      head: [["Employee", "Days Worked", "Attendance Allowance", "Other Allowance", "Total Salary", "Total Advances", "Loan Deduction", "Net Payable"]],
       // Export follows the on-screen order so the PDF matches what the user
       // is looking at when they hit Download (the table is sortable).
       body: sortedSummary.map((s) => [
         s.employeeName,
         s.totalDaysWorked,
+        fmtMoney(s.attAllowance),
+        fmtMoney(s.othAllowance),
         fmtMoney(s.totalSalary),
         fmtMoney(s.totalAdvances),
+        fmtMoney(s.loanDeduction),
         fmtMoney(s.netPayable),
       ]),
       styles: { fontSize: 9 },
@@ -607,10 +613,13 @@ function PayrollSummaryTab() {
     // Grand total row on the PDF (mirrors the on-screen footer).
     const pdfGrand = sortedSummary.reduce((acc, s) => ({
       days: acc.days + s.totalDaysWorked,
+      att: acc.att + s.attAllowance,
+      oth: acc.oth + s.othAllowance,
       salary: acc.salary + s.totalSalary,
       advances: acc.advances + s.totalAdvances,
+      loan: acc.loan + s.loanDeduction,
       net: acc.net + s.netPayable,
-    }), { days: 0, salary: 0, advances: 0, net: 0 });
+    }), { days: 0, att: 0, oth: 0, salary: 0, advances: 0, loan: 0, net: 0 });
     const grandY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4;
     autoTable(doc, {
       startY: grandY,
@@ -618,8 +627,11 @@ function PayrollSummaryTab() {
       body: [[
         "Total",
         pdfGrand.days,
+        fmtMoney(pdfGrand.att),
+        fmtMoney(pdfGrand.oth),
         fmtMoney(pdfGrand.salary),
         fmtMoney(pdfGrand.advances),
+        fmtMoney(pdfGrand.loan),
         fmtMoney(pdfGrand.net),
       ]],
       styles: { fontSize: 9, fontStyle: "bold", fillColor: [243, 244, 246], textColor: [31, 41, 55] },
