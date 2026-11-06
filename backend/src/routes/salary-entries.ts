@@ -34,6 +34,10 @@ function fmtMoney(n: number): string {
   return n.toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
 /** Last calendar day of a payroll period, used as the loan-deduction date. */
 function lastDayOfMonth(year: number, month: number): string {
   const last = new Date(year, month, 0).getDate();
@@ -69,10 +73,42 @@ router.get("/salary-entries", async (req, res): Promise<void> => {
   const depts = await db.select().from(departmentMasterTable).where(eq(departmentMasterTable.tenantId, tenantId));
   const deptMap = Object.fromEntries(depts.map((d) => [d.id, d.name]));
 
-  const result = headers.map((h) => ({
-    ...h,
-    departmentNames: (h.departmentIds ?? []).map((id) => deptMap[id] ?? String(id)),
-  }));
+  // Per-header totals for the listing table. Same applied-allowance rule as
+  // the Payroll Summary: the attendance allowance counts only at 100%
+  // attendance, and other allowance is not part of the payable calculation.
+  const details = await db
+    .select({
+      headerId: salaryDetailTable.headerId,
+      presentDays: salaryDetailTable.presentDays,
+      totalSalary: salaryDetailTable.totalSalary,
+      attAllowance: salaryDetailTable.attAllowance,
+    })
+    .from(salaryDetailTable)
+    .where(eq(salaryDetailTable.tenantId, tenantId));
+
+  const periodByHeader = new Map(headers.map((h) => [h.id, { month: h.month, year: h.year }]));
+  const totalsByHeader = new Map<number, { gross: number; total: number }>();
+  for (const d of details) {
+    const period = periodByHeader.get(d.headerId);
+    if (!period) continue;
+    const daysInMonth = new Date(period.year, period.month, 0).getDate();
+    const gross = Number(d.totalSalary);
+    const att = Number(d.presentDays) >= daysInMonth ? Number(d.attAllowance) : 0;
+    const entry = totalsByHeader.get(d.headerId) ?? { gross: 0, total: 0 };
+    entry.gross += gross;
+    entry.total += gross + att;
+    totalsByHeader.set(d.headerId, entry);
+  }
+
+  const result = headers.map((h) => {
+    const totals = totalsByHeader.get(h.id) ?? { gross: 0, total: 0 };
+    return {
+      ...h,
+      departmentNames: (h.departmentIds ?? []).map((id) => deptMap[id] ?? String(id)),
+      grossSalary: round2(totals.gross),
+      totalSalary: round2(totals.total),
+    };
+  });
 
   res.json(result);
 });
