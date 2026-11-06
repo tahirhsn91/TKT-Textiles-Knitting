@@ -709,7 +709,10 @@ export default function PayrollEntryPage() {
 
   // Column totals for the grid footer (matching the numeric column order).
   // Whole-number columns (attendance) sum to 0 decimals; money columns to 2.
-  const numericColumns: Array<{ key: keyof DetailRow; decimals: number }> = [
+  type NumericColumn =
+    | { key: keyof DetailRow; decimals: number }
+    | { compute: (row: DetailRow) => number; decimals: number };
+  const numericColumns: NumericColumn[] = [
     { key: "basicSalary", decimals: 2 },
     { key: "otRateHr", decimals: 2 },
     { key: "attAllowance", decimals: 2 },
@@ -721,13 +724,15 @@ export default function PayrollEntryPage() {
     { key: "otHours", decimals: 0 },
     { key: "otAmount", decimals: 2 },
     { key: "totalSalary", decimals: 2 },
+    // Total Salary (inclusive) = Gross Salary + Att. Allow. + Oth. Allow.
+    { compute: (row) => toNum(row.totalSalary) + toNum(row.attAllowance) + toNum(row.othAllowance), decimals: 2 },
     { key: "advanceDeduction", decimals: 2 },
     { key: "loanDeduction", decimals: 2 },
     { key: "otherDeduction", decimals: 2 },
     { key: "payableSalary", decimals: 2 },
   ];
   const columnTotals = numericColumns.map((col) =>
-    rows.reduce((acc, row) => acc + toNum(row[col.key]), 0)
+    rows.reduce((acc, row) => acc + ("key" in col ? toNum(row[col.key]) : col.compute(row)), 0)
   );
   const fmtTotal = (v: number, decimals: number) =>
     v.toLocaleString("en-IN", {
@@ -873,8 +878,9 @@ export default function PayrollEntryPage() {
                   Computed / read-only
                 </span>
                 <span className="text-muted-foreground/70">
-                  Total Att. = Present + Holidays · Total Salary = (Basic ÷ {totalDays}) × Att. + OT ·
-                  Payable = Total Salary + Att. Allow. (when Present = {totalDays}) − Deductions
+                  Total Att. = Present + Holidays · Gross Salary = (Basic ÷ {totalDays}) × Att. + OT ·
+                  Total Salary = Gross Salary + Att. Allow. + Oth. Allow. ·
+                  Payable = Gross Salary + Att. Allow. (when Present = {totalDays}) − Deductions
                   {isNewMode && <> · Present / Absent from Attendance</>}
                 </span>
               </div>
@@ -894,7 +900,8 @@ export default function PayrollEntryPage() {
                     <TableHead className="text-right min-w-[80px]" title="Present + Holidays (computed)">Total Att.</TableHead>
                     <TableHead className="text-right min-w-[70px]">OT Hrs</TableHead>
                     <TableHead className="text-right min-w-[90px]" title="OT Hours × OT Rate (computed)">OT Amount</TableHead>
-                    <TableHead className="text-right min-w-[100px]" title="(Basic ÷ days) × Attendance + OT (computed)">Total Salary</TableHead>
+                    <TableHead className="text-right min-w-[100px]" title="(Basic ÷ days) × Attendance + OT (computed)">Gross Salary</TableHead>
+                    <TableHead className="text-right min-w-[100px]" title="Gross Salary + Att. Allow. + Oth. Allow.">Total Salary</TableHead>
                     <TableHead className="text-right min-w-[90px]" title="Advances for the month (auto-loaded)">Adv. Deduction</TableHead>
                     <TableHead className="text-right min-w-[90px]">Loan Deduction</TableHead>
                     <TableHead className="text-right min-w-[90px]">Other Deduction</TableHead>
@@ -1007,10 +1014,15 @@ export default function PayrollEntryPage() {
                           <Input type="number" min="0" step={STEP_MONEY} className={ro}
                             value={row.otAmount} disabled readOnly />
                         </TableCell>
-                        {/* totalSalary — auto-computed; display only (no manual override) */}
+                        {/* totalSalary — auto-computed gross; display only */}
                         <TableCell className="py-1">
                           <Input type="number" min="0" step={STEP_MONEY} className={ro}
                             value={row.totalSalary} disabled readOnly />
+                        </TableCell>
+                        {/* Total Salary (inclusive) = Gross Salary + Att. Allow. + Oth. Allow. */}
+                        <TableCell className="py-1">
+                          <Input type="number" min="0" step={STEP_MONEY} className={ro}
+                            value={(toNum(row.totalSalary) + toNum(row.attAllowance) + toNum(row.othAllowance)).toFixed(NUM_DECIMALS)} disabled readOnly />
                         </TableCell>
                         {/* Deductions — Advance Deduction is auto-loaded from the
                             advances table for the selected month, so it's read-only. */}
@@ -1141,9 +1153,9 @@ const FLOW_NODES: FlowNode[] = [
   { id: "otAmt", label: "OT Amount", formula: "OT Hours × OT Rate/Hr", kind: "process" },
   { id: "totalAtt", label: "Total Attendance", formula: "Present + Holidays (Absent derived from days in month − Present)", kind: "process" },
   { id: "dailyCredit", label: "Daily Credit", formula: "max(Daily Production Sum, Daily Basic) — an operator is never paid less than a day's basic.", kind: "process" },
-  { id: "totalSalary", label: "Total Salary", formula: "(Basic ÷ DAYS) × Total Attendance + OT Amount", kind: "process" },
+  { id: "totalSalary", label: "Gross Salary", formula: "(Basic ÷ DAYS) × Total Attendance + OT Amount. Total Salary = Gross Salary + Att. Allow. + Oth. Allow.", kind: "process" },
   { id: "attBonus", label: "Att. Allowance Bonus", formula: "Full allowance when Present ≥ DAYS (100% attendance), else 0.", kind: "process" },
-  { id: "payable", label: "Payable Salary", formula: "Total Salary + Att. Allowance Bonus − Advance − Loan − Other", kind: "process" },
+  { id: "payable", label: "Payable Salary", formula: "Gross Salary + Att. Allowance Bonus − Advance − Loan − Other", kind: "process" },
   // Output
   { id: "netPayable", label: "Net Payable", sub: "Per employee", formula: "Final take-home for the month, shown in the grid and payroll summary.", kind: "output", yHint: 560 },
 ];
@@ -1352,9 +1364,14 @@ function SalaryCalculationLogic({
               <span className="text-xs text-muted-foreground">Zero when the employee has no OT rate set.</span>
             </div>
             <div className={formula}>
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total Salary</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Gross Salary</span>
               <code className={term}>(Basic ÷ {daysInMonth}) × Total Attendance + OT Amount</code>
               <span className="text-xs text-muted-foreground">Basic prorated to the days actually attended, plus OT.</span>
+            </div>
+            <div className={formula}>
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total Salary</span>
+              <code className={term}>Gross Salary + Att. Allowance + Oth. Allowance</code>
+              <span className="text-xs text-muted-foreground">Gross salary including the allowances shown above.</span>
             </div>
             <div className={formula}>
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Attendance Allowance Bonus</span>

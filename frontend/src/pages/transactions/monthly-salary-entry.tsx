@@ -127,6 +127,7 @@ interface PayrollSummaryItem {
   employeeName: string;
   employeeCode: string;
   totalDaysWorked: number;
+  grossSalary: number;
   totalSalary: number;
   attAllowance: number;
   othAllowance: number;
@@ -145,6 +146,8 @@ interface SalaryHeader {
   posted: boolean;
   createdAt: string | null;
   updatedAt: string | null;
+  grossSalary: number;
+  totalSalary: number;
 }
 
 interface SalaryDetailRow {
@@ -232,6 +235,8 @@ function SalaryEntryTab() {
     departments: (h: SalaryHeader) => (h.departmentNames ?? []).join(", "),
     createdAt: (h: SalaryHeader) => h.createdAt,
     posted: (h: SalaryHeader) => h.posted,
+    grossSalary: (h: SalaryHeader) => h.grossSalary,
+    totalSalary: (h: SalaryHeader) => h.totalSalary,
   });
 
   // Which header row currently has a post/unpost/delete in flight, so we can
@@ -397,6 +402,8 @@ function SalaryEntryTab() {
                 <SortableHead label="Month / Year" sortKey="period" sort={sort} onSort={toggleSort} />
                 <SortableHead label="Department(s)" sortKey="departments" sort={sort} onSort={toggleSort} />
                 <SortableHead label="Created" sortKey="createdAt" sort={sort} onSort={toggleSort} />
+                <SortableHead label="Gross Salary" sortKey="grossSalary" sort={sort} onSort={toggleSort} right />
+                <SortableHead label="Total Salary" sortKey="totalSalary" sort={sort} onSort={toggleSort} right />
                 <SortableHead label="Status" sortKey="posted" sort={sort} onSort={toggleSort} />
                 <TableHead className="w-52 text-right">Actions</TableHead>
               </TableRow>
@@ -404,12 +411,12 @@ function SalaryEntryTab() {
             <TableBody>
               {isLoading && Array.from({ length: 3 }).map((_, i) => (
                 <TableRow key={i}>
-                  {[1,2,3,4,5].map((c) => <TableCell key={c}><Skeleton className="h-5 w-full" /></TableCell>)}
+                  {[1,2,3,4,5,6,7].map((c) => <TableCell key={c}><Skeleton className="h-5 w-full" /></TableCell>)}
                 </TableRow>
               ))}
               {!isLoading && headers.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-10">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
                     {hasFilter
                       ? "No salary entries match the selected filters."
                       : "No salary entries yet. Click \"Add New Salary\" to get started."}
@@ -429,6 +436,8 @@ function SalaryEntryTab() {
                   <TableCell className="text-sm text-muted-foreground">
                     {fmtTimestamp(h.createdAt)}
                   </TableCell>
+                  <TableCell className="text-right font-mono text-sm">{fmtMoney(h.grossSalary ?? 0)}</TableCell>
+                  <TableCell className="text-right font-mono text-sm font-semibold">{fmtMoney(h.totalSalary ?? 0)}</TableCell>
                   <TableCell>
                     {h.posted
                       ? <Badge className="bg-green-100 text-green-800 border-green-200">Posted</Badge>
@@ -564,8 +573,12 @@ function PayrollSummaryTab() {
   const { sorted: sortedSummary, sort: sumSort, toggleSort: toggleSumSort } = useSort(summary, {
     employeeName: (s: PayrollSummaryItem) => s.employeeName,
     totalDaysWorked: (s: PayrollSummaryItem) => s.totalDaysWorked,
+    attAllowance: (s: PayrollSummaryItem) => s.attAllowance,
+    othAllowance: (s: PayrollSummaryItem) => s.othAllowance,
+    grossSalary: (s: PayrollSummaryItem) => s.grossSalary,
     totalSalary: (s: PayrollSummaryItem) => s.totalSalary,
     totalAdvances: (s: PayrollSummaryItem) => s.totalAdvances,
+    loanDeduction: (s: PayrollSummaryItem) => s.loanDeduction,
     netPayable: (s: PayrollSummaryItem) => s.netPayable,
   });
 
@@ -593,7 +606,7 @@ function PayrollSummaryTab() {
 
     autoTable(doc, {
       startY: 26,
-      head: [["Employee", "Days Worked", "Attendance Allowance", "Other Allowance", "Total Salary", "Total Advances", "Loan Deduction", "Net Payable"]],
+      head: [["Employee", "Days Worked", "Attendance Allowance", "Other Allowance", "Gross Salary", "Total Salary", "Total Advances", "Loan Deduction", "Net Payable"]],
       // Export follows the on-screen order so the PDF matches what the user
       // is looking at when they hit Download (the table is sortable).
       body: sortedSummary.map((s) => [
@@ -601,6 +614,7 @@ function PayrollSummaryTab() {
         s.totalDaysWorked,
         s.attAllowance > 0 ? fmtMoney(s.attAllowance) : "",
         s.othAllowance > 0 ? fmtMoney(s.othAllowance) : "",
+        fmtMoney(s.grossSalary),
         fmtMoney(s.totalSalary),
         fmtMoney(s.totalAdvances),
         fmtMoney(s.loanDeduction),
@@ -615,11 +629,12 @@ function PayrollSummaryTab() {
       days: acc.days + s.totalDaysWorked,
       att: acc.att + s.attAllowance,
       oth: acc.oth + s.othAllowance,
+      gross: acc.gross + s.grossSalary,
       salary: acc.salary + s.totalSalary,
       advances: acc.advances + s.totalAdvances,
       loan: acc.loan + s.loanDeduction,
       net: acc.net + s.netPayable,
-    }), { days: 0, att: 0, oth: 0, salary: 0, advances: 0, loan: 0, net: 0 });
+    }), { days: 0, att: 0, oth: 0, gross: 0, salary: 0, advances: 0, loan: 0, net: 0 });
     const grandY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4;
     autoTable(doc, {
       startY: grandY,
@@ -629,6 +644,7 @@ function PayrollSummaryTab() {
         pdfGrand.days,
         pdfGrand.att > 0 ? fmtMoney(pdfGrand.att) : "",
         pdfGrand.oth > 0 ? fmtMoney(pdfGrand.oth) : "",
+        fmtMoney(pdfGrand.gross),
         fmtMoney(pdfGrand.salary),
         fmtMoney(pdfGrand.advances),
         fmtMoney(pdfGrand.loan),
@@ -678,10 +694,14 @@ function PayrollSummaryTab() {
 
   const grandTotal = summary.reduce((acc, s) => ({
     days: acc.days + s.totalDaysWorked,
+    att: acc.att + s.attAllowance,
+    oth: acc.oth + s.othAllowance,
+    gross: acc.gross + s.grossSalary,
     salary: acc.salary + s.totalSalary,
     advances: acc.advances + s.totalAdvances,
+    loan: acc.loan + s.loanDeduction,
     net: acc.net + s.netPayable,
-  }), { days: 0, salary: 0, advances: 0, net: 0 });
+  }), { days: 0, att: 0, oth: 0, gross: 0, salary: 0, advances: 0, loan: 0, net: 0 });
 
   return (
     <Card>
@@ -749,8 +769,12 @@ function PayrollSummaryTab() {
               <TableRow>
                 <SortableHead label="Employee" sortKey="employeeName" sort={sumSort} onSort={toggleSumSort} />
                 <SortableHead label="Days Worked" sortKey="totalDaysWorked" sort={sumSort} onSort={toggleSumSort} right />
+                <SortableHead label="Attendance Allowance" sortKey="attAllowance" sort={sumSort} onSort={toggleSumSort} right />
+                <SortableHead label="Other Allowance" sortKey="othAllowance" sort={sumSort} onSort={toggleSumSort} right />
+                <SortableHead label="Gross Salary" sortKey="grossSalary" sort={sumSort} onSort={toggleSumSort} right />
                 <SortableHead label="Total Salary" sortKey="totalSalary" sort={sumSort} onSort={toggleSumSort} right />
                 <SortableHead label="Total Advances" sortKey="totalAdvances" sort={sumSort} onSort={toggleSumSort} right />
+                <SortableHead label="Loan Deduction" sortKey="loanDeduction" sort={sumSort} onSort={toggleSumSort} right />
                 <SortableHead label="Net Payable" sortKey="netPayable" sort={sumSort} onSort={toggleSumSort} right />
               </TableRow>
             </TableHeader>
@@ -759,8 +783,12 @@ function PayrollSummaryTab() {
                 <TableRow key={s.employeeId}>
                   <TableCell className="font-medium">{s.employeeName} <span className="text-muted-foreground text-xs">({s.employeeCode})</span></TableCell>
                   <TableCell className="text-right">{s.totalDaysWorked}</TableCell>
-                  <TableCell className="text-right">{fmtMoney(s.totalSalary)}</TableCell>
+                  <TableCell className="text-right">{s.attAllowance > 0 ? fmtMoney(s.attAllowance) : ""}</TableCell>
+                  <TableCell className="text-right">{s.othAllowance > 0 ? fmtMoney(s.othAllowance) : ""}</TableCell>
+                  <TableCell className="text-right">{fmtMoney(s.grossSalary)}</TableCell>
+                  <TableCell className="text-right font-semibold">{fmtMoney(s.totalSalary)}</TableCell>
                   <TableCell className="text-right text-red-600">{fmtMoney(s.totalAdvances)}</TableCell>
+                  <TableCell className="text-right text-red-600">{fmtMoney(s.loanDeduction)}</TableCell>
                   <TableCell className={`text-right font-semibold ${s.netPayable < 0 ? "text-red-600" : "text-green-700"}`}>
                     {fmtMoney(s.netPayable)}
                   </TableCell>
@@ -770,8 +798,12 @@ function PayrollSummaryTab() {
                 <TableRow className="border-t-2 font-bold bg-muted/30">
                   <TableCell>Total</TableCell>
                   <TableCell className="text-right">{grandTotal.days}</TableCell>
+                  <TableCell className="text-right">{grandTotal.att > 0 ? fmtMoney(grandTotal.att) : ""}</TableCell>
+                  <TableCell className="text-right">{grandTotal.oth > 0 ? fmtMoney(grandTotal.oth) : ""}</TableCell>
+                  <TableCell className="text-right">{fmtMoney(grandTotal.gross)}</TableCell>
                   <TableCell className="text-right">{fmtMoney(grandTotal.salary)}</TableCell>
                   <TableCell className="text-right text-red-600">{fmtMoney(grandTotal.advances)}</TableCell>
+                  <TableCell className="text-right text-red-600">{fmtMoney(grandTotal.loan)}</TableCell>
                   <TableCell className={`text-right ${grandTotal.net < 0 ? "text-red-600" : "text-green-700"}`}>
                     {fmtMoney(grandTotal.net)}
                   </TableCell>
@@ -779,7 +811,7 @@ function PayrollSummaryTab() {
               )}
               {summary.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No data for selected period.</TableCell>
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">No data for selected period.</TableCell>
                 </TableRow>
               )}
             </TableBody>

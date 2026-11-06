@@ -394,7 +394,7 @@ router.get("/employees/payroll-summary", async (req, res): Promise<void> => {
   const daysInMonth = new Date(y, m, 0).getDate();
   const summary = details.map((d) => {
     const opAdvances = advances.filter((a) => a.employeeId === d.employeeId);
-    const totalSalary = Number(d.totalSalary);
+    const grossSalary = Number(d.totalSalary);
     const totalAdvances = Number(d.advanceDeduction);
     const netPayable = Number(d.payableSalary);
     const presentDays = Number(d.presentDays);
@@ -405,11 +405,14 @@ router.get("/employees/payroll-summary", async (req, res): Promise<void> => {
     // Other allowance is stored on the salary row but is not part of the
     // payable calculation, so it is never added to the salary — report 0.
     const othAllowance = 0;
+    // Total Salary = Gross Salary + the allowances that were actually applied.
+    const totalSalary = round2(grossSalary + attAllowance + othAllowance);
     return {
       employeeId: d.employeeId,
       employeeName: d.employeeName,
       employeeCode: d.employeeCode,
       totalDaysWorked: presentDays,
+      grossSalary,
       totalSalary,
       attAllowance,
       othAllowance,
