@@ -90,6 +90,25 @@ test("computePaymentState: outstanding reduces by gross amount", () => {
   assert.equal(s.totalTaxDeduction, 10);
 });
 
+test("computePaymentState: float residue on a settled invoice stays paid", () => {
+  // Regression (invoice #248): 463943.29 + 0.74 settles 463944.03 exactly, but
+  // JS float math sums the payments to 463944.02999999997, leaving a 5.8e-11
+  // outstanding balance that flipped a fully paid invoice to overdue.
+  const s = computePaymentState({
+    grandTotal: "463944.03",
+    dueDays: 60,
+    postedDateIso: daysFromNowIso(-120),
+    payments: [
+      { amount: "463943.29", taxDeduction: "5799.29" },
+      { amount: "0.74", taxDeduction: "0" },
+    ],
+  });
+  assert.equal(s.outstanding, 0);
+  assert.equal(s.paid, true);
+  assert.equal(s.overdue, false);
+  assert.equal(s.overpaid, 0);
+});
+
 test("computePaymentState: partial gross payment leaves correct outstanding", () => {
   // Grand total 10000, received gross 1000 (net 990 + WHT 10) → balance 9000.
   const s = computePaymentState({
