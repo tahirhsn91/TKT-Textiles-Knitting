@@ -97,9 +97,12 @@ export function computePaymentState(input: InvoicePaymentStateInput): InvoicePay
   // Outstanding reduces by the *gross* amount settled (net + WHT) — a recorded
   // payment of gross 1000 (net 990 + tax 10) clears 1000 of the balance,
   // not just the 990 that was actually received.
-  const paidAmount = sumGrossApplied(input.payments);
-  const outstanding = grandTotal - paidAmount;
-  const totalTaxDeduction = sumTaxDeduction(input.payments);
+  const paidAmount = round2(sumGrossApplied(input.payments));
+  // Round to paisa: payments/balances are numeric(14,2), but the sums here are
+  // JS floats. 463943.29 + 0.74 === 463944.02999999997, which would leave a
+  // 5.8e-11 "outstanding" on a fully settled invoice and mark it overdue.
+  const outstanding = round2(grandTotal - paidAmount);
+  const totalTaxDeduction = round2(sumTaxDeduction(input.payments));
 
   const tracked = (input.dueDays ?? 0) > 0;
   const dueDateIso = tracked ? addDays(input.postedDateIso, input.dueDays ?? 0) : null;
@@ -113,9 +116,14 @@ export function computePaymentState(input: InvoicePaymentStateInput): InvoicePay
     dueDateIso,
     overdue,
     paid: outstanding <= 0,
-    overpaid: paidAmount > grandTotal ? paidAmount - grandTotal : 0,
+    overpaid: paidAmount > grandTotal ? round2(paidAmount - grandTotal) : 0,
     totalTaxDeduction,
   };
+}
+
+/** Round a money amount to 2 decimal places (paisa). */
+function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
 export function toNum(v: unknown): number {
